@@ -46,11 +46,12 @@ Nhóm cần kiểm tra với BTC mức mong đợi của bốn nguyên lý. Nế
 ## 4. Cấp kiểm thử và failure matrix
 
 - Unit: invariant lot/status/quantity, action transition, event mapping, policy public, risk rule AI.
-- Integration PG: transaction rollback, concurrent stock, outbox, audit, inbox unique, migration/restore.
+- Integration PG/Prisma: `$transaction` rollback, concurrent stock/version, outbox, audit, inbox unique, `migrate deploy`/restore.
 - Contract API: OpenAPI, authz, validation, versioning, idempotency, payload max, pagination.
 - Integration lõi: APISIX ↔ Keycloak, Next ↔ PG/storage/Flowable, file scan, liveness/readiness.
 - Federation: A/B/C, duplicate, timeout, offline, out-of-order, wrong issuer, partial/dispute, schema v1/v2 compatibility.
-- E2E UI: Admin/Staff/Approver/public, keyboard/mobile, loading/error states, QR, AI Draft→human Confirm.
+- E2E UI: Admin/Staff/Approver/Viewer/public, keyboard/mobile, loading/error states, QR, AI Draft→human Confirm.
+- Security (XSS/CSRF/SQLi): xem `security.md` §2.1 — XSS reflection không execute; CSRF thiếu token → 403 không side effect; filter/sort report với payload SQL → 400, không đổi dữ liệu.
 - Operability: kill/restart worker, DB restore, credential rotate, logs/metrics/alerts, GitOps drift nếu áp dụng.
 
 ## 5. Quy tắc lưu bằng chứng

@@ -18,11 +18,12 @@
 | [decision-log.md](./decision-log.md) | Các quyết định cần chốt bằng spike/ADR trước khi code phụ thuộc |
 | [implementation-baseline.md](./implementation-baseline.md) | Lựa chọn mặc định, layout và quy ước thống nhất cho AI; đổi bằng ADR có kiểm chứng |
 | [architecture.md](./architecture.md) | Ranh giới ba tầng, topology, các luồng quan trọng |
-| [database.md](./database.md), [database-schema-v1.md](./database-schema-v1.md) | Bất biến dữ liệu và blueprint từng bảng/cột/FK/index/migration |
+| [database.md](./database.md), [database-schema-v1.md](./database-schema-v1.md), [prisma-migration-spec.md](./prisma-migration-spec.md) | Bất biến dữ liệu, blueprint bảng, **Prisma Migrate (D03)** |
 | [core-record-payloads-v1.md](./core-record-payloads-v1.md) | Schema JSON theo từng kind của Core Data API, source key và quyền ghi |
-| [api-contracts.md](./api-contracts.md), [api-payloads-v1.md](./api-payloads-v1.md) | Route, request/response, auth, lỗi và test theo API |
+| [api-contracts.md](./api-contracts.md), [api-payloads-v1.md](./api-payloads-v1.md) | Route theo cụm chức năng, DTO, audit/reports, auth, lỗi |
 | [event-contracts.md](./event-contracts.md), [event-payloads-v1.md](./event-payloads-v1.md), [workflow-spec-v1.md](./workflow-spec-v1.md) | Envelope/event v1, ACK, BPMN GoodsIssue và bridge Flowable |
-| [deployment-spec-v1.md](./deployment-spec-v1.md), [ui-ai-spec-v1.md](./ui-ai-spec-v1.md), [security.md](./security.md) | Runtime/env/CI, màn hình H-P-D-I, tool AI và ranh giới quyền |
+| [deployment-spec-v1.md](./deployment-spec-v1.md), [ui-ai-spec-v1.md](./ui-ai-spec-v1.md), [security.md](./security.md) | Runtime/env/CI, H-P-D-I, XSS/CSRF/SQLi, RBAC |
+| [../referents/MVC_DDD_LAYERING.md](../referents/MVC_DDD_LAYERING.md), [../referents/PLATFORM_CAPABILITIES.md](../referents/PLATFORM_CAPABILITIES.md) | Thin Controller/Service/Model; CRUD/RBAC/Workflow/Queue/Audit/Reporting |
 | [test-matrix.md](./test-matrix.md) | AC-01…AC-13, điều kiện đề thi và minh chứng phải lưu |
 | [contest-scorecard.md](./contest-scorecard.md) | 50 điểm PoF và 50 điểm sản phẩm theo thể lệ, bằng chứng cho từng mục |
 | [demo-fixtures.md](./demo-fixtures.md) | Dữ liệu A→B→C, số dư mong đợi và biến thể lỗi kiểm thử |

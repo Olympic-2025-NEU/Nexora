@@ -34,16 +34,24 @@ Flowable và Keycloak lưu vào database/role riêng của **cùng instance stac
 ## 3. Transaction và concurrency
 
 1. `confirm` của chứng từ sở hữu movement load document/version và balance liên quan, khóa hoặc cập nhật có điều kiện theo thứ tự ổn định để tránh race/deadlock. Transfer/sale confirm kiểm issue đã confirm và chưa được link trước đó; không gọi `adjustStock`.
-2. Trong **cùng DB transaction**: xác nhận document; gọi Inventory port với transaction client cùng scope; insert movement unique theo source; cập nhật balance; ghi audit và outbox. Lỗi bất kỳ bước nào rollback toàn bộ.
+2. Trong **cùng Prisma `$transaction`**: xác nhận document; gọi Inventory port với `TransactionClient` cùng scope; insert movement unique theo source; cập nhật balance; ghi audit và outbox. Lỗi bất kỳ bước nào rollback toàn bộ.
 3. Sau commit, dispatcher claim outbox row có lease; send; ghi attempt/ack; retry bằng backoff có giới hạn. **Federation destination** chỉ mark delivered sau technical ACK hợp lệ; local handler chỉ mark delivered sau handler success. Crash trước mark có thể gửi lại, receiver/handler phải dedupe.
 4. Nhận federation: authenticate trước parse/ghi; unique inbox + payload hash; duplicate cùng hash trả ACK tương đương, duplicate khác hash báo conflict và audit. Nhận message không được update balance.
 5. Test cạnh tranh: hai issue vượt số dư, chỉ một được confirm; double-click confirm tạo một movement/outbox; message replay tạo một inbox/trace summary.
 
-## 4. Migration và dữ liệu mẫu
+## 4. Migration và dữ liệu mẫu (Prisma)
 
-- P01 tạo versioned migration `0001_platform_core.sql` + runner; P03 kiểm/repository không sửa migration đã áp dụng; P04 thêm `0002_platform_delivery.sql`, P05 `system`, P06 `catalog`/`inventory` + warehouse scope join, P07 `trading`, P08 `traceability`, P09 `federation`, P12 `quality_issue`. Thứ tự/file/FK muộn ở `database-schema-v1.md`. Mỗi migration có kiểm tra forward và chiến lược rollback/restore; không dùng file SQL rỗng làm bằng chứng Done.
-- Seed idempotent cho dev/test; demo A/B/C có tên, sản phẩm/lô, partner mapping và quyền khác nhau. Secret, token và dữ liệu cá nhân thật không ở seed public.
-- Trước release: từ DB trống chạy toàn bộ migrations + seed, tạo nghiệp vụ; từ bản backup restore vào stack mới; đối chiếu số lượng document, balance, outbox, file metadata, trace links.
+- **Một nguồn migration:** Prisma Migrate (`prisma/migrations/`). P01 thay/loại file rỗng `db/migrations/0001_platform.sql`; không duy trì hai hệ migration song song. Chi tiết quy ước: [`prisma-migration-spec.md`](./prisma-migration-spec.md).
+- Thứ tự nội dung schema theo phase: platform core → delivery (idempotency/outbox/approval) → system → catalog/inventory → trading → traceability → federation → quality_issue (P12). FK muộn và CHECK phức tạp: SQL trong migration Prisma khi schema DSL chưa cover.
+- Không sửa migration đã áp dụng trên môi trường chung; rollback bằng migration bù hoặc restore backup đã diễn tập.
+- Seed idempotent (`prisma/seed` hoặc script) cho dev/test; demo A/B/C có tên, sản phẩm/lô, partner mapping và quyền khác nhau. Secret, token và dữ liệu cá nhân thật không ở seed public.
+- Trước release: từ DB trống `prisma migrate deploy` + seed, tạo nghiệp vụ; restore backup vào stack mới; đối chiếu document, balance, outbox, file metadata, trace links.
+
+## 4.1. Transaction với Prisma
+
+- Confirm chứng từ sở hữu movement: một `prisma.$transaction(async (tx) => { ... })`; mọi repository trong TX nhận `tx`, không dùng client ngoài.
+- Inventory port nhận cùng transaction client; insert movement + update balance + audit + outbox trong TX. Lỗi bất kỳ → rollback toàn bộ.
+- Worker outbox chạy **sau** commit; không gửi HTTP federation bên trong TX.
 
 ## 5. Câu hỏi cần đóng ở D07
 

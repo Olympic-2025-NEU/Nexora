@@ -1,6 +1,6 @@
 # PostgreSQL schema v1 — blueprint tạo migration
 
-Đây là **schema đích cụ thể** cho AI viết SQL migrations, chưa tồn tại trong DB hiện tại. Baseline D03/D07/D14 ở `implementation-baseline.md` áp dụng. Nếu P00 spike thay đổi lựa chọn, cập nhật blueprint và contract trước khi code. Dùng một app DB cho một instance; DB Keycloak và Flowable riêng. Không viết `tenant_id` đa org.
+Đây là **schema đích cụ thể** để AI viết **Prisma schema + Migrate** (D03; xem `prisma-migration-spec.md`), chưa tồn tại trong DB hiện tại. Baseline D03/D07/D14 ở `implementation-baseline.md` áp dụng. Nếu P00 spike thay đổi lựa chọn, cập nhật blueprint và contract trước khi code. Dùng một app DB cho một instance; DB Keycloak và Flowable riêng. Không viết `tenant_id` đa org.
 
 ## Ký hiệu và quy tắc chung
 
@@ -8,7 +8,7 @@
 - Hậu tố `!` = `NOT NULL`, `?` = nullable cho **mọi** kiểu (`text!`, `uuid?`, `numeric(20,3)!`); cột nullable mặc định `NULL`. `uuid→x.y` = FK tới bảng/cột đó, `ON DELETE RESTRICT` mặc định; `jsonb! = '{}'` nghĩa `NOT NULL DEFAULT '{}'::jsonb`. `char(64)` là SHA-256 lowercase hex với `CHECK(value ~ '^[0-9a-f]{64}$')`. Không dùng `ON DELETE CASCADE` với chứng từ, movement, audit, inbox, outbox hay trace. Mã/cookie/token không lưu plaintext khi chỉ cần hash/reference.
 - Domain enum lưu `text` + `CHECK` trong migration (giúp version thêm giá trị có migration); mọi enum và giá trị hợp lệ ghi dưới đây. Text code dùng `CHECK(length(trim(value)) BETWEEN 1 AND N)` với N nêu theo bảng. `numeric(20,3)` không âm/khác 0 theo constraint bảng. JSONB validate shape ở application + JSON Schema, không biến JSONB thành chỗ bỏ qua FK.
 - ID người dùng là Keycloak `sub text` (không FK để giữ audit sau disable/delete). `instance_id text` do cấu hình instance và organization kiểm soát, không nhận từ request. `request_id`/`correlation_id` text <=128.
-- Mỗi migration tạo bảng/index/constraint trong transaction PG nếu DDL hỗ trợ; file `db/migrations/0001_platform.sql` hiện 0 byte phải được thay bằng runner versioned. Không dùng mount `docker-entrypoint-initdb.d` làm cơ chế migration sau lần boot đầu.
+- Mỗi migration Prisma tạo bảng/index/constraint trong transaction PG nếu DDL hỗ trợ; file `db/migrations/0001_platform.sql` hiện 0 byte phải được thay bằng `prisma/migrations/` (một nguồn). Không dùng mount `docker-entrypoint-initdb.d` làm cơ chế migration sau lần boot đầu.
 
 ## P03/P04 — `platform`
 
@@ -154,10 +154,10 @@ Stocktake dùng `document` + `document_line.counted_quantity`; variance = counte
 
 ## Migration order, FK muộn và truy vấn kiểm chứng
 
-1. P01 thay file rỗng `db/migrations/0001_platform.sql` bằng `0001_platform_core.sql` trong **cùng PR** và thêm runner/checksum; không để cả hai số `0001`. `0001_platform_core.sql`: audit/attachment/core_record; `0002_platform_delivery.sql`: idempotency/outbox/approval_request.
+1. P01 thay file rỗng `db/migrations/0001_platform.sql` bằng migration Prisma đầu (platform core: audit/attachment/core_record) trong **cùng PR**; migration tiếp theo: idempotency/outbox/approval_request. Không duy trì runner SQL thủ công song song.
 2. `0003_system.sql`, `0004_catalog.sql`, `0005_inventory.sql` (bao gồm `system.membership_warehouse` sau khi warehouse có); lúc này `stock_movement.source_line_id` chưa FK vì `trading.document_line` chưa có. Không tạo movement ngoài test harness trước P07.
 3. `0006_trading.sql`: document/line/subtype; add FK `stock_movement.source_line_id→document_line.id`, `approval_request.document_id→document.id`. FK/trigger subtype và required line field phải có test migration.
 4. `0007_traceability.sql`; `0008_federation.sql` add FK `receiving_detail.inbound_message_id`, `trace_event.source_message_id` sau khi inbox tồn tại; `0009_quality_operations.sql` ở P12 tạo `traceability.quality_issue`.
 5. Mọi migration chạy từ DB trống và DB đã ở version trước; không sửa file migration đã áp dụng. Rollback bằng migration bù hoặc restore backup đã diễn tập. Query `SELECT count(*)` từng bảng, unique/FK/check violation tests, `EXPLAIN` cho balance/trace/outbox hot paths.
 
-**Invariant quan trọng:** document confirm + stock movement/balance + audit + outbox cùng một `PoolClient` transaction. `core_record`/file link sang app sau commit qua outbox/reconciliation, không gọi core API trong transaction M03. Không dùng trigger DB âm thầm ghi balance; chỉ Inventory port thực hiện và test đối chiếu `sum(delta)=balance` theo warehouse+batch.
+**Invariant quan trọng:** document confirm + stock movement/balance + audit + outbox cùng một `prisma.$transaction` (`Prisma.TransactionClient`). `core_record`/file link sang app sau commit qua outbox/reconciliation, không gọi core API trong transaction M03. Không dùng trigger DB âm thầm ghi balance; chỉ Inventory port thực hiện và test đối chiếu `sum(delta)=balance` theo warehouse+batch. Migration: xem `prisma-migration-spec.md` (D03).

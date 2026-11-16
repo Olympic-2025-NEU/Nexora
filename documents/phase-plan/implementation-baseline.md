@@ -22,7 +22,7 @@ Tài liệu này là **lựa chọn mặc định có thể thi công** cho 14 p
 | --- | --- | --- |
 | D01 | Apache APISIX gateway, route public/user/M2M tách; OIDC plugin, default deny | P00 chứng minh 200/401/403, PKCE browser, bearer M2M và app không bị gọi bypass; pin image/digest |
 | D02 | SeaweedFS S3 API tự host; bucket `quarantine`, `private`, `public` theo instance | P00 upload/download, presigned URL, restart/backup; nếu thay phải cùng contract S3 và giấy phép phù hợp |
-| D03 | `pg` + SQL migration tuần tự, một `PoolClient` qua `Transaction.run(tx => ...)` | Spike rollback document+movement+audit+outbox, kiểm lock/concurrency; không dùng Prisma/Drizzle song song |
+| D03 | **Prisma Client + Prisma Migrate**; singleton client ở `platform/persistence`; TX qua `prisma.$transaction` truyền `TransactionClient` vào repository | Spike rollback document+movement+audit+outbox, optimistic `version`, concurrency; cấm Drizzle/`pg` Pool song song; `$queryRaw` chỉ khi ADR |
 | D04/D05 | Keycloak OIDC; browser authorization-code + PKCE; receiver cấp service account cho partner; membership role/scope ở app DB | Test issuer/audience/expiry, revoke/disable, client mapping và token không lộ browser logs |
 | D06 | Flowable OSS REST + PostgreSQL riêng; BPMN `goods-issue-approval` v1 cho GoodsIssue | Test deploy/start/task complete/reject/restart và bridge idempotent |
 | D07 | `numeric(20,3)` cho lượng, decimal string ở JSON; unit `EA`, `KG`, `L`; `EA` phải số nguyên, không quy đổi unit trong MVP; không cho stock âm; issue chặn batch có `expires_on < today` theo timezone org, ngày hết hạn còn hợp lệ đến cuối ngày | Test 0/âm/overflow/làm tròn/concurrent issue và biên ngày hết hạn; nếu đổi precision phải sửa toàn bộ contract/fixture |
@@ -38,7 +38,7 @@ Node/Next/React/Tailwind version hiện theo `package.json` + lockfile, không s
 
 - UUID do application sinh; PG `uuid` PK. Mọi timestamp `timestamptz` UTC, date nghiệp vụ `date`. `created_at` là server timestamp; không nhận actor/confirmed time từ body.
 - `numeric(20,3)` lưu DB, JSON decimal string. Validate unit tại domain; không cộng `EA` với `KG`. Không dùng JS Number cho phép tính stock; adapter đọc PG numeric thành string/Decimal.
-- `version integer NOT NULL DEFAULT 1 CHECK(version>0)` cho aggregate mutable. Ghi `UPDATE ... WHERE id=$1 AND version=$2`, tăng version; 0 row → 409. Mọi unique/FK/check của `database-schema-v1.md` phải nằm ở migration, không chỉ ở TypeScript.
+- `version integer NOT NULL DEFAULT 1 CHECK(version>0)` cho aggregate mutable. Optimistic lock qua Prisma `updateMany({ where: { id, version }, data: { version: { increment: 1 }, ... } })`; 0 row → 409. Mọi unique/FK/check của `database-schema-v1.md` phải nằm ở Prisma schema + migration SQL bổ sung khi CHECK vượt khả năng Prisma.
 - Các action bắt buộc trong `api-payloads-v1.md` có `Idempotency-Key` UUID/string 16–128 ký tự; scope `(actor_sub hoặc client_id, method, route, key)`, lưu payload SHA-256. Cùng key + hash trả kết quả cũ; khác hash → 409; concurrent calls chỉ một effect. Federation inbound dùng `messageId`/payload hash riêng, không dựa header này.
 - Response lỗi `{code,message,requestId,details?}`; không trả SQL/stack/secret. List dùng `limit` mặc định 20, tối đa 100 và opaque cursor; sort/filter allowlist, không cho raw SQL.
 - Business API ở `/api/v1/*`; gateway ưu tiên `/api/v1/core/*`, `/api/v1/files/*` tới core API, `/api/v1/federation/*` M2M, `/api/v1/public/*` anonymous. App và core tự verify authz, không tin identity header từ client.

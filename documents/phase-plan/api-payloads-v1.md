@@ -85,6 +85,17 @@ Passport không trả member email, giá, stock private, credential, file chưa 
 
 AI service chỉ gọi allowlist `getLot`, `getStock`, `getTrace`, `createReceiptDraft`, `createIssueDraft` qua backend với delegated actor; không SQL, không service token Admin cho user thường. `services/ai/` không tự lưu nghiệp vụ.
 
+## Audit và Reporting (read-model)
+
+| Method/path | Request | Response/rule |
+| --- | --- | --- |
+| `GET /api/v1/audit-logs` | `?cursor&limit&action&targetType&targetId&from&to&outcome` — filter allowlist | Administrator: `{id,createdAt,actorSub,clientId,action,targetType,targetId,outcome,requestId}` không secret/PII trong summary |
+| `GET /api/v1/reports/inventory-summary` | `?warehouseId&productId&cursor&limit` | Staff+/Admin theo warehouse scope: `{warehouseId,productId,batchId,quantity,unit}` aggregate/list; sort allowlist |
+| `GET /api/v1/reports/document-counts` | `?from&to&type&status` | Actor authenticated với scope: `{documentType,status,count}[]`; không lộ chứng từ ngoài quyền |
+| `GET /api/v1/reports/open-quality-signals` | `?severity&cursor&limit` | Admin (và Staff nếu policy mở): `{id,ruleId,sourceType,sourceId,severity,state,lastDetectedAt}` từ quality_issue mở; P12 đầy đủ |
+
+Mọi report chỉ `GET`; cấm raw SQL từ query string. Query service dùng Prisma hoặc `$queryRaw` parameterized theo `prisma-migration-spec.md`.
+
 ## Vận hành dữ liệu P12
 
 `GET /api/v1/quality/issues?state&severity&ruleId&cursor&limit` chỉ Admin trả `{id,ruleId,sourceType,sourceId,state,severity,firstDetectedAt,lastDetectedAt,version}`; detail thêm `sourceEventIds`/redacted `detail`, không public. `POST /api/v1/quality/issues/{id}/acknowledge|resolve` nhận `{reason}` + `If-Match` + `Idempotency-Key`, trả state/version; resolve cần đối chiếu nguồn đã sửa hoặc Admin ghi quyết định/rủi ro tồn đọng, audit cả hai. Worker tự mở lại issue khi recurrence, không để người dùng sửa `ruleId/sourceId/detail` bằng PATCH.
