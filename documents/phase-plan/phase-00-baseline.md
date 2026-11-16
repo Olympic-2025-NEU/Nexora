@@ -4,25 +4,27 @@
 
 ## P00-T01 — Kiểm kê mã, tài sản và khoảng trống
 
-- [ ] Chụp `git status`, tree, dependency lock, route hiện có, migration 0 byte, Compose chỉ PG, test hiện có và version Node; phân loại code chuẩn đích vs scaffold `sales|procurement|finance|master-data`.
-- [ ] Ghi danh mục file tự viết, template code, SVG/ảnh/font/tài sản bên thứ ba và nguồn gốc để biết file nào gắn SPDX, file nào cần giữ notice riêng.
-- [ ] Chạy build/lint/typecheck baseline trên clone sạch; lưu lỗi hiện tại riêng với lỗi do phase sau đưa vào.
+- [x] Chụp `git status`, tree, dependency lock, route hiện có, migration 0 byte, Compose chỉ PG, test hiện có và version Node; phân loại code chuẩn đích vs scaffold `sales|procurement|finance|master-data`.
+- [x] Ghi danh mục file tự viết, template code, SVG/ảnh/font/tài sản bên thứ ba và nguồn gốc để biết file nào gắn SPDX, file nào cần giữ notice riêng.
+- [x] Chạy build/lint/typecheck baseline trên clone sạch; lưu lỗi hiện tại riêng với lỗi do phase sau đưa vào.
 - **Đầu ra:** baseline report và issue cho từng gap; **kiểm chứng:** người khác tái tạo được các lệnh, không ghi “module hoàn thành” theo tên folder.
 
 ## P00-T02 — Chuẩn hóa nghĩa “xong” và phạm vi
 
-- [ ] So Ch6/AC-01…13 với đề thi mục 3–4, bảng `test-matrix.md`; đánh dấu bắt buộc, mở rộng, ngoài MVP cho từng yêu cầu.
-- [ ] Chốt demo dọc A→B→C và một ứng dụng H-P-D-I; tạo tập tình huống happy/error/offline trước khi viết schema.
+- [x] So Ch6/AC-01…13 với đề thi mục 3–4, bảng `test-matrix.md`; đánh dấu bắt buộc, mở rộng, ngoài MVP cho từng yêu cầu.
+- [x] Chốt demo dọc A→B→C và một ứng dụng H-P-D-I; tạo tập tình huống happy/error/offline trước khi viết schema.
 - [ ] Xác minh với BTC mốc nộp bài vì đề thi ghi 2025 còn thể lệ có lịch 2026; lưu phản hồi, không suy từ PDF cũ.
 - **Đầu ra:** scope statement, demo acceptance narrative; **kiểm chứng:** không có task finance/full POS/production bị đưa vào MVP mà không có change request.
 
 ## P00-T03 — ADR lõi và spike kỹ thuật
 
-- [ ] Đóng D01 gateway bằng route OIDC/public/M2M demo; ghi APISIX/etcd mode hoặc phương án thay thế, pin version/license/RAM.
-- [ ] Đóng D02 storage bằng upload/download private, presigned URL, backup/source build; kiểm tra tình trạng phân phối MinIO nếu chọn nó.
-- [ ] Đóng D03 database adapter/migration bằng spike một transaction ghi hai repository + outbox và rollback; D04 session/Next docs; D06 Flowable OSS REST + PG.
-- [ ] D07 decimal/lot, D08 envelope, D10 H-P-D-I, D11/D12 nguyên lý/GitOps, D14 movement ownership và D15 runtime lõi/tầng 2 có ADR có test chấp nhận.
+- [x] Đóng D01 gateway bằng route OIDC/public/M2M demo; ghi APISIX/etcd mode hoặc phương án thay thế, pin version/license/RAM.
+- [x] Đóng D02 storage bằng upload/download private, presigned URL, backup/source build; kiểm tra tình trạng phân phối MinIO nếu chọn nó.
+- [x] Đóng D03 database adapter/migration bằng spike một transaction ghi hai repository + outbox và rollback; D04 session/Next docs; D06 Flowable OSS REST + PG.
+- [x] D07 decimal/lot, D08 envelope, D10 H-P-D-I, D11/D12 nguyên lý/GitOps, D14 movement ownership và D15 runtime lõi/tầng 2 có ADR có test chấp nhận.
 - **Đầu ra:** ADR trong `decision-log.md` hoặc `documents/adr/`; **kiểm chứng:** không còn “TBD” chặn migration, auth hoặc transport của P01–04.
+
+**Bằng chứng P00-T01–T03:** [baseline](./evidence/baseline.md), [scope v1](./scope-v1.md), [decision log/ADR](./decision-log.md), [spike hạ tầng](./evidence/spikes/infra/README.md) và [spike PG](./evidence/spikes/d03/README.md). Dấu tick T03 xác nhận **quyết định và spike P00**; Core Data/File API sản phẩm, auth/session production, scanner và G00 vẫn chưa đạt. T02 còn chờ phản hồi BTC về mốc nộp.
 
 ## P00-T04 — Quyền phát hành AGPL và tiêu chí nguồn mở
 
