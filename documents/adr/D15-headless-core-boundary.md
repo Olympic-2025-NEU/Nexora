@@ -1,0 +1,15 @@
+# D15 — Ranh giới lõi headless và ứng dụng tầng trên
+
+- Ngày: 2026-11-17. Trạng thái: **chốt kiến trúc đích**, spike ranh giới headless đã pass; smoke Core Data/File API **sản phẩm** còn mở vì service chưa tồn tại, reviewer G00/G03 còn mở.
+- Câu hỏi: khi dừng UI, còn những dịch vụ lõi nào chạy độc lập để đáp ứng §3, đồng thời giữ transaction nghiệp vụ thống nhất?
+- Quyết định: ba runtime tách: `services/core-data/` **headless** sở hữu API metadata/projection có cấu trúc và file/quarantine/scan, DB role chỉ ghi bảng core sở hữu; Next ERP `app/`/`contexts/` sở hữu business API và transaction document+stock+audit+outbox trong app DB; `apps/dx-lab/` là app UI H-P-D-I thứ hai, chỉ gọi gateway. Identity Keycloak, APISIX và Flowable là dịch vụ lõi độc lập. Cả ERP và DX-Lab có thể dừng hoàn toàn mà core SSO/gateway/data/file/workflow vẫn trả API/health thật; business API M01–M04 thuộc ERP dừng cùng ERP. Không lồng core API trong process Next ERP rồi gọi đó là headless.
+
+## Phương án và hợp đồng smoke
+
+Giữ một app PostgreSQL **per instance**; role `core_data`, `app_runtime`, `migrator` tách quyền trên schema/bảng, Keycloak/Flowable có DB riêng. D03 bảo đảm transaction M03 nằm trong app DB; core không trực tiếp ghi stock/document. Core record theo `core-record-payloads-v1.md`, file metadata theo `database-schema-v1.md`; ERP/DX-Lab gọi qua gateway theo user/service scope, không có DB credential ở UI. Phương án chỉ đặt route Next API dưới `/api/v1/core/*` bị loại vì nếu dừng ERP thì core mất.
+
+Acceptance P01/P03: dựng từ source, gọi GET/POST structured record có schema/authz và upload→scan→download file qua gateway; dừng **toàn bộ** ERP/DX-Lab containers, các lệnh core này cùng Keycloak/Flowable/health vẫn pass; user/M2M/public route tách, thử 401/403 và bypass; bật lại app không mất dữ liệu. Đây là bài test sản phẩm thật, không thay bằng request tới server giả.
+
+Trong [spike hạ tầng](../phase-plan/evidence/spikes/infra/README.md), `core_spike.py` là runtime HTTP headless **thật trong môi trường nghiên cứu**, có PostgreSQL scratch riêng, tự kiểm JWT và chỉ chấp nhận schema `spike_note` cố định. Qua APISIX đã tạo record 201, payload sai 422, anonymous 401, service token 403, gọi thẳng container anonymous 401. Restart core vẫn GET 200; dừng `upstream.py` giả lập ERP/UI thì core record, Keycloak và Flowable vẫn 200. Đây chứng minh khả năng tách process và tuyến truy cập; snapshot core 27.68 MiB, DB 58.99 MiB. `upstream.py` vẫn chỉ là mock 200/202 cho route khác.
+
+Spike **không** có app DB/role grants, schema `platform.core_record`, file/quarantine/scan, ERP hay DX-Lab thật; service này không nằm trong đường dẫn sản phẩm `services/core-data/`. Repo hiện chỉ có Compose PostgreSQL và interface `platform/`; **không có** Core Data/File API sản phẩm, ERP business API, DX-Lab hay full topology. Vì vậy E3-1/G00/G03 vẫn mở. P01/P03 phải xây lát cắt core sản phẩm rồi chạy chính acceptance trên; P11 chứng minh DX-Lab tiêu thụ core thật. Team review ranh giới/DB grants trước khi khởi công P01.
