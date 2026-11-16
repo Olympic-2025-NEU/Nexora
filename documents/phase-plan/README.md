@@ -15,6 +15,8 @@
 | Đọc theo thứ tự | Mục đích |
 | --- | --- |
 | [summary.md](./summary.md) | Bản đồ phase, đường găng và mốc Done |
+| [evidence/G00.md](./evidence/G00.md) | Gate G00 — hiện **NOT CLOSED**; P00 docs provisional |
+| [../adr/README.md](../adr/README.md) | ADR D01–D15 Accepted-provisional (spike pending) |
 | [decision-log.md](./decision-log.md) | Các quyết định cần chốt bằng spike/ADR trước khi code phụ thuộc |
 | [implementation-baseline.md](./implementation-baseline.md) | Lựa chọn mặc định, layout và quy ước thống nhất cho AI; đổi bằng ADR có kiểm chứng |
 | [architecture.md](./architecture.md) | Ranh giới ba tầng, topology, các luồng quan trọng |

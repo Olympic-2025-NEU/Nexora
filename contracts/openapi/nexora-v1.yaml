@@ -1,0 +1,2939 @@
+openapi: 3.0.3
+info:
+  title: Nexora API
+  version: 1.0.0-provisional
+  description: Provisional OpenAPI materialized from documents/phase-plan/api-contracts.md and api-payloads-v1.md. Not runtime-complete; stubs marked x-nexora-comment.
+  license:
+    name: AGPL-3.0-only
+servers:
+  -
+    url: "https://{instance}/"
+    variables:
+      instance:
+        default: "localhost:3000"
+tags:
+  -
+    name: Platform
+  -
+    name: M01
+  -
+    name: M02
+  -
+    name: M03
+  -
+    name: M04
+  -
+    name: AI01
+  -
+    name: Core
+paths:
+  /api/v1/health/live:
+    get:
+      summary: Liveness
+      tags:
+        - Platform
+      security:
+
+      responses:
+        200:
+          description: Alive
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/HealthStatus
+  /api/v1/health/ready:
+    get:
+      summary: Readiness
+      tags:
+        - Platform
+      security:
+
+      responses:
+        200:
+          description: Ready
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/HealthStatus
+        503:
+          $ref: #/components/responses/Error
+  /api/v1/me:
+    get:
+      summary: Current actor
+      tags:
+        - Platform
+      security:
+        -
+          oidc:
+
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        401:
+          $ref: #/components/responses/Error
+        403:
+          $ref: #/components/responses/Error
+  /api/v1/organization:
+    get:
+      summary: Get organization
+      tags:
+        - M01
+      security:
+        -
+          oidc:
+
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        401:
+          $ref: #/components/responses/Error
+        403:
+          $ref: #/components/responses/Error
+    patch:
+      summary: Patch organization
+      tags:
+        - M01
+      security:
+        -
+          oidc:
+
+      parameters:
+        -
+          name: If-Match
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: #/components/schemas/OrganizationPatch
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        403:
+          $ref: #/components/responses/Error
+      x-nexora-comment: fill-from-payloads
+  /api/v1/members:
+    get:
+      summary: GET List/create members
+      tags:
+        - M01
+      security:
+        -
+          oidc:
+
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        401:
+          $ref: #/components/responses/Error
+        403:
+          $ref: #/components/responses/Error
+    post:
+      summary: POST List/create members
+      tags:
+        - M01
+      security:
+        -
+          oidc:
+
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        201:
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        202:
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        400:
+          $ref: #/components/responses/Error
+        401:
+          $ref: #/components/responses/Error
+        403:
+          $ref: #/components/responses/Error
+        409:
+          $ref: #/components/responses/Error
+        422:
+          $ref: #/components/responses/Error
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: #/components/schemas/GenericWrite
+  /api/v1/partners:
+    get:
+      summary: GET List/create partners
+      tags:
+        - M01
+      security:
+        -
+          oidc:
+
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        401:
+          $ref: #/components/responses/Error
+        403:
+          $ref: #/components/responses/Error
+    post:
+      summary: POST List/create partners
+      tags:
+        - M01
+      security:
+        -
+          oidc:
+
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        201:
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        202:
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        400:
+          $ref: #/components/responses/Error
+        401:
+          $ref: #/components/responses/Error
+        403:
+          $ref: #/components/responses/Error
+        409:
+          $ref: #/components/responses/Error
+        422:
+          $ref: #/components/responses/Error
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: #/components/schemas/GenericWrite
+  /api/v1/products:
+    get:
+      summary: GET List/create products
+      tags:
+        - M02
+      security:
+        -
+          oidc:
+
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        401:
+          $ref: #/components/responses/Error
+        403:
+          $ref: #/components/responses/Error
+    post:
+      summary: POST List/create products
+      tags:
+        - M02
+      security:
+        -
+          oidc:
+
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        201:
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        202:
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        400:
+          $ref: #/components/responses/Error
+        401:
+          $ref: #/components/responses/Error
+        403:
+          $ref: #/components/responses/Error
+        409:
+          $ref: #/components/responses/Error
+        422:
+          $ref: #/components/responses/Error
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: #/components/schemas/GenericWrite
+  /api/v1/batches:
+    get:
+      summary: GET List/create batches
+      tags:
+        - M02
+      security:
+        -
+          oidc:
+
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        401:
+          $ref: #/components/responses/Error
+        403:
+          $ref: #/components/responses/Error
+    post:
+      summary: POST List/create batches
+      tags:
+        - M02
+      security:
+        -
+          oidc:
+
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        201:
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        202:
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        400:
+          $ref: #/components/responses/Error
+        401:
+          $ref: #/components/responses/Error
+        403:
+          $ref: #/components/responses/Error
+        409:
+          $ref: #/components/responses/Error
+        422:
+          $ref: #/components/responses/Error
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: #/components/schemas/GenericWrite
+  /api/v1/warehouses:
+    get:
+      summary: GET List/create warehouses
+      tags:
+        - M02
+      security:
+        -
+          oidc:
+
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        401:
+          $ref: #/components/responses/Error
+        403:
+          $ref: #/components/responses/Error
+    post:
+      summary: POST List/create warehouses
+      tags:
+        - M02
+      security:
+        -
+          oidc:
+
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        201:
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        202:
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        400:
+          $ref: #/components/responses/Error
+        401:
+          $ref: #/components/responses/Error
+        403:
+          $ref: #/components/responses/Error
+        409:
+          $ref: #/components/responses/Error
+        422:
+          $ref: #/components/responses/Error
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: #/components/schemas/GenericWrite
+  /api/v1/partners/{id}/connection:
+    put:
+      summary: Upsert partner connection
+      tags:
+        - M01
+      security:
+        -
+          oidc:
+
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: #/components/schemas/PartnerConnection
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        403:
+          $ref: #/components/responses/Error
+  /api/v1/inventory/balances:
+    get:
+      summary: List balances (read-only)
+      tags:
+        - M02
+      security:
+        -
+          oidc:
+
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        401:
+          $ref: #/components/responses/Error
+        403:
+          $ref: #/components/responses/Error
+  /api/v1/inventory/movements:
+    get:
+      summary: List movements (read-only)
+      tags:
+        - M02
+      security:
+        -
+          oidc:
+
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        401:
+          $ref: #/components/responses/Error
+        403:
+          $ref: #/components/responses/Error
+  /api/v1/receipts:
+    get:
+      summary: List receipts
+      tags:
+        - M03
+      security:
+        -
+          oidc:
+
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        401:
+          $ref: #/components/responses/Error
+        403:
+          $ref: #/components/responses/Error
+    post:
+      summary: Create receipts draft
+      tags:
+        - M03
+      security:
+        -
+          oidc:
+
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        201:
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        202:
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        400:
+          $ref: #/components/responses/Error
+        401:
+          $ref: #/components/responses/Error
+        403:
+          $ref: #/components/responses/Error
+        409:
+          $ref: #/components/responses/Error
+        422:
+          $ref: #/components/responses/Error
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: #/components/schemas/GenericWrite
+  /api/v1/receipts/{id}:
+    get:
+      summary: Get receipts by id
+      tags:
+        - M03
+      security:
+        -
+          oidc:
+
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        401:
+          $ref: #/components/responses/Error
+        403:
+          $ref: #/components/responses/Error
+    patch:
+      summary: Update draft receipts
+      tags:
+        - M03
+      security:
+        -
+          oidc:
+
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        -
+          name: If-Match
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: #/components/schemas/GenericWrite
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        409:
+          $ref: #/components/responses/Error
+  /api/v1/receipts/{id}/confirm:
+    post:
+      summary: confirm receipts
+      tags:
+        - M03
+      security:
+        -
+          oidc:
+
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        201:
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        202:
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        400:
+          $ref: #/components/responses/Error
+        401:
+          $ref: #/components/responses/Error
+        403:
+          $ref: #/components/responses/Error
+        409:
+          $ref: #/components/responses/Error
+        422:
+          $ref: #/components/responses/Error
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: #/components/schemas/EmptyObject
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        -
+          name: If-Match
+          in: header
+          required: true
+          schema:
+            type: string
+        -
+          name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+            minLength: 16
+            maxLength: 128
+  /api/v1/receipts/{id}/cancel:
+    post:
+      summary: cancel receipts
+      tags:
+        - M03
+      security:
+        -
+          oidc:
+
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        201:
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        202:
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        400:
+          $ref: #/components/responses/Error
+        401:
+          $ref: #/components/responses/Error
+        403:
+          $ref: #/components/responses/Error
+        409:
+          $ref: #/components/responses/Error
+        422:
+          $ref: #/components/responses/Error
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: #/components/schemas/EmptyObject
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        -
+          name: If-Match
+          in: header
+          required: true
+          schema:
+            type: string
+        -
+          name: Idempotency-Key
+          in: header
+          required: false
+          schema:
+            type: string
+            minLength: 16
+            maxLength: 128
+  /api/v1/issues:
+    get:
+      summary: List issues
+      tags:
+        - M03
+      security:
+        -
+          oidc:
+
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        401:
+          $ref: #/components/responses/Error
+        403:
+          $ref: #/components/responses/Error
+    post:
+      summary: Create issues draft
+      tags:
+        - M03
+      security:
+        -
+          oidc:
+
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        201:
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        202:
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        400:
+          $ref: #/components/responses/Error
+        401:
+          $ref: #/components/responses/Error
+        403:
+          $ref: #/components/responses/Error
+        409:
+          $ref: #/components/responses/Error
+        422:
+          $ref: #/components/responses/Error
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: #/components/schemas/GenericWrite
+  /api/v1/issues/{id}:
+    get:
+      summary: Get issues by id
+      tags:
+        - M03
+      security:
+        -
+          oidc:
+
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        401:
+          $ref: #/components/responses/Error
+        403:
+          $ref: #/components/responses/Error
+    patch:
+      summary: Update draft issues
+      tags:
+        - M03
+      security:
+        -
+          oidc:
+
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        -
+          name: If-Match
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: #/components/schemas/GenericWrite
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        409:
+          $ref: #/components/responses/Error
+  /api/v1/issues/{id}/confirm:
+    post:
+      summary: confirm issues
+      tags:
+        - M03
+      security:
+        -
+          oidc:
+
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        201:
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        202:
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        400:
+          $ref: #/components/responses/Error
+        401:
+          $ref: #/components/responses/Error
+        403:
+          $ref: #/components/responses/Error
+        409:
+          $ref: #/components/responses/Error
+        422:
+          $ref: #/components/responses/Error
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: #/components/schemas/EmptyObject
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        -
+          name: If-Match
+          in: header
+          required: true
+          schema:
+            type: string
+        -
+          name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+            minLength: 16
+            maxLength: 128
+  /api/v1/issues/{id}/cancel:
+    post:
+      summary: cancel issues
+      tags:
+        - M03
+      security:
+        -
+          oidc:
+
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        201:
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        202:
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        400:
+          $ref: #/components/responses/Error
+        401:
+          $ref: #/components/responses/Error
+        403:
+          $ref: #/components/responses/Error
+        409:
+          $ref: #/components/responses/Error
+        422:
+          $ref: #/components/responses/Error
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: #/components/schemas/EmptyObject
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        -
+          name: If-Match
+          in: header
+          required: true
+          schema:
+            type: string
+        -
+          name: Idempotency-Key
+          in: header
+          required: false
+          schema:
+            type: string
+            minLength: 16
+            maxLength: 128
+  /api/v1/transfers:
+    get:
+      summary: List transfers
+      tags:
+        - M03
+      security:
+        -
+          oidc:
+
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        401:
+          $ref: #/components/responses/Error
+        403:
+          $ref: #/components/responses/Error
+    post:
+      summary: Create transfers draft
+      tags:
+        - M03
+      security:
+        -
+          oidc:
+
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        201:
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        202:
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        400:
+          $ref: #/components/responses/Error
+        401:
+          $ref: #/components/responses/Error
+        403:
+          $ref: #/components/responses/Error
+        409:
+          $ref: #/components/responses/Error
+        422:
+          $ref: #/components/responses/Error
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: #/components/schemas/GenericWrite
+  /api/v1/transfers/{id}:
+    get:
+      summary: Get transfers by id
+      tags:
+        - M03
+      security:
+        -
+          oidc:
+
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        401:
+          $ref: #/components/responses/Error
+        403:
+          $ref: #/components/responses/Error
+    patch:
+      summary: Update draft transfers
+      tags:
+        - M03
+      security:
+        -
+          oidc:
+
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        -
+          name: If-Match
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: #/components/schemas/GenericWrite
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        409:
+          $ref: #/components/responses/Error
+  /api/v1/transfers/{id}/confirm:
+    post:
+      summary: confirm transfers
+      tags:
+        - M03
+      security:
+        -
+          oidc:
+
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        201:
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        202:
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        400:
+          $ref: #/components/responses/Error
+        401:
+          $ref: #/components/responses/Error
+        403:
+          $ref: #/components/responses/Error
+        409:
+          $ref: #/components/responses/Error
+        422:
+          $ref: #/components/responses/Error
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: #/components/schemas/EmptyObject
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        -
+          name: If-Match
+          in: header
+          required: true
+          schema:
+            type: string
+        -
+          name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+            minLength: 16
+            maxLength: 128
+  /api/v1/transfers/{id}/cancel:
+    post:
+      summary: cancel transfers
+      tags:
+        - M03
+      security:
+        -
+          oidc:
+
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        201:
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        202:
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        400:
+          $ref: #/components/responses/Error
+        401:
+          $ref: #/components/responses/Error
+        403:
+          $ref: #/components/responses/Error
+        409:
+          $ref: #/components/responses/Error
+        422:
+          $ref: #/components/responses/Error
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: #/components/schemas/EmptyObject
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        -
+          name: If-Match
+          in: header
+          required: true
+          schema:
+            type: string
+        -
+          name: Idempotency-Key
+          in: header
+          required: false
+          schema:
+            type: string
+            minLength: 16
+            maxLength: 128
+  /api/v1/receivings:
+    get:
+      summary: List receivings
+      tags:
+        - M03
+      security:
+        -
+          oidc:
+
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        401:
+          $ref: #/components/responses/Error
+        403:
+          $ref: #/components/responses/Error
+    post:
+      summary: Create receivings draft
+      tags:
+        - M03
+      security:
+        -
+          oidc:
+
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        201:
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        202:
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        400:
+          $ref: #/components/responses/Error
+        401:
+          $ref: #/components/responses/Error
+        403:
+          $ref: #/components/responses/Error
+        409:
+          $ref: #/components/responses/Error
+        422:
+          $ref: #/components/responses/Error
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: #/components/schemas/GenericWrite
+  /api/v1/receivings/{id}:
+    get:
+      summary: Get receivings by id
+      tags:
+        - M03
+      security:
+        -
+          oidc:
+
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        401:
+          $ref: #/components/responses/Error
+        403:
+          $ref: #/components/responses/Error
+    patch:
+      summary: Update draft receivings
+      tags:
+        - M03
+      security:
+        -
+          oidc:
+
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        -
+          name: If-Match
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: #/components/schemas/GenericWrite
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        409:
+          $ref: #/components/responses/Error
+  /api/v1/receivings/{id}/confirm:
+    post:
+      summary: confirm receivings
+      tags:
+        - M03
+      security:
+        -
+          oidc:
+
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        201:
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        202:
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        400:
+          $ref: #/components/responses/Error
+        401:
+          $ref: #/components/responses/Error
+        403:
+          $ref: #/components/responses/Error
+        409:
+          $ref: #/components/responses/Error
+        422:
+          $ref: #/components/responses/Error
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: #/components/schemas/EmptyObject
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        -
+          name: If-Match
+          in: header
+          required: true
+          schema:
+            type: string
+        -
+          name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+            minLength: 16
+            maxLength: 128
+  /api/v1/receivings/{id}/cancel:
+    post:
+      summary: cancel receivings
+      tags:
+        - M03
+      security:
+        -
+          oidc:
+
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        201:
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        202:
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        400:
+          $ref: #/components/responses/Error
+        401:
+          $ref: #/components/responses/Error
+        403:
+          $ref: #/components/responses/Error
+        409:
+          $ref: #/components/responses/Error
+        422:
+          $ref: #/components/responses/Error
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: #/components/schemas/EmptyObject
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        -
+          name: If-Match
+          in: header
+          required: true
+          schema:
+            type: string
+        -
+          name: Idempotency-Key
+          in: header
+          required: false
+          schema:
+            type: string
+            minLength: 16
+            maxLength: 128
+  /api/v1/stocktakes:
+    get:
+      summary: List stocktakes
+      tags:
+        - M03
+      security:
+        -
+          oidc:
+
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        401:
+          $ref: #/components/responses/Error
+        403:
+          $ref: #/components/responses/Error
+    post:
+      summary: Create stocktakes draft
+      tags:
+        - M03
+      security:
+        -
+          oidc:
+
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        201:
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        202:
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        400:
+          $ref: #/components/responses/Error
+        401:
+          $ref: #/components/responses/Error
+        403:
+          $ref: #/components/responses/Error
+        409:
+          $ref: #/components/responses/Error
+        422:
+          $ref: #/components/responses/Error
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: #/components/schemas/GenericWrite
+  /api/v1/stocktakes/{id}:
+    get:
+      summary: Get stocktakes by id
+      tags:
+        - M03
+      security:
+        -
+          oidc:
+
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        401:
+          $ref: #/components/responses/Error
+        403:
+          $ref: #/components/responses/Error
+    patch:
+      summary: Update draft stocktakes
+      tags:
+        - M03
+      security:
+        -
+          oidc:
+
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        -
+          name: If-Match
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: #/components/schemas/GenericWrite
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        409:
+          $ref: #/components/responses/Error
+  /api/v1/stocktakes/{id}/confirm:
+    post:
+      summary: confirm stocktakes
+      tags:
+        - M03
+      security:
+        -
+          oidc:
+
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        201:
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        202:
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        400:
+          $ref: #/components/responses/Error
+        401:
+          $ref: #/components/responses/Error
+        403:
+          $ref: #/components/responses/Error
+        409:
+          $ref: #/components/responses/Error
+        422:
+          $ref: #/components/responses/Error
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: #/components/schemas/EmptyObject
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        -
+          name: If-Match
+          in: header
+          required: true
+          schema:
+            type: string
+        -
+          name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+            minLength: 16
+            maxLength: 128
+  /api/v1/stocktakes/{id}/cancel:
+    post:
+      summary: cancel stocktakes
+      tags:
+        - M03
+      security:
+        -
+          oidc:
+
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        201:
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        202:
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        400:
+          $ref: #/components/responses/Error
+        401:
+          $ref: #/components/responses/Error
+        403:
+          $ref: #/components/responses/Error
+        409:
+          $ref: #/components/responses/Error
+        422:
+          $ref: #/components/responses/Error
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: #/components/schemas/EmptyObject
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        -
+          name: If-Match
+          in: header
+          required: true
+          schema:
+            type: string
+        -
+          name: Idempotency-Key
+          in: header
+          required: false
+          schema:
+            type: string
+            minLength: 16
+            maxLength: 128
+  /api/v1/sales-records:
+    get:
+      summary: List sales-records
+      tags:
+        - M03
+      security:
+        -
+          oidc:
+
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        401:
+          $ref: #/components/responses/Error
+        403:
+          $ref: #/components/responses/Error
+    post:
+      summary: Create sales-records draft
+      tags:
+        - M03
+      security:
+        -
+          oidc:
+
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        201:
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        202:
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        400:
+          $ref: #/components/responses/Error
+        401:
+          $ref: #/components/responses/Error
+        403:
+          $ref: #/components/responses/Error
+        409:
+          $ref: #/components/responses/Error
+        422:
+          $ref: #/components/responses/Error
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: #/components/schemas/GenericWrite
+  /api/v1/sales-records/{id}:
+    get:
+      summary: Get sales-records by id
+      tags:
+        - M03
+      security:
+        -
+          oidc:
+
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        401:
+          $ref: #/components/responses/Error
+        403:
+          $ref: #/components/responses/Error
+    patch:
+      summary: Update draft sales-records
+      tags:
+        - M03
+      security:
+        -
+          oidc:
+
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        -
+          name: If-Match
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: #/components/schemas/GenericWrite
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        409:
+          $ref: #/components/responses/Error
+  /api/v1/sales-records/{id}/confirm:
+    post:
+      summary: confirm sales-records
+      tags:
+        - M03
+      security:
+        -
+          oidc:
+
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        201:
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        202:
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        400:
+          $ref: #/components/responses/Error
+        401:
+          $ref: #/components/responses/Error
+        403:
+          $ref: #/components/responses/Error
+        409:
+          $ref: #/components/responses/Error
+        422:
+          $ref: #/components/responses/Error
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: #/components/schemas/EmptyObject
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        -
+          name: If-Match
+          in: header
+          required: true
+          schema:
+            type: string
+        -
+          name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+            minLength: 16
+            maxLength: 128
+  /api/v1/sales-records/{id}/cancel:
+    post:
+      summary: cancel sales-records
+      tags:
+        - M03
+      security:
+        -
+          oidc:
+
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        201:
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        202:
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        400:
+          $ref: #/components/responses/Error
+        401:
+          $ref: #/components/responses/Error
+        403:
+          $ref: #/components/responses/Error
+        409:
+          $ref: #/components/responses/Error
+        422:
+          $ref: #/components/responses/Error
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: #/components/schemas/EmptyObject
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        -
+          name: If-Match
+          in: header
+          required: true
+          schema:
+            type: string
+        -
+          name: Idempotency-Key
+          in: header
+          required: false
+          schema:
+            type: string
+            minLength: 16
+            maxLength: 128
+  /api/v1/issues/{id}/submit:
+    post:
+      summary: Submit issue to Flowable
+      tags:
+        - M03
+      security:
+        -
+          oidc:
+
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        201:
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        202:
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        400:
+          $ref: #/components/responses/Error
+        401:
+          $ref: #/components/responses/Error
+        403:
+          $ref: #/components/responses/Error
+        409:
+          $ref: #/components/responses/Error
+        422:
+          $ref: #/components/responses/Error
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: #/components/schemas/EmptyObject
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        -
+          name: If-Match
+          in: header
+          required: true
+          schema:
+            type: string
+        -
+          name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+  /api/v1/documents:
+    get:
+      summary: Union document read-model
+      tags:
+        - M03
+      security:
+        -
+          oidc:
+
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        401:
+          $ref: #/components/responses/Error
+        403:
+          $ref: #/components/responses/Error
+  /api/v1/approvals/tasks:
+    get:
+      summary: List approval tasks
+      tags:
+        - M03
+      security:
+        -
+          oidc:
+
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        401:
+          $ref: #/components/responses/Error
+        403:
+          $ref: #/components/responses/Error
+  /api/v1/approvals/{approvalRequestId}/decision:
+    post:
+      summary: Record approval decision intent
+      tags:
+        - M03
+      security:
+        -
+          oidc:
+
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        201:
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        202:
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        400:
+          $ref: #/components/responses/Error
+        401:
+          $ref: #/components/responses/Error
+        403:
+          $ref: #/components/responses/Error
+        409:
+          $ref: #/components/responses/Error
+        422:
+          $ref: #/components/responses/Error
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: #/components/schemas/ApprovalDecision
+  /api/v1/lots/{id}/history:
+    get:
+      summary: Lot history
+      tags:
+        - M04
+      security:
+        -
+          oidc:
+
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        401:
+          $ref: #/components/responses/Error
+        403:
+          $ref: #/components/responses/Error
+  /api/v1/lots/{id}/trace/backward:
+    get:
+      summary: Trace backward
+      tags:
+        - M04
+      security:
+        -
+          oidc:
+
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        401:
+          $ref: #/components/responses/Error
+        403:
+          $ref: #/components/responses/Error
+  /api/v1/lots/{id}/trace/forward:
+    get:
+      summary: Trace forward
+      tags:
+        - M04
+      security:
+        -
+          oidc:
+
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        401:
+          $ref: #/components/responses/Error
+        403:
+          $ref: #/components/responses/Error
+  /api/v1/lots/{id}/qr:
+    post:
+      summary: Issue QR token
+      tags:
+        - M04
+      security:
+        -
+          oidc:
+
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        201:
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        202:
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        400:
+          $ref: #/components/responses/Error
+        401:
+          $ref: #/components/responses/Error
+        403:
+          $ref: #/components/responses/Error
+        409:
+          $ref: #/components/responses/Error
+        422:
+          $ref: #/components/responses/Error
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: #/components/schemas/QrCreate
+  /api/v1/public/passport/{token}:
+    get:
+      summary: Public product passport
+      tags:
+        - M04
+      security:
+
+      parameters:
+        -
+          name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: Public projection
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/PassportPublic
+        404:
+          $ref: #/components/responses/Error
+  /api/v1/federation/events:
+    post:
+      summary: Inbound federation envelope
+      tags:
+        - M04
+      security:
+        -
+          bearerM2M:
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: #/components/schemas/FederationEnvelope
+      responses:
+        202:
+          description: Technical ACK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/FederationAck
+        401:
+          $ref: #/components/responses/Error
+        409:
+          $ref: #/components/responses/Error
+        422:
+          $ref: #/components/responses/Error
+  /api/v1/federation/deliveries:
+    get:
+      summary: Outbound delivery status
+      tags:
+        - M04
+      security:
+        -
+          oidc:
+
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        401:
+          $ref: #/components/responses/Error
+        403:
+          $ref: #/components/responses/Error
+  /api/v1/federation/deliveries/{id}/retry:
+    post:
+      summary: Admin retry delivery
+      tags:
+        - M04
+      security:
+        -
+          oidc:
+
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        201:
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        202:
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        400:
+          $ref: #/components/responses/Error
+        401:
+          $ref: #/components/responses/Error
+        403:
+          $ref: #/components/responses/Error
+        409:
+          $ref: #/components/responses/Error
+        422:
+          $ref: #/components/responses/Error
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: #/components/schemas/RetryReason
+  /api/v1/audit-logs:
+    get:
+      summary: Query audit logs (Admin)
+      tags:
+        - Platform
+      security:
+        -
+          oidc:
+
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        401:
+          $ref: #/components/responses/Error
+        403:
+          $ref: #/components/responses/Error
+  /api/v1/reports/inventory-summary:
+    get:
+      summary: Inventory summary report
+      tags:
+        - Platform
+      security:
+        -
+          oidc:
+
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        401:
+          $ref: #/components/responses/Error
+        403:
+          $ref: #/components/responses/Error
+  /api/v1/reports/document-counts:
+    get:
+      summary: Document counts report
+      tags:
+        - Platform
+      security:
+        -
+          oidc:
+
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        401:
+          $ref: #/components/responses/Error
+        403:
+          $ref: #/components/responses/Error
+  /api/v1/reports/open-quality-signals:
+    get:
+      summary: Open quality signals
+      tags:
+        - Platform
+      security:
+        -
+          oidc:
+
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        401:
+          $ref: #/components/responses/Error
+        403:
+          $ref: #/components/responses/Error
+  /api/v1/ai/chat:
+    post:
+      summary: AI chat
+      tags:
+        - AI01
+      security:
+        -
+          oidc:
+
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        201:
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        202:
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        400:
+          $ref: #/components/responses/Error
+        401:
+          $ref: #/components/responses/Error
+        403:
+          $ref: #/components/responses/Error
+        409:
+          $ref: #/components/responses/Error
+        422:
+          $ref: #/components/responses/Error
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: #/components/schemas/AiChat
+  /api/v1/ai/drafts:
+    post:
+      summary: AI draft document
+      tags:
+        - AI01
+      security:
+        -
+          oidc:
+
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        201:
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        202:
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        400:
+          $ref: #/components/responses/Error
+        401:
+          $ref: #/components/responses/Error
+        403:
+          $ref: #/components/responses/Error
+        409:
+          $ref: #/components/responses/Error
+        422:
+          $ref: #/components/responses/Error
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: #/components/schemas/AiDraft
+  /api/v1/ai/tool-calls/{id}:
+    get:
+      summary: AI tool call audit view
+      tags:
+        - AI01
+      security:
+        -
+          oidc:
+
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        401:
+          $ref: #/components/responses/Error
+        403:
+          $ref: #/components/responses/Error
+  /api/v1/core/records:
+    post:
+      summary: Create core record
+      tags:
+        - Core
+      security:
+        -
+          oidc:
+
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        201:
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        202:
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        400:
+          $ref: #/components/responses/Error
+        401:
+          $ref: #/components/responses/Error
+        403:
+          $ref: #/components/responses/Error
+        409:
+          $ref: #/components/responses/Error
+        422:
+          $ref: #/components/responses/Error
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: #/components/schemas/CoreRecordCreate
+  /api/v1/core/records/{id}:
+    get:
+      summary: Get core record
+      tags:
+        - Core
+      security:
+        -
+          oidc:
+
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        401:
+          $ref: #/components/responses/Error
+        403:
+          $ref: #/components/responses/Error
+  /api/v1/files:
+    post:
+      summary: Upload file (multipart)
+      tags:
+        - Core
+      security:
+        -
+          oidc:
+
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        201:
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        202:
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        400:
+          $ref: #/components/responses/Error
+        401:
+          $ref: #/components/responses/Error
+        403:
+          $ref: #/components/responses/Error
+        409:
+          $ref: #/components/responses/Error
+        422:
+          $ref: #/components/responses/Error
+  /api/v1/files/{id}:
+    get:
+      summary: Get file metadata or stream
+      tags:
+        - Core
+      security:
+        -
+          oidc:
+
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/SuccessEnvelope
+        401:
+          $ref: #/components/responses/Error
+        403:
+          $ref: #/components/responses/Error
+components:
+  securitySchemes:
+    oidc:
+      type: openIdConnect
+      openIdConnectUrl: "https://keycloak.example/.well-known/openid-configuration"
+    bearerM2M:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    SuccessEnvelope:
+      type: object
+      required:
+        - data
+        - requestId
+      properties:
+        data:
+
+        requestId:
+          type: string
+        page:
+          type: object
+          properties:
+            nextCursor:
+              type: string
+              nullable: true
+            limit:
+              type: integer
+    ErrorBody:
+      type: object
+      required:
+        - code
+        - message
+        - requestId
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        requestId:
+          type: string
+        details:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+              reason:
+                type: string
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+        service:
+          type: string
+        version:
+          type: string
+    GenericData:
+      type: object
+      additionalProperties: true
+      x-nexora-comment: fill-from-payloads
+    GenericWrite:
+      type: object
+      additionalProperties: true
+      x-nexora-comment: fill-from-payloads
+    EmptyObject:
+      type: object
+      additionalProperties: false
+    OrganizationPatch:
+      type: object
+      properties:
+        name:
+          type: string
+        contactEmail:
+          type: string
+        timezone:
+          type: string
+    PartnerConnection:
+      type: object
+      required:
+        - endpointUrl
+        - outboundTokenUrl
+        - outboundClientId
+        - outboundSecretRef
+        - outboundAudience
+        - inboundClientId
+        - allowedInboundScope
+      properties:
+        endpointUrl:
+          type: string
+          format: uri
+        outboundTokenUrl:
+          type: string
+          format: uri
+        outboundClientId:
+          type: string
+        outboundSecretRef:
+          type: string
+        outboundAudience:
+          type: string
+        inboundClientId:
+          type: string
+        allowedInboundScope:
+          type: string
+    ApprovalDecision:
+      type: object
+      required:
+        - decision
+      properties:
+        decision:
+          enum:
+            - approved
+            - rejected
+        reason:
+          type: string
+    QrCreate:
+      type: object
+      required:
+        - policyVersion
+      properties:
+        policyVersion:
+          type: string
+    PassportPublic:
+      type: object
+      properties:
+        productName:
+          type: string
+        publicLotCode:
+          type: string
+        originIssuer:
+          type: string
+        timeline:
+          type: array
+          items:
+            type: object
+        verificationState:
+          type: string
+        gaps:
+          type: array
+          items:
+            type: object
+        asOf:
+          type: string
+          format: date-time
+    FederationEnvelope:
+      type: object
+      description: See contracts/events/envelope-v1.schema.json
+      additionalProperties: true
+    FederationAck:
+      type: object
+      required:
+        - messageId
+        - ackId
+        - acceptedAt
+        - status
+      properties:
+        messageId:
+          type: string
+          format: uuid
+        ackId:
+          type: string
+          format: uuid
+        acceptedAt:
+          type: string
+          format: date-time
+        status:
+          enum:
+            - validated
+            - pending_dependency
+    RetryReason:
+      type: object
+      required:
+        - reason
+      properties:
+        reason:
+          type: string
+    AiChat:
+      type: object
+      required:
+        - message
+      properties:
+        message:
+          type: string
+        conversationId:
+          type: string
+          format: uuid
+        lotRef:
+          type: string
+    AiDraft:
+      type: object
+      required:
+        - documentType
+        - instruction
+      properties:
+        documentType:
+          enum:
+            - goods_receipt
+            - goods_issue
+        instruction:
+          type: string
+        purpose:
+          enum:
+            - partner_transfer
+            - sale
+            - other
+        proposedFields:
+          type: object
+    CoreRecordCreate:
+      type: object
+      required:
+        - kind
+        - payload
+        - visibility
+        - policyVersion
+      properties:
+        kind:
+          enum:
+            - evidence_metadata
+            - trace_projection
+            - ot_reading
+            - archive_manifest
+        sourceType:
+          type: string
+        sourceId:
+          type: string
+        payload:
+          type: object
+        visibility:
+          type: string
+        policyVersion:
+          type: string
+  responses:
+    Error:
+      description: Error
+      content:
+        application/json:
+          schema:
+            $ref: #/components/schemas/ErrorBody

@@ -1,24 +1,24 @@
 # Decision log và spike bắt buộc
 
-Quyết định ở đây là **đề xuất có điều kiện**, chưa phải dependency đã cài. Mỗi ADR cần: câu hỏi, phương án, tiêu chí, spike lặp lại được, ảnh hưởng giấy phép/tài nguyên, lựa chọn, ngày và người chấp thuận. Không bắt đầu task phụ thuộc khi ADR liên quan chưa đóng.
+Quyết định ở đây là **Accepted-provisional** theo ADR trong [`documents/adr/`](../adr/README.md) — đủ để AI/dev không tự chọn stack khác, **chưa** đủ đóng G00. Mỗi ADR cần spike lặp lại được, pin version/digest/license/RAM, rồi promote status → Accepted. Không bắt đầu task runtime phụ thuộc khi spike của ADR chặn phase đó còn pending (trừ công việc thuần tài liệu).
 
-| ID | Chốt trước | Đề xuất/điều kiện chấp nhận |
-| --- | --- | --- |
-| D01 Gateway | P01/P02 | Thử Apache APISIX vì có plugin OIDC/Keycloak và Compose; kiểm tra route private/public/M2M, nguồn mở, tag, phụ thuộc etcd và RAM. Nếu không đạt, chọn gateway nguồn mở khác có cùng test, không thay bằng reverse proxy chỉ route URL. |
-| D02 Object storage | P01/P03 | Chọn server S3-compatible tự host có image/source tái lập, ký URL và backup. SeaweedFS là ứng viên; nếu dùng MinIO Community cần xác minh cách build/phân phối hiện hành, không mặc định có image community mới. |
-| D03 Database adapter/migration | P00/P03 | **Accepted baseline: Prisma Client + Prisma Migrate** trên PostgreSQL. Một stack duy nhất; `prisma.$transaction` (interactive) truyền `Prisma.TransactionClient` vào repository/port. Spike confirm + stock movement + audit + outbox rollback trong cùng TX. Không dùng Drizzle/`pg` Pool song song. `$queryRaw` chỉ tagged/parameterized khi ADR cho phép report/CTE. Chi tiết: `prisma-migration-spec.md`. |
-| D04 Identity/session | P02 | Keycloak OIDC, authorization-code + PKCE cho người dùng; backend kiểm token/claims và quyền theo DB, gateway bảo vệ route. Quyết định session/BFF theo Next.js 16 docs trong `node_modules` khi bắt đầu code. |
-| D05 Federation trust | P02/P05 | Receiver cấp confidential client/service account cho partner trong realm của receiver, token client-credentials ngắn hạn; partner mapping cố định theo `client_id`/scope, không tin org ID từ body. Chứng minh A/B/C độc lập. |
-| D06 Workflow process | P04/P07 | Baseline Flowable OSS REST/BPMN `goods-issue-approval` cho **mọi** GoodsIssue v1, Approver khác creator, poller/reconciler state về app. Spike chốt process key/version, timeout, retry và REST/history trên phiên bản pin; không dùng H2/mật khẩu demo trong release. |
-| D07 Decimal/unit/lot | P00/P06 | Chốt đơn vị cơ sở, precision `numeric`, quy tắc hàng rời/hàng chiếc, uniqueness lot theo issuer và product. Không dùng JS float cho tồn; test làm tròn và concurrent issue. |
-| D08 Trace/federation contract | P00/P08 | Event envelope có version, issuer, event/message IDs, occurred/published times, **origin lot và sender-local lot tách biệt**, upstream references, source document/evidence và sharing policy. Quyết định quyền chuyển tiếp upstream summary tới C và downstream impact summary ngược tới A; không suy diễn lô cùng tên là cùng nguồn. |
-| D09 AI provider | P10 | Python service + LLM có thể tự host hoặc external theo cấu hình. Không gửi secret/PII sang external mặc định; AI chỉ gọi tool allowlist qua API có authz, không tự confirm. Chốt model, data policy, timeout, quota và fallback. |
-| D10 H-P-D-I proof | P00/P11 | Chọn workspace tầng 2 cụ thể: H danh tính/hộp việc, P phê duyệt + giao nhận, D timeline/điều hành lô, I AI tra cứu/Draft. Chỉ gọi là minh họa khi UI chạy qua lõi thật. |
-| D11 Bốn nguyên lý §4 | P00/P12 | Chốt minh chứng có thể demo cho lifecycle dữ liệu, IT/OT, lineage/quality, zero-trust/GitOps. Xác minh với BTC mức bắt buộc nếu có diễn giải khác; giữ phương án kỹ thuật trong Phase 12. |
-| D12 GitOps demo | P12 | Compose + CI là IaC/CI, không tự động là GitOps. Nếu cần minh chứng GitOps đúng nghĩa, dùng môi trường k3s/Argo CD riêng với desired state trong Git và drift/reconcile test; không đổi toàn bộ dev stack khi chưa có tài nguyên. |
-| D13 Phiên bản/giấy phép | P01/P13 | Pin image digest, lockfile, SBOM/license inventory; xác minh giấy phép của Flowable OSS, gateway, storage, model/SDK; không dùng sản phẩm enterprise không thể build từ source. |
-| D14 Movement ownership | P00/P07 | Chốt chính xác chứng từ nào đổi tồn. Đề xuất: GoodsReceipt +, GoodsIssue −, ReceivingConfirmation + theo actual, Stocktake theo variance; PartnerTransfer và SaleRecord chỉ tham chiếu GoodsIssue, không trừ thêm. Một outbound issue ↔ một transfer cùng lot/qty trong MVP. Test chống double movement. |
-| D15 Ranh giới headless/tầng 2 | P00/P01 | Bắt buộc chứng minh lõi không cấp UI: tách runtime core data/file API không UI khỏi Next ERP và một DX-Lab app tầng 2 riêng (có thể cùng monorepo). Core API phục vụ structured metadata/projection + file qua gateway; ERP vẫn sở hữu transaction stock/document/audit/outbox trong một app DB. Smoke core khi tắt cả hai UI. ADR chốt contract/runtime/resource. |
+| ID | Chốt trước | Status | ADR | Đề xuất/điều kiện chấp nhận |
+| --- | --- | --- | --- | --- |
+| D01 Gateway | P01/P02 | Accepted-provisional (spike pending) | [0001](../adr/0001-gateway-apisix.md) | Apache APISIX + OIDC/Keycloak; route private/public/M2M; không thay bằng reverse proxy chỉ rewrite URL. |
+| D02 Object storage | P01/P03 | Accepted-provisional (spike pending) | [0002](../adr/0002-object-storage-seaweedfs.md) | SeaweedFS S3 tự host (ứng viên); buckets quarantine/private/public; kiểm MinIO Community nếu đổi. |
+| D03 Database adapter/migration | P00/P03 | Accepted-provisional (spike pending) | [0003](../adr/0003-database-prisma.md) | **Prisma Client + Prisma Migrate**; `$transaction` + `TransactionClient`; cấm Drizzle/`pg` Pool song song; xem `prisma-migration-spec.md`. |
+| D04 Identity/session | P02 | Accepted-provisional (spike pending) | [0004](../adr/0004-identity-session-keycloak.md) | Keycloak OIDC + PKCE; RBAC trong app DB; CSRF/session theo Next 16 + `security.md`. |
+| D05 Federation trust | P02/P05 | Accepted-provisional (spike pending) | [0005](../adr/0005-federation-trust-m2m.md) | Receiver cấp M2M client; map `client_id`→partner; không tin org ID từ body. |
+| D06 Workflow process | P04/P07 | Accepted-provisional (spike pending) | [0006](../adr/0006-workflow-flowable-goods-issue.md) | Flowable OSS + PG; BPMN `goods-issue-approval` mọi GoodsIssue v1; Approver ≠ creator. |
+| D07 Decimal/unit/lot | P00/P06 | Accepted-provisional (spike pending) | [0007](../adr/0007-decimal-unit-lot.md) | `numeric(20,3)`, decimal string JSON; EA/KG/L; không JS float; lot issuer-qualified. |
+| D08 Trace/federation contract | P00/P08 | Accepted-provisional (spike pending) | [0008](../adr/0008-trace-federation-envelope.md) | Envelope 1.0; originLot ≠ senderBatch; ACK ≠ receiving; sharing policy. |
+| D09 AI provider | P10 | Accepted-provisional (deferred P10) | [0009](../adr/0009-ai-provider.md) | Python + tool allowlist; Draft-only; chốt model/policy tại P10. |
+| D10 H-P-D-I proof | P00/P11 | Accepted-provisional (spike pending) | [0010](../adr/0010-hpdi-dx-lab.md) | `apps/dx-lab` H/P/D/I qua gateway; không slide-only. |
+| D11 Bốn nguyên lý §4 | P00/P12 | Accepted-provisional (spike pending) | [0011](../adr/0011-four-principles-proof.md) | Minh chứng lifecycle/IT-OT/lineage/zero-trust; xác minh BTC. |
+| D12 GitOps demo | P12 | Accepted-provisional (spike pending) | [0012](../adr/0012-gitops-demo.md) | Compose+CI ≠ GitOps; k3s/Argo riêng nếu cần. |
+| D13 Phiên bản/giấy phép | P01/P13 | Accepted-provisional (spike pending) | [0013](../adr/0013-versions-licenses.md) | Pin digest, SBOM, license inventory; không `latest` release. |
+| D14 Movement ownership | P00/P07 | Accepted-provisional (spike pending) | [0014](../adr/0014-movement-ownership.md) | Receipt+/Issue−/Receiving+actual/Stocktake±; transfer/sale không trừ lần hai. |
+| D15 Ranh giới headless/tầng 2 | P00/P01 | Accepted-provisional (spike pending) | [0015](../adr/0015-headless-tier2-boundary.md) | Core data/file headless; ERP TX; DX-Lab tách; smoke tắt UI. |
 
 ### Ghi chú về lựa chọn công nghệ
 

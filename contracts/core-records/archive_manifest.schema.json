@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "archive_manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "objectKey",
+    "sha256Hex",
+    "recordCount",
+    "firstOccurredAt",
+    "lastOccurredAt",
+    "sourceMinId",
+    "sourceMaxId",
+    "exportedAt",
+    "checkpoint",
+    "format"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "objectKey": {
+      "type": "string"
+    },
+    "sha256Hex": {
+      "type": "string",
+      "minLength": 64,
+      "maxLength": 64
+    },
+    "recordCount": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "firstOccurredAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "lastOccurredAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "sourceMinId": {
+      "type": "string"
+    },
+    "sourceMaxId": {
+      "type": "string"
+    },
+    "exportedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "checkpoint": {
+      "type": "string"
+    },
+    "format": {
+      "const": "jsonl"
+    }
+  }
+}

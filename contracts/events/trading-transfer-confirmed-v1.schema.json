@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "trading.transfer.confirmed.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "eventId",
+    "occurredAt"
+  ],
+  "properties": {
+    "eventId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "occurredAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "documentId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "documentVersion": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "lines": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    }
+  },
+  "x-nexora-comment": "fill-from-payloads \u2014 see event-payloads-v1.md section 2"
+}

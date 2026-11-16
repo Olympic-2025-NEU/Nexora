@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "trace_projection",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "originLot",
+    "sourceEventIds",
+    "nodes",
+    "edges",
+    "transformVersion",
+    "asOf"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "originLot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "issuerInstanceId",
+        "lotId"
+      ],
+      "properties": {
+        "issuerInstanceId": {
+          "type": "string"
+        },
+        "lotId": {
+          "type": "string",
+          "format": "uuid"
+        }
+      }
+    },
+    "sourceEventIds": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "format": "uuid"
+      }
+    },
+    "nodes": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "edges": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "transformVersion": {
+      "type": "string"
+    },
+    "asOf": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}
