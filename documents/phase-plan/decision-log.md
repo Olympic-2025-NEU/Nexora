@@ -6,7 +6,7 @@ Quyết định ở đây là **Accepted-provisional** theo ADR trong [`document
 | --- | --- | --- | --- | --- |
 | D01 Gateway | P01/P02 | Accepted-provisional (spike pending) | [0001](../adr/0001-gateway-apisix.md) | Apache APISIX + OIDC/Keycloak; route private/public/M2M; không thay bằng reverse proxy chỉ rewrite URL. |
 | D02 Object storage | P01/P03 | Accepted-provisional (spike pending) | [0002](../adr/0002-object-storage-seaweedfs.md) | SeaweedFS S3 tự host (ứng viên); buckets quarantine/private/public; kiểm MinIO Community nếu đổi. |
-| D03 Database adapter/migration | P00/P03 | Accepted-provisional (spike pending) | [0003](../adr/0003-database-prisma.md) | **Prisma Client + Prisma Migrate**; `$transaction` + `TransactionClient`; cấm Drizzle/`pg` Pool song song; xem `prisma-migration-spec.md`. |
+| D03 Database adapter/migration | P00/P03 | **Accepted** (spike PASS 2026-11-16) | [0003](../adr/0003-database-prisma.md) | **Prisma Client + Prisma Migrate** 6.19.0; evidence [`evidence/spike-d03.md`](./evidence/spike-d03.md). Cấm Drizzle/`pg` Pool song song. |
 | D04 Identity/session | P02 | Accepted-provisional (spike pending) | [0004](../adr/0004-identity-session-keycloak.md) | Keycloak OIDC + PKCE; RBAC trong app DB; CSRF/session theo Next 16 + `security.md`. |
 | D05 Federation trust | P02/P05 | Accepted-provisional (spike pending) | [0005](../adr/0005-federation-trust-m2m.md) | Receiver cấp M2M client; map `client_id`→partner; không tin org ID từ body. |
 | D06 Workflow process | P04/P07 | Accepted-provisional (spike pending) | [0006](../adr/0006-workflow-flowable-goods-issue.md) | Flowable OSS + PG; BPMN `goods-issue-approval` mọi GoodsIssue v1; Approver ≠ creator. |

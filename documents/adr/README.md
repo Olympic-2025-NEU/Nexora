@@ -10,7 +10,7 @@ Status convention for this package:
 | --- | --- | --- |
 | D01 | [0001-gateway-apisix.md](./0001-gateway-apisix.md) | P01/P02 |
 | D02 | [0002-object-storage-seaweedfs.md](./0002-object-storage-seaweedfs.md) | P01/P03 |
-| D03 | [0003-database-prisma.md](./0003-database-prisma.md) | P00/P03 |
+| D03 | [0003-database-prisma.md](./0003-database-prisma.md) (**Accepted**) | P00/P03 |
 | D04 | [0004-identity-session-keycloak.md](./0004-identity-session-keycloak.md) | P02 |
 | D05 | [0005-federation-trust-m2m.md](./0005-federation-trust-m2m.md) | P02/P05 |
 | D06 | [0006-workflow-flowable-goods-issue.md](./0006-workflow-flowable-goods-issue.md) | P04/P07 |
