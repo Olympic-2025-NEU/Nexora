@@ -15,9 +15,9 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 1. `documents/referents/SOURCE_OF_TRUTH.md`
 2. `ARCHITECTURE.md`
 3. Module plan in `documents/plans/` for the feature you touch
-4. `documents/referents/CODING_RULES.md` and `FOLDER_STRUCTURE.md`
+4. `documents/referents/CODING_RULES.md`, `FOLDER_STRUCTURE.md`, `MVC_DDD_LAYERING.md`, `PLATFORM_CAPABILITIES.md`
 5. `documents/referents/OLP_2026_ALIGNMENT.md` when planning contest readiness
-6. `documents/phase-plan/README.md` and the relevant phase when implementing MVP work
+6. `documents/phase-plan/README.md`, the relevant `phase-xx-*.md` **TASK_ID**, and contracts (`api-contracts`, `database-schema-v1`, `prisma-migration-spec`, `security`) when implementing
 
 ## MVP modules (Chapter 6)
 
@@ -45,7 +45,8 @@ Use project skills under `.cursor/skills/` when relevant:
 ## Hard constraints
 
 - Self-hosted single-org per instance; not SaaS multi-tenant.
-- Stack: Next.js + TypeScript + PostgreSQL (Chapter 7.12) — not Laravel.
+- Stack: Next.js + TypeScript + PostgreSQL + **Prisma** (Chapter 7.12 / D03) — not Laravel, not a second ORM.
+- Thin Controller / Application+Domain / Prisma Repository only — no fat routes, no `prisma` in domain.
 - License: GNU AGPL v3 only (`AGPL-3.0-only`). Preserve the full `LICENSE`; add SPDX notices to authored source files before release.
 - Contest core: headless Identity/SSO, API Gateway, structured/unstructured data, and executable Workflow. The Next.js UI/API is the business application, not proof that the headless core exists.
 - Do not expand MVP with finance/CRM/full POS/production.

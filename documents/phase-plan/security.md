@@ -15,7 +15,18 @@ Internet chỉ đến Gateway HTTPS. User token từ Keycloak, partner token t�
 | Public consumer | Không đăng nhập | Chỉ Passport projection theo QR/policy/rate limit |
 | AI service | Internal service identity | Chỉ inference/tool request allowlist, không có DB credential ghi |
 
-M01 quản lý mapping `Keycloak sub -> membership/role/scope`. Vai trò tối thiểu Admin/Staff theo Ch6; Approver là quyền/task assignment của workflow, không nhất thiết một role toàn hệ thống. Resource authz theo product/warehouse/partner/row phải chạy trong app kể cả khi gateway đã chấp nhận token. Mọi 403 phải có audit an toàn; tránh phân biệt tài nguyên không tồn tại với không được phép nếu gây lộ ID.
+M01 quản lý mapping `Keycloak sub -> membership/role/scope`. Vai membership v1: `administrator`, `staff`, `approver`, `viewer` (một nguồn với schema). Approver gắn Flowable task; không đồng nghĩa quyền confirm document. Resource authz theo product/warehouse/partner/row chạy trong app kể cả khi gateway đã chấp nhận token. Mọi 403 phải có audit an toàn; tránh phân biệt tài nguyên không tồn tại với không được phép nếu gây lộ ID.
+
+## 2.1. XSS, CSRF, SQL Injection (bắt buộc)
+
+| Threat | Biện pháp |
+| --- | --- |
+| **SQL Injection** | Chỉ Prisma Client API; `$queryRaw`/`$executeRaw` dùng tagged template hoặc bind values — **cấm** nối chuỗi SQL từ input. Sort/filter/report: allowlist cột trong code. |
+| **XSS** | React escape mặc định; cấm `dangerouslySetInnerHTML` trừ allowlist + sanitize. CSP qua Next/gateway. Passport/public chỉ field projection; không render HTML từ partner payload thô. Encode output API khi đưa vào UI. |
+| **CSRF** | Cookie session (D04 BFF): `SameSite=Lax` hoặc `Strict`, `Secure`, CSRF token hoặc double-submit cookie cho mutative browser calls. API bearer M2M/federation: không dùng cookie session → không áp CSRF cookie. Origin/Referer check bổ sung khi dùng cookie. |
+| **Mass assignment** | Zod schema cố định; bỏ field `role`, `orgId`, `createdBy`, `status` từ body nếu client tự gửi. |
+
+Threat-test tối thiểu: XSS reflection trên field text chứng từ/Passport; CSRF thiếu token → 403; filter report với payload SQL → 400 và không đổi dữ liệu.
 
 ## 3. Route và dữ liệu
 
@@ -37,6 +48,9 @@ M01 quản lý mapping `Keycloak sub -> membership/role/scope`. Vai trò tối t
 | Upload tệp độc hại, scan timeout | Quarantine, không download/public |
 | QR đoán được, truy cập private attachment | Không thể truy cập; rate limit và policy |
 | Prompt injection yêu cầu confirm hoặc đọc lot ngoài quyền | Tool reject; không có confirmed document/stock movement |
+| XSS payload trong text field / Passport | Không thực thi script; CSP chặn inline nếu cấu hình |
+| CSRF: POST confirm cookie session thiếu token | 403; không side effect |
+| SQLi trong `sort`/`filter` report hoặc list | 400; query không chạy chuỗi tùy ý; audit/deny |
 
 ## 5. Chứng cứ bảo mật cần bàn giao
 

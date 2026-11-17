@@ -1,0 +1,244 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nexora.local/contracts/events/envelope-v1.schema.json",
+  "title": "FederationEnvelopeV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "messageId",
+    "eventId",
+    "eventType",
+    "issuerInstanceId",
+    "recipientInstanceId",
+    "occurredAt",
+    "publishedAt",
+    "correlationId",
+    "causationId",
+    "sourceDocument",
+    "lots",
+    "upstreamReferences",
+    "evidence",
+    "sharingPolicyVersion"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0"
+    },
+    "messageId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "eventId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "eventType": {
+      "type": "string",
+      "enum": [
+        "transfer.announced.v1",
+        "receipt.confirmed.v1",
+        "downstream.impact.v1"
+      ]
+    },
+    "issuerInstanceId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "recipientInstanceId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "occurredAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "publishedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "correlationId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "causationId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "sourceDocument": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "id",
+        "version"
+      ],
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "lots": {
+      "type": "array",
+      "maxItems": 100,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "sourceLineId",
+          "originLot",
+          "senderBatch",
+          "product",
+          "quantity",
+          "unit"
+        ],
+        "properties": {
+          "sourceLineId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "originLot": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "issuerInstanceId",
+              "lotId"
+            ],
+            "properties": {
+              "issuerInstanceId": {
+                "type": "string"
+              },
+              "lotId": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          },
+          "senderBatch": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "instanceId",
+              "batchId"
+            ],
+            "properties": {
+              "instanceId": {
+                "type": "string"
+              },
+              "batchId": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          },
+          "product": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "instanceId",
+              "productId"
+            ],
+            "properties": {
+              "instanceId": {
+                "type": "string"
+              },
+              "productId": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          },
+          "quantity": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]*)(\\.[0-9]{1,3})?$"
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "EA",
+              "KG",
+              "L"
+            ]
+          }
+        }
+      }
+    },
+    "upstreamReferences": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "issuerInstanceId",
+          "messageId",
+          "eventId"
+        ],
+        "properties": {
+          "issuerInstanceId": {
+            "type": "string"
+          },
+          "messageId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "eventId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "maxItems": 100,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "checksum",
+          "visibility"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "checksum": {
+            "type": "string",
+            "minLength": 64,
+            "maxLength": 64
+          },
+          "visibility": {
+            "enum": [
+              "partner",
+              "public"
+            ]
+          }
+        }
+      }
+    },
+    "sharingPolicyVersion": {
+      "type": "string"
+    },
+    "linkedIssueId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "sentQuantity": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)(\\.[0-9]{1,3})?$"
+    }
+  }
+}

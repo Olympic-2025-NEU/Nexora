@@ -28,6 +28,9 @@ Thứ tự ưu tiên khi tài liệu mâu thuẫn:
 | Định danh | Keycloak (OIDC/SSO) |
 | Workflow | Flowable (một quy trình phê duyệt mẫu trong MVP) |
 | Dữ liệu | PostgreSQL; Redis; object storage tương thích S3 (ưu tiên tự host cho bản demo) |
+| Persistence (D03) | **Prisma Client + Prisma Migrate — chốt 2026-11-17** (một stack; không Drizzle/`pg` Pool; ADR `pg` trên phase-00 superseded) |
+| Layering | MVC map trên DDD: Thin Controller / Application+Domain / Prisma Repository — `MVC_DDD_LAYERING.md` |
+| Platform caps | CRUD pattern, RBAC 4 vai, Workflow+Flowable, Outbox queue, Audit, Reporting read-model — `PLATFORM_CAPABILITIES.md` |
 | AI | Python/LLM gọi tool qua API nghiệp vụ đã phân quyền |
 
 ## Phạm vi MVP (tóm tắt Chương 6)

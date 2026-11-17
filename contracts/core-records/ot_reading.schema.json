@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ot_reading",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "deviceId",
+    "readingId",
+    "batchId",
+    "metric",
+    "value",
+    "unit",
+    "observedAt",
+    "qualityState",
+    "simulated"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "deviceId": {
+      "type": "string"
+    },
+    "readingId": {
+      "type": "string"
+    },
+    "batchId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "metric": {
+      "const": "temperature_c"
+    },
+    "value": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)(\\.[0-9]{1,3})?$"
+    },
+    "unit": {
+      "const": "C"
+    },
+    "observedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "qualityState": {
+      "enum": [
+        "accepted",
+        "stale"
+      ]
+    },
+    "simulated": {
+      "const": true
+    }
+  }
+}

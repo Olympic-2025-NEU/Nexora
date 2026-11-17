@@ -1,5 +1,7 @@
 # Quy tắc coding Nexora
 
+Layering MVC↔DDD: `MVC_DDD_LAYERING.md`. Platform capabilities (CRUD/RBAC/Workflow/Queue/Audit/Reporting): `PLATFORM_CAPABILITIES.md`. Persistence: Prisma (`../phase-plan/prisma-migration-spec.md`).
+
 ## Giấy phép và ranh giới lõi
 
 - Tệp mã do nhóm viết phải có thông báo `SPDX-License-Identifier: AGPL-3.0-only`; giữ toàn văn giấy phép trong `LICENSE`. Kiểm tra quyền và giấy phép của mã/tài sản bên thứ ba trước khi đưa vào repo.
@@ -14,7 +16,7 @@ Thứ tự bắt buộc trong route/application handler:
 2. Phân quyền theo vai và phạm vi dữ liệu.
 3. Idempotency (`Idempotency-Key`) trước khi làm lại lệnh đã thành công.
 4. Domain kiểm bất biến và hành động trạng thái.
-5. Một giao dịch PostgreSQL: ghi aggregate + lịch sử cần thiết + outbox + audit.
+5. Một `prisma.$transaction`: ghi aggregate + lịch sử cần thiết + outbox + audit (cùng `TransactionClient`).
 6. Sau commit: dispatcher gửi outbox. Lỗi bên nhận không rollback nghiệp vụ đã commit.
 
 ## Trạng thái chứng từ
@@ -36,11 +38,20 @@ Thứ tự bắt buộc trong route/application handler:
 - Gửi lại được; chống trùng bằng khóa nghiệp vụ (message id / idempotency key).
 - Nhận thông tin xuất hàng từ đối tác không đồng nghĩa đã nhập đủ số lượng.
 
-## Quyền MVP
+## Quyền MVP (RBAC)
 
-Vai tối thiểu: `Administrator`, `Staff`.
+Vai membership (một nguồn với `database-schema-v1.md`):
 
-Phạm vi dòng khi cần: `all`, `read`, `own`, `unit`, `assigned` (học từ DX-OS; áp dụng dần theo nhu cầu).
+| Role | Phạm vi chính |
+| --- | --- |
+| `administrator` | Org, members, partner connection, retry federation, audit/report rộng, policy |
+| `staff` | Draft/confirm trong kho được cấp, xem lot/trace theo scope |
+| `approver` | Quyết định Flowable task (không đồng nghĩa tự confirm document; separation-of-duties) |
+| `viewer` | Chỉ đọc theo warehouse/row scope được cấp |
+
+Warehouse scope qua `membership_warehouse`. Phân quyền resource chạy trong application dù gateway đã chấp nhận token.
+
+Phạm vi dòng khi cần: `all`, `read`, `own`, `unit`, `assigned` (học từ DX-OS; áp dụng dần).
 
 ## Kiểm thử tối thiểu theo thay đổi
 
@@ -54,5 +65,6 @@ Phạm vi dòng khi cần: `all`, `read`, `own`, `unit`, `assigned` (học từ 
 
 - Thêm module finance, CRM, POS đầy đủ, sản xuất, QC nhiều bước.
 - SaaS multi-tenant trên một database.
-- Import Laravel pattern / Eloquent; stack là Next.js + TypeScript.
+- Import Laravel/Eloquent hoặc ORM thứ hai; persistence = **Prisma** + Next.js + TypeScript.
+- Gọi `prisma.*` từ route handler hoặc domain; chỉ repository/infrastructure được dùng Prisma client.
 - AI tự confirm hoặc tự kết luận hàng giả không có căn cứ.

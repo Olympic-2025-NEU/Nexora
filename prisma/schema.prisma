@@ -1,0 +1,74 @@
+// D03 spike schema — minimal multi-schema models for TX/rollback evidence.
+// Full MVP models land in P01+ per database-schema-v1.md; do not treat this as production schema.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  schemas  = ["platform", "inventory", "trading"]
+}
+
+model SpikeAuditLog {
+  id         String   @id @db.Uuid
+  action     String
+  targetType String   @map("target_type")
+  targetId   String   @map("target_id") @db.Uuid
+  outcome    String
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("spike_audit_log")
+  @@schema("platform")
+}
+
+model SpikeOutboxMessage {
+  id            String   @id @db.Uuid
+  aggregateType String   @map("aggregate_type")
+  aggregateId   String   @map("aggregate_id") @db.Uuid
+  eventType     String   @map("event_type")
+  payloadJson   Json     @map("payload_json")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("spike_outbox_message")
+  @@schema("platform")
+}
+
+model SpikeStockBalance {
+  id          String   @id @db.Uuid
+  warehouseId String   @map("warehouse_id") @db.Uuid
+  batchId     String   @map("batch_id") @db.Uuid
+  quantity    Decimal  @db.Decimal(20, 3)
+  version     Int      @default(1)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([warehouseId, batchId])
+  @@map("spike_stock_balance")
+  @@schema("inventory")
+}
+
+model SpikeStockMovement {
+  id               String   @id @db.Uuid
+  warehouseId      String   @map("warehouse_id") @db.Uuid
+  batchId          String   @map("batch_id") @db.Uuid
+  delta            Decimal  @db.Decimal(20, 3)
+  sourceDocumentId String   @map("source_document_id") @db.Uuid
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([sourceDocumentId])
+  @@map("spike_stock_movement")
+  @@schema("inventory")
+}
+
+model SpikeDocument {
+  id        String   @id @db.Uuid
+  status    String
+  version   Int      @default(1)
+  quantity  Decimal  @db.Decimal(20, 3)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("spike_document")
+  @@schema("trading")
+}

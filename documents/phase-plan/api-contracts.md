@@ -1,6 +1,6 @@
 # API contract đề xuất để chốt ở P00
 
-Đây là **bề mặt API mục tiêu**, chưa tồn tại. Route và DTO/response/error chi tiết v1 ở [api-payloads-v1.md](./api-payloads-v1.md); file OpenAPI thực phải sinh ở P00/P02. Giữ `/api/v1`, JSON UTF-8, thời gian ISO 8601 UTC, ID opaque; không trả nguyên stack trace. Contract ở đây phải được sửa cùng test và client khi ADR thay đổi. Next Route Handler là adapter HTTP, use case/domain ở context.
+Đây là **bề mặt API mục tiêu**, chưa tồn tại. Route và DTO/response/error chi tiết v1 ở [api-payloads-v1.md](./api-payloads-v1.md); file OpenAPI thực phải sinh ở P00/P02. Giữ `/api/v1`, JSON UTF-8, thời gian ISO 8601 UTC, ID opaque; không trả nguyên stack trace. Contract ở đây phải được sửa cùng test và client khi ADR thay đổi. Next Route Handler là **Thin Controller** (MVC map): chỉ validate + gọi use case — xem `../referents/MVC_DDD_LAYERING.md`.
 
 ## 1. Quy tắc chung
 
@@ -23,8 +23,36 @@
 | M04 Trace | `GET /api/v1/lots/{id}/history`, `/trace/backward`, `/trace/forward`, `POST /api/v1/lots/{id}/qr`, `GET /api/v1/public/passport/{token}` | Giới hạn depth/page; ghi khoảng thiếu, issuer/evidence; public projection không lộ PII/giá/secret |
 | M04 Federation | `POST /api/v1/federation/events`, `GET /api/v1/federation/deliveries`, `POST /api/v1/federation/deliveries/{id}/retry` | M2M auth, schema_version, dedupe/hash; technical ACK là response 202 có message ID (async ACK route chỉ thêm nếu ADR chứng minh cần), riêng business receipt; admin-only retry |
 | AI01 | `POST /api/v1/ai/chat`, `POST /api/v1/ai/drafts`, `GET /api/v1/ai/tool-calls/{id}` nếu cần audit UI | Tool allowlist; cùng quyền user; chỉ Draft; timeout/fallback; response có source IDs |
+| Platform Audit | `GET /api/v1/audit-logs` | Administrator; filter allowlist; append-only data |
+| Platform Reports | `GET /api/v1/reports/inventory-summary`, `.../document-counts`, `.../open-quality-signals` | Read-model/ops stats theo RBAC scope; không BI builder |
 
 Các route `/{type}` trên là ký hiệu rút gọn; OpenAPI phải liệt kê từng path cụ thể, không implement dynamic catch-all cho mọi loại chứng từ.
+
+### 2.1. Cây thư mục route theo cụm chức năng
+
+```text
+app/api/v1/
+  health/live|ready/
+  me/
+  organization/                 # M01
+  members/
+  partners/[id]/connection/
+  products/[id]/identifiers/    # M02
+  batches/[id]/quality-actions/
+  warehouses/
+  inventory/balances|movements/
+  receipts|issues|transfers|receivings|stocktakes|sales-records/[id]/{confirm,cancel,...}/
+  documents/
+  approvals/tasks|/[id]/decision/
+  lots/[id]/history|trace|qr/   # M04
+  public/passport/[token]/
+  federation/events|deliveries/
+  audit-logs/                   # platform
+  reports/inventory-summary|document-counts|open-quality-signals/
+  ai/chat|drafts|tool-calls/
+  core/records/                 # core API (có thể runtime riêng)
+  files/
+```
 
 ## 3. Ví dụ contract quan trọng
 

@@ -1,6 +1,6 @@
 # Runtime/deploy/CI blueprint v1
 
-Đây là danh sách tệp và config để AI dựng hạ tầng. `deploy/docker-compose.yml` hiện chỉ có PostgreSQL và mount SQL rỗng; P01 thay/di chuyển nó sang `deploy/compose.yml`, cập nhật mọi script và README trong **cùng PR**, không để hai Compose file cùng được coi là entrypoint. `db/migrations/0001_platform.sql` rỗng cũng được thay bằng `0001_platform_core.sql`, không giữ hai migration số 0001. Những tệp sau là **đích phải tạo**. Image tag/digest của dịch vụ ngoài repo phải được ghi vào D01/D02/D06/D13 sau spike P00; không đoán tag hợp lệ hoặc dùng `latest` ở release.
+Đây là danh sách tệp và config để AI dựng hạ tầng. `deploy/docker-compose.yml` hiện chỉ có PostgreSQL và mount SQL rỗng; P01 thay/di chuyển nó sang `deploy/compose.yml`, cập nhật mọi script và README trong **cùng PR**, không để hai Compose file cùng được coi là entrypoint. `db/migrations/0001_platform.sql` rỗng được thay bằng **Prisma Migrate** (`prisma/migrations/`, xem `prisma-migration-spec.md`). Những tệp sau là **đích phải tạo**. Image tag/digest của dịch vụ ngoài repo phải được ghi vào D01/D02/D06/D13 sau spike P00; không đoán tag hợp lệ hoặc dùng `latest` ở release.
 
 ## Layout đích
 
@@ -15,14 +15,15 @@ deploy/
   seaweedfs/bucket-policy.json
   scripts/bootstrap.ps1, bootstrap.sh, smoke.ps1, smoke.sh
   gitops/                     # k3s/Argo CD demo P12
-db/migrations/0001_*.sql ... 0009_*.sql
+prisma/schema.prisma
+prisma/migrations/          # Prisma Migrate (D03); thay db/migrations/*.sql
 contracts/openapi/nexora-v1.yaml
 contracts/events/*.schema.json
 contracts/core-records/*.schema.json
 .github/workflows/ci.yml
 ```
 
-Không commit `.env`, realm export có secret, token, DB dump thật, private file hay API key. `bootstrap` đọc env, validate biến, chạy migration runner versioned, seed idempotent theo instance, provision realm/client/bucket/route/process bằng API hoặc import có retry; không chỉ dựa `docker-entrypoint-initdb.d`.
+Không commit `.env`, realm export có secret, token, DB dump thật, private file hay API key. `bootstrap` đọc env, validate biến, chạy `prisma migrate deploy` (+ `prisma generate`), seed idempotent theo instance, provision realm/client/bucket/route/process bằng API hoặc import có retry; không chỉ dựa `docker-entrypoint-initdb.d`.
 
 ## Compose service matrix (một instance)
 

@@ -33,7 +33,11 @@ nexora/
     ai/                     # AI01 — tool-calling service
   workers/                  # Outbox, Flowable bridge, trace/federation/archive; process riêng
   composition/              # Wire ports, event handlers giữa contexts
-  db/migrations/
+  prisma/
+    schema.prisma           # Models/relations (multi-schema PG) — D03
+    migrations/             # Prisma Migrate (nguồn migration duy nhất)
+    seed.ts                 # Seed idempotent (optional)
+  db/migrations/            # Deprecated: file rỗng cũ; P01 chuyển hẳn sang prisma/
   contracts/                # OpenAPI, JSON Schema event/core-record, fixtures versioned
   tests/                    # Integration/e2e, gateway/auth, security và failure tests
   deploy/                   # Cấu hình lõi headless và multi-instance demo A/B/C (đích)
@@ -52,21 +56,24 @@ Lõi headless là các dịch vụ triển khai và API của chúng (Identity/S
 
 ## Luật import
 
-1. `app/` chỉ gọi public API của context (`contexts/<name>/index.ts`) hoặc application service qua composition. Không chứa quy tắc nghiệp vụ.
-2. `platform/` không import `contexts/` hoặc `services/ai/`.
+1. `app/` chỉ gọi public API của context (`contexts/<name>/index.ts`) hoặc application service qua composition. Không chứa quy tắc nghiệp vụ. Route = Thin Controller (xem `MVC_DDD_LAYERING.md`).
+2. `platform/` không import `contexts/` hoặc `services/ai/`. Prisma singleton sống ở `platform/persistence/`.
 3. Context A không import domain/infrastructure của context B. Chỉ giao tiếp qua port (interface) do context sở hữu, được wire ở `composition/`.
 4. Mỗi context export công khai qua `index.ts`.
 5. `services/ai/` chỉ gọi API nghiệp vụ đã phân quyền; không ghi DB trực tiếp.
+6. Chỉ `infrastructure/*Repository` được gọi Prisma; domain/route cấm `prisma.*`.
 
-## Lớp trong mỗi context
+## Lớp trong mỗi context (MVC ↔ DDD)
 
 ```text
 contexts/<name>/
-  domain/           # Aggregate, value object, domain service, domain event
-  application/      # Use case, ports
-  infrastructure/   # Repository, SQL, adapter ngoài
+  domain/           # Aggregate, VO, domain service, domain event (Service logic)
+  application/      # Use case, ports (Service orchestration)
+  infrastructure/   # Repository Prisma, adapter ngoài (Model access)
   index.ts          # Public surface
 ```
+
+Cây `app/api/v1/` theo cụm chức năng: xem `../phase-plan/api-contracts.md` §2.1.
 
 ## Schema PostgreSQL gợi ý
 
