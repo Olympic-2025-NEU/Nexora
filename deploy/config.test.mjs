@@ -44,3 +44,8 @@ test("runtime processes fail before serving with named missing variables", () =>
     assert.throws(() => validateConfig(env, service), { message: `Invalid or missing ${field}` });
   }
 });
+
+test("optional AI reference is checked when supplied or when provider enabled", () => {
+  assert.throws(() => validateConfig({ ...examples[0], AI_KEY_REF: "invalid" }), { message: "Invalid or missing AI_KEY_REF" });
+  assert.throws(() => validateConfig({ ...examples[0], AI_PROVIDER: "local" }), { message: "Invalid or missing AI_KEY_REF" });
+});
