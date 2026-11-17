@@ -43,7 +43,8 @@
 ## P00-T06 — Chuẩn hóa repo/CI nền
 
 - [x] Mapping scaffold: `evidence/scaffold-mapping.md`.
-- [x] CI `.github/workflows/ci.yml`: install, SPDX, lint, prisma generate, build, typecheck, test.
+- [x] CI `.github/workflows/ci.yml`: clean install, lint (zero warnings), Prisma generate, build, typecheck và `npm test` gồm SPDX, lockfile license/provenance, known-secret scan, generated OpenAPI/Redocly và static contract fixtures.
+- [x] Local clean install và negative guards cố ý sai lint/typecheck/SPDX/OpenAPI đều trả exit 1; xem `evidence/ci-local.md`. GitHub Actions run của nhánh remediation cần kiểm sau push.
 - [x] `.env.example` (root + deploy) không secret.
 - **Đầu ra:** pipeline trên clone sạch; **kiểm chứng:** thiếu SPDX / fixture sai → đỏ.
 

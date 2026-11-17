@@ -7,7 +7,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint",
+    "lint": "eslint --max-warnings=0",
     "typecheck": "tsc --noEmit",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate deploy",
@@ -19,7 +19,7 @@
     "generate:openapi": "node scripts/generate-openapi.mjs",
     "check:openapi": "node scripts/generate-openapi.mjs --check && redocly lint contracts/openapi/nexora-v1.yaml --format=summary",
     "test:contracts": "npm run check:openapi && node scripts/validate-contracts.mjs",
-    "test": "npm run check:spdx && npm run test:contracts"
+    "test": "npm run check:spdx && npm run check:licenses && npm run check:secrets && npm run test:contracts"
   },
   "dependencies": {
     "@prisma/client": "6.19.0",

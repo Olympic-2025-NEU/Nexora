@@ -19,15 +19,13 @@ jobs:
           cache-dependency-path: package-lock.json
       - name: Install
         run: npm ci
-      - name: SPDX check
-        run: npm run check:spdx
       - name: Lint
         run: npm run lint
       - name: Prisma generate
-        run: npx prisma generate
+        run: npm run db:generate
       - name: Build
         run: npm run build
       - name: Typecheck (after Next typegen)
         run: npm run typecheck
-      - name: Contracts + unit gate
+      - name: Provenance, secrets and static contracts
         run: npm test

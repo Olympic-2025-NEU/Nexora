@@ -1,40 +1,39 @@
-# P00 G00 — local branch / CI notes
+# P00-T06 — Clean install and CI guard evidence
 
-**Working branch:** `chore/p00-g00-close`  
-**Base develop:** `63abd139a41d3c05ac9a7b681e470433dc8ed097` (includes PR #48 reconcile phase-00 + Prisma)  
-**Started:** 2026-11-17  
-**Tree:** `main` ← `develop` ← `chore/p00-g00-close` (PR target: develop)
+**Date:** 2026-11-17
+**Branch:** `chore/p00-audit-remediation`
+**Base:** `develop` at `18be482` (merged previous G00 package)
 
-Gate 0: left `reconcile/phase-00-into-develop` (already merged); synced `develop`; created chore branch before code.
+## Clean install and positive run
 
-## Local verify (2026-11-17)
-
-Commands (clean clone path):
+Ran the same commands as `.github/workflows/ci.yml` after `npm ci`:
 
 ```text
-npm ci
-npm run lint
-npx prisma generate
-npm run build
-npm run typecheck
-npm test   # check:spdx + test:contracts
+npm ci                         PASS (405 installed; 13 audit advisories recorded separately)
+npm run lint                   PASS (zero warnings allowed)
+npm run db:generate            PASS (Prisma Client 6.19.0)
+npm run build                  PASS (Next 16.4.6; only / and /api/v1/health in app)
+npm run typecheck              PASS
+npm test                       PASS
+  check:spdx                   43 sources
+  check:licenses               505 lockfile packages
+  check:secrets                221 files; known key/token patterns
+  test:contracts               70 paths, 87 operations, 30 request fixture pairs;
+                               4 core pairs, 7 domain pairs, 7 federation valid,
+                               9 negative, 3 retry/hash vectors
 ```
 
-Result: **PASS**
+`npm ci` printed the same 13 dependency advisories documented in `license-inventory.md`. The advisory set needs P01/P13 review; a clean install is not a security clearance.
 
-| Step | Outcome |
-| --- | --- |
-| lint | OK |
-| prisma generate | OK (6.19.0) |
-| build | OK (Next 16.4.6) |
-| typecheck | OK |
-| check-spdx | OK (32 files) |
-| test:contracts | envelope PASS; openapi structure PASS (59 paths) |
+## Negative guards
 
-CI workflow: `.github/workflows/ci.yml` mirrors these steps.
+Each mutation was temporary, restored immediately after its expected failure; none is committed.
 
-## Push / PR
+| Deliberate defect | Command | Expected result observed |
+| --- | --- | --- |
+| Unused variable in temporary `.mjs` source | `npm run lint` | Exit 1 with `@typescript-eslint/no-unused-vars` warning; `--max-warnings=0` makes it blocking. |
+| Assign string to `number` in temporary `.ts` source | `npm run typecheck` | Exit 1, `TS2322`. |
+| Temporary source lacks SPDX header | `npm run check:spdx` | Exit 1, file named in missing-header report. |
+| Hand-edit generated OpenAPI description | `npm run check:openapi` | Exit 1, generated YAML reported stale. |
 
-- Branch pushed: `origin/chore/p00-g00-close` @ `d17fd4f`
-- Open PR → `develop`: https://github.com/Olympic-2025-NEU/Nexora/compare/develop...chore/p00-g00-close?expand=1
-- Note: local `gh` CLI not installed; create PR via the compare URL (do not push to develop/main).
+The static contract suite detects malformed fixtures and request schemas, but route behavior requires running API/DB tests in the owning phases. GitHub Actions result for this branch must be added after push; local success alone does not prove the remote runner passed.
