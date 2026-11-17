@@ -7,6 +7,8 @@ RUN npm ci
 
 FROM node:22-bookworm-slim@sha256:e9f565d32859f0cbfb52125eafe8be39390f24dac302dc3cdf566e8ba3ab21ee AS builder
 WORKDIR /app
+RUN apt-get update && apt-get install -y --no-install-recommends openssl \
+  && rm -rf /var/lib/apt/lists/*
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -16,7 +18,9 @@ FROM node:22-bookworm-slim@sha256:e9f565d32859f0cbfb52125eafe8be39390f24dac302dc
 WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN groupadd --system --gid 1001 nexora \
+RUN apt-get update && apt-get install -y --no-install-recommends openssl \
+  && rm -rf /var/lib/apt/lists/* \
+  && groupadd --system --gid 1001 nexora \
   && useradd --system --uid 1001 --gid nexora nexora
 COPY --from=builder --chown=nexora:nexora /app/package.json ./
 COPY --from=builder --chown=nexora:nexora /app/package-lock.json ./
