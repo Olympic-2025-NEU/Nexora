@@ -35,7 +35,6 @@ COPY --from=builder --chown=nexora:nexora /app/package.json ./
 COPY --from=builder --chown=nexora:nexora /app/package-lock.json ./
 COPY --from=builder --chown=nexora:nexora /app/node_modules ./node_modules
 COPY --from=builder --chown=nexora:nexora /app/.next ./.next
-COPY --from=builder --chown=nexora:nexora /app/public ./public
 COPY --from=builder --chown=nexora:nexora /app/prisma ./prisma
 COPY --from=builder --chown=nexora:nexora /app/worker ./worker
 COPY --from=builder --chown=nexora:nexora /app/deploy/config.mjs ./deploy/config.mjs
