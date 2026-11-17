@@ -1,0 +1,17 @@
+{
+  "realm": "nexora-p00",
+  "enabled": true,
+  "clientScopes": [
+    {"name": "erp:user", "protocol": "openid-connect", "attributes": {"include.in.token.scope": "true", "display.on.consent.screen": "false"}, "protocolMappers": [{"name": "p00-subject", "protocol": "openid-connect", "protocolMapper": "oidc-sub-mapper", "config": {"access.token.claim": "true"}}]},
+    {"name": "federation:write", "protocol": "openid-connect", "attributes": {"include.in.token.scope": "true", "display.on.consent.screen": "false"}}
+  ],
+  "clients": [
+    {"clientId": "nexora-gateway", "enabled": true, "protocol": "openid-connect", "publicClient": false, "secret": "${P00_GATEWAY_SECRET}", "standardFlowEnabled": true, "directAccessGrantsEnabled": false, "serviceAccountsEnabled": false, "redirectUris": ["http://127.0.0.1:19080/*"]},
+    {"clientId": "erp-browser", "enabled": true, "protocol": "openid-connect", "publicClient": true, "standardFlowEnabled": true, "directAccessGrantsEnabled": false, "serviceAccountsEnabled": false, "redirectUris": ["http://127.0.0.1:19090/callback"], "attributes": {"pkce.code.challenge.method": "S256"}, "defaultClientScopes": ["basic", "profile", "email", "erp:user"]},
+    {"clientId": "sender-a", "enabled": true, "protocol": "openid-connect", "publicClient": false, "secret": "${P00_SENDER_A_SECRET}", "standardFlowEnabled": false, "directAccessGrantsEnabled": false, "serviceAccountsEnabled": true, "defaultClientScopes": ["federation:write"]},
+    {"clientId": "sender-c", "enabled": true, "protocol": "openid-connect", "publicClient": false, "secret": "${P00_SENDER_C_SECRET}", "standardFlowEnabled": false, "directAccessGrantsEnabled": false, "serviceAccountsEnabled": true}
+  ],
+  "users": [
+    {"username": "p00-user", "enabled": true, "email": "p00-user@example.invalid", "firstName": "P00", "lastName": "User", "emailVerified": true, "credentials": [{"type": "password", "value": "${P00_USER_PASSWORD}", "temporary": false}]}
+  ]
+}

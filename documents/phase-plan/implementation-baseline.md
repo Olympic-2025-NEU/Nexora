@@ -2,6 +2,8 @@
 
 Tài liệu này là **lựa chọn mặc định có thể thi công** cho 14 phase, không xác nhận rằng repo đã triển khai. Nếu spike P00 chứng minh một lựa chọn không chạy/không tương thích giấy phép, tạo ADR thay thế và sửa **schema, API, event, task dossier, test** trong cùng PR trước khi implement phần phụ thuộc. Không để mỗi AI tự chọn một stack khác nhau.
 
+**Cập nhật P00-T03 ngày 17/11/2026:** [decision-log.md](./decision-log.md) liên kết ADR D01–D15 và mức chứng minh của từng spike. D01 dùng APISIX **standalone file-driven** (không có etcd v1); D02 chọn SeaweedFS 4.53; D04 chọn Keycloak authorization-code+PKCE với session BFF phía server; D06 chọn Flowable OSS REST 8.0.0 + PostgreSQL riêng. D15 có spike core headless scratch chạy độc lập khi dừng upstream giả, nhưng **Core Data/File API sản phẩm chưa có**. Image digest và RAM quan sát ở D13. Các runtime/app thật chưa được dựng từ bảng này; nếu ADR và hàng baseline dưới khác nhau, ADR có bằng chứng mới hơn chi phối task cho tới khi tài liệu được đồng bộ.
+
 ## 1. Ranh giới và layout cố định
 
 | Runtime | Đường dẫn đích | Trách nhiệm |

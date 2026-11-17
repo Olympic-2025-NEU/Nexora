@@ -1,0 +1,59 @@
+routes:
+  - uri: /api/v1/public/ping
+    plugins:
+      proxy-rewrite:
+        uri: /
+    upstream:
+      type: roundrobin
+      nodes:
+        "upstream:8000": 1
+  - uri: /api/v1/private/ping
+    plugins:
+      proxy-rewrite:
+        uri: /
+      openid-connect:
+        client_id: nexora-gateway
+        client_secret: ${P00_GATEWAY_SECRET}
+        discovery: http://keycloak:8080/realms/nexora-p00/.well-known/openid-configuration
+        bearer_only: true
+        use_jwks: true
+        required_scopes:
+          - erp:user
+    upstream:
+      type: roundrobin
+      nodes:
+        "upstream:8000": 1
+  - uri: /api/v1/federation/events
+    plugins:
+      proxy-rewrite:
+        uri: /
+      openid-connect:
+        client_id: nexora-gateway
+        client_secret: ${P00_GATEWAY_SECRET}
+        discovery: http://keycloak:8080/realms/nexora-p00/.well-known/openid-configuration
+        bearer_only: true
+        use_jwks: true
+        required_scopes:
+          - federation:write
+    upstream:
+      type: roundrobin
+      nodes:
+        "upstream:8000": 1
+  - uris:
+      - /api/v1/core/records
+      - /api/v1/core/records/*
+    plugins:
+      openid-connect:
+        client_id: nexora-gateway
+        client_secret: ${P00_GATEWAY_SECRET}
+        discovery: http://keycloak:8080/realms/nexora-p00/.well-known/openid-configuration
+        bearer_only: true
+        use_jwks: true
+        access_token_in_authorization_header: true
+        required_scopes:
+          - erp:user
+    upstream:
+      type: roundrobin
+      nodes:
+        "core:8001": 1
+#END
