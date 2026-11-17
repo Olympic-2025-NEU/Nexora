@@ -13,6 +13,14 @@ for name in POSTGRES_USER APP_DB_NAME APP_DB_USER CORE_DB_USER MIGRATOR_DB_USER 
 done
 [ "$APP_DB_NAME" != "$KEYCLOAK_DB_NAME" ] && [ "$APP_DB_NAME" != "$FLOWABLE_DB_NAME" ] && [ "$KEYCLOAK_DB_NAME" != "$FLOWABLE_DB_NAME" ] || { printf 'database names must be distinct\n' >&2; exit 1; }
 [ "$APP_DB_USER" = app_runtime ] && [ "$CORE_DB_USER" = core_data ] && [ "$MIGRATOR_DB_USER" = migrator ] || { printf 'platform roles must be app_runtime/core_data/migrator\n' >&2; exit 1; }
+for name in APP_DB_NAME KEYCLOAK_DB_NAME FLOWABLE_DB_NAME; do
+  eval 'value=${'"$name"'}'
+  case "$value" in postgres|template0|template1) printf '%s must not use a system database\n' "$name" >&2; exit 1;; esac
+done
+for role in "$POSTGRES_USER" "$KEYCLOAK_DB_USER" "$FLOWABLE_DB_USER"; do
+  case "$role" in app_runtime|core_data|migrator) printf 'service roles must be distinct\n' >&2; exit 1;; esac
+done
+[ "$POSTGRES_USER" != "$KEYCLOAK_DB_USER" ] && [ "$POSTGRES_USER" != "$FLOWABLE_DB_USER" ] && [ "$KEYCLOAK_DB_USER" != "$FLOWABLE_DB_USER" ] || { printf 'service roles must be distinct\n' >&2; exit 1; }
 
 export PGPASSWORD="$POSTGRES_PASSWORD"
 psql -X -v ON_ERROR_STOP=1 -h postgres -U "$POSTGRES_USER" -d postgres <<'SQL'

@@ -12,7 +12,6 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate deploy",
     "db:migrate:dev": "prisma migrate dev",
-    "spike:d03": "tsx scripts/spikes/d03-prisma-tx.ts",
     "check:spdx": "node scripts/check-spdx.mjs",
     "test:contracts": "node scripts/validate-contracts.mjs",
     "test": "npm run check:spdx && npm run test:contracts"

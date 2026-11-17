@@ -27,10 +27,22 @@ Copy-Item deploy/instances/a.env.example deploy/instances/a.env
 # edit CHANGE_ME_* values
 
 docker compose -f deploy/compose.yml --env-file deploy/instances/a.env -p nexora-a config -q
-docker compose -f deploy/compose.yml --env-file deploy/instances/a.env -p nexora-a up -d
+docker compose -f deploy/compose.yml --env-file deploy/instances/a.env -p nexora-a up -d --build
 ```
 
 Repeat with `b` / `c` (different project name, ports, credentials, volumes).
+
+## PostgreSQL baseline (P01-T03)
+
+One PostgreSQL instance holds separate `nexora`, `keycloak`, and `flowable` databases. `db-bootstrap` provisions roles/databases on every Compose start, even with an existing volume. App and worker use `app_runtime`; core-data uses `core_data` on the app database; only `db-migrate` uses `migrator`. PostgreSQL administrator credentials stay in the bootstrap job. Set each `CHANGE_ME_*` value in the untracked instance env file; URL passwords must match their corresponding role passwords (URL-encode special characters). Do not log resolved Compose config or commit env files.
+
+`db-migrate` runs `prisma migrate deploy` once after bootstrap. Prisma records applied versions in `public._prisma_migrations`. It is safe to repeat without dropping rows:
+
+```sh
+docker compose -f deploy/compose.yml --env-file deploy/instances/a.env -p nexora-a run --rm db-migrate
+```
+
+For baseline backup, use `pg_dump -Fc` for each database (`nexora`, `keycloak`, `flowable`). Keep dumps outside Git. Restore to a new database with `pg_restore --no-owner`, check migration history and rows before routing services to the restored database. Do not restore over a running database.
 
 ## Profiles
 
@@ -48,5 +60,4 @@ Digests are locked in `compose.yml` from ADR / Hub (2026-11-17): Postgres 17.6, 
 
 - Realm template uses `CHANGE_ME_*` secrets — not production credentials.
 - Gateway route `/gateway/ping` only; full OIDC matrix is P02.
-- Prisma Migrate + fine-grained DB roles are P01-T03.
 - Bucket bootstrap / realm harden / Flowable deploy scripts are P01-T04.
