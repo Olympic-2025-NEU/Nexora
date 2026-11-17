@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 // D03 spike schema — minimal multi-schema models for TX/rollback evidence.
 // Full MVP models land in P01+ per database-schema-v1.md; do not treat this as production schema.
 

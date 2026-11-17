@@ -1,22 +1,25 @@
-# P00-T05 — Contract validate evidence
+# P00-T05 — Contract validation evidence
 
-**Date:** 2026-11-17  
-**Branch:** `chore/p00-g00-close`  
+**Date:** 2026-11-17
+**Branch:** `chore/p00-audit-remediation`
 **Command:** `npm run test:contracts`
 
 ```text
-envelope fixture: PASS
-openapi structure: PASS (59 paths, version 3.0.3)
-validate-contracts: OK
+OpenAPI in sync (70 paths)
+contracts/openapi/nexora-v1.yaml: validated by Redocly
+openapi: PASS (70 paths, 87 operations, 30 request fixture pairs)
+events: PASS (4 core pairs, 7 domain pairs, 7 federation valid, 9 negative, 3 retry/hash vectors)
+python-jcs: PASS (7 fixed hashes, 3 replay vectors)
+validate-contracts: OK (static contract checks; no runtime API claim)
 ```
 
-## Covered
+## What was checked
 
-- Ajv 2020-12: `contracts/events/envelope-v1.schema.json` ← `fixtures/a-to-b-transfer-announced.json`
-- OpenAPI YAML parse + required `openapi` / `info.title` / `paths` (≥5)
+- `scripts/generate-openapi.mjs --check` detects generated YAML drift; Redocly checks OpenAPI 3.0.3 structure and references. The route matrix freezes all 87 operations, primary success status, public/OIDC/M2M auth, role, scope, 401/403 and selected concurrency/idempotency headers.
+- Ajv checks 30 valid/invalid request-body pairs, four core-record payload pairs and seven trading/workflow outbox pairs. OpenAPI response shapes are declared and structurally checked; no running API response is claimed.
+- Federation fixtures cover transfer A→B, partial and zero-actual receiving, B→C, downstream impact and B→A relay. Negative fixtures cover unsupported version, missing evidence, wrong issuer/recipient, over-receipt, invalid quantity, duplicate JSON key and private URL leakage. Decimal totals use integer milliscale arithmetic. RFC 8785 JCS SHA-256 hashes and same/different-hash retries are frozen in `contracts/events/fixtures/manifest-v1.json` and checked independently in Node and Python for the v1 envelope subset (ASCII keys, safe integers, strings, arrays and objects).
+- Stock transfer and sale responses have zero movement IDs; technical federation ACK has no receiving quantity; public passport schema excludes private stock, buyer and credential fields.
 
-## Notes
+## Boundary and follow-up
 
-- OpenAPI remains `v1-provisional` with stub schemas (`x-nexora-comment`); structural lint only.
-- D07 / D08 / D14 remain as decided in `decision-log.md` / numbered ADRs (no schema rewrite in this task).
-- Wired into `npm test` and CI.
+This is a **static design contract**. P01+ must test actual route handlers against these schemas and status codes, authorization/scope, transaction rollback, concurrency and idempotency. P09 must run two-instance consumer-driven tests including audience/scope, offline delivery and replay. Do not close runtime ACs from this evidence alone. Contract changes require updating the Markdown blueprint, generator/schema, fixtures and locked route matrix together.

@@ -21,12 +21,12 @@
       "const": 1
     },
     "objectKey": {
-      "type": "string"
+      "type": "string",
+      "minLength": 1
     },
     "sha256Hex": {
       "type": "string",
-      "minLength": 64,
-      "maxLength": 64
+      "pattern": "^[0-9a-f]{64}$"
     },
     "recordCount": {
       "type": "integer",
@@ -41,17 +41,20 @@
       "format": "date-time"
     },
     "sourceMinId": {
-      "type": "string"
+      "type": "string",
+      "minLength": 1
     },
     "sourceMaxId": {
-      "type": "string"
+      "type": "string",
+      "minLength": 1
     },
     "exportedAt": {
       "type": "string",
       "format": "date-time"
     },
     "checkpoint": {
-      "type": "string"
+      "type": "string",
+      "minLength": 1
     },
     "format": {
       "const": "jsonl"

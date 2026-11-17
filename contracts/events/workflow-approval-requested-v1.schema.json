@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "workflow.approval.requested.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "eventId",
+    "approvalRequestId",
+    "documentId",
+    "creatorSub",
+    "processKey",
+    "correlationKey",
+    "submittedDocumentVersion",
+    "lineSnapshotSha256"
+  ],
+  "properties": {
+    "eventId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "approvalRequestId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "documentId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "creatorSub": {
+      "type": "string",
+      "minLength": 1
+    },
+    "processKey": {
+      "type": "string",
+      "minLength": 1
+    },
+    "correlationKey": {
+      "type": "string",
+      "minLength": 1
+    },
+    "submittedDocumentVersion": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "lineSnapshotSha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}

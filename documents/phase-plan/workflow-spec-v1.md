@@ -1,6 +1,6 @@
 # Workflow `goods-issue-approval` v1 — Flowable OSS
 
-Tài liệu này định nghĩa quy trình **một phiếu GoodsIssue** để AI viết `deploy/flowable/processes/goods-issue-approval.bpmn20.xml` và adapter. Flowable engine chỉ quyết định duyệt/từ chối; M03 `confirm` của người dùng mới trừ tồn. Đây là đề xuất v1 phải được spike D06 trên Flowable OSS REST + PG riêng trước khi đóng ADR.
+Tài liệu này khóa contract v1 cho quy trình **một phiếu GoodsIssue** để AI viết `deploy/flowable/processes/goods-issue-approval.bpmn20.xml` và adapter. Spike D06 đã kiểm Flowable OSS REST + PG riêng; BPMN/adapter sản phẩm và test luồng chưa hoàn thành. Flowable engine chỉ quyết định duyệt/từ chối; M03 `confirm` của người dùng mới trừ tồn.
 
 ## BPMN và biến
 

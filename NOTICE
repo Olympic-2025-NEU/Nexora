@@ -1,0 +1,18 @@
+Nexora — third-party notices for the Phase 00 source tree
+
+Nexora-authored source is licensed under AGPL-3.0-only; see LICENSE.
+The npm packages installed from package-lock.json retain their own licenses.
+The exact package versions, license expressions, registry URLs and integrity
+hashes are recorded in documents/phase-plan/evidence/npm-license-inventory.json.
+
+The initial repository used the Create Next App starter (Next.js, MIT,
+https://github.com/vercel/next.js/blob/canary/license.md). Phase 00 replaced
+its placeholder page, bundled logo/favicon assets and Google font import.
+Remaining configuration/style patterns may originate from that starter.
+
+The caniuse-lite browser compatibility data is provided under CC-BY-4.0.
+Attribution: caniuse.com, https://github.com/browserslist/caniuse-lite.
+
+This notice is a source-tree attribution record. Before distributing a built
+image or release archive, the release owner must inspect the packages and
+assets actually included and preserve their required license texts/notices.

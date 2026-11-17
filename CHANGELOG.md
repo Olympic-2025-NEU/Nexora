@@ -4,6 +4,12 @@ Các thay đổi của Nexora sẽ được ghi tại đây. Chưa có bản ph�
 
 ## Unreleased
 
+### Phase 00 remediation
+
+- Removed unused starter branding and Google font import; recorded source and dependency provenance.
+- Added exact SPDX, tracked-secret and lockfile-license checks with generated inventories.
+- Added contract validation and CI checks for the Phase 00 gate.
+
 ### Tài liệu và giấy phép
 
 - Công bố toàn văn GNU AGPL v3 và metadata `AGPL-3.0-only`.

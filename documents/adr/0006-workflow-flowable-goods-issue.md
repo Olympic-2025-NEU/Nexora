@@ -35,7 +35,7 @@ Flowable OSS REST + dedicated PostgreSQL. BPMN process goods-issue-approval appl
 ## Contract impact
 
 - See phase-plan docs linked from decision-log for this ID.
-- Machine-readable stubs may live under `contracts/` as `v1-provisional`.
+- Approval routes and workflow outbox payloads are now versioned under `contracts/`; the app bridge remains P04/P07 runtime work.
 
 ## Spike evidence
 
@@ -45,5 +45,3 @@ Flowable OSS REST + dedicated PostgreSQL. BPMN process goods-issue-approval appl
 - [x] Default admin denied; P04 owns app bridge
 
 **Evidence links:** ../phase-plan/evidence/spikes/infra/README.md + D06-workflow-engine.md
-
-**Evidence links:** _(none yet — Dev attaches logs/commits here)_

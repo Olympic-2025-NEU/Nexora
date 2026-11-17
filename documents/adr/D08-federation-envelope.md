@@ -1,6 +1,6 @@
 # D08 — Envelope và ACK federation v1
 
-- Ngày: 2026-11-16. Trạng thái: **chấp nhận contract thiết kế**; JSON Schema/consumer test chạy ở P00-T05/P09, reviewer thứ hai ở G00.
+- Ngày: 2026-11-16; cập nhật evidence 2026-11-17. Trạng thái: **chấp nhận contract thiết kế**; JSON Schema và hash vectors P00-T05 đã pass, consumer test hai instance vẫn P09, hai reviewer G00 còn mở.
 - Quyết định: envelope v1 theo `event-payloads-v1.md`; event ID nghiệp vụ và message ID truyền tải là hai khóa khác nhau. `issuerInstanceId` lấy từ M2M token→partner mapping ở receiver, `recipientInstanceId` phải bằng local instance. Origin lot và sender batch tách riêng, mỗi lot có `sourceLineId`; `upstreamReferences` giữ chain. ACK HTTP 202 chỉ xác nhận inbox đã ghi; ReceivingConfirmation do người dùng xác nhận mới đổi tồn.
 - Câu hỏi: làm sao A→B→C giữ nguồn gốc, retry không tạo hai effect và không suy ACK là đã nhận hàng?
 
@@ -12,4 +12,4 @@ M2M bearer + TLS là authn/authz vận chuyển v1; payload hash phục vụ ded
 
 ## Evidence và acceptance chưa giả xanh
 
-Ví dụ JSON UUID hợp lệ và quantity=sent ở [event-contracts.md](../phase-plan/event-contracts.md); RFC/JCS là chuẩn được chọn, **chưa có** JSON Schema hay cross-language hash test trong codebase ở P00-T03. P00-T05 phải tạo fixtures Node/Python cùng hash, valid/invalid/schema-version tests; P09 phải chạy A→B→C, replay same/different hash, lost ACK, offline/order, actual 10/12 và privacy. D01/D05 phải chứng minh token→issuer mapping trước inbox. Không xem đề xuất envelope là federation đã chạy.
+Ví dụ nghiệp vụ ở [event-contracts.md](../phase-plan/event-contracts.md). Tại P00-T05 đã có [JSON Schema, valid/invalid fixtures và bảy JCS hash cố định](../phase-plan/evidence/contract-validate.md); Node và Python cùng xác nhận ba vector replay/hash trên subset envelope v1. Đây là kiểm tra contract tĩnh: chưa có inbox, ACK lưu thật hoặc token→issuer mapping trong app. P09 phải chạy A→B→C, replay same/different hash, lost ACK, offline/order, actual 10/12 và privacy; P02/P05 chứng minh mapping/auth trước inbox. Không xem contract pass là federation đã chạy.

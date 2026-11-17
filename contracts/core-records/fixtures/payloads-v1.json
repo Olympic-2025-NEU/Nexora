@@ -1,0 +1,125 @@
+{
+  "schemaVersion": 1,
+  "cases": {
+    "evidence_metadata.schema.json": {
+      "valid": {
+        "schemaVersion": 1,
+        "ownerType": "batch",
+        "ownerId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        "attachmentId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        "title": "Quality report"
+      },
+      "invalid": {
+        "schemaVersion": 1,
+        "ownerType": "batch",
+        "ownerId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        "attachmentId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        "title": "Quality report",
+        "unexpectedPrivateField": "secret"
+      }
+    },
+    "trace_projection.schema.json": {
+      "valid": {
+        "schemaVersion": 1,
+        "originLot": {
+          "issuerInstanceId": "A",
+          "lotId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+        },
+        "sourceEventIds": [
+          "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+        ],
+        "nodes": [
+          {
+            "eventId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            "issuerInstanceId": "A",
+            "type": "receipt.confirmed",
+            "occurredAt": "2026-11-14T08:00:00Z",
+            "verificationState": "local_verified"
+          }
+        ],
+        "edges": [],
+        "transformVersion": "v1",
+        "asOf": "2026-11-14T08:00:01Z"
+      },
+      "invalid": {
+        "schemaVersion": 1,
+        "originLot": {
+          "issuerInstanceId": "A",
+          "lotId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+        },
+        "sourceEventIds": [
+          "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+        ],
+        "nodes": [
+          {
+            "eventId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            "issuerInstanceId": "A",
+            "type": "receipt.confirmed",
+            "occurredAt": "2026-11-14T08:00:00Z",
+            "verificationState": "local_verified"
+          }
+        ],
+        "edges": [],
+        "transformVersion": "v1",
+        "asOf": "2026-11-14T08:00:01Z",
+        "unexpectedPrivateField": "secret"
+      }
+    },
+    "ot_reading.schema.json": {
+      "valid": {
+        "schemaVersion": 1,
+        "deviceId": "sim-temp-a",
+        "readingId": "reading-001",
+        "batchId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        "metric": "temperature_c",
+        "value": "-2.5",
+        "unit": "C",
+        "observedAt": "2026-11-14T08:00:00Z",
+        "qualityState": "accepted",
+        "simulated": true
+      },
+      "invalid": {
+        "schemaVersion": 1,
+        "deviceId": "sim-temp-a",
+        "readingId": "reading-001",
+        "batchId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        "metric": "temperature_c",
+        "value": "-2.5",
+        "unit": "C",
+        "observedAt": "2026-11-14T08:00:00Z",
+        "qualityState": "accepted",
+        "simulated": true,
+        "unexpectedPrivateField": "secret"
+      }
+    },
+    "archive_manifest.schema.json": {
+      "valid": {
+        "schemaVersion": 1,
+        "objectKey": "A/2026/11/trace/run-001.jsonl",
+        "sha256Hex": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "recordCount": 2,
+        "firstOccurredAt": "2026-11-14T08:00:00Z",
+        "lastOccurredAt": "2026-11-14T09:00:00Z",
+        "sourceMinId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        "sourceMaxId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        "exportedAt": "2026-11-14T10:00:00Z",
+        "checkpoint": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        "format": "jsonl"
+      },
+      "invalid": {
+        "schemaVersion": 1,
+        "objectKey": "A/2026/11/trace/run-001.jsonl",
+        "sha256Hex": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "recordCount": 2,
+        "firstOccurredAt": "2026-11-14T08:00:00Z",
+        "lastOccurredAt": "2026-11-14T09:00:00Z",
+        "sourceMinId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        "sourceMaxId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        "exportedAt": "2026-11-14T10:00:00Z",
+        "checkpoint": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        "format": "jsonl",
+        "unexpectedPrivateField": "secret"
+      }
+    }
+  }
+}
