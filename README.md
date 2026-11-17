@@ -78,8 +78,8 @@ nexora/
   services/core-data/   # API dữ liệu/tệp headless (đích)
   services/ai/          # AI01
   composition/          # Wire ports giữa contexts
-  db/migrations/        # Schema PostgreSQL
-  deploy/               # Docker Compose, env mẫu
+  prisma/               # Prisma schema + Migrate (D03)
+  deploy/               # compose.yml, instances A/B/C, APISIX stubs
   documents/
     referents/          # Luật & nguồn chân lý cho Agent/DevOps
     plans/              # Plan tổng quan theo module
@@ -111,7 +111,7 @@ Tiêu chí nghiệm thu MVP (AC-01…AC-13): [documents/referents/ACCEPTANCE_MVP
 
 - Node.js (khuyến nghị bản LTS tương thích Next.js 16)
 - npm
-- Docker (cho PostgreSQL cục bộ)
+- Docker Compose (topology hạ tầng P01)
 
 ### Chạy scaffold giao diện
 
@@ -122,15 +122,18 @@ npm run dev
 
 Mở [http://localhost:3000](http://localhost:3000).
 
-### PostgreSQL cục bộ
+### Compose hạ tầng (P01-T01)
+
+Entrypoint duy nhất: [`deploy/compose.yml`](./deploy/compose.yml). Chi tiết: [`deploy/README.md`](./deploy/README.md).
 
 ```bash
-cp deploy/.env.example deploy/.env
-docker compose -f deploy/docker-compose.yml up -d
+# Kiểm tra topology instance A (chưa phải G01 / chưa claim stack đã boot)
+docker compose -f deploy/compose.yml --env-file deploy/instances/a.env.example -p nexora-a config -q
 ```
 
-- `deploy/.env` chỉ dùng máy dev — không commit secret.
-- `db/migrations/0001_platform.sql` hiện rỗng; Compose chỉ khởi động PostgreSQL, chưa khởi động app hoặc lõi DX-OS.
+- Chỉ cổng gateway bind `127.0.0.1` theo mặc định; không publish PG/Redis/Flowable/storage.
+- Profile `apps` / `ai` dành chỗ image (P01-T02); bootstrap realm/routes = P01-T04.
+- Không commit `deploy/instances/*.env` — chỉ dùng `*.env.example`.
 
 ### Scripts
 

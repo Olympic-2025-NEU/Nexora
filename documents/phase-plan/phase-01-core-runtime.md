@@ -4,10 +4,12 @@
 
 ## P01-T01 — Topology Compose và mạng
 
-- [ ] Thiết kế service Next ERP, worker, **core data/file API không UI**, DX-Lab frontend tầng 2 (profile P11), PostgreSQL, Keycloak, gateway (+etcd nếu D01 yêu cầu), Redis, object storage, Flowable OSS REST, scanner ClamAV, optional AI; internal/public networks và volume riêng.
-- [ ] Chỉ publish gateway (và cổng quản trị dev theo profile local), không publish PG/Redis/Flowable/storage admin/etcd ra Internet; document port map và hostname nội bộ.
-- [ ] Đặt healthcheck/dependency readiness với timeout rõ, resource limits hợp lý cho máy demo; chốt pinned image tags/digests và giấy phép.
-- **Đầu ra:** Compose dev và config template; **kiểm chứng:** `docker compose config` pass, `ps`/network inspect cho thấy chỉ cổng được phép public.
+- [x] Thiết kế service Next ERP, worker, **core data/file API không UI**, DX-Lab frontend tầng 2 (profile P11), PostgreSQL, Keycloak, gateway (+etcd nếu D01 yêu cầu), Redis, object storage, Flowable OSS REST, scanner ClamAV, optional AI; internal/public networks và volume riêng.
+- [x] Chỉ publish gateway (và cổng quản trị dev theo profile local), không publish PG/Redis/Flowable/storage admin/etcd ra Internet; document port map và hostname nội bộ (`deploy/README.md`).
+- [x] Đặt healthcheck/dependency readiness với timeout rõ, resource limits (`mem_limit`/`cpus` + deploy limits) cho máy demo; chốt pinned image tags/digests và ghi giấy phép (D13 + license-inventory).
+- **Đầu ra:** Compose dev và config template.
+- **Kiểm chứng T01 (đã chạy):** `docker compose … config` A/B/C pass; rendered config chỉ publish gateway `127.0.0.1`. Evidence: [evidence/p01-t01-compose.md](./evidence/p01-t01-compose.md).
+- **Kiểm chứng hoãn (cần stack boot):** `compose ps` / network inspect sau `up` — P01-T02+T03+T04 rồi xác nhận lại; không claim G01 từ T01.
 
 ## P01-T02 — Build Next.js từ source và image app/worker
 

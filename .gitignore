@@ -33,6 +33,11 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 !.env.example
+!**/.env.example
+!deploy/instances/*.env.example
+# Local instance secrets (copied from *.env.example)
+deploy/instances/*.env
+!deploy/instances/*.env.example
 
 # vercel
 .vercel

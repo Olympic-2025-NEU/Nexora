@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Optional overlay: publish Postgres on loopback for host-side Prisma/tools.
+# Usage:
+#   docker compose -f deploy/compose.yml -f deploy/compose.dev-db-publish.yml \
+#     --env-file deploy/instances/a.env.example -p nexora-a config
+# Do not use on shared/demo hosts exposed beyond the developer machine.
+
+services:
+  postgres:
+    ports:
+      - "127.0.0.1:${POSTGRES_HOST_PORT:-5433}:5432"

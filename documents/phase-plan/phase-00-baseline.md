@@ -50,7 +50,7 @@
 
 ## P00-T07 — Gate G00
 
-- [ ] Hai người review và ký `evidence/G00.md` (Status hiện **READY FOR REVIEW**).
+- [ ] Hai người review và ký `evidence/G00.md` (Status hiện **PROVISIONAL PASS — REMAINS OPEN**; một chữ ký directed đã ghi, còn chữ ký thứ hai và CLOSED).
 - [x] Gói kỹ thuật: ADR D01–D08/D14/D15 đối chiếu evidence và owner runtime (D03 = Prisma); AGPL/SPDX/lockfile inventory; clean CI + negative guards; API/event contract v1. Không claim M01–M04 Done.
 - [x] GitHub Actions của nhánh remediation pass trên Ubuntu sau fix hash CRLF/LF; run và lỗi ban đầu được ghi trong `evidence/G00.md`/`evidence/ci-local.md`.
 - **Bằng chứng:** `evidence/G00.md`, ADR, baseline, scope, license inventory, contract-validate.

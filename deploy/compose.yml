@@ -1,0 +1,331 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# P01-T01 sole Compose entrypoint for one Nexora instance (project name nexora-a|b|c).
+# App images (erp/core-data/worker/dx-lab) are profile "apps" — Dockerfiles land in P01-T02.
+# Realm/routes/bucket/BPMN bootstrap lands in P01-T04. Do not treat config-pass as G01 Done.
+
+name: nexora
+
+networks:
+  edge:
+    driver: bridge
+  # Logical backend network. Not Docker "internal: true" so ClamAV can refresh
+  # signatures and services can resolve upstreams; host exposure is controlled by ports.
+  internal:
+    driver: bridge
+
+volumes:
+  pg_data:
+  seaweed_data:
+  clamav_data:
+
+services:
+  gateway:
+    image: apache/apisix:3.20.0-debian@sha256:013de62a9dfba7d8e6006b3e85b524c28c9f1c3549fca3b91d5b258b0b9e759a
+    restart: unless-stopped
+    # Gateway does not use Postgres; no depends_on (ordering owned by T04 upstreams).
+    networks:
+      - edge
+      - internal
+    ports:
+      # Only published host port in the default topology (loopback). HTTPS hardening = P02.
+      - "127.0.0.1:${GATEWAY_HOST_PORT:-19080}:9080"
+    volumes:
+      - ./apisix/config.yaml:/usr/local/apisix/conf/config.yaml:ro
+      - ./apisix/apisix.yaml:/usr/local/apisix/conf/apisix.yaml:ro
+    environment:
+      TZ: UTC
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 2 bash -c 'cat < /dev/null > /dev/tcp/127.0.0.1/9080' || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 20s
+    mem_limit: 512m
+    cpus: 1.0
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "1.0"
+
+  postgres:
+    image: postgres:17.6@sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929
+    restart: unless-stopped
+    networks:
+      - internal
+    # No host ports by default. Host Prisma: also use -f deploy/compose.dev-db-publish.yml
+    environment:
+      POSTGRES_USER: ${POSTGRES_SUPERUSER:-nexora}
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:-nexora_dev_change_me}
+      POSTGRES_DB: ${POSTGRES_APP_DB:-nexora}
+      TZ: UTC
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    mem_limit: 1g
+    cpus: 1.0
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: "1.0"
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.8.2@sha256:c68e286cacd87b942ac1939a0a1481461109d6acd3a57dc496969a319a76bbf0
+    restart: unless-stopped
+    command: ["start-dev", "--http-port=8080", "--health-enabled=true"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - internal
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD:-admin_dev_change_me}
+      KC_HEALTH_ENABLED: "true"
+      KC_HTTP_ENABLED: "true"
+      KC_HOSTNAME_STRICT: "false"
+      # JDBC URLs/roles are provisioned in P01-T03/T04; placeholders keep topology valid.
+      KC_DB: postgres
+      KC_DB_URL: ${KEYCLOAK_JDBC_URL:-jdbc:postgresql://postgres:5432/keycloak}
+      KC_DB_USERNAME: ${KEYCLOAK_DB_USER:-keycloak}
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-keycloak_dev_change_me}
+      TZ: UTC
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000 && echo -e 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && cat <&3 | grep -q '200\\|UP'"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 60s
+    mem_limit: 1280m
+    cpus: 1.5
+    deploy:
+      resources:
+        limits:
+          memory: 1280M
+          cpus: "1.5"
+
+  flowable:
+    image: flowable/flowable-rest:8.0.0@sha256:708dfa32f27b93180bb6e7a30684d881d995fe257f5b8413e14b20a55c25672d
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - internal
+    environment:
+      SERVER_PORT: "8080"
+      SPRING_DATASOURCE_URL: ${FLOWABLE_JDBC_URL:-jdbc:postgresql://postgres:5432/flowable}
+      SPRING_DATASOURCE_USERNAME: ${FLOWABLE_DB_USER:-flowable}
+      SPRING_DATASOURCE_PASSWORD: ${FLOWABLE_DB_PASSWORD:-flowable_dev_change_me}
+      SPRING_DATASOURCE_DRIVER-CLASS-NAME: org.postgresql.Driver
+      FLOWABLE_REST_APP_ADMIN_USER_ID: ${FLOWABLE_ADMIN_USER:-admin}
+      FLOWABLE_REST_APP_ADMIN_PASSWORD: ${FLOWABLE_ADMIN_PASSWORD:-flowable_admin_dev_change_me}
+      FLOWABLE_REST_APP_CREATE_DEMO_DEFINITIONS: "false"
+      REST_VARIABLES_ALLOW_SERIALIZABLE: "false"
+      TZ: UTC
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080'"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 60s
+    mem_limit: 768m
+    cpus: 1.0
+    deploy:
+      resources:
+        limits:
+          memory: 768M
+          cpus: "1.0"
+
+  seaweedfs:
+    image: chrislusf/seaweedfs:4.53@sha256:ccad23e18639c8b98cee17e7100b95830a06077b56d8e5b006d6dcf8ec5e94a0
+    restart: unless-stopped
+    command: ["mini", "-dir=/data", "-ip.bind=0.0.0.0", "-filer.uploadLimitMB=32"]
+    networks:
+      - internal
+    environment:
+      AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY:-seaweed_dev_key}
+      AWS_SECRET_ACCESS_KEY: ${S3_SECRET_KEY:-seaweed_dev_secret_change_me}
+      TZ: UTC
+    volumes:
+      - seaweed_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:8333/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 20s
+    mem_limit: 512m
+    cpus: 1.0
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "1.0"
+
+  redis:
+    image: redis:7.4-alpine@sha256:7f7d30b7fdd09467bac58198a1f166dd69789d348d4fe859cccb20e0cf287fbe
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--save", ""]
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    mem_limit: 256m
+    cpus: 0.5
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.5"
+
+  clamav:
+    # Official image is linux/amd64-only; pin digest from P01-T01 pull on 2026-11-17.
+    image: clamav/clamav:1.4@sha256:4cc4350d3fded380caf1799e76c0d1c93f3fa40af99c0cb2862ec0c9b117718a
+    platform: linux/amd64
+    restart: unless-stopped
+    networks:
+      - internal
+    volumes:
+      - clamav_data:/var/lib/clamav
+    healthcheck:
+      test: ["CMD-SHELL", "clamdcheck.sh || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 120s
+    mem_limit: 2g
+    cpus: 1.0
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: "1.0"
+
+  # --- Profile: apps (images from P01-T02) ---
+  erp:
+    profiles: ["apps"]
+    image: nexora/erp:local
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - internal
+    environment:
+      DATABASE_URL: ${APP_DATABASE_URL:-postgresql://app_runtime:change_me@postgres:5432/nexora}
+      OIDC_ISSUER_URL: ${OIDC_ISSUER_URL:-http://keycloak:8080/realms/nexora}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      TZ: UTC
+    mem_limit: 1g
+    cpus: 1.0
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: "1.0"
+
+  core-data:
+    profiles: ["apps"]
+    image: nexora/core-data:local
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      seaweedfs:
+        condition: service_healthy
+      clamav:
+        condition: service_healthy
+    networks:
+      - internal
+    environment:
+      DATABASE_URL: ${CORE_DATABASE_URL:-postgresql://core_data:change_me@postgres:5432/nexora}
+      S3_ENDPOINT: ${S3_ENDPOINT:-http://seaweedfs:8333}
+      S3_REGION: ${S3_REGION:-us-east-1}
+      S3_BUCKET_QUARANTINE: ${S3_BUCKET_QUARANTINE:-quarantine}
+      S3_BUCKET_PRIVATE: ${S3_BUCKET_PRIVATE:-private}
+      S3_BUCKET_PUBLIC: ${S3_BUCKET_PUBLIC:-public}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-seaweed_dev_key}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-seaweed_dev_secret_change_me}
+      CLAMAV_HOST: clamav
+      TZ: UTC
+    mem_limit: 512m
+    cpus: 0.75
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.75"
+
+  worker:
+    profiles: ["apps"]
+    image: nexora/erp:local
+    restart: unless-stopped
+    command: ["node", "workers/outbox.js"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      flowable:
+        condition: service_started
+    networks:
+      - internal
+    environment:
+      DATABASE_URL: ${APP_DATABASE_URL:-postgresql://app_runtime:change_me@postgres:5432/nexora}
+      FLOWABLE_BASE_URL: ${FLOWABLE_BASE_URL:-http://flowable:8080}
+      FLOWABLE_ADMIN_USER: ${FLOWABLE_ADMIN_USER:-admin}
+      FLOWABLE_ADMIN_PASSWORD: ${FLOWABLE_ADMIN_PASSWORD:-flowable_admin_dev_change_me}
+      TZ: UTC
+    mem_limit: 512m
+    cpus: 0.5
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.5"
+
+  dx-lab:
+    profiles: ["apps"]
+    image: nexora/dx-lab:local
+    restart: unless-stopped
+    networks:
+      - internal
+    environment:
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://127.0.0.1:19080}
+      OIDC_ISSUER_URL: ${OIDC_ISSUER_URL:-http://keycloak:8080/realms/nexora}
+      TZ: UTC
+    mem_limit: 512m
+    cpus: 0.5
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.5"
+
+  # --- Profile: ai (optional; P10 owns runtime) ---
+  ai:
+    profiles: ["ai"]
+    image: nexora/ai:local
+    restart: unless-stopped
+    networks:
+      - internal
+    environment:
+      AI_PROVIDER: ${AI_PROVIDER:-stub}
+      AI_BASE_URL: ${AI_BASE_URL:-http://ai:8080}
+      TZ: UTC
+    mem_limit: 1g
+    cpus: 1.0
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: "1.0"

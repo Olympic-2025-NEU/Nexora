@@ -24,7 +24,7 @@ Chọn công nghệ qua spike **không** nghĩa app/core đã triển khai. Hai 
 | [D14](../adr/D14-stock-movement-ownership.md) → [0014](../adr/0014-movement-ownership.md) | Movement ownership **đã chốt thiết kế** | P07/P09 tests |
 | [D15](../adr/D15-headless-core-boundary.md) → [0015](../adr/0015-headless-tier2-boundary.md) | Ba runtime **đã chốt**; headless spike pass | Core Data/File API sản phẩm chưa có |
 
-Smoke: [infra](./evidence/spikes/infra/README.md), [pg semantics spike](./evidence/spikes/d03/README.md), [Prisma SoT spike](./evidence/spike-d03.md). T04–T06 static gates đã có evidence; **G00 vẫn READY FOR REVIEW** vì hai chữ ký người review chưa có. T02 còn chờ BTC theo phạm vi được loại trừ.
+Smoke: [infra](./evidence/spikes/infra/README.md), [pg semantics spike](./evidence/spikes/d03/README.md), [Prisma SoT spike](./evidence/spike-d03.md). T04–T06 static gates đã có evidence; **G00 PROVISIONAL PASS — vẫn OPEN** (một chữ ký directed; còn chữ ký thứ hai trước CLOSED). P01 được phép bắt đầu dưới chấp nhận tạm. T02 còn chờ BTC theo phạm vi được loại trừ.
 
 ## Bảng baseline (canonical numbered ADR)
 

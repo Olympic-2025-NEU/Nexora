@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# P01-T01 stub — APISIX standalone data plane (D01). Full OIDC routes = P01-T04 / P02.
+apisix:
+  node_listen: 9080
+  enable_admin: false
+
+deployment:
+  role: data_plane
+  role_data_plane:
+    config_provider: yaml
