@@ -41,7 +41,7 @@ docker compose -f deploy/compose.yml --env-file deploy/instances/a.env -p nexora
 bash deploy/scripts/smoke.sh a
 ```
 
-When `19080`/`19081` is already bound, edit only `PUBLIC_BASE_URL`, `GATEWAY_HTTP_PORT`, `GATEWAY_HTTPS_PORT`, `OIDC_REDIRECT_URI_ERP`, and `OIDC_REDIRECT_URI_DXLAB` in each ignored instance env file to use a free port before first `up`. Run `bash deploy/scripts/bootstrap.sh a` again to validate. For another deployment on a shared Docker host, choose distinct Compose project names (`-p g01-a`, `-p g01-b`); Compose scopes networks, volumes and container names by project. Keep the same project name for every command on each stack. Pass the project name to smoke as second argument: `bash deploy/scripts/smoke.sh a g01-a`. Do not reuse existing project names or their volumes.
+When `19080`/`19081` is already bound, edit only `PUBLIC_BASE_URL`, `GATEWAY_HTTP_PORT`, `GATEWAY_HTTPS_PORT`, `OIDC_REDIRECT_URI_ERP`, and `OIDC_REDIRECT_URI_DXLAB` in each ignored instance env file to use a free port before first `up`. Run `bash deploy/scripts/bootstrap.sh a` again to validate. For another deployment on a shared Docker host, choose distinct Compose project names (`-p g01-a`, `-p g01-b`); Compose scopes networks, volumes and container names by project. Pass the project name to bootstrap and smoke as second argument: `bash deploy/scripts/bootstrap.sh a g01-a` and `bash deploy/scripts/smoke.sh a g01-a`. Keep the same project name for every command on each stack. Do not reuse existing project names or their volumes.
 
 ## PostgreSQL baseline (P01-T03)
 

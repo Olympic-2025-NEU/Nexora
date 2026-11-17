@@ -7,6 +7,6 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 $envFile = "deploy/instances/$Instance.env"
 node deploy/config.mjs --file $envFile
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-docker compose -f deploy/compose.yml --env-file $envFile -p "nexora-$Instance" config -q
+docker compose -f deploy/compose.yml --env-file $envFile -p "nexora-$Instance" --profile apps config -q
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-Write-Output "Ready: docker compose -f deploy/compose.yml --env-file $envFile -p nexora-$Instance up -d --build"
+Write-Output "Ready: docker compose -f deploy/compose.yml --env-file $envFile -p nexora-$Instance --profile apps up -d --build"
