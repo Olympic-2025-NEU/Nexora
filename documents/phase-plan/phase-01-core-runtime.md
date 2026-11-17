@@ -14,7 +14,7 @@
 - [x] `Dockerfile` multi-stage Next 16 + `.dockerignore`; non-root user; không copy `.env`.
 - [x] `services/core-data/` stub image + `/health/live`; `apps/dx-lab/` stub (P11). Chưa phải Core Data/File API sản phẩm.
 - [x] `worker/entrypoint.js` stub (cùng image ERP, command khác); outbox thật = P04.
-- [ ] Build/run image trên clone sạch + CI image job; ghi digest runtime.
+- [x] Build/run image trên clone sạch + CI image job; ghi digest runtime (`evidence/p01-t02.md`).
 - **Đầu ra:** image app/worker tái lập; **kiểm chứng:** image build trong CI và run sau khi xóa cache build (không dựa máy tác giả).
 
 ## P01-T03 — PostgreSQL và migration runner
