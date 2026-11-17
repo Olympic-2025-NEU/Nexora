@@ -1,0 +1,5 @@
+{
+  "core": ["Read:private", "Write:private", "Read:quarantine", "Write:quarantine", "Read:public", "Write:public"],
+  "scanner": ["Read:quarantine", "Write:quarantine"],
+  "admin": ["Admin"]
+}

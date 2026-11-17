@@ -5,10 +5,13 @@
     "prisma/migrations/**"
   ],
   "files": [
-    "app/api/v1/health/route.ts",
+    "app/api/v1/health/live/route.ts",
+    "app/api/v1/health/ready/route.ts",
+    "app/api/v1/metrics/route.ts",
     "app/globals.css",
     "app/layout.tsx",
     "app/page.tsx",
+    "apps/dx-lab/server.js",
     "components/shell/areas.ts",
     "composition/context-map.ts",
     "contexts/finance/domain/invoice.ts",
@@ -23,6 +26,13 @@
     "contexts/sales/application/ports.ts",
     "contexts/sales/domain/sales-order.ts",
     "contexts/sales/index.ts",
+    "deploy/config.mjs",
+    "deploy/config.test.mjs",
+    "deploy/health.mjs",
+    "deploy/keycloak/bootstrap.mjs",
+    "deploy/scripts/prepare.mjs",
+    "deploy/scripts/smoke.mjs",
+    "deploy/seaweedfs/bootstrap.mjs",
     "documents/phase-plan/evidence/spikes/d03/run.mjs",
     "documents/phase-plan/evidence/spikes/infra/core_spike.py",
     "documents/phase-plan/evidence/spikes/infra/render.py",
@@ -39,6 +49,8 @@
     "platform/kernel/errors.ts",
     "platform/kernel/id.ts",
     "platform/modules.ts",
+    "platform/observability/health.ts",
+    "platform/observability/readiness.ts",
     "platform/outbox/message.ts",
     "platform/persistence/prisma.ts",
     "platform/persistence/transaction.ts",
@@ -51,7 +63,8 @@
     "scripts/check-spdx.mjs",
     "scripts/generate-openapi.mjs",
     "scripts/openapi-v1-schemas.mjs",
-    "scripts/spikes/d03-prisma-tx.ts",
-    "scripts/validate-contracts.mjs"
+    "scripts/validate-contracts.mjs",
+    "services/core-data/server.js",
+    "worker/entrypoint.js"
   ]
 }

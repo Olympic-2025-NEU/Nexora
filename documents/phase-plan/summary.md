@@ -2,11 +2,11 @@
 
 ## Trạng thái xuất phát được kiểm tra
 
-- **P00 technical package (2026-11-17):** baseline/scope, ADR D01–D08/D14/D15, AGPL/SPDX/license inventory, clean CI trên Ubuntu và static contract v1 (OpenAPI 70 paths/87 operations, event/schema fixtures, Node/Python JCS hashes) đã có evidence. **G00 PROVISIONAL PASS — vẫn OPEN** (một chữ ký directed; còn chữ ký thứ hai + CLOSED); T02 chờ BTC. P01 được phép bắt đầu dưới chấp nhận tạm. Không coi contract/spike là app runtime.
+- **P00 technical package (2026-11-17):** baseline/scope, ADR D01–D08/D14/D15, AGPL/SPDX/license inventory, clean CI trên Ubuntu và static contract v1 đã có evidence. **G00 CLOSED** trên `phase-01` theo owner waiver (chưa có chữ ký reviewer thứ hai). T02 BTC vẫn mở. Không coi contract là app runtime.
 - `package.json`: Next.js 16, React 19, TypeScript, Tailwind; chưa có các dependency nghiệp vụ.
-- `app/page.tsx`: placeholder Nexora sau khi bỏ trang starter/tài sản không dùng; `app/api/v1/health/route.ts` trả `ok` tĩnh.
-- `deploy/compose.yml` (P01-T01): topology edge/internal + gateway-only publish; app images còn profile `apps`. `db/migrations/0001_platform.sql` rỗng — P01-T03 chuyển sang Prisma Migrate (`prisma-migration-spec.md`, D03).
-- `platform/`: type/interface, hàm domain nhỏ và Prisma transaction adapter của spike D03; chưa có Keycloak, gateway, Flowable, S3 hoặc outbox worker sản phẩm.
+- `app/page.tsx`: placeholder Nexora; health `live`/`ready` nằm ở `app/api/v1/health/`.
+- `deploy/compose.yml`: topology P01 (gateway publish loopback; PG/Keycloak/Flowable/SeaweedFS/Redis/ClamAV internal). Prisma Migrate platform baseline đã có (`prisma-migration-spec.md`, D03).
+- G00 **CLOSED** trên `phase-01` theo owner waiver 2026-11-17. Bằng chứng runtime P01 nằm ở `evidence/p01-t01.md` … `evidence/G01.md`.
 - `contexts/sales|procurement|finance|master-data`: scaffold cũ, không tính là M01–M04. `contexts/inventory` hiện chỉ có reservation guard.
 - `LICENSE`, `NOTICE`, `CHANGELOG.md`, SPDX trên nguồn viết, repo và issue tracker công khai đã được kiểm trong T04; bản phát hành/PoF vẫn thuộc P13.
 

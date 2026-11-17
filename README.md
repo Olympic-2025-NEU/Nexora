@@ -111,7 +111,7 @@ Tiêu chí nghiệm thu MVP (AC-01…AC-13): [documents/referents/ACCEPTANCE_MVP
 
 - Node.js (khuyến nghị bản LTS tương thích Next.js 16)
 - npm
-- Docker Compose (topology hạ tầng P01)
+- Docker Engine cùng Docker Compose v2 (cho stack cục bộ)
 
 ### Chạy scaffold giao diện
 
@@ -122,18 +122,16 @@ npm run dev
 
 Mở [http://localhost:3000](http://localhost:3000).
 
-### Compose hạ tầng (P01-T01)
-
-Entrypoint duy nhất: [`deploy/compose.yml`](./deploy/compose.yml). Chi tiết: [`deploy/README.md`](./deploy/README.md).
+### Cài toàn bộ stack từ clone sạch
 
 ```bash
-# Kiểm tra topology instance A (chưa phải G01 / chưa claim stack đã boot)
-docker compose -f deploy/compose.yml --env-file deploy/instances/a.env.example -p nexora-a config -q
+bash deploy/scripts/bootstrap.sh a
+docker compose -f deploy/compose.yml --env-file deploy/instances/a.env -p nexora-a --profile apps config -q
+docker compose -f deploy/compose.yml --env-file deploy/instances/a.env -p nexora-a --profile apps up -d --build
+bash deploy/scripts/smoke.sh a
 ```
 
-- Chỉ cổng gateway bind `127.0.0.1` theo mặc định; không publish PG/Redis/Flowable/storage.
-- Profile `apps` / `ai` dành chỗ image (P01-T02); bootstrap realm/routes = P01-T04.
-- Không commit `deploy/instances/*.env` — chỉ dùng `*.env.example`.
+`bootstrap.sh` tạo `deploy/instances/a.env` riêng từ `a.env.example`, sinh mật khẩu ngẫu nhiên và kiểm tra cấu hình; không cần tệp bí mật có sẵn. `up` chạy migration PostgreSQL qua `db-migrate` trước khi bật ERP/core-data/worker. Đợi các dịch vụ khởi động rồi chạy lại `smoke.sh` nếu chúng còn đang khởi động. Không commit tệp `.env`. Để chạy B đồng thời, thay `a` bằng `b` và `nexora-a` bằng `nexora-b` trong bốn lệnh trên; B dùng cổng gateway 19081 thay vì 19080. Xem [deploy/README.md](./deploy/README.md).
 
 ### Scripts
 
@@ -146,7 +144,7 @@ docker compose -f deploy/compose.yml --env-file deploy/instances/a.env.example -
 
 ## Trạng thái hiện tại
 
-Repo đang ở giai đoạn **scaffold Next.js + định hướng kiến trúc + tài liệu Agent/plan module**. Trang chủ vẫn là trang mặc định; API health trả trạng thái tĩnh; các context cũ `sales`, `procurement`, `finance`, `master-data` không thuộc cấu trúc MVP đích. Chưa có triển khai M01–M04, AI01, Keycloak, API Gateway, Flowable, object storage hoặc demo ba instance. Bảng chênh lệch để lập plan nằm trong [OLP_2026_ALIGNMENT.md](./documents/referents/OLP_2026_ALIGNMENT.md).
+Phase 01 đã có Compose cho PostgreSQL, Keycloak, APISIX, Flowable, SeaweedFS, ERP và core-data/worker nền tảng. Chưa có nghiệp vụ M01–M04 hoặc AI01 hoàn chỉnh; xem [phase plan](./documents/phase-plan/README.md) để biết các gate còn mở.
 
 ## Giấy phép
 

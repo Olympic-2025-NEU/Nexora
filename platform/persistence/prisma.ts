@@ -7,7 +7,7 @@ const globalForPrisma = globalThis as unknown as { nexoraPrisma?: PrismaClient }
 export const prisma =
   globalForPrisma.nexoraPrisma ??
   new PrismaClient({
-    log: process.env.PRISMA_LOG === "1" ? ["query", "error", "warn"] : ["error"],
+    log: [],
   });
 
 if (process.env.NODE_ENV !== "production") {

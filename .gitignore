@@ -34,10 +34,9 @@ yarn-error.log*
 .env*
 !.env.example
 !**/.env.example
+!deploy/.env.example
 !deploy/instances/*.env.example
-# Local instance secrets (copied from *.env.example)
 deploy/instances/*.env
-!deploy/instances/*.env.example
 
 # vercel
 .vercel

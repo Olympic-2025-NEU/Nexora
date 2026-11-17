@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-only
-# P01-T01 stub — APISIX standalone data plane (D01). Full OIDC routes = P01-T04 / P02.
+# APISIX standalone data plane (D01). OIDC route bodies live in routes.yaml.
 apisix:
   node_listen: 9080
   enable_admin: false
@@ -8,3 +8,9 @@ deployment:
   role: data_plane
   role_data_plane:
     config_provider: yaml
+
+# Log only allowlisted fields; never log headers, query strings or request bodies.
+nginx_config:
+  http:
+    access_log_format: '{"service":"gateway","requestId":"$request_id","correlationId":"$upstream_http_x_request_id","status":$status,"path":"$uri"}'
+    access_log_format_escape: json

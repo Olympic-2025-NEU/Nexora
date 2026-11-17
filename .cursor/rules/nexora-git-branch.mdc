@@ -1,0 +1,57 @@
+---
+description: Cây nhánh phase-XX — task merge vào phase, phase merge vào develop
+alwaysApply: true
+---
+
+# Git branch — phase-first
+
+## Cây chuẩn
+
+```text
+main
+ └── develop
+      └── phase-00                 # tích hợp toàn Phase 00
+      │    └── phase-00/p00-t04-…  # task / PR nhỏ
+      │    └── phase-00/p00-t07-…
+      └── phase-01
+           └── phase-01/p01-t01-…
+           └── phase-01/p01-t03-…
+```
+
+Luồng merge:
+
+1. **Task → phase:** PR từ `phase-XX/<task-slug>` vào `phase-XX` (không PR task thẳng `develop` trừ hotfix được user chỉ định).
+2. **Phase → develop:** PR từ `phase-XX` vào `develop` khi gói phase/gate đủ hoặc theo nhịp tích hợp đội.
+3. **develop → main:** chỉ khi ổn định; không làm việc phase trực tiếp trên `main`/`develop`.
+
+Viết **`phase-XX`** (không dùng `phrase-XX`). Số phase khớp `documents/phase-plan/phase-XX-*.md` (`phase-00` … `phase-13`).
+
+## Trước khi code
+
+1. `git branch --show-current` và `git status --short --branch`.
+2. Không commit/push thẳng `main` hoặc `develop`.
+3. Base đúng:
+   - Việc thuộc Phase N → đảm bảo có `phase-N` (tạo từ `origin/develop` nếu chưa có) → tạo/checkout `phase-N/<TASK_ID>-slug`.
+   - Cùng task / phụ thuộc WIP trên nhánh task hiện tại → được ở lại.
+   - Khác phase hoặc không phụ thuộc → đổi sang nhánh phase/task đúng; đừng trộn.
+4. Working tree bẩn với thay đổi không liên quan → dừng, báo status; chỉ stash/đổi nhánh khi user xác nhận.
+5. Không rewrite lịch sử dùng chung; không force-push `main` / `develop` / `phase-XX` đã share.
+
+## Đặt tên
+
+| Loại | Pattern | Ví dụ |
+| --- | --- | --- |
+| Tích hợp phase | `phase-XX` | `phase-01` |
+| Task trong phase | `phase-XX/<task-id>-<slug>` | `phase-01/p01-t03-prisma-migrate` |
+| Docs/chore trong phase | `phase-XX/<type>-<slug>` | `phase-00/docs-g00-signoff` |
+| Hotfix khẩn (ngoài phase) | `hotfix/<slug>` → PR `develop` | `hotfix/ci-node-version` |
+
+Slug: kebab-case, có `Pxx-Tyy` khi gắn task plan. Tránh `phase-01-2`, `feat/p01-…` song song với cùng mục đích khi đã có `phase-01/…`.
+
+Tiền tố cũ (`feature/*`, `chore/*`, `feat/*`) chỉ dùng nếu user yêu cầu tương thích; **mặc định agent dùng `phase-XX/…`**.
+
+## Ví dụ nhanh
+
+- Làm P01-T03 → `git fetch` → checkout/tạo `phase-01` từ `develop` → tạo `phase-01/p01-t03-prisma-migrate` từ `phase-01` → PR vào `phase-01` → sau đó PR `phase-01` → `develop`.
+- Đang ở `phase-01/p01-t01-…`, nhận P02-T01 → không tiếp tục trên nhánh P01; chuyển `phase-02` / `phase-02/p02-t01-…`.
+- G00/G01 evidence thuộc phase tương ứng (`phase-00/…`, `phase-01/…`), không đẩy thẳng `develop` trừ khi đang mở PR tích hợp phase.

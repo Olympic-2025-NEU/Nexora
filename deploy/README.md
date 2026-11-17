@@ -1,100 +1,89 @@
-# Deploy — Compose topology (P01-T01)
+# Nexora deploy (P01)
 
-Sole Compose entrypoint: **`deploy/compose.yml`**. The legacy `deploy/docker-compose.yml` was removed.
+Single Compose entrypoint: [`compose.yml`](./compose.yml).  
+Legacy `docker-compose.yml` (Postgres-only) is removed; do not reintroduce a second entrypoint.
 
-## What this phase delivers
+## Topology
 
-| Item | State after P01-T01 |
-| --- | --- |
-| Networks `edge` + `internal`, volumes per Compose project | Yes |
-| Infra: postgres, gateway (APISIX), keycloak, flowable, seaweedfs, redis, clamav | Declared with pinned digests |
-| Host ports | **Only** gateway on `127.0.0.1:${GATEWAY_HOST_PORT}` |
-| App images erp / core-data / worker / dx-lab | Profile `apps` — images land in **P01-T02** |
-| AI service | Profile `ai` — runtime owned by later AI phase |
-| Realm / real routes / buckets / BPMN | **P01-T04** |
-| DB roles + Prisma MVP migrate | **P01-T03** |
-| live/ready + smoke | **P01-T06** |
-| Clean-clone G01 | **P01-T07** |
+| Service | Network | Host publish (default) |
+| --- | --- | --- |
+| `gateway` (APISIX) | `edge` + `internal` | `127.0.0.1:${GATEWAY_HTTP_PORT}` → 9080 |
+| `postgres` | `internal` | none (use `--profile local-admin`) |
+| `redis` | `internal` | none |
+| `keycloak` | `internal` | none (use `--profile local-admin`) |
+| `seaweedfs` | `internal` | none |
+| `flowable` | `internal` | none |
+| `clamav` | `internal` | none |
+| `erp` / `worker` / `core-data` | `internal` | none — `--profile apps` |
+| `dx-lab` | `internal` | none — `--profile dxlab` |
+| `ai` | `internal` | none — `--profile ai` |
 
-`docker compose … config` passing is **not** proof that the stack boots or that AC/G01 are met.
-
-## Image pins (P01-T01)
-
-| Service | Image |
-| --- | --- |
-| gateway | `apache/apisix:3.20.0-debian@sha256:013de62a9dfba7d8e6006b3e85b524c28c9f1c3549fca3b91d5b258b0b9e759a` |
-| postgres | `postgres:17.6@sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929` (D03 spike pin) |
-| keycloak | `quay.io/keycloak/keycloak:26.8.2@sha256:c68e286cacd87b942ac1939a0a1481461109d6acd3a57dc496969a319a76bbf0` |
-| flowable | `flowable/flowable-rest:8.0.0@sha256:708dfa32f27b93180bb6e7a30684d881d995fe257f5b8413e14b20a55c25672d` |
-| seaweedfs | `chrislusf/seaweedfs:4.53@sha256:ccad23e18639c8b98cee17e7100b95830a06077b56d8e5b006d6dcf8ec5e94a0` |
-| redis | `redis:7.4-alpine@sha256:7f7d30b7fdd09467bac58198a1f166dd69789d348d4fe859cccb20e0cf287fbe` |
-| clamav | `clamav/clamav:1.4@sha256:4cc4350d3fded380caf1799e76c0d1c93f3fa40af99c0cb2862ec0c9b117718a` (`platform: linux/amd64`) |
-
-No etcd: APISIX runs standalone YAML (D01). Stub files live under `deploy/apisix/`.
+APISIX runs **standalone YAML** (no etcd), per D01.
 
 ## Instances A / B / C
 
-Use distinct Compose **project names** and env files so volumes/networks do not collide:
+From repository root with Node 22+, Docker Engine and Docker Compose v2:
 
-| Instance | Env example | Project | Gateway loopback port |
-| --- | --- | --- | --- |
-| A | `instances/a.env.example` | `nexora-a` | 19080 |
-| B | `instances/b.env.example` | `nexora-b` | 19081 |
-| C | `instances/c.env.example` | `nexora-c` | 19082 |
-
-```bash
-# Validate infra topology (default profiles)
-docker compose -f deploy/compose.yml --env-file deploy/instances/a.env.example -p nexora-a config -q
-
-# Include reserved app + AI services (images not built yet)
-docker compose -f deploy/compose.yml --env-file deploy/instances/a.env.example -p nexora-a \
-  --profile apps --profile ai config --services
+```sh
+bash deploy/scripts/bootstrap.sh a  # use b or c for another isolated instance
+docker compose -f deploy/compose.yml --env-file deploy/instances/a.env -p nexora-a --profile apps up -d --build
 ```
 
-Copy examples to gitignored `instances/{a,b,c}.env` before any real `up` that should keep local secrets.
+PowerShell: `./deploy/scripts/bootstrap.ps1 a`, then run the same Compose `up` command. Both scripts copy only a missing instance env file, replace matching `CHANGE_ME_*` markers with the same random value in each password/URL pair, validate the complete deployment contract, then run `compose config -q`. Existing env files are never overwritten; edit local values before rerunning validation. Instance env files stay ignored by Git (mode `0600` when generated). Never run `docker compose config` without `-q`: expanded output contains credentials. The demo defaults use loopback HTTP; Internet deployments require HTTPS for `PUBLIC_BASE_URL` and reachable OIDC endpoints. `GATEWAY_HTTPS_PORT` reserves the external HTTPS port; this P01 Compose gateway still listens on loopback HTTP. Partner secret references identify external secrets for later integration; no partner credential is created by this bootstrap. Optional AI uses `AI_PROVIDER=none`; set `AI_KEY_REF` to a secret reference for another provider. Config matrix and verification: [P01-T05 evidence](../documents/phase-plan/evidence/p01-t05.md).
 
-## Optional: publish Postgres on loopback
-
-For host-side Prisma against the container DB:
+If Docker Engine works but `docker compose version` reports `unknown command: docker compose`, install the Compose plugin, or use this Bash-only fallback from repository root. It runs Compose v5.7.1 in the Docker CLI container, mounts the checkout at the same absolute path for build contexts and bind mounts, and works with `bootstrap.sh` and `smoke.sh` when invoked with `bash`:
 
 ```bash
-docker compose -f deploy/compose.yml -f deploy/compose.dev-db-publish.yml \
-  --env-file deploy/instances/a.env.example -p nexora-a config
+docker() { command docker run --rm --security-opt label=disable -e DOCKER_HOST=unix:///var/run/docker.sock -v /var/run/docker.sock:/var/run/docker.sock -v "$PWD:$PWD" -w "$PWD" docker:29-cli docker "$@"; }
+export -f docker
+bash deploy/scripts/bootstrap.sh a
+docker compose -f deploy/compose.yml --env-file deploy/instances/a.env -p nexora-a --profile apps up -d --build
+bash deploy/scripts/smoke.sh a
 ```
 
-Binds `127.0.0.1:${POSTGRES_HOST_PORT}` only. Do not expose Postgres beyond the developer machine.
+When `19080`/`19081` is already bound, edit only `PUBLIC_BASE_URL`, `GATEWAY_HTTP_PORT`, `GATEWAY_HTTPS_PORT`, `OIDC_REDIRECT_URI_ERP`, and `OIDC_REDIRECT_URI_DXLAB` in each ignored instance env file to use a free port before first `up`. Run `bash deploy/scripts/bootstrap.sh a` again to validate. For another deployment on a shared Docker host, choose distinct Compose project names (`-p g01-a`, `-p g01-b`); Compose scopes networks, volumes and container names by project. Pass the project name to bootstrap and smoke as second argument: `bash deploy/scripts/bootstrap.sh a g01-a` and `bash deploy/scripts/smoke.sh a g01-a`. Keep the same project name for every command on each stack. Do not reuse existing project names or their volumes.
 
-## Env catalog
+## PostgreSQL baseline (P01-T03)
 
-- Shared names: [`deploy/.env.example`](./.env.example)
-- Per-instance: [`deploy/instances/`](./instances/)
-- App `DATABASE_URL` for Next on the host: repo-root [`.env.example`](../.env.example)
+One PostgreSQL instance holds separate `nexora`, `keycloak`, and `flowable` databases. `db-bootstrap` provisions roles/databases on every Compose start, even with an existing volume. App and worker use `app_runtime`; core-data uses `core_data` on the app database; only `db-migrate` uses `migrator`. PostgreSQL administrator credentials stay in the bootstrap job. Set each `CHANGE_ME_*` value in the untracked instance env file; URL passwords must match their corresponding role passwords (URL-encode special characters). Do not log resolved Compose config or commit env files.
 
-All `*_change_me` / empty partner refs are **unsafe development placeholders**.
+`db-migrate` runs `prisma migrate deploy` once after bootstrap. Prisma records applied versions in `public._prisma_migrations`. It is safe to repeat without dropping rows:
 
-## Networks and ports
+```sh
+docker compose -f deploy/compose.yml --env-file deploy/instances/a.env -p nexora-a run --rm db-migrate
+```
 
-- `edge`: gateway (and future public edge peers).
-- `internal`: postgres, keycloak, flowable, seaweedfs, redis, clamav, app profile services.
-- Gateway joins both networks.
-- Default topology must not publish PG, Redis, Flowable, Seaweed, Keycloak, or ClamAV admin ports to the host.
-- Resource caps use both Compose `mem_limit`/`cpus` and `deploy.resources.limits` for broader engine support.
+For baseline backup, use `pg_dump -Fc` for each database (`nexora`, `keycloak`, `flowable`). Keep dumps outside Git. Restore to a new database with `pg_restore --no-owner`, check migration history and rows before routing services to the restored database. Do not restore over a running database.
 
-### Internal DNS (Compose service names)
+## Profiles
 
-| Service | Hostname on `internal` | Container port | Host publish (default) |
-| --- | --- | --- | --- |
-| gateway | `gateway` | 9080 | `127.0.0.1:${GATEWAY_HOST_PORT}` only |
-| postgres | `postgres` | 5432 | none (optional overlay → `127.0.0.1:${POSTGRES_HOST_PORT}`) |
-| keycloak | `keycloak` | 8080; health mgmt 9000 | none |
-| flowable | `flowable` | 8080 | none |
-| seaweedfs | `seaweedfs` | 8333 (S3 mini) | none |
-| redis | `redis` | 6379 | none |
-| clamav | `clamav` | 3310 | none |
-| erp | `erp` | (T02) | none — profile `apps` |
-| core-data | `core-data` | (T02) | none — profile `apps` |
-| worker | `worker` | n/a | none — profile `apps` |
-| dx-lab | `dx-lab` | (T02/P11) | none — profile `apps` |
-| ai | `ai` | (later) | none — profile `ai` |
+- default: infrastructure (PG, Redis, Keycloak, gateway, SeaweedFS, Flowable, ClamAV)
+- `local-admin`: loopback publish for Postgres + Keycloak only
+- `apps`: ERP + worker + core-data
+- `dxlab`: DX-Lab frontend (P11)
+- `ai`: optional AI stub
 
-APISIX stub under `deploy/apisix/` is topology-only (`routes: []`); real OIDC/public/M2M routes arrive in **P01-T04**.
+## P01-T04 runtime bootstrap
+
+Set `OIDC_BASE_URL` to the Keycloak URL advertised to token consumers, `OIDC_ISSUER_URL` to `${OIDC_BASE_URL}/realms/nexora`, and both exact `OIDC_REDIRECT_URI_*` values for browser clients. Choose per-instance passwords and S3 access keys in the untracked env file. `KC_DEV_USER_PASSWORD` is optional; when set, bootstrap creates `KC_DEV_USERNAME` once with a temporary password that must be changed on first login. Re-running bootstrap updates client redirect settings without resetting the dev user's password.
+
+`keycloak-bootstrap` waits for Keycloak and provisions the realm/clients via the admin REST API. APISIX then starts with `/gateway/ping`, read-only `/core/*` and `/erp/*` upstreams. Its admin API is disabled. `storage-bootstrap` writes consumer-scoped SeaweedFS S3 identities into an instance-specific Docker volume. SeaweedFS `mini -bucket` creates the private, quarantine, and public buckets only when absent; storage files and filer metadata live in `seaweed_data`. Core-data uses `S3_ACCESS_KEY` / `S3_SECRET_KEY`; scanner access to quarantine uses `S3_SCANNER_*`; `S3_ADMIN_*` stays with storage bootstrap. The SeaweedFS admin UI binds to container loopback. Flowable REST uses its dedicated PostgreSQL role and authenticated engine health check. Bootstrap jobs rerun safely with Compose `up` or explicitly:
+
+```sh
+docker compose -f deploy/compose.yml --env-file deploy/instances/a.env -p nexora-a run --rm keycloak-bootstrap
+docker compose -f deploy/compose.yml --env-file deploy/instances/a.env -p nexora-a run --rm storage-bootstrap
+```
+
+The default example issuer uses Docker's internal `keycloak` hostname. Set a browser-reachable Keycloak base URL and matching issuer for browser login in a trusted deployment; public OIDC gateway routes and access policies belong to P02.
+
+## Image pins
+
+Digests are locked in `compose.yml` from ADR / Hub (2026-11-17): Postgres 17.6, APISIX 3.20.0-debian, Keycloak 26.8.2, SeaweedFS 4.53, Flowable REST 8.0.0, Redis 7.4-alpine, ClamAV 1.4.
+
+P01-T04 records runtime verification in [`../documents/phase-plan/evidence/p01-t04.md`](../documents/phase-plan/evidence/p01-t04.md). BPMN deployment and application authorization belong to later phases.
+
+## P01-T06 health, metrics and dev infrastructure seed
+
+Start with `--profile apps` to run ERP, core-data and worker. From the repository root, run `bash deploy/scripts/smoke.sh b` for the external aggregate check (replace `b` with `a` or `c`; pass a second project-name argument for non-default `-p`). The script uses a throwaway container attached to the project's internal Docker network. It checks PostgreSQL, gateway, Keycloak discovery, ERP/core/worker readiness, authenticated Flowable and signed S3 bucket access; it never probes readiness through the gateway. On a running default-name stack, use `bash deploy/scripts/seed.sh b` to reapply **dev-only** Keycloak realm/browser clients/optional temporary dev user and object-storage credentials/buckets. Repeating it reports `changes=0`; neither script prints credentials. Both scripts require Docker Compose and a validated, ignored `deploy/instances/b.env`.
+
+ERP and core-data expose `/api/v1/health/live`, `/api/v1/health/ready`; worker exposes `/health/live`, `/health/ready`. ERP also exposes `/api/v1/metrics`; core-data and worker expose `/metrics` on the internal network. `service_up` is 1 only when that process's dependencies respond. `worker_queue_depth NaN` explicitly means unavailable until P04 adds an outbox queue; it does not imply an empty queue. HTTP readiness returns 503 and the fixed `dependency_unavailable` reason on failure, without revealing connection details. `x-request-id` is propagated by the gateway and included in JSON health logs; gateway access logs use the validated upstream response ID as `correlationId`. Evidence: [P01-T06](../documents/phase-plan/evidence/p01-t06.md).
