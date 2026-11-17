@@ -2,7 +2,7 @@ name: ci
 
 on:
   push:
-    branches: [develop, main, "chore/**", "spike/**", "phase-*/**"]
+    branches: [develop, main, "chore/**", "spike/**", "phase-*/**", "phase01/**"]
   pull_request:
     branches: [develop, main]
 
@@ -31,3 +31,13 @@ jobs:
         run: npm run typecheck
       - name: Contracts + unit gate
         run: npm test
+
+  images:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build ERP image
+        run: docker build -t nexora-erp:ci -f Dockerfile .
+      - name: Build core-data image
+        run: docker build -t nexora-core-data:ci -f services/core-data/Dockerfile services/core-data
