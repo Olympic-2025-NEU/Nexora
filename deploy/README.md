@@ -22,15 +22,14 @@ APISIX runs **standalone YAML** (no etcd), per D01.
 
 ## Instances A / B / C
 
-```powershell
-Copy-Item deploy/instances/a.env.example deploy/instances/a.env
-# edit CHANGE_ME_* values
+From repository root with Node 22+ and Docker Compose:
 
-docker compose -f deploy/compose.yml --env-file deploy/instances/a.env -p nexora-a config -q
+```sh
+sh deploy/scripts/bootstrap.sh a  # use b or c for another isolated instance
 docker compose -f deploy/compose.yml --env-file deploy/instances/a.env -p nexora-a up -d --build
 ```
 
-Repeat with `b` / `c` (different project name, ports, credentials, volumes).
+PowerShell: `./deploy/scripts/bootstrap.ps1 a`, then run the same Compose `up` command. Both scripts copy only a missing instance env file, replace matching `CHANGE_ME_*` markers with the same random value in each password/URL pair, validate the complete deployment contract, then run `compose config -q`. Existing env files are never overwritten; edit local values before rerunning validation. Instance env files stay ignored by Git (mode `0600` when generated). Never run `docker compose config` without `-q`: expanded output contains credentials. The demo defaults use loopback HTTP; Internet deployments require HTTPS for `PUBLIC_BASE_URL` and reachable OIDC endpoints. `GATEWAY_HTTPS_PORT` reserves the external HTTPS port; this P01 Compose gateway still listens on loopback HTTP. Partner secret references identify external secrets for later integration; no partner credential is created by this bootstrap. Optional AI uses `AI_PROVIDER=none`; set `AI_KEY_REF` to a secret reference for another provider. Config matrix and verification: [P01-T05 evidence](../documents/phase-plan/evidence/p01-t05.md).
 
 ## PostgreSQL baseline (P01-T03)
 
