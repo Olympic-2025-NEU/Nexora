@@ -2,7 +2,7 @@
 
 **Project license:** `AGPL-3.0-only`; full text in `LICENSE`.
 
-`npm run check:spdx` checks the **exact** identifier in the first six lines of every tracked or untracked non-ignored `.ts`, `.tsx`, `.js`, `.mjs`, `.css` and `.prisma` source/config file. It compares paths to [source-inventory.json](./source-inventory.json), so adding a source file requires an inventory update in the same PR. Regenerate with `node scripts/check-spdx.mjs --write-inventory`.
+`npm run check:spdx` checks the **exact** identifier in the first six lines of every tracked or untracked non-ignored `.ts`, `.tsx`, `.js`, `.mjs`, `.py`, `.css` and `.prisma` source/config file. It compares paths to [source-inventory.json](./source-inventory.json), so adding a source file requires an inventory update in the same PR. Regenerate with `node scripts/check-spdx.mjs --write-inventory`.
 
 Excluded: `next-env.d.ts` (Next-generated); `prisma/migrations/**` (Prisma-generated SQL). `db/migrations/0001_platform.sql` is a zero-byte legacy placeholder and will be removed/replaced under D03/P01. The scanner does not relicense third-party source; new vendored code/assets require separate provenance and notices before merging.
 

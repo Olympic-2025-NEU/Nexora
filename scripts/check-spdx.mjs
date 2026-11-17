@@ -3,9 +3,9 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-const SOURCE_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".mjs", ".css", ".prisma"]);
+const SOURCE_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".mjs", ".py", ".css", ".prisma"]);
 const INVENTORY = "documents/phase-plan/evidence/source-inventory.json";
-const HEADER = /^\s*(?:\/\/|\/\*|\*)\s*SPDX-License-Identifier:\s*AGPL-3\.0-only\s*(?:\*\/)?\s*$/m;
+const HEADER = /^\s*(?:\/\/|\/\*|\*|#)\s*SPDX-License-Identifier:\s*AGPL-3\.0-only\s*(?:\*\/)?\s*$/m;
 
 function sourcePaths() {
   const output = execFileSync(

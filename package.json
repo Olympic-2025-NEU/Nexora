@@ -18,7 +18,7 @@
     "check:licenses": "node scripts/check-licenses.mjs",
     "generate:openapi": "node scripts/generate-openapi.mjs",
     "check:openapi": "node scripts/generate-openapi.mjs --check && redocly lint contracts/openapi/nexora-v1.yaml --format=summary",
-    "test:contracts": "npm run check:openapi && node scripts/validate-contracts.mjs",
+    "test:contracts": "npm run check:openapi && node scripts/validate-contracts.mjs && python scripts/check-jcs-python.py",
     "test": "npm run check:spdx && npm run check:licenses && npm run check:secrets && npm run test:contracts"
   },
   "dependencies": {

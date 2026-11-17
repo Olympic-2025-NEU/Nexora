@@ -21,4 +21,4 @@ node scripts/check-licenses.mjs --write-inventory
 npm run test:contracts
 ```
 
-`npm run test:contracts` checks generated-file drift, Redocly OpenAPI structure, every route's auth/success/headers, request fixtures, core/domain/federation JSON Schemas, A→B→C provenance, recipient/issuer and quantity invariants, duplicate JSON keys, and JCS SHA-256/retry vectors. A future route implementation must add runtime API tests for actual 401/403/409 behavior, transaction rollback and concurrency in its owning phase. Static contract checks cannot substitute for those tests.
+`npm run test:contracts` checks generated-file drift, Redocly OpenAPI structure, every route's auth/success/headers, request fixtures, core/domain/federation JSON Schemas, A→B→C provenance, recipient/issuer and quantity invariants, duplicate JSON keys, and JCS SHA-256/retry vectors in Node plus an independent Python check for the envelope's ASCII-key/integer/string subset. A future route implementation must add runtime API tests for actual 401/403/409 behavior, transaction rollback and concurrency in its owning phase. Static contract checks cannot substitute for those tests.

@@ -15,12 +15,12 @@ npm run db:generate            PASS (Prisma Client 6.19.0)
 npm run build                  PASS (Next 16.4.6; only / and /api/v1/health in app)
 npm run typecheck              PASS
 npm test                       PASS
-  check:spdx                   43 sources
+  check:spdx                   48 sources
   check:licenses               505 lockfile packages
-  check:secrets                221 files; known key/token patterns
+  check:secrets                222 files; known key/token patterns
   test:contracts               70 paths, 87 operations, 30 request fixture pairs;
                                4 core pairs, 7 domain pairs, 7 federation valid,
-                               9 negative, 3 retry/hash vectors
+                               9 negative, 3 retry/hash vectors, Python cross-check
 ```
 
 `npm ci` printed the same 13 dependency advisories documented in `license-inventory.md`. The advisory set needs P01/P13 review; a clean install is not a security clearance.
