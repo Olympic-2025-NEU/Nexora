@@ -5,21 +5,14 @@ name: nexora-${INSTANCE_ID:-a}
 
 networks:
   edge:
-    name: nexora-${INSTANCE_ID:-a}-edge
   internal:
-    name: nexora-${INSTANCE_ID:-a}-internal
 
 volumes:
   pg_data:
-    name: nexora-${INSTANCE_ID:-a}-pg
   redis_data:
-    name: nexora-${INSTANCE_ID:-a}-redis
   seaweed_data:
-    name: nexora-${INSTANCE_ID:-a}-seaweed
   seaweed_config:
-    name: nexora-${INSTANCE_ID:-a}-seaweed-config
   clamav_data:
-    name: nexora-${INSTANCE_ID:-a}-clamav
 
 services:
   postgres:

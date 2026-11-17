@@ -10,6 +10,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends openssl \
   && rm -rf /var/lib/apt/lists/* \
   && chown -R node:node /app/node_modules
 COPY prisma ./prisma
+RUN npx prisma generate
 USER node
 CMD ["npm", "run", "db:migrate"]
 

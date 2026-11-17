@@ -47,8 +47,8 @@
 
 ## P01-T07 — Gate G01 cài lại độc lập
 
-- [ ] Một người khác clone từ Git, dùng chỉ README + `.env.example`, build ERP/core API images, chạy migration và Compose; ghi thời gian/lỗi thực tế.
-- [ ] Dựng stack thứ hai với project name/volume/network/DB riêng; chứng minh không xung đột port/tên. Chưa cần federation.
+- [ ] Một người khác clone từ Git, dùng chỉ README + `.env.example`, build ERP/core API images, chạy migration và Compose; ghi thời gian/lỗi thực tế. Agent đã xác minh đường cài từ clone sạch, nhưng chưa có người khác nghiệm thu: [evidence/G01.md](evidence/G01.md).
+- [x] Dựng stack thứ hai với project name/volume/network/DB riêng; chứng minh không xung đột port/tên. Chưa cần federation. Evidence: [evidence/G01.md](evidence/G01.md).
 - **Bằng chứng:** terminal log, `compose ps/config`, DB role list đã redacted, health dependency và SHA image.
 
 ## Hồ sơ giao AI theo từng task
