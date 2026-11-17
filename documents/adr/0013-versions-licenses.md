@@ -14,15 +14,17 @@ Nexora needs a single agreed default before P01 runtime work. This ADR records t
 
 Pin image digests and lockfiles; maintain SBOM/license inventory. Verify OSS licenses for Flowable, gateway, storage, AI SDK. No enterprise-only components that cannot be built from source for contest rebuild.
 
-## Pin fields (fill after spike)
+## Pin fields
+
+Canonical table (spike + **P01-T01 Compose pins** including Redis/ClamAV/Postgres 17.6): [`D13-versions-licenses-resources.md`](./D13-versions-licenses-resources.md). Deploy entrypoint: [`deploy/compose.yml`](../../deploy/compose.yml). Inventory: [`evidence/license-inventory.md`](../phase-plan/evidence/license-inventory.md).
 
 | Field | Value |
 | --- | --- |
-| image / package version | TBD-until-spike |
-| digest | TBD-until-spike |
-| license | TBD-until-spike |
-| source URL | TBD-until-spike |
-| RAM (measured) | TBD-until-spike |
+| image / package version | See D13 evidence table |
+| digest | See D13 evidence table |
+| license | See D13 + license-inventory |
+| source URL | See D13 evidence table |
+| RAM (measured) | Spike snapshots in D13; full-stack peak still P01/P12 |
 | Owner for spike | Dev |
 
 ## Consequences
@@ -36,10 +38,15 @@ Pin image digests and lockfiles; maintain SBOM/license inventory. Verify OSS lic
 - See phase-plan docs linked from decision-log for this ID.
 - Machine-readable stubs may live under `contracts/` as `v1-provisional`.
 
-## Spike evidence: pending
+## Spike / Compose evidence
 
-- [ ] Inventory every image/dep
-- [ ] Reject incompatible licenses
-- [ ] No latest tags in release compose
+- Spike RAM/digest: `D13-versions-licenses-resources.md`
+- P01-T01 topology: `documents/phase-plan/evidence/p01-t01-compose.md`
+- Image licenses in deploy Compose: `documents/phase-plan/evidence/license-inventory.md`
 
-**Evidence links:** _(none yet — Dev attaches logs/commits here)_
+## Remaining before release (P13)
+
+- [x] Pin infra images used by `deploy/compose.yml` (no `latest`)
+- [ ] Full SBOM / transitive image layer inventory for distributed artifacts
+- [ ] Reject incompatible licenses in the **shipped** artifact set
+- [ ] Peak RAM for full A/B/C + ClamAV demo machine

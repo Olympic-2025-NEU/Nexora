@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-only
+# APISIX standalone data plane (D01). OIDC route bodies live in routes.yaml.
 apisix:
   node_listen: 9080
   enable_admin: false

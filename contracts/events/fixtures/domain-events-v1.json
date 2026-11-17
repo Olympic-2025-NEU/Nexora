@@ -1,0 +1,266 @@
+{
+  "schemaVersion": 1,
+  "cases": {
+    "trading-receipt-confirmed-v1.schema.json": {
+      "valid": {
+        "eventId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        "documentId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        "documentVersion": 2,
+        "lines": [
+          {
+            "lineId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            "batchId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            "warehouseId": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+            "originLot": {
+              "issuerInstanceId": "A",
+              "lotId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+            },
+            "quantity": "12",
+            "unit": "EA"
+          }
+        ],
+        "actorSub": "staff-a",
+        "occurredAt": "2026-11-14T08:00:00Z"
+      },
+      "invalid": {
+        "eventId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        "documentVersion": 2,
+        "lines": [
+          {
+            "lineId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            "batchId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            "warehouseId": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+            "originLot": {
+              "issuerInstanceId": "A",
+              "lotId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+            },
+            "quantity": "12",
+            "unit": "EA"
+          }
+        ],
+        "actorSub": "staff-a",
+        "occurredAt": "2026-11-14T08:00:00Z"
+      }
+    },
+    "trading-issue-confirmed-v1.schema.json": {
+      "valid": {
+        "eventId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        "documentId": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        "documentVersion": 3,
+        "lines": [
+          {
+            "lineId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            "batchId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            "warehouseId": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+            "originLot": {
+              "issuerInstanceId": "A",
+              "lotId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+            },
+            "quantity": "12",
+            "unit": "EA"
+          }
+        ],
+        "movementIds": [
+          "dddddddd-dddd-4ddd-8ddd-dddddddddddd"
+        ],
+        "actorSub": "staff-a",
+        "occurredAt": "2026-11-14T09:00:00Z"
+      },
+      "invalid": {
+        "eventId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        "documentVersion": 3,
+        "lines": [
+          {
+            "lineId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            "batchId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            "warehouseId": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+            "originLot": {
+              "issuerInstanceId": "A",
+              "lotId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+            },
+            "quantity": "12",
+            "unit": "EA"
+          }
+        ],
+        "movementIds": [
+          "dddddddd-dddd-4ddd-8ddd-dddddddddddd"
+        ],
+        "actorSub": "staff-a",
+        "occurredAt": "2026-11-14T09:00:00Z"
+      }
+    },
+    "trading-transfer-confirmed-v1.schema.json": {
+      "valid": {
+        "eventId": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        "transferId": "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+        "linkedIssueId": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+        "destinationPartnerId": "ffffffff-ffff-4fff-8fff-ffffffffffff",
+        "lines": [
+          {
+            "sourceLineId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            "batchId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            "originLot": {
+              "issuerInstanceId": "A",
+              "lotId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+            },
+            "quantity": "5",
+            "unit": "EA"
+          }
+        ],
+        "occurredAt": "2026-11-14T10:00:00Z"
+      },
+      "invalid": {
+        "eventId": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        "linkedIssueId": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+        "destinationPartnerId": "ffffffff-ffff-4fff-8fff-ffffffffffff",
+        "lines": [
+          {
+            "sourceLineId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            "batchId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            "originLot": {
+              "issuerInstanceId": "A",
+              "lotId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+            },
+            "quantity": "5",
+            "unit": "EA"
+          }
+        ],
+        "occurredAt": "2026-11-14T10:00:00Z"
+      }
+    },
+    "trading-receiving-confirmed-v1.schema.json": {
+      "valid": {
+        "eventId": "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+        "receivingId": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+        "sourceIssuerInstanceId": "A",
+        "sourceTransferId": "ffffffff-ffff-4fff-8fff-ffffffffffff",
+        "sentLines": [
+          {
+            "sourceLineId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            "originLot": {
+              "issuerInstanceId": "A",
+              "lotId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+            },
+            "sentQuantity": "12",
+            "unit": "EA"
+          }
+        ],
+        "actualLines": [
+          {
+            "sourceLineId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            "localBatchId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            "actualQuantity": "10",
+            "unit": "EA"
+          }
+        ],
+        "discrepancyReason": "Two damaged",
+        "occurredAt": "2026-11-14T11:00:00Z"
+      },
+      "invalid": {
+        "eventId": "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+        "sourceIssuerInstanceId": "A",
+        "sourceTransferId": "ffffffff-ffff-4fff-8fff-ffffffffffff",
+        "sentLines": [
+          {
+            "sourceLineId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            "originLot": {
+              "issuerInstanceId": "A",
+              "lotId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+            },
+            "sentQuantity": "12",
+            "unit": "EA"
+          }
+        ],
+        "actualLines": [
+          {
+            "sourceLineId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            "localBatchId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            "actualQuantity": "10",
+            "unit": "EA"
+          }
+        ],
+        "discrepancyReason": "Two damaged",
+        "occurredAt": "2026-11-14T11:00:00Z"
+      }
+    },
+    "trading-sale-recorded-v1.schema.json": {
+      "valid": {
+        "eventId": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+        "saleId": "ffffffff-ffff-4fff-8fff-ffffffffffff",
+        "linkedIssueId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        "lines": [
+          {
+            "sourceLineId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            "batchId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            "originLot": {
+              "issuerInstanceId": "A",
+              "lotId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+            },
+            "quantity": "5",
+            "unit": "EA"
+          }
+        ],
+        "occurredAt": "2026-11-14T12:00:00Z"
+      },
+      "invalid": {
+        "eventId": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+        "linkedIssueId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        "lines": [
+          {
+            "sourceLineId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            "batchId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            "originLot": {
+              "issuerInstanceId": "A",
+              "lotId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+            },
+            "quantity": "5",
+            "unit": "EA"
+          }
+        ],
+        "occurredAt": "2026-11-14T12:00:00Z"
+      }
+    },
+    "workflow-approval-requested-v1.schema.json": {
+      "valid": {
+        "eventId": "ffffffff-ffff-4fff-8fff-ffffffffffff",
+        "approvalRequestId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        "documentId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        "creatorSub": "staff-a",
+        "processKey": "goods-issue-approval",
+        "correlationKey": "issue-a",
+        "submittedDocumentVersion": 2,
+        "lineSnapshotSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "invalid": {
+        "eventId": "ffffffff-ffff-4fff-8fff-ffffffffffff",
+        "documentId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        "creatorSub": "staff-a",
+        "processKey": "goods-issue-approval",
+        "correlationKey": "issue-a",
+        "submittedDocumentVersion": 2,
+        "lineSnapshotSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    },
+    "workflow-approval-decision-requested-v1.schema.json": {
+      "valid": {
+        "eventId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        "approvalRequestId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        "documentId": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        "taskId": "task-a",
+        "decision": "approved",
+        "requestedBySub": "approver-b",
+        "requestedAt": "2026-11-14T12:00:00Z",
+        "lineSnapshotSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "invalid": {
+        "eventId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        "documentId": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        "taskId": "task-a",
+        "decision": "approved",
+        "requestedBySub": "approver-b",
+        "requestedAt": "2026-11-14T12:00:00Z",
+        "lineSnapshotSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    }
+  }
+}

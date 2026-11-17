@@ -1,46 +1,21 @@
-# D07 — Decimal, unit, and lot rules
+# D07 — Decimal, unit and origin-lot identity
 
-- **Status:** Accepted-provisional
-- **Blocks:** P00/P06
-- **Date:** 2026-11-16
-- **Decision owners:** Dev (provisional); promote after spike
-- **Baseline source:** `documents/phase-plan/implementation-baseline.md`, `decision-log.md`
-
-## Context
-
-Nexora needs a single agreed default before P01 runtime work. This ADR records the baseline choice so agents do not invent alternate stacks. It is **not** proof that the dependency is running in the repo.
+- **Status:** Accepted for P00 design, 2026-11-17; application constraints remain P06/P07.
+- **Blocks:** P06 catalog/inventory and P07 document confirm.
+- **Decision owners:** Dev/team; two G00 reviewers still required.
+- **Detailed rationale and SQL observations:** [D07-quantity-unit-lot.md](./D07-quantity-unit-lot.md).
 
 ## Decision
 
-Stock quantities: PostgreSQL numeric(20,3); JSON decimal strings; no JS Number arithmetic. Units MVP: EA, KG, L — no cross-unit conversion. EA must be integer. No negative stock. Lot identity issuer-qualified; batch quality inspect/available/restricted. Expiry: block issue when expires_on < today (org timezone), valid through end of expiry day.
+Store stock as PostgreSQL `numeric(20,3)` and exchange decimal strings in JSON. Reject values with more than three fraction digits before PostgreSQL can round them. `EA` is integral; `KG` and `L` allow up to three fraction digits; no unit conversion in v1. Confirm cannot make a balance negative. Batch origin is the immutable `(origin_issuer_instance_id, origin_lot_id)` pair, distinct from each sender's local batch ID. A local code or SKU alone never identifies a cross-instance lot. Issue expiry is evaluated in the organization timezone; the expiry date itself remains valid.
 
-## Pin fields (fill after spike)
+This is a domain/schema decision on the chosen PostgreSQL/Prisma stack; infrastructure pin/license/RAM are in [D03](./0003-database-prisma.md) and [D03 evidence](../phase-plan/evidence/spike-d03.md).
 
-| Field | Value |
-| --- | --- |
-| image / package version | TBD-until-spike |
-| digest | TBD-until-spike |
-| license | TBD-until-spike |
-| source URL | TBD-until-spike |
-| RAM (measured) | TBD-until-spike |
-| Owner for spike | Dev |
+## P00 evidence and boundary
 
-## Consequences
+- [x] SQL spike showed PostgreSQL rounding beyond scale, numeric overflow and issuer-qualified uniqueness (see detailed D07).
+- [x] Contract fixtures reject invalid decimal/zero lot and compare quantities with integer milliscale arithmetic; A→B→C preserves the origin lot. See [contract validation](../phase-plan/evidence/contract-validate.md).
+- [x] Prisma D03 scratch transaction proved rollback and one-winner stock contention primitive; it is not the six-use-case schema.
+- [ ] Runtime: reject overprecision/EA fraction/expiry cases at API and DB constraints, enforce unit/product/lot FK and two concurrent issues on the real schema. Owners: P06/P07.
 
-- Implementation tasks must follow this decision until a superseding ADR.
-- Contracts (`api-contracts`, `event-contracts`, `database-schema-v1`, `security`) stay aligned; change them in the same PR as any ADR revision.
-- G00 remains **open** while Spike evidence is pending for gate-critical ADRs (especially D01–D08, D14, D15).
-
-## Contract impact
-
-- See phase-plan docs linked from decision-log for this ID.
-- Machine-readable stubs may live under `contracts/` as `v1-provisional`.
-
-## Spike evidence: pending
-
-- [ ] Rounding vectors
-- [ ] Concurrent issue only one success when stock insufficient
-- [ ] EA fractional rejected
-- [ ] Expiry boundary cases
-
-**Evidence links:** _(none yet — Dev attaches logs/commits here)_
+Contract consumers: [database schema](../phase-plan/database-schema-v1.md), [API payloads](../phase-plan/api-payloads-v1.md), [event payloads](../phase-plan/event-payloads-v1.md). G00 still awaits human sign-off.

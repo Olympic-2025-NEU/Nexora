@@ -1,0 +1,58 @@
+{
+  "schemaVersion": "1.0",
+  "messageId": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+  "eventId": "ffffffff-ffff-4fff-8fff-ffffffffffff",
+  "eventType": "downstream.impact.v1",
+  "issuerInstanceId": "B",
+  "recipientInstanceId": "A",
+  "occurredAt": "2026-11-16T09:00:00Z",
+  "publishedAt": "2026-11-16T09:00:01Z",
+  "correlationId": "33333333-3333-4333-8333-333333333333",
+  "causationId": "44444444-4444-4444-8444-444444444444",
+  "sourceDocument": {
+    "type": "partner_transfer",
+    "id": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+    "version": 2
+  },
+  "lots": [
+    {
+      "sourceLineId": "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+      "originLot": {
+        "issuerInstanceId": "A",
+        "lotId": "77777777-7777-4777-8777-777777777777"
+      },
+      "senderBatch": {
+        "instanceId": "B",
+        "batchId": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
+      },
+      "product": {
+        "instanceId": "B",
+        "productId": "ffffffff-ffff-4fff-8fff-ffffffffffff"
+      },
+      "quantity": "2",
+      "unit": "EA"
+    }
+  ],
+  "upstreamReferences": [
+    {
+      "issuerInstanceId": "C",
+      "messageId": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+      "eventId": "dddddddd-dddd-4ddd-8ddd-dddddddddddd"
+    }
+  ],
+  "evidence": [],
+  "sharingPolicyVersion": "v1",
+  "originLot": {
+    "issuerInstanceId": "A",
+    "lotId": "77777777-7777-4777-8777-777777777777"
+  },
+  "downstreamPartnerRef": "C",
+  "impactType": "downstream_sale",
+  "sourceEventRefs": [
+    {
+      "issuerInstanceId": "C",
+      "eventId": "dddddddd-dddd-4ddd-8ddd-dddddddddddd"
+    }
+  ],
+  "disclosureScope": "partner"
+}

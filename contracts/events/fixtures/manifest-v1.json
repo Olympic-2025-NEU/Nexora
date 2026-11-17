@@ -1,0 +1,120 @@
+{
+  "schemaVersion": 1,
+  "valid": [
+    {
+      "file": "a-to-b-transfer-announced.json",
+      "receiver": "B",
+      "partnerIssuer": "A",
+      "sha256": "2786068df0067da04b9f76ba2dbc1bafb1a277209b3925b0802231c0ab966ca4"
+    },
+    {
+      "file": "b-to-a-receipt-confirmed.json",
+      "receiver": "A",
+      "partnerIssuer": "B",
+      "sha256": "04c6fddb92bf8f55cf2f63cc33eaf8ef18967fa2209e0007efe0f7f184fb129f"
+    },
+    {
+      "file": "b-to-c-transfer-announced.json",
+      "receiver": "C",
+      "partnerIssuer": "B",
+      "sha256": "815c3e97e9dc4cdbe50d614a20afb54858ca88fbe4141549763806a13d106b57"
+    },
+    {
+      "file": "c-to-b-receipt-confirmed.json",
+      "receiver": "B",
+      "partnerIssuer": "C",
+      "sha256": "786382ad6a466b9e3814bb2431bfb23c921979a3193973abc794d075b8a26e78"
+    },
+    {
+      "file": "c-to-b-downstream-impact.json",
+      "receiver": "B",
+      "partnerIssuer": "C",
+      "sha256": "23d3319d622cbcefa1b210073d88281760e773843f734f4c7389881cdea6e937"
+    },
+    {
+      "file": "b-to-a-downstream-impact.json",
+      "receiver": "A",
+      "partnerIssuer": "B",
+      "sha256": "5bc941efe2fea1aa28e1c29187d46edcd9826aaa5748b8abc52f11a323143263"
+    },
+    {
+      "file": "b-to-a-zero-actual-receipt.json",
+      "receiver": "A",
+      "partnerIssuer": "B",
+      "sha256": "c8feda398451401113d7e6bad2dd5a1a3d45c75e417e0408530895eaf67b69ae"
+    }
+  ],
+  "invalid": [
+    {
+      "file": "invalid/missing-evidence.json",
+      "kind": "schema",
+      "receiver": "B",
+      "partnerIssuer": "A"
+    },
+    {
+      "file": "invalid/unknown-version.json",
+      "kind": "schema",
+      "receiver": "B",
+      "partnerIssuer": "A"
+    },
+    {
+      "file": "invalid/zero-lot.json",
+      "kind": "schema",
+      "receiver": "B",
+      "partnerIssuer": "A"
+    },
+    {
+      "file": "invalid/extra-private-url.json",
+      "kind": "schema",
+      "receiver": "B",
+      "partnerIssuer": "A"
+    },
+    {
+      "file": "invalid/wrong-recipient.json",
+      "kind": "domain",
+      "receiver": "B",
+      "partnerIssuer": "A"
+    },
+    {
+      "file": "invalid/wrong-issuer.json",
+      "kind": "domain",
+      "receiver": "B",
+      "partnerIssuer": "A"
+    },
+    {
+      "file": "invalid/receipt-over-actual.json",
+      "kind": "domain",
+      "receiver": "A",
+      "partnerIssuer": "B"
+    },
+    {
+      "file": "invalid/duplicate-key.json",
+      "kind": "json",
+      "receiver": "B",
+      "partnerIssuer": "A"
+    },
+    {
+      "file": "invalid/receipt-zero-lots-positive-actual.json",
+      "kind": "domain",
+      "receiver": "A",
+      "partnerIssuer": "B"
+    }
+  ],
+  "replay": [
+    {
+      "file": "a-to-b-retry.json",
+      "reference": "a-to-b-transfer-announced.json",
+      "sameHash": true
+    },
+    {
+      "file": "a-to-b-reordered.json",
+      "reference": "a-to-b-transfer-announced.json",
+      "sameHash": true
+    },
+    {
+      "file": "a-to-b-message-id-reused.json",
+      "reference": "a-to-b-transfer-announced.json",
+      "sameHash": false
+    }
+  ]
+}

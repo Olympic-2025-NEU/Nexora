@@ -1,0 +1,61 @@
+{
+  "schemaVersion": "1.0",
+  "messageId": "66666666-6666-4666-8666-666666666666",
+  "eventId": "77777777-7777-4777-8777-777777777777",
+  "eventType": "receipt.confirmed.v1",
+  "issuerInstanceId": "C",
+  "recipientInstanceId": "B",
+  "occurredAt": "2026-11-15T12:00:00Z",
+  "publishedAt": "2026-11-15T12:00:01Z",
+  "correlationId": "33333333-3333-4333-8333-333333333333",
+  "causationId": "44444444-4444-4444-8444-444444444444",
+  "sourceDocument": {
+    "type": "receiving_confirmation",
+    "id": "88888888-8888-4888-8888-888888888888",
+    "version": 2
+  },
+  "lots": [
+    {
+      "sourceLineId": "99999999-9999-4999-8999-999999999999",
+      "originLot": {
+        "issuerInstanceId": "A",
+        "lotId": "77777777-7777-4777-8777-777777777777"
+      },
+      "senderBatch": {
+        "instanceId": "C",
+        "batchId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+      },
+      "product": {
+        "instanceId": "C",
+        "productId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+      },
+      "quantity": "5",
+      "unit": "EA"
+    }
+  ],
+  "upstreamReferences": [
+    {
+      "issuerInstanceId": "B",
+      "messageId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      "eventId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+    }
+  ],
+  "evidence": [],
+  "sharingPolicyVersion": "v1",
+  "sentQuantity": "5",
+  "sourceTransfer": {
+    "issuerInstanceId": "B",
+    "id": "cccccccc-cccc-4ccc-8ccc-cccccccccccc"
+  },
+  "actualLines": [
+    {
+      "sourceLineId": "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+      "receiverBatchId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      "sentQuantity": "5",
+      "actualQuantity": "5",
+      "unit": "EA"
+    }
+  ],
+  "actualQuantity": "5",
+  "discrepancyQuantity": "0"
+}

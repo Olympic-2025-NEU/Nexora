@@ -1,0 +1,391 @@
+{
+  "schemaVersion": 1,
+  "cases": {
+    "AiChatInput": {
+      "valid": {
+        "message": "Show lot trace",
+        "lotRef": "A/A-L1"
+      },
+      "invalid": {
+        "lotRef": "A/A-L1"
+      }
+    },
+    "AiDraftInput": {
+      "valid": {
+        "documentType": "goods_issue",
+        "instruction": "Prepare an outbound issue for 5 EA",
+        "purpose": "partner_transfer"
+      },
+      "invalid": {
+        "instruction": "Prepare an outbound issue for 5 EA",
+        "purpose": "partner_transfer"
+      }
+    },
+    "ApprovalDecisionInput": {
+      "valid": {
+        "decision": "approved"
+      },
+      "invalid": {}
+    },
+    "BatchCreate": {
+      "valid": {
+        "productId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        "localCode": "A-L1"
+      },
+      "invalid": {
+        "localCode": "A-L1"
+      }
+    },
+    "BatchQualityAction": {
+      "valid": {
+        "action": "mark_available",
+        "reason": "Inspection passed"
+      },
+      "invalid": {
+        "reason": "Inspection passed"
+      }
+    },
+    "CoreRecordCreate": {
+      "valid": {
+        "kind": "evidence_metadata",
+        "payload": {
+          "schemaVersion": 1,
+          "ownerType": "batch",
+          "ownerId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          "attachmentId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+          "title": "Quality document"
+        },
+        "visibility": "private",
+        "policyVersion": "v1"
+      },
+      "invalid": {
+        "payload": {
+          "schemaVersion": 1,
+          "ownerType": "batch",
+          "ownerId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          "attachmentId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+          "title": "Quality document"
+        },
+        "visibility": "private",
+        "policyVersion": "v1"
+      }
+    },
+    "FederationEnvelope": {
+      "valid": {
+        "schemaVersion": "1.0",
+        "messageId": "11111111-1111-4111-8111-111111111111",
+        "eventId": "22222222-2222-4222-8222-222222222222",
+        "eventType": "transfer.announced.v1",
+        "issuerInstanceId": "A",
+        "recipientInstanceId": "B",
+        "occurredAt": "2026-11-14T08:00:00Z",
+        "publishedAt": "2026-11-14T08:00:01Z",
+        "correlationId": "33333333-3333-4333-8333-333333333333",
+        "causationId": "44444444-4444-4444-8444-444444444444",
+        "sourceDocument": {
+          "type": "partner_transfer",
+          "id": "55555555-5555-4555-8555-555555555555",
+          "version": 2
+        },
+        "lots": [
+          {
+            "sourceLineId": "66666666-6666-4666-8666-666666666666",
+            "originLot": {
+              "issuerInstanceId": "A",
+              "lotId": "77777777-7777-4777-8777-777777777777"
+            },
+            "senderBatch": {
+              "instanceId": "A",
+              "batchId": "77777777-7777-4777-8777-777777777777"
+            },
+            "product": {
+              "instanceId": "A",
+              "productId": "88888888-8888-4888-8888-888888888888"
+            },
+            "quantity": "12",
+            "unit": "EA"
+          }
+        ],
+        "upstreamReferences": [],
+        "evidence": [],
+        "sharingPolicyVersion": "v1",
+        "linkedIssueId": "99999999-9999-4999-8999-999999999999",
+        "sentQuantity": "12"
+      },
+      "invalid": {
+        "messageId": "11111111-1111-4111-8111-111111111111",
+        "eventId": "22222222-2222-4222-8222-222222222222",
+        "eventType": "transfer.announced.v1",
+        "issuerInstanceId": "A",
+        "recipientInstanceId": "B",
+        "occurredAt": "2026-11-14T08:00:00Z",
+        "publishedAt": "2026-11-14T08:00:01Z",
+        "correlationId": "33333333-3333-4333-8333-333333333333",
+        "causationId": "44444444-4444-4444-8444-444444444444",
+        "sourceDocument": {
+          "type": "partner_transfer",
+          "id": "55555555-5555-4555-8555-555555555555",
+          "version": 2
+        },
+        "lots": [
+          {
+            "sourceLineId": "66666666-6666-4666-8666-666666666666",
+            "originLot": {
+              "issuerInstanceId": "A",
+              "lotId": "77777777-7777-4777-8777-777777777777"
+            },
+            "senderBatch": {
+              "instanceId": "A",
+              "batchId": "77777777-7777-4777-8777-777777777777"
+            },
+            "product": {
+              "instanceId": "A",
+              "productId": "88888888-8888-4888-8888-888888888888"
+            },
+            "quantity": "12",
+            "unit": "EA"
+          }
+        ],
+        "upstreamReferences": [],
+        "evidence": [],
+        "sharingPolicyVersion": "v1",
+        "linkedIssueId": "99999999-9999-4999-8999-999999999999",
+        "sentQuantity": "12"
+      }
+    },
+    "FileUpload": {
+      "valid": {
+        "file": "binary-content"
+      },
+      "invalid": {}
+    },
+    "IssueCreate": {
+      "valid": {
+        "purpose": "partner_transfer",
+        "lines": [
+          {
+            "warehouseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            "productId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            "batchId": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+            "quantity": "12",
+            "unit": "EA"
+          }
+        ]
+      },
+      "invalid": {
+        "lines": [
+          {
+            "warehouseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            "productId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            "batchId": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+            "quantity": "12",
+            "unit": "EA"
+          }
+        ]
+      }
+    },
+    "IssuePatch": {
+      "valid": {
+        "note": "Corrected note"
+      },
+      "invalid": {}
+    },
+    "MemberCreate": {
+      "valid": {
+        "keycloakSub": "user-123",
+        "displayName": "Staff A",
+        "role": "staff"
+      },
+      "invalid": {
+        "displayName": "Staff A",
+        "role": "staff"
+      }
+    },
+    "MemberPatch": {
+      "valid": {
+        "role": "viewer"
+      },
+      "invalid": {}
+    },
+    "OrganizationPatch": {
+      "valid": {
+        "name": "Nexora A"
+      },
+      "invalid": {}
+    },
+    "PartnerConnectionInput": {
+      "valid": {
+        "endpointUrl": "https://partner.example/api/v1/federation/events",
+        "outboundTokenUrl": "https://sso.partner.example/realms/nexora/protocol/openid-connect/token",
+        "outboundClientId": "sender-a",
+        "outboundSecretRef": "vault://nexora/a",
+        "outboundAudience": "partner-b",
+        "inboundClientId": "sender-b",
+        "allowedInboundScope": "federation:write"
+      },
+      "invalid": {
+        "outboundTokenUrl": "https://sso.partner.example/realms/nexora/protocol/openid-connect/token",
+        "outboundClientId": "sender-a",
+        "outboundSecretRef": "vault://nexora/a",
+        "outboundAudience": "partner-b",
+        "inboundClientId": "sender-b",
+        "allowedInboundScope": "federation:write"
+      }
+    },
+    "PartnerCreate": {
+      "valid": {
+        "issuerInstanceId": "B",
+        "code": "PARTNER-B",
+        "displayName": "Partner B"
+      },
+      "invalid": {
+        "code": "PARTNER-B",
+        "displayName": "Partner B"
+      }
+    },
+    "PartnerPatch": {
+      "valid": {
+        "displayName": "Partner B updated"
+      },
+      "invalid": {}
+    },
+    "ProductCreate": {
+      "valid": {
+        "sku": "SKU-001",
+        "name": "Sample product",
+        "baseUnit": "EA"
+      },
+      "invalid": {
+        "name": "Sample product",
+        "baseUnit": "EA"
+      }
+    },
+    "ProductIdentifierCreate": {
+      "valid": {
+        "kind": "ean13",
+        "value": "5901234123457"
+      },
+      "invalid": {
+        "value": "5901234123457"
+      }
+    },
+    "ProductPatch": {
+      "valid": {
+        "name": "Updated product"
+      },
+      "invalid": {}
+    },
+    "QrCreate": {
+      "valid": {
+        "policyVersion": "v1"
+      },
+      "invalid": {}
+    },
+    "Reason": {
+      "valid": {
+        "reason": "Reviewed by administrator"
+      },
+      "invalid": {}
+    },
+    "ReceiptCreate": {
+      "valid": {
+        "lines": [
+          {
+            "warehouseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            "productId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            "batchId": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+            "quantity": "12",
+            "unit": "EA"
+          }
+        ]
+      },
+      "invalid": {}
+    },
+    "ReceiptPatch": {
+      "valid": {
+        "note": "Corrected receipt note"
+      },
+      "invalid": {}
+    },
+    "ReceivingCreate": {
+      "valid": {
+        "inboundMessageId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        "actualLines": [
+          {
+            "sourceLineId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            "localBatchId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            "warehouseId": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+            "actualQuantity": "10",
+            "unit": "EA"
+          }
+        ],
+        "discrepancyReason": "Two units damaged in transit"
+      },
+      "invalid": {
+        "actualLines": [
+          {
+            "sourceLineId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            "localBatchId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            "warehouseId": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+            "actualQuantity": "10",
+            "unit": "EA"
+          }
+        ],
+        "discrepancyReason": "Two units damaged in transit"
+      }
+    },
+    "ReceivingPatch": {
+      "valid": {
+        "discrepancyReason": "Confirmed discrepancy"
+      },
+      "invalid": {}
+    },
+    "SaleCreate": {
+      "valid": {
+        "linkedIssueId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+      },
+      "invalid": {}
+    },
+    "StocktakeCreate": {
+      "valid": {
+        "lines": [
+          {
+            "warehouseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            "productId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            "batchId": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+            "countedQuantity": "10",
+            "unit": "EA"
+          }
+        ],
+        "note": "Cycle count"
+      },
+      "invalid": {
+        "note": "Cycle count"
+      }
+    },
+    "StocktakePatch": {
+      "valid": {
+        "note": "Recount completed"
+      },
+      "invalid": {}
+    },
+    "TransferCreate": {
+      "valid": {
+        "linkedIssueId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        "destinationPartnerId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+      },
+      "invalid": {
+        "destinationPartnerId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+      }
+    },
+    "WarehouseCreate": {
+      "valid": {
+        "code": "WH-A",
+        "name": "Main warehouse"
+      },
+      "invalid": {
+        "name": "Main warehouse"
+      }
+    }
+  }
+}

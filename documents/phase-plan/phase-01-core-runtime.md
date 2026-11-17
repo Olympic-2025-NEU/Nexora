@@ -6,7 +6,7 @@
 
 - [x] `deploy/compose.yml`: ERP/worker/core-data (profile `apps`), DX-Lab (`dxlab`), PG, Keycloak, APISIX standalone (không etcd), Redis, SeaweedFS, Flowable, ClamAV, AI (`ai`); mạng `edge`/`internal`, volume per `INSTANCE_ID`.
 - [x] Chỉ publish gateway `127.0.0.1:${GATEWAY_HTTP_PORT}`; `local-admin` publish loopback PG/Keycloak; không public Redis/Flowable/storage/etcd.
-- [x] Resource limits + pinned digests trong compose; evidence `evidence/p01-t01.md` (`config -q` A/B/C PASS). `up`/inspect runtime còn lại khi Docker sẵn sàng.
+- [x] Resource limits + pinned digests trong compose; evidence `evidence/p01-t01.md` (`config -q` A/B/C PASS).
 - **Đầu ra:** Compose + `deploy/README.md` + `instances/{a,b,c}.env.example`; **kiểm chứng:** `config` pass; published ports chỉ gateway.
 
 ## P01-T02 — Build Next.js từ source và image app/worker

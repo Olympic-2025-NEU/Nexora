@@ -10,9 +10,14 @@
 | Keycloak 26.8.2 | `quay.io/keycloak/keycloak@sha256:c68e286cacd87b942ac1939a0a1481461109d6acd3a57dc496969a319a76bbf0` | [Apache-2.0](https://github.com/keycloak/keycloak/blob/main/LICENSE.txt) | 944.7 MiB |
 | SeaweedFS 4.53 | `chrislusf/seaweedfs@sha256:ccad23e18639c8b98cee17e7100b95830a06077b56d8e5b006d6dcf8ec5e94a0` | [Apache-2.0](https://github.com/seaweedfs/seaweedfs/blob/4.53/LICENSE), source build D02 | 152.7 MiB |
 | Flowable REST 8.0.0 | `flowable/flowable-rest@sha256:708dfa32f27b93180bb6e7a30684d881d995fe257f5b8413e14b20a55c25672d` | [Apache-2.0](https://github.com/flowable/flowable-engine/blob/flowable-8.0.0/LICENSE) | 316.9 MiB |
-| PostgreSQL 17 | `postgres@sha256:0d938e975177bef9f1f61f3f9dbcf2e0aa0a139568f66d3415ed8892eb97f6ac` | [PostgreSQL License](https://www.postgresql.org/about/licence/) | 70.36 MiB cho Flowable DB; D03 scratch riêng |
+| PostgreSQL 17 (spike major) | `postgres@sha256:0d938e975177bef9f1f61f3f9dbcf2e0aa0a139568f66d3415ed8892eb97f6ac` | [PostgreSQL License](https://www.postgresql.org/about/licence/) | 70.36 MiB cho Flowable DB; D03 scratch riêng |
+| PostgreSQL 17.6 (**P01 Compose**) | `postgres:17.6@sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929` | PostgreSQL License | D03 spike idle ~37 MiB; peak chưa đo full stack |
+| Redis 7.4-alpine (**P01 Compose**) | `redis:7.4-alpine@sha256:7f7d30b7fdd09467bac58198a1f166dd69789d348d4fe859cccb20e0cf287fbe` | [BSD-3-Clause](https://github.com/redis/redis/blob/7.4/COPYING) | Chưa đo peak; limit Compose 256 MiB |
+| ClamAV 1.4 (**P01 Compose**) | `clamav/clamav:1.4@sha256:4cc4350d3fded380caf1799e76c0d1c93f3fa40af99c0cb2862ec0c9b117718a` (`platform: linux/amd64`) | [GPL-2.0-only](https://github.com/Cisco-Talos/clamav/blob/main/COPYING.txt) — review redistribution | Chưa đo peak; limit Compose 2 GiB |
 | Python 3.12-slim (upstream giả) | `python@sha256:78387bc3881b8273120a12ebe6c1ab22b018ccc2c9adf565ae1ac9b536e184ea` | Chỉ dùng test gateway, **không** là runtime Nexora | 14.04 MiB |
 | Core headless spike | Build local từ Python base digest trên; `requirements-core.txt` pin psycopg/PyJWT và phụ thuộc Python | Mã scratch [core_spike.py](../phase-plan/evidence/spikes/infra/core_spike.py) AGPL-3.0-only; không là Core API sản phẩm | 27.68 MiB; core PG riêng 58.99 MiB |
+
+P01 application pins are also listed in [`deploy/README.md`](../../deploy/README.md) and [`evidence/license-inventory.md`](../phase-plan/evidence/license-inventory.md).
 
 Docker Engine 29.6.1, Linux VM báo 11.55 GiB. Số RAM là một snapshot idle sau khi khởi động trên máy có container khác; không là peak, không suy đủ RAM cho ba stack A/B/C, AI, scanner, k3s/Argo CD. P01/P09/P12 phải đo peak/CPU/disk khi full demo và failure/restart. Flowable/Keycloak có JVM nên nhu cầu thực có thể khác nhiều.
 

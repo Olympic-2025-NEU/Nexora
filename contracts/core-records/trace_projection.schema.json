@@ -25,7 +25,8 @@
       ],
       "properties": {
         "issuerInstanceId": {
-          "type": "string"
+          "type": "string",
+          "minLength": 1
         },
         "lotId": {
           "type": "string",
@@ -43,17 +44,101 @@
     "nodes": {
       "type": "array",
       "items": {
-        "type": "object"
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "eventId",
+          "issuerInstanceId",
+          "type",
+          "occurredAt",
+          "verificationState"
+        ],
+        "properties": {
+          "eventId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "issuerInstanceId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "type": {
+            "type": "string",
+            "minLength": 1
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "verificationState": {
+            "type": "string",
+            "enum": [
+              "local_verified",
+              "partner_asserted",
+              "missing"
+            ]
+          }
+        }
       }
     },
     "edges": {
       "type": "array",
       "items": {
-        "type": "object"
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "fromEventId",
+          "relation"
+        ],
+        "properties": {
+          "fromEventId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "toEventId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "missingRef": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "issuerInstanceId",
+              "eventId"
+            ],
+            "properties": {
+              "issuerInstanceId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "eventId": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          },
+          "relation": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "oneOf": [
+          {
+            "required": [
+              "toEventId"
+            ]
+          },
+          {
+            "required": [
+              "missingRef"
+            ]
+          }
+        ]
       }
     },
     "transformVersion": {
-      "type": "string"
+      "type": "string",
+      "minLength": 1
     },
     "asOf": {
       "type": "string",

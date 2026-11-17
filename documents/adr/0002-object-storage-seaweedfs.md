@@ -35,15 +35,13 @@ Self-host S3-compatible storage. Baseline candidate: SeaweedFS (Apache-2.0) with
 ## Contract impact
 
 - See phase-plan docs linked from decision-log for this ID.
-- Machine-readable stubs may live under `contracts/` as `v1-provisional`.
+- The current target File API is `contracts/openapi/nexora-v1.yaml`; upload policy and scanning remain P03 runtime work.
 
 ## Spike evidence
 
 - [x] Upload/download private S3
 - [x] Presigned URL
 - [x] Restart persistence + logical restore SHA-256
-- [x] Source build attempted (Apache-2.0)
+- [x] SeaweedFS 4.53 binary built from source (Apache-2.0); the two builds had different hashes, so bit-for-bit reproducibility is not claimed.
 
 **Evidence links:** ../phase-plan/evidence/spikes/infra/README.md + D02-object-storage.md
-
-**Evidence links:** _(none yet — Dev attaches logs/commits here)_

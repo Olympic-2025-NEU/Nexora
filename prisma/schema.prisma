@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+// Platform baseline (P01-T03). Extend per database-schema-v1.md in later phases.
 generator client {
   provider = "prisma-client-js"
 }

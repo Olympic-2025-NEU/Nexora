@@ -77,7 +77,12 @@
       ],
       "properties": {
         "type": {
-          "type": "string"
+          "type": "string",
+          "enum": [
+            "partner_transfer",
+            "receiving_confirmation",
+            "sale_record"
+          ]
         },
         "id": {
           "type": "string",
@@ -117,7 +122,9 @@
             ],
             "properties": {
               "issuerInstanceId": {
-                "type": "string"
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
               },
               "lotId": {
                 "type": "string",
@@ -134,7 +141,9 @@
             ],
             "properties": {
               "instanceId": {
-                "type": "string"
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
               },
               "batchId": {
                 "type": "string",
@@ -151,7 +160,9 @@
             ],
             "properties": {
               "instanceId": {
-                "type": "string"
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
               },
               "productId": {
                 "type": "string",
@@ -161,7 +172,7 @@
           },
           "quantity": {
             "type": "string",
-            "pattern": "^(0|[1-9][0-9]*)(\\.[0-9]{1,3})?$"
+            "pattern": "^(?!0(?:\\.0{1,3})?$)(0|[1-9][0-9]*)(\\.[0-9]{1,3})?$"
           },
           "unit": {
             "type": "string",
@@ -186,7 +197,9 @@
         ],
         "properties": {
           "issuerInstanceId": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
           },
           "messageId": {
             "type": "string",
@@ -197,7 +210,8 @@
             "format": "uuid"
           }
         }
-      }
+      },
+      "maxItems": 100
     },
     "evidence": {
       "type": "array",
@@ -217,8 +231,7 @@
           },
           "checksum": {
             "type": "string",
-            "minLength": 64,
-            "maxLength": 64
+            "pattern": "^[0-9a-f]{64}$"
           },
           "visibility": {
             "enum": [
@@ -230,7 +243,8 @@
       }
     },
     "sharingPolicyVersion": {
-      "type": "string"
+      "type": "string",
+      "minLength": 1
     },
     "linkedIssueId": {
       "type": "string",
@@ -239,6 +253,229 @@
     "sentQuantity": {
       "type": "string",
       "pattern": "^(0|[1-9][0-9]*)(\\.[0-9]{1,3})?$"
+    },
+    "sourceTransfer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "issuerInstanceId",
+        "id"
+      ],
+      "properties": {
+        "issuerInstanceId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        }
+      }
+    },
+    "actualLines": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "sourceLineId",
+          "receiverBatchId",
+          "sentQuantity",
+          "actualQuantity",
+          "unit"
+        ],
+        "properties": {
+          "sourceLineId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "receiverBatchId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sentQuantity": {
+            "type": "string",
+            "pattern": "^(?!0(?:\\.0{1,3})?$)(0|[1-9][0-9]*)(\\.[0-9]{1,3})?$"
+          },
+          "actualQuantity": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]*)(\\.[0-9]{1,3})?$"
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "EA",
+              "KG",
+              "L"
+            ]
+          }
+        }
+      },
+      "minItems": 1,
+      "maxItems": 100
+    },
+    "actualQuantity": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)(\\.[0-9]{1,3})?$"
+    },
+    "discrepancyQuantity": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)(\\.[0-9]{1,3})?$"
+    },
+    "discrepancyReason": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+    },
+    "originLot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "issuerInstanceId",
+        "lotId"
+      ],
+      "properties": {
+        "issuerInstanceId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "lotId": {
+          "type": "string",
+          "format": "uuid"
+        }
+      }
+    },
+    "downstreamPartnerRef": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "impactType": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80
+    },
+    "sourceEventRefs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "issuerInstanceId",
+          "eventId"
+        ],
+        "properties": {
+          "issuerInstanceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "eventId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "minItems": 1,
+      "maxItems": 100
+    },
+    "disclosureScope": {
+      "type": "string",
+      "enum": [
+        "partner",
+        "public"
+      ]
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "eventType": {
+            "const": "transfer.announced.v1"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "linkedIssueId",
+          "sentQuantity"
+        ],
+        "properties": {
+          "sourceDocument": {
+            "properties": {
+              "type": {
+                "const": "partner_transfer"
+              }
+            }
+          },
+          "lots": {
+            "minItems": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "eventType": {
+            "const": "receipt.confirmed.v1"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "sourceTransfer",
+          "actualLines",
+          "sentQuantity",
+          "actualQuantity",
+          "discrepancyQuantity"
+        ],
+        "properties": {
+          "sourceDocument": {
+            "properties": {
+              "type": {
+                "const": "receiving_confirmation"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "eventType": {
+            "const": "downstream.impact.v1"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "originLot",
+          "downstreamPartnerRef",
+          "impactType",
+          "sourceEventRefs",
+          "disclosureScope"
+        ],
+        "properties": {
+          "sourceDocument": {
+            "properties": {
+              "type": {
+                "enum": [
+                  "partner_transfer",
+                  "sale_record"
+                ]
+              }
+            }
+          },
+          "lots": {
+            "minItems": 1
+          }
+        }
+      }
+    }
+  ]
 }

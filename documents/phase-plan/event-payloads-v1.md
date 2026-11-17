@@ -1,6 +1,6 @@
 # Event và federation payload v1
 
-`event-contracts.md` giữ nguyên lý; file này cố định trường để tạo `contracts/events/*.schema.json` và consumer tests. JSON decimal là string, UUID string, timestamp UTC. `schemaVersion='1.0'` của envelope độc lập version từng event. Mọi message phát từ document confirmed/outbox, không phát từ Draft. Receiver xác thực bearer M2M và partner mapping **trước** khi tin `issuerInstanceId` trong JSON.
+`event-contracts.md` giữ nguyên lý; file này khóa các trường v1 đã thể hiện trong `contracts/events/*.schema.json` và fixture. P00 kiểm JSON Schema, JCS/hash và các bất biến cục bộ; consumer tests hai instance thật thuộc P09. JSON decimal là string, UUID string, timestamp UTC. `schemaVersion='1.0'` của envelope độc lập version từng event. Mọi message phát từ document confirmed/outbox, không phát từ Draft. Receiver xác thực bearer M2M và partner mapping **trước** khi tin `issuerInstanceId` trong JSON.
 
 ## 1. Envelope bắt buộc
 
@@ -17,8 +17,8 @@ Validation: UUID/length/date format, supported version/type, recipient đúng re
 | `trading.transfer.confirmed.v1` | `{eventId,transferId,linkedIssueId,destinationPartnerId,lines,occurredAt}` | Federation outbound + trace; **không** movement mới |
 | `trading.receiving.confirmed.v1` | `{eventId,receivingId,sourceIssuerInstanceId,sourceTransferId,sentLines,actualLines,discrepancyReason?,occurredAt}` | Trace + gửi business receipt về sender; actual đã cộng stock |
 | `trading.sale.recorded.v1` | `{eventId,saleId,linkedIssueId,lines,occurredAt}` | Trace + downstream impact theo policy; **không** movement mới |
-| `workflow.approval.requested.v1` | `{approvalRequestId,documentId,creatorSub,processKey,correlationKey,submittedDocumentVersion,lineSnapshotSha256}` | Flowable bridge; không gửi partner |
-| `workflow.approval.decision_requested.v1` | `{approvalRequestId,documentId,taskId,decision,decisionReason?,requestedBySub,requestedAt,lineSnapshotSha256}` | Flowable decision worker; không gửi partner, không tự confirm |
+| `workflow.approval.requested.v1` | `{eventId,approvalRequestId,documentId,creatorSub,processKey,correlationKey,submittedDocumentVersion,lineSnapshotSha256}` | Flowable bridge; không gửi partner |
+| `workflow.approval.decision_requested.v1` | `{eventId,approvalRequestId,documentId,taskId,decision,decisionReason?,requestedBySub,requestedAt,lineSnapshotSha256}` | Flowable decision worker; không gửi partner, không tự confirm |
 
 `lines` chứa decimal string + unit + issuer-qualified lot reference hoặc resolver được kiểm thử; không đưa full record/secret vào outbox nếu không cần. Cùng `(aggregate,version,event_type,destination)` chỉ một row. Consumer biết version hỗ trợ, không gọi handler v1 cho payload v2 chưa có adapter.
 

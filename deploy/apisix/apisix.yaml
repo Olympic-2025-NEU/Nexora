@@ -1,0 +1,7 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# P01-T01 topology stub only — NOT a production or demo route set.
+# Do not use this file to claim gateway authz or upstream health.
+# P01-T04 replaces this with public / OIDC user / M2M routes and real upstreams.
+routes: []
+
+#END

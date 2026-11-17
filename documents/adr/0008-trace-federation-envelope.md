@@ -1,46 +1,21 @@
-# D08 — Trace and federation envelope
+# D08 — Trace and federation envelope v1
 
-- **Status:** Accepted-provisional
-- **Blocks:** P00/P08
-- **Date:** 2026-11-16
-- **Decision owners:** Dev (provisional); promote after spike
-- **Baseline source:** `documents/phase-plan/implementation-baseline.md`, `decision-log.md`
-
-## Context
-
-Nexora needs a single agreed default before P01 runtime work. This ADR records the baseline choice so agents do not invent alternate stacks. It is **not** proof that the dependency is running in the repo.
+- **Status:** Accepted for P00 design, 2026-11-17; two-instance behavior remains P09.
+- **Blocks:** P08 trace projections and P09 federation.
+- **Decision owners:** Dev/team; two G00 reviewers still required.
+- **Detailed rationale:** [D08-federation-envelope.md](./D08-federation-envelope.md).
 
 ## Decision
 
-Federation envelope schemaVersion 1.0 with messageId/eventId, issuer/recipient, occurred/published times, originLot distinct from senderBatch, upstreamReferences, evidence refs, sharingPolicyVersion. Technical ACK != business receiving. Downstream impact and upstream summary only per sharing policy; same local lot code across instances is not same origin.
+The v1 envelope has `schemaVersion='1.0'`, separate business `eventId` and transport `messageId`, authenticated issuer/recipient, event/publish timestamps, immutable origin lot, sender batch, source line, upstream references, evidence references and sharing policy. Decimal quantities are strings. Technical HTTP ACK means inbox persistence only; a user-confirmed receiving business event changes stock. Retry keeps the same message ID/payload; inbox dedupes by issuer/message ID and event key, and a reused message ID with another JCS SHA-256 hash returns 409. No private URL or raw upstream buyer data crosses an unapproved sharing boundary.
 
-## Pin fields (fill after spike)
+This is a wire/data contract; no new container image is selected here. M2M transport is [D05](./0005-federation-trust-m2m.md), storage/DB pins are in D01/D03/D04/D13.
 
-| Field | Value |
-| --- | --- |
-| image / package version | TBD-until-spike |
-| digest | TBD-until-spike |
-| license | TBD-until-spike |
-| source URL | TBD-until-spike |
-| RAM (measured) | TBD-until-spike |
-| Owner for spike | Dev |
+## P00 evidence and boundary
 
-## Consequences
+- [x] JSON Schema for envelope and three event types validates A→B transfer, partial/zero receiving, B→C and downstream relay; invalid version, private field, issuer/recipient and quantity cases are rejected.
+- [x] Seven fixed JCS hashes and three retry vectors agree between Node and independent Python for the v1 envelope subset. See [contract validation](../phase-plan/evidence/contract-validate.md).
+- [x] OpenAPI specifies a 202 technical ACK without receiving quantities and a separate `receipt.confirmed.v1` event. Public passport fields are allowlisted.
+- [ ] Runtime: persist/replay the original ACK, emit 409 on conflicting hash/event key, handle offline/out-of-order and policy-denied gap, and run A→B→C with actual 10/12. Owner: P09. The static vectors do not exercise an inbox or remote service.
 
-- Implementation tasks must follow this decision until a superseding ADR.
-- Contracts (`api-contracts`, `event-contracts`, `database-schema-v1`, `security`) stay aligned; change them in the same PR as any ADR revision.
-- G00 remains **open** while Spike evidence is pending for gate-critical ADRs (especially D01–D08, D14, D15).
-
-## Contract impact
-
-- See phase-plan docs linked from decision-log for this ID.
-- Machine-readable stubs may live under `contracts/` as `v1-provisional`.
-
-## Spike evidence: pending
-
-- [ ] Validate fixture A->B transfer.announced
-- [ ] Replay same hash -> same ACK; different hash -> 409
-- [ ] B->C keeps originLot=A
-- [ ] Policy gap when share denied
-
-**Evidence links:** _(none yet — Dev attaches logs/commits here)_
+Contract sources: [event payloads](../phase-plan/event-payloads-v1.md), [envelope schema](../../contracts/events/envelope-v1.schema.json), [fixtures](../../contracts/events/fixtures/manifest-v1.json). G00 still awaits human sign-off.

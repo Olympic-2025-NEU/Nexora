@@ -78,8 +78,8 @@ nexora/
   services/core-data/   # API dữ liệu/tệp headless (đích)
   services/ai/          # AI01
   composition/          # Wire ports giữa contexts
-  db/migrations/        # Schema PostgreSQL
-  deploy/               # Docker Compose, env mẫu
+  prisma/               # Prisma schema + Migrate (D03)
+  deploy/               # compose.yml, instances A/B/C, APISIX stubs
   documents/
     referents/          # Luật & nguồn chân lý cho Agent/DevOps
     plans/              # Plan tổng quan theo module
@@ -131,7 +131,7 @@ docker compose -f deploy/compose.yml --env-file deploy/instances/a.env -p nexora
 bash deploy/scripts/smoke.sh a
 ```
 
-`bootstrap.sh` tạo `deploy/instances/a.env` riêng từ `a.env.example`, sinh mật khẩu ngẫu nhiên và kiểm tra cấu hình; không cần tệp bí mật có sẵn. `up` chạy migration PostgreSQL qua `db-migrate` trước khi bật ERP/core-data/worker. Đợi các dịch vụ khởi động rồi chạy lại `smoke.sh` nếu chúng còn đang khởi động. Không commit tệp `.env`. Để chạy B đồng thời, thay `a` bằng `b` và `nexora-a` bằng `nexora-b` trong bốn lệnh trên; B dùng cổng gateway 19081 thay vì 19080. Xem [deploy/README.md](./deploy/README.md) để đổi cổng khi host đã có stack khác, kiểm tra container và dùng Docker Compose trên máy thiếu plugin.
+`bootstrap.sh` tạo `deploy/instances/a.env` riêng từ `a.env.example`, sinh mật khẩu ngẫu nhiên và kiểm tra cấu hình; không cần tệp bí mật có sẵn. `up` chạy migration PostgreSQL qua `db-migrate` trước khi bật ERP/core-data/worker. Đợi các dịch vụ khởi động rồi chạy lại `smoke.sh` nếu chúng còn đang khởi động. Không commit tệp `.env`. Để chạy B đồng thời, thay `a` bằng `b` và `nexora-a` bằng `nexora-b` trong bốn lệnh trên; B dùng cổng gateway 19081 thay vì 19080. Xem [deploy/README.md](./deploy/README.md).
 
 ### Scripts
 

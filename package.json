@@ -7,14 +7,18 @@
     "dev": "next dev",
     "build": "next build",
     "start": "node deploy/config.mjs --runtime erp && next start",
-    "lint": "eslint",
+    "lint": "eslint --max-warnings=0",
     "typecheck": "tsc --noEmit",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate deploy",
     "db:migrate:dev": "prisma migrate dev",
     "check:spdx": "node scripts/check-spdx.mjs",
-    "test:contracts": "node scripts/validate-contracts.mjs",
-    "test": "npm run check:spdx && npm run test:contracts && node --test deploy/config.test.mjs"
+    "check:secrets": "node scripts/check-secrets.mjs",
+    "check:licenses": "node scripts/check-licenses.mjs",
+    "generate:openapi": "node scripts/generate-openapi.mjs",
+    "check:openapi": "node scripts/generate-openapi.mjs --check && redocly lint contracts/openapi/nexora-v1.yaml --format=summary",
+    "test:contracts": "npm run check:openapi && node scripts/validate-contracts.mjs && python3 scripts/check-jcs-python.py",
+    "test": "npm run check:spdx && npm run check:licenses && npm run check:secrets && npm run test:contracts && node --test deploy/config.test.mjs"
   },
   "dependencies": {
     "@prisma/client": "6.19.0",
@@ -23,12 +27,14 @@
     "react-dom": "19.3.0"
   },
   "devDependencies": {
+    "@redocly/cli": "2.79.0",
     "@tailwindcss/turbopack": "4.3.3",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "ajv": "8.17.1",
     "ajv-formats": "3.0.1",
+    "canonicalize": "5.1.0",
     "eslint": "^9",
     "eslint-config-next": "16.4.6",
     "prisma": "6.19.0",
