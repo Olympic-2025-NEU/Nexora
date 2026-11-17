@@ -1,4 +1,5 @@
-# Minimal P01 gateway routes. Full OIDC / private matrix = P02.
+# SPDX-License-Identifier: AGPL-3.0-only
+# P01 bootstrap routes. Access policy for private APIs belongs to P02.
 # Default topology does not require erp/core containers.
 routes:
   - id: public-gateway-ping
@@ -9,3 +10,24 @@ routes:
         phase: access
         functions:
           - return function(conf, ctx) local core = require("apisix.core"); core.response.exit(200, "{\"ok\":true,\"service\":\"gateway\"}") end
+  - id: core-api
+    uri: /core/*
+    methods: [GET, HEAD]
+    upstream:
+      type: roundrobin
+      nodes:
+        "core-data:8080": 1
+    plugins:
+      proxy-rewrite:
+        regex_uri: ["^/core/(.*)", "/$1"]
+  - id: erp-app
+    uri: /erp/*
+    methods: [GET, HEAD]
+    upstream:
+      type: roundrobin
+      nodes:
+        "erp:3000": 1
+    plugins:
+      proxy-rewrite:
+        regex_uri: ["^/erp/(.*)", "/$1"]
+#END

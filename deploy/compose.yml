@@ -16,6 +16,8 @@ volumes:
     name: nexora-${INSTANCE_ID:-a}-redis
   seaweed_data:
     name: nexora-${INSTANCE_ID:-a}-seaweed
+  seaweed_config:
+    name: nexora-${INSTANCE_ID:-a}-seaweed-config
   clamav_data:
     name: nexora-${INSTANCE_ID:-a}-clamav
 
@@ -60,7 +62,7 @@ services:
       FLOWABLE_DB_PASSWORD: ${FLOWABLE_DB_PASSWORD}
       FLOWABLE_DB_NAME: ${FLOWABLE_DB_NAME}
     volumes:
-      - ./postgres/bootstrap.sh:/bootstrap.sh:ro
+      - ./postgres/bootstrap.sh:/bootstrap.sh:ro,z
     depends_on:
       postgres:
         condition: service_healthy
@@ -98,19 +100,18 @@ services:
 
   keycloak:
     image: quay.io/keycloak/keycloak:26.8.2@sha256:c68e286cacd87b942ac1939a0a1481461109d6acd3a57dc496969a319a76bbf0
-    command: ["start-dev", "--import-realm", "--http-port=8080"]
+    command: ["start-dev", "--http-port=8080"]
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME}
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD}
       KC_HEALTH_ENABLED: "true"
       KC_HTTP_ENABLED: "true"
       KC_HOSTNAME_STRICT: "false"
+      KC_HOSTNAME: ${OIDC_BASE_URL}
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://postgres:5432/${KEYCLOAK_DB_NAME}
       KC_DB_USERNAME: ${KEYCLOAK_DB_USER}
       KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD}
-    volumes:
-      - ./keycloak/realm-template.json:/opt/keycloak/data/import/nexora-realm.json:ro
     depends_on:
       db-bootstrap:
         condition: service_completed_successfully
@@ -126,14 +127,36 @@ services:
         limits:
           memory: 1g
 
+  keycloak-bootstrap:
+    image: node:22-bookworm-slim@sha256:e9f565d32859f0cbfb52125eafe8be39390f24dac302dc3cdf566e8ba3ab21ee
+    command: ["node", "/bootstrap/bootstrap.mjs"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD}
+      OIDC_BASE_URL: ${OIDC_BASE_URL}
+      OIDC_ISSUER_URL: ${OIDC_ISSUER_URL}
+      OIDC_CLIENT_ID_ERP: ${OIDC_CLIENT_ID_ERP}
+      OIDC_CLIENT_ID_DXLAB: ${OIDC_CLIENT_ID_DXLAB}
+      OIDC_REDIRECT_URI_ERP: ${OIDC_REDIRECT_URI_ERP}
+      OIDC_REDIRECT_URI_DXLAB: ${OIDC_REDIRECT_URI_DXLAB}
+      KC_DEV_USERNAME: ${KC_DEV_USERNAME:-}
+      KC_DEV_USER_PASSWORD: ${KC_DEV_USER_PASSWORD:-}
+    volumes:
+      - ./keycloak:/bootstrap:ro,z
+    depends_on:
+      keycloak:
+        condition: service_healthy
+    networks: [internal]
+    restart: "no"
+
   gateway:
     image: apache/apisix:3.20.0-debian@sha256:013de62a9dfba7d8e6006b3e85b524c28c9f1c3549fca3b91d5b258b0b9e759a
     volumes:
-      - ./apisix/config.yaml:/usr/local/apisix/conf/config.yaml:ro
-      - ./apisix/routes.yaml:/usr/local/apisix/conf/apisix.yaml:ro
+      - ./apisix/config.yaml:/usr/local/apisix/conf/config.yaml:ro,z
+      - ./apisix/routes.yaml:/usr/local/apisix/conf/apisix.yaml:ro,z
     depends_on:
-      keycloak:
-        condition: service_started
+      keycloak-bootstrap:
+        condition: service_completed_successfully
     networks: [edge, internal]
     ports:
       # Only public-facing bind in default topology (loopback).
@@ -143,16 +166,40 @@ services:
         limits:
           memory: 512m
 
+  storage-bootstrap:
+    image: node:22-bookworm-slim@sha256:e9f565d32859f0cbfb52125eafe8be39390f24dac302dc3cdf566e8ba3ab21ee
+    command: ["node", "/bootstrap/bootstrap.mjs"]
+    environment:
+      S3_CORE_ACCESS_KEY: ${S3_ACCESS_KEY}
+      S3_CORE_SECRET_KEY: ${S3_SECRET_KEY}
+      S3_SCANNER_ACCESS_KEY: ${S3_SCANNER_ACCESS_KEY}
+      S3_SCANNER_SECRET_KEY: ${S3_SCANNER_SECRET_KEY}
+      S3_ADMIN_ACCESS_KEY: ${S3_ADMIN_ACCESS_KEY}
+      S3_ADMIN_SECRET_KEY: ${S3_ADMIN_SECRET_KEY}
+      S3_BUCKET_PRIVATE: ${S3_BUCKET_PRIVATE}
+      S3_BUCKET_QUARANTINE: ${S3_BUCKET_QUARANTINE}
+      S3_BUCKET_PUBLIC: ${S3_BUCKET_PUBLIC}
+    volumes:
+      - ./seaweedfs:/bootstrap:ro,z
+      - seaweed_config:/config
+    networks: [internal]
+    restart: "no"
+
   seaweedfs:
     image: chrislusf/seaweedfs:4.53@sha256:ccad23e18639c8b98cee17e7100b95830a06077b56d8e5b006d6dcf8ec5e94a0
-    command: ["mini", "-dir=/data", "-ip.bind=0.0.0.0"]
-    environment:
-      AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY}
-      AWS_SECRET_ACCESS_KEY: ${S3_SECRET_KEY}
+    command: ["mini", "-dir=/data", "-ip.bind=0.0.0.0", "-s3.config=/config/s3.json", "-bucket=${S3_BUCKET_PRIVATE},${S3_BUCKET_QUARANTINE},${S3_BUCKET_PUBLIC}"]
     volumes:
       - seaweed_data:/data
-      - ./seaweedfs/bucket-policy.json:/etc/seaweedfs/bucket-policy.json:ro
+      - seaweed_config:/config:ro
+    depends_on:
+      storage-bootstrap:
+        condition: service_completed_successfully
     networks: [internal]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9333/cluster/status"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
     deploy:
       resources:
         limits:
@@ -165,17 +212,24 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${FLOWABLE_DB_NAME}
       SPRING_DATASOURCE_USERNAME: ${FLOWABLE_DB_USER}
       SPRING_DATASOURCE_PASSWORD: ${FLOWABLE_DB_PASSWORD}
-      SPRING_DATASOURCE_DRIVER-CLASS-NAME: org.postgresql.Driver
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
+      SPRING_PROFILES_ACTIVE: postgres
       FLOWABLE_REST_APP_ADMIN_USER_ID: ${FLOWABLE_ADMIN_USER}
       FLOWABLE_REST_APP_ADMIN_PASSWORD: ${FLOWABLE_ADMIN_PASSWORD}
       FLOWABLE_REST_APP_CREATE_DEMO_DEFINITIONS: "false"
       REST_VARIABLES_ALLOW_SERIALIZABLE: "false"
     volumes:
-      - ./flowable/processes:/process-definitions:ro
+      - ./flowable/processes:/process-definitions:ro,z
     depends_on:
       db-bootstrap:
         condition: service_completed_successfully
     networks: [internal]
+    healthcheck:
+      test: ["CMD-SHELL", "auth=$$(printf '%s:%s' \"$$FLOWABLE_REST_APP_ADMIN_USER_ID\" \"$$FLOWABLE_REST_APP_ADMIN_PASSWORD\" | base64 -w0); wget -q -O /dev/null --header \"Authorization: Basic $$auth\" http://127.0.0.1:8080/flowable-rest/service/management/engine"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 90s
     deploy:
       resources:
         limits:
@@ -247,7 +301,7 @@ services:
       db-migrate:
         condition: service_completed_successfully
       seaweedfs:
-        condition: service_started
+        condition: service_healthy
       clamav:
         condition: service_started
     networks: [internal]
