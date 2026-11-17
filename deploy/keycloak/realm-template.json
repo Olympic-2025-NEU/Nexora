@@ -16,46 +16,7 @@
       { "name": "viewer" }
     ]
   },
-  "clientScopes": [
-    {
-      "name": "erp:user",
-      "protocol": "openid-connect",
-      "attributes": {
-        "include.in.token.scope": "true",
-        "display.on.consent.screen": "false"
-      },
-      "protocolMappers": [
-        {
-          "name": "nexora-subject",
-          "protocol": "openid-connect",
-          "protocolMapper": "oidc-sub-mapper",
-          "config": { "access.token.claim": "true" }
-        }
-      ]
-    },
-    {
-      "name": "federation:write",
-      "protocol": "openid-connect",
-      "attributes": {
-        "include.in.token.scope": "true",
-        "display.on.consent.screen": "false"
-      }
-    }
-  ],
   "clients": [
-    {
-      "clientId": "nexora-gateway",
-      "name": "Nexora Gateway",
-      "enabled": true,
-      "protocol": "openid-connect",
-      "publicClient": false,
-      "secret": "CHANGE_ME_GATEWAY_SECRET",
-      "standardFlowEnabled": true,
-      "directAccessGrantsEnabled": false,
-      "serviceAccountsEnabled": false,
-      "redirectUris": ["http://127.0.0.1:*/*"],
-      "webOrigins": ["http://127.0.0.1:*"]
-    },
     {
       "clientId": "erp-browser",
       "name": "Nexora ERP Browser",
@@ -65,9 +26,9 @@
       "standardFlowEnabled": true,
       "directAccessGrantsEnabled": false,
       "serviceAccountsEnabled": false,
-      "redirectUris": ["http://127.0.0.1:*/*"],
-      "attributes": { "pkce.code.challenge.method": "S256" },
-      "defaultClientScopes": ["basic", "profile", "email", "erp:user"]
+      "redirectUris": [],
+      "webOrigins": [],
+      "attributes": { "pkce.code.challenge.method": "S256" }
     },
     {
       "clientId": "dxlab-browser",
@@ -77,9 +38,9 @@
       "publicClient": true,
       "standardFlowEnabled": true,
       "directAccessGrantsEnabled": false,
-      "redirectUris": ["http://127.0.0.1:*/*"],
-      "attributes": { "pkce.code.challenge.method": "S256" },
-      "defaultClientScopes": ["basic", "profile", "email", "erp:user"]
+      "redirectUris": [],
+      "webOrigins": [],
+      "attributes": { "pkce.code.challenge.method": "S256" }
     }
   ],
   "users": []
