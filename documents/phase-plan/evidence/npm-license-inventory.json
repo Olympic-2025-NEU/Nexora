@@ -1,7 +1,7 @@
 {
   "source": "package-lock.json",
-  "lockSha256": "b284c81791ab769462c97d75fa01ac7a421ba874824eadc1b64bdc6c91151902",
-  "packageCount": 503,
+  "lockSha256": "4a5f2bbb68ed702e02893f4b0f1f3c7eacf84ac909b5419b6facb2b19825ef2b",
+  "packageCount": 505,
   "packages": [
     {
       "path": "node_modules/@alloc/quick-lru",
@@ -1048,6 +1048,15 @@
       "optional": false
     },
     {
+      "path": "node_modules/@redocly/cli",
+      "version": "2.79.0",
+      "license": "MIT",
+      "resolved": "https://registry.npmjs.org/@redocly/cli/-/cli-2.79.0.tgz",
+      "integrity": "sha512-MbaH+fA0KqUoGPm82vc/MBhY9D097QK8vSQbZJGzHUcYl3evwnVL9c9hAe5J9C0BenlKTSDPe70YCRGZ/DLHlg==",
+      "dev": true,
+      "optional": false
+    },
+    {
       "path": "node_modules/@rtsao/scc",
       "version": "1.1.0",
       "license": "MIT",
@@ -1873,6 +1882,15 @@
       "resolved": "https://registry.npmjs.org/caniuse-lite/-/caniuse-lite-1.0.30001826.tgz",
       "integrity": "sha512-wTB+9tIbLro/BCXwLuNV1meHE4L9dS6dArMDwgYfNBPMYScqClHyGunhkCSDtHhe/69Xl0sHlKgBVZ+fNsYtWA==",
       "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/canonicalize",
+      "version": "5.1.0",
+      "license": "Apache-2.0",
+      "resolved": "https://registry.npmjs.org/canonicalize/-/canonicalize-5.1.0.tgz",
+      "integrity": "sha512-bab9+WefZljqQ8jT0qRwVmTyzAUU63K97QIQD3agynIBrb6sa5M2eAy8Hv8K3p4V9+ONVYZKtGYl4Dg+/5Gumw==",
+      "dev": true,
       "optional": false
     },
     {

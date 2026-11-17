@@ -44,6 +44,8 @@
     "scripts/check-licenses.mjs",
     "scripts/check-secrets.mjs",
     "scripts/check-spdx.mjs",
+    "scripts/generate-openapi.mjs",
+    "scripts/openapi-v1-schemas.mjs",
     "scripts/spikes/d03-prisma-tx.ts",
     "scripts/validate-contracts.mjs"
   ]

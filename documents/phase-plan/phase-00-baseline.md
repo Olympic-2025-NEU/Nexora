@@ -35,10 +35,10 @@
 
 ## P00-T05 — Chốt contract nghiệp vụ và dữ liệu
 
-- [x] Contracts v1-provisional đã có (`contracts/`); D07/D08/D14 trong decision-log/ADR.
-- [x] Validate envelope fixture + OpenAPI structure (`npm run test:contracts`); evidence `contract-validate.md`.
-- [ ] Contract tests đầy đủ theo từng route (mở rộng khi adapter P01+); cập nhật docs/test cùng PR khi đổi schema.
-- **Đầu ra:** contract parse/validate tối thiểu pass; **kiểm chứng:** `npm test` gồm contracts.
+- [x] Khóa blueprint DB/API/event/workflow v1 và generator OpenAPI; D07/D08/D14 được đối chiếu với một owner stock movement, issuer-qualified lot, technical ACK riêng business receipt, public allowlist.
+- [x] `npm run test:contracts` kiểm OpenAPI 70 paths/87 operations bằng Redocly + ma trận auth/role/scope/success/header; 30 cặp request fixtures, 4 core payload, 7 domain event, chuỗi federation A→B→C và 9 negative/3 retry/hash vectors. Xem `evidence/contract-validate.md`.
+- [ ] Test gọi API/consumer đang chạy cho từng route, 401/403/409, rollback/concurrency và cross-instance; các phase P01+ và P09 phải thêm theo owner của route/event trước khi claim AC tương ứng.
+- **Đầu ra P00:** contract v1 parse/validate và static fixtures pass; **kiểm chứng:** `npm test` gồm contracts, không đồng nghĩa sản phẩm đã chạy.
 
 ## P00-T06 — Chuẩn hóa repo/CI nền
 

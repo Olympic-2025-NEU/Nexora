@@ -1,25 +1,24 @@
-# Nexora contracts — v1-provisional
+# Nexora contract v1 — design locked, runtime pending
 
-Machine-readable contracts generated from phase-plan markdown. **Not** runtime-validated until CI + consumer tests exist.
+The versioned files in this directory are the **Phase 00 target contract** for later implementation. They do not claim that all routes, DB tables, Keycloak policies or federation workers currently run.
 
-| Artifact | Source markdown |
-| --- | --- |
-| `openapi/nexora-v1.yaml` | `documents/phase-plan/api-contracts.md`, `api-payloads-v1.md` |
-| `events/*.schema.json` | `event-contracts.md`, `event-payloads-v1.md` |
-| `events/fixtures/` | Envelope examples + A→B transfer |
-| `core-records/*.schema.json` | `core-record-payloads-v1.md` |
+| Artifact | Scope | Human blueprint |
+| --- | --- | --- |
+| `openapi/nexora-v1.yaml` | 70 paths / 87 operations, typed request/response schemas, roles, scope, headers and error responses | `documents/phase-plan/api-payloads-v1.md` |
+| `openapi/fixtures/route-matrix-v1.json` | Locked operation/auth/success inventory | `api-payloads-v1.md` |
+| `openapi/fixtures/request-cases-v1.json` | 30 valid/invalid request body pairs reused across routes | `api-payloads-v1.md` |
+| `events/envelope-v1.schema.json` | Federation envelope, event-specific fields and bounds | `documents/phase-plan/event-payloads-v1.md` |
+| `events/*-v1.schema.json` | Five trading and two workflow outbox payloads | `event-payloads-v1.md`, `workflow-spec-v1.md` |
+| `events/fixtures/` | A→B→C, partial/zero receiving, downstream relay, invalid payloads and JCS retry vectors | `demo-fixtures.md` |
+| `core-records/*.schema.json` | Four core-data payload kinds | `core-record-payloads-v1.md` |
 
-## Version
-
-- Label: `v1-provisional`
-- Promote after G00 spikes and contract tests pass.
-
-## Validate later (Dev)
+`scripts/generate-openapi.mjs` is the reproducible OpenAPI source. It reads the event/core JSON schemas for shared shapes. To change v1, update its route/schema definitions, the relevant Markdown blueprint and the fixtures in one PR, then run:
 
 ```bash
-# example — add tooling in P00-T06 / P01
-npx --yes @redocly/cli lint contracts/openapi/nexora-v1.yaml
-npx --yes ajv-cli validate -s contracts/events/envelope-v1.schema.json -d contracts/events/fixtures/a-to-b-transfer-announced.json
+npm run generate:openapi
+node scripts/check-spdx.mjs --write-inventory
+node scripts/check-licenses.mjs --write-inventory
+npm run test:contracts
 ```
 
-Do not invent fields beyond the markdown sources; stub schemas use `x-nexora-comment: fill-from-payloads` where DTO detail is still thin.
+`npm run test:contracts` checks generated-file drift, Redocly OpenAPI structure, every route's auth/success/headers, request fixtures, core/domain/federation JSON Schemas, A→B→C provenance, recipient/issuer and quantity invariants, duplicate JSON keys, and JCS SHA-256/retry vectors. A future route implementation must add runtime API tests for actual 401/403/409 behavior, transaction rollback and concurrency in its owning phase. Static contract checks cannot substitute for those tests.

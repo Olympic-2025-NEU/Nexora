@@ -1,6 +1,6 @@
 # PostgreSQL schema v1 — blueprint tạo migration
 
-Đây là **schema đích cụ thể** để AI viết **Prisma schema + Migrate** (D03; xem `prisma-migration-spec.md`), chưa tồn tại trong DB hiện tại. Baseline D03/D07/D14 ở `implementation-baseline.md` áp dụng. Nếu P00 spike thay đổi lựa chọn, cập nhật blueprint và contract trước khi code. Dùng một app DB cho một instance; DB Keycloak và Flowable riêng. Không viết `tenant_id` đa org.
+Đây là **schema đích v1 đã khóa ở mức thiết kế** để AI viết **Prisma schema + Migrate** (D03; xem `prisma-migration-spec.md`); các bảng nghiệp vụ chưa tồn tại trong DB hiện tại. Baseline D03/D07/D14 ở `implementation-baseline.md` áp dụng. Nếu implementation/spike sau này phát hiện khác biệt, sửa ADR, blueprint, contract và migration trong cùng PR trước khi dùng runtime. Dùng một app DB cho một instance; DB Keycloak và Flowable riêng. Không viết `tenant_id` đa org.
 
 ## Ký hiệu và quy tắc chung
 

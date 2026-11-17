@@ -1,0 +1,1172 @@
+{
+  "schemaVersion": 1,
+  "operations": [
+    {
+      "method": "POST",
+      "path": "/api/v1/ai/chat",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff",
+        "approver",
+        "viewer"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/ai/drafts",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff"
+      ],
+      "scope": "resource",
+      "success": [
+        "201"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/ai/tool-calls/{id}",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff",
+        "approver",
+        "viewer"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/approvals/{approvalRequestId}/decision",
+      "auth": "protected",
+      "roles": [
+        "approver"
+      ],
+      "scope": "resource",
+      "success": [
+        "202"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/approvals/tasks",
+      "auth": "protected",
+      "roles": [
+        "approver"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/audit-logs",
+      "auth": "protected",
+      "roles": [
+        "administrator"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/batches",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff",
+        "approver",
+        "viewer"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/batches",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff"
+      ],
+      "scope": "resource",
+      "success": [
+        "201"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/batches/{id}",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff",
+        "approver",
+        "viewer"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/batches/{id}/quality-actions",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/core/records",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff",
+        "service"
+      ],
+      "scope": "resource",
+      "success": [
+        "201"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/core/records/{id}",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff",
+        "approver",
+        "viewer"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/documents",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff",
+        "approver",
+        "viewer"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/federation/deliveries",
+      "auth": "protected",
+      "roles": [
+        "administrator"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/federation/deliveries/{id}/retry",
+      "auth": "protected",
+      "roles": [
+        "administrator"
+      ],
+      "scope": "resource",
+      "success": [
+        "202"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/federation/events",
+      "auth": "protected",
+      "roles": [
+        "partner-service"
+      ],
+      "scope": "partner-mapping",
+      "success": [
+        "202"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/files",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff"
+      ],
+      "scope": "resource",
+      "success": [
+        "202"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/files/{id}",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff",
+        "approver",
+        "viewer"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/health/live",
+      "auth": "public",
+      "roles": [],
+      "scope": "anonymous",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/health/ready",
+      "auth": "public",
+      "roles": [],
+      "scope": "anonymous",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/inventory/balances",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff",
+        "approver",
+        "viewer"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/inventory/movements",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff",
+        "approver",
+        "viewer"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/issues",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff",
+        "approver",
+        "viewer"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/issues",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff"
+      ],
+      "scope": "resource",
+      "success": [
+        "201"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/issues/{id}",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff",
+        "approver",
+        "viewer"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/issues/{id}",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/issues/{id}/cancel",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/issues/{id}/confirm",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/issues/{id}/submit",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff"
+      ],
+      "scope": "resource",
+      "success": [
+        "202"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/lots/{id}/history",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff",
+        "approver",
+        "viewer"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/lots/{id}/qr",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff"
+      ],
+      "scope": "resource",
+      "success": [
+        "201"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/lots/{id}/qr/{tokenId}/revoke",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff"
+      ],
+      "scope": "resource",
+      "success": [
+        "204"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/lots/{id}/trace/backward",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff",
+        "approver",
+        "viewer"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/lots/{id}/trace/forward",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff",
+        "approver",
+        "viewer"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/me",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff",
+        "approver",
+        "viewer"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/members",
+      "auth": "protected",
+      "roles": [
+        "administrator"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/members",
+      "auth": "protected",
+      "roles": [
+        "administrator"
+      ],
+      "scope": "resource",
+      "success": [
+        "201"
+      ]
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/members/{id}",
+      "auth": "protected",
+      "roles": [
+        "administrator"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/organization",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff",
+        "approver",
+        "viewer"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/organization",
+      "auth": "protected",
+      "roles": [
+        "administrator"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/partners",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff",
+        "approver",
+        "viewer"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/partners",
+      "auth": "protected",
+      "roles": [
+        "administrator"
+      ],
+      "scope": "resource",
+      "success": [
+        "201"
+      ]
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/partners/{id}",
+      "auth": "protected",
+      "roles": [
+        "administrator"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/partners/{id}/connection",
+      "auth": "protected",
+      "roles": [
+        "administrator"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/products",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff",
+        "approver",
+        "viewer"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/products",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff"
+      ],
+      "scope": "resource",
+      "success": [
+        "201"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/products/{id}",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff",
+        "approver",
+        "viewer"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/products/{id}",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/products/{id}/identifiers",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff"
+      ],
+      "scope": "resource",
+      "success": [
+        "201"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/public/passport/{token}",
+      "auth": "public",
+      "roles": [],
+      "scope": "anonymous",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/quality/issues",
+      "auth": "protected",
+      "roles": [
+        "administrator"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/quality/issues/{id}",
+      "auth": "protected",
+      "roles": [
+        "administrator"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/quality/issues/{id}/acknowledge",
+      "auth": "protected",
+      "roles": [
+        "administrator"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/quality/issues/{id}/resolve",
+      "auth": "protected",
+      "roles": [
+        "administrator"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/receipts",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff",
+        "approver",
+        "viewer"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/receipts",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff"
+      ],
+      "scope": "resource",
+      "success": [
+        "201"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/receipts/{id}",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff",
+        "approver",
+        "viewer"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/receipts/{id}",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/receipts/{id}/cancel",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/receipts/{id}/confirm",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/receivings",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff",
+        "approver",
+        "viewer"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/receivings",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff"
+      ],
+      "scope": "resource",
+      "success": [
+        "201"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/receivings/{id}",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff",
+        "approver",
+        "viewer"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/receivings/{id}",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/receivings/{id}/cancel",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/receivings/{id}/confirm",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/reports/document-counts",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff",
+        "approver",
+        "viewer"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/reports/inventory-summary",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/reports/open-quality-signals",
+      "auth": "protected",
+      "roles": [
+        "administrator"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/sales-records",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff",
+        "approver",
+        "viewer"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/sales-records",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff"
+      ],
+      "scope": "resource",
+      "success": [
+        "201"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/sales-records/{id}",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff",
+        "approver",
+        "viewer"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/sales-records/{id}/cancel",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/sales-records/{id}/confirm",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/stocktakes",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff",
+        "approver",
+        "viewer"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/stocktakes",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff"
+      ],
+      "scope": "resource",
+      "success": [
+        "201"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/stocktakes/{id}",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff",
+        "approver",
+        "viewer"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/stocktakes/{id}",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/stocktakes/{id}/cancel",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/stocktakes/{id}/confirm",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/transfers",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff",
+        "approver",
+        "viewer"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/transfers",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff"
+      ],
+      "scope": "resource",
+      "success": [
+        "201"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/transfers/{id}",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff",
+        "approver",
+        "viewer"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/transfers/{id}/cancel",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/transfers/{id}/confirm",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/warehouses",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff",
+        "approver",
+        "viewer"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/warehouses",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff"
+      ],
+      "scope": "resource",
+      "success": [
+        "201"
+      ]
+    }
+  ]
+}

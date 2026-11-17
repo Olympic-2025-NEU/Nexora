@@ -4,12 +4,12 @@
 
 ## Complete npm lockfile
 
-`npm run check:licenses` checks every package entry in `package-lock.json` for a version, license expression, HTTPS npm registry source and integrity hash, then compares the lockfile SHA-256 and all entries with [npm-license-inventory.json](./npm-license-inventory.json). Regenerate with `node scripts/check-licenses.mjs --write-inventory` whenever the lockfile changes. The current inventory has **503 package entries** (including optional platform binaries), not just the direct dependencies in `package.json`.
+`npm run check:licenses` checks every package entry in `package-lock.json` for a version, license expression, HTTPS npm registry source and integrity hash, then compares the lockfile SHA-256 and all entries with [npm-license-inventory.json](./npm-license-inventory.json). Regenerate with `node scripts/check-licenses.mjs --write-inventory` whenever the lockfile changes. The current inventory has **505 package entries** (including optional platform binaries), not just the direct dependencies in `package.json`.
 
 | Expression in lockfile | Entries | Distribution note |
 | --- | ---: | --- |
-| MIT | 399 | Preserve upstream package notices when bundled. |
-| Apache-2.0 | 42 | Preserve upstream notices when applicable. |
+| MIT | 400 | Preserve upstream package notices when bundled. |
+| Apache-2.0 | 43 | Preserve upstream notices when applicable. |
 | ISC | 17 | Preserve upstream license text when bundled. |
 | MPL-2.0 | 13 | Mostly build tooling; inspect distributed artifacts at release. |
 | LGPL-3.0-or-later and combined expressions | 14 | Mostly optional Sharp/libvips binaries; inspect the actual image contents and obligations at release. |

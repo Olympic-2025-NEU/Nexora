@@ -1,6 +1,6 @@
 # HTTP contract v1 — trường dữ liệu theo route
 
-Đây là DTO/OpenAPI blueprint để AI triển khai `contracts/openapi/nexora-v1.yaml` và route handlers. Chưa là API đã chạy. Tên bảng/kiểu DB ở `database-schema-v1.md`; trạng thái và quyền ở `security.md`, `workflow-spec-v1.md`. Mọi ID trong JSON là UUID string, timestamp ISO-8601 UTC, lượng là decimal string. Không cho client gửi `actorSub`, `confirmedBy`, `balanceAfter`, `issuerInstanceId` của chính mình hoặc `status='confirmed'` trong create/update.
+Đây là DTO blueprint v1 đã đối chiếu với `contracts/openapi/nexora-v1.yaml` (70 paths/87 operations). OpenAPI được sinh từ `scripts/generate-openapi.mjs` và kiểm drift/Redocly/fixtures bằng `npm run test:contracts`; route handlers sản phẩm chưa được triển khai. Tên bảng/kiểu DB ở `database-schema-v1.md`; trạng thái và quyền ở `security.md`, `workflow-spec-v1.md`. Mọi ID trong JSON là UUID string, timestamp ISO-8601 UTC, lượng là decimal string. Không cho client gửi `actorSub`, `confirmedBy`, `balanceAfter`, `issuerInstanceId` của chính mình hoặc `status='confirmed'` trong create/update.
 
 ## Envelope và lỗi chung
 
@@ -102,4 +102,4 @@ Mọi report chỉ `GET`; cấm raw SQL từ query string. Query service dùng P
 
 ## Contract tests bắt buộc
 
-Mỗi route có fixture valid/invalid, 401/403 và role/scope; mỗi write có 409 version/idempotency; public có snapshot privacy; M2M có wrong issuer/audience/replay; confirm có rollback + concurrency. Sinh OpenAPI từ spec này hoặc thêm schema trực tiếp trong `contracts/openapi/nexora-v1.yaml`; CI diff generated routes với spec, không để bảng Markdown là contract duy nhất khi code đã tồn tại.
+P00 khóa ma trận 87 operation (role/scope/auth/success), kiểm OpenAPI, 30 cặp fixture request body dùng chung, schema public passport/ACK và các vector federation wrong issuer/recipient/replay. Đây là **kiểm tra contract tĩnh**. P01+ phải thêm test gọi API thật theo từng route cho 401/403, 409 version/idempotency, response payload, public privacy, M2M audience/scope và confirm rollback/concurrency; chỉ tick các AC runtime sau khi các test đó chạy. Khi đổi contract, cập nhật blueprint, generator, fixture và snapshot trong cùng PR; CI kiểm generated-file drift.
