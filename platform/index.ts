@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 export { DomainError } from "./kernel/errors";
 export type { OrgUnitId, TenantId, UserId } from "./kernel/id";
 export type { Actor } from "./identity/actor";

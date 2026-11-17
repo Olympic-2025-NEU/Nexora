@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { TenantId } from "../kernel/id";
 
 /** Ghi trong cùng giao dịch với thay đổi nghiệp vụ. Gửi đi sau khi commit. */

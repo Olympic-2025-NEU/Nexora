@@ -1,0 +1,33 @@
+name: ci
+
+on:
+  push:
+    branches: [develop, main, "chore/**", "spike/**", "phase-*/**"]
+  pull_request:
+    branches: [develop, main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Install
+        run: npm ci
+      - name: SPDX check
+        run: npm run check:spdx
+      - name: Lint
+        run: npm run lint
+      - name: Prisma generate
+        run: npx prisma generate
+      - name: Build
+        run: npm run build
+      - name: Typecheck (after Next typegen)
+        run: npm run typecheck
+      - name: Contracts + unit gate
+        run: npm test

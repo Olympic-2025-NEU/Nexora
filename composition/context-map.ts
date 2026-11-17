@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { receiptPosted } from "@/contexts/procurement";
 import { salesOrderConfirmed } from "@/contexts/sales";
 

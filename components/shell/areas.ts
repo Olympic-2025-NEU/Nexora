@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 /** Khung Tầng ứng dụng. Trang thêm khi có ca sử dụng tương ứng. */
 export const shellAreas = [
   { href: "/inbox", label: "Hộp việc", audience: "operator" },

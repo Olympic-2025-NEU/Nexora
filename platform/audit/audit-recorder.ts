@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { TenantId, UserId } from "../kernel/id";
 
 export type AuditEntry = {

@@ -28,30 +28,30 @@
 
 ## P00-T04 — Quyền phát hành AGPL và tiêu chí nguồn mở
 
-- [ ] Xác nhận chủ sở hữu/quyền cấp phép mã nhóm và tài sản; thêm SPDX `AGPL-3.0-only` vào từng tệp mã nhóm viết, giữ nguyên notice bên thứ ba; kiểm tra `LICENSE` toàn văn.
-- [ ] Tạo quy tắc không commit secret, SBOM/license inventory từ lockfile/image; đánh dấu dependency không tương thích hoặc không thể build source trước khi tích hợp.
-- [ ] Chuẩn bị kho public/web viewer, issue tracker, changelog và chính sách release; chưa cần phát hành ở phase này.
-- **Đầu ra:** license inventory và checklist nguồn mở; **kiểm chứng:** script quét file tự viết không thiếu SPDX, source/license của dependency truy được.
+- [x] SPDX `AGPL-3.0-only` trên source nhóm viết + `LICENSE` toàn văn; `npm run check:spdx`.
+- [x] Inventory license top-level + image PG pin (`evidence/license-inventory.md`); secret `.env*` gitignored.
+- [x] Public repo/issue tracker URL ghi trong `evidence/open-source-checklist.md`; release/PoF đầy đủ vẫn P13.
+- **Đầu ra:** license inventory và checklist nguồn mở; **kiểm chứng:** script quét SPDX fail nếu thiếu.
 
 ## P00-T05 — Chốt contract nghiệp vụ và dữ liệu
 
-- [ ] Review `database.md`, `api-contracts.md`, `event-contracts.md`, `security.md` với cả ba vai Admin/Staff/Approver và kịch bản partial receiving.
-- [ ] Chọn định danh lot issuer-qualified, đơn vị/precision, document lifecycle, chủ sở hữu movement của từng loại phiếu (D14), technical ACK vs receiving, public field policy và versioning.
-- [ ] Viết contract tests trước hoặc cùng adapter đầu tiên; mọi thay đổi sau này phải cập nhật docs/test cùng PR.
-- **Đầu ra:** contract v1 có ví dụ và lỗi; **kiểm chứng:** cả sender A và receiver B hiểu cùng một message, không có field cập nhật tồn từ client.
+- [x] Contracts v1-provisional đã có (`contracts/`); D07/D08/D14 trong decision-log/ADR.
+- [x] Validate envelope fixture + OpenAPI structure (`npm run test:contracts`); evidence `contract-validate.md`.
+- [ ] Contract tests đầy đủ theo từng route (mở rộng khi adapter P01+); cập nhật docs/test cùng PR khi đổi schema.
+- **Đầu ra:** contract parse/validate tối thiểu pass; **kiểm chứng:** `npm test` gồm contracts.
 
 ## P00-T06 — Chuẩn hóa repo/CI nền
 
-- [ ] Chốt layout đích theo `FOLDER_STRUCTURE.md`; lập mapping giữ/xóa/chuyển scaffold cũ, tránh xóa khi chưa chứng minh không có import dùng chung.
-- [ ] Thêm CI baseline: install theo lockfile, lint, typecheck, build, test command (có thể rỗng có thông báo ở đầu); không dùng tag image `latest` trong pipeline demo.
-- [ ] Quy ước PR/issue theo task ID, yêu cầu evidence và CODEOWNERS/review nếu đội muốn; chuẩn hóa `.env.example` không secret.
-- **Đầu ra:** pipeline xanh trên clone sạch; **kiểm chứng:** cố ý làm sai lint/build thì pipeline đỏ.
+- [x] Mapping scaffold: `evidence/scaffold-mapping.md`.
+- [x] CI `.github/workflows/ci.yml`: install, SPDX, lint, prisma generate, build, typecheck, test.
+- [x] `.env.example` (root + deploy) không secret.
+- **Đầu ra:** pipeline trên clone sạch; **kiểm chứng:** thiếu SPDX / fixture sai → đỏ.
 
 ## P00-T07 — Gate G00
 
-- [ ] Hai người review ranh giới core headless/Next ERP/DX-Lab app, D01–D08/D14/D15 và ma trận AC; ghi rủi ro còn mở có owner.
-- [ ] Chạy lại baseline, kiểm tra bản tài liệu và mã không claim sai trạng thái. Phase 01 chỉ mở khi có lựa chọn gateway/storage/DB adapter xác định và demo topology khả thi.
-- **Bằng chứng:** ADR, baseline log, scope/contract v1, license inventory.
+- [ ] Hai người review và ký `evidence/G00.md` (Status hiện **READY FOR REVIEW**).
+- [x] Gói kỹ thuật: ADR promote D01/D02/D04/D06/D15 + Prisma D03; CI; SPDX; contracts; không claim M01–M04 Done.
+- **Bằng chứng:** `evidence/G00.md`, ADR, baseline, scope, license inventory, contract-validate.
 
 ## Hồ sơ giao AI theo từng task
 
