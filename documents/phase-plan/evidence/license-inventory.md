@@ -4,7 +4,7 @@
 
 ## Complete npm lockfile
 
-`npm run check:licenses` checks every package entry in `package-lock.json` for a version, license expression, HTTPS npm registry source and integrity hash, then compares the lockfile SHA-256 and all entries with [npm-license-inventory.json](./npm-license-inventory.json). Regenerate with `node scripts/check-licenses.mjs --write-inventory` whenever the lockfile changes. The current inventory has **505 package entries** (including optional platform binaries), not just the direct dependencies in `package.json`.
+`npm run check:licenses` checks every package entry in `package-lock.json` for a version, license expression, HTTPS npm registry source and integrity hash, then compares the **LF-normalized** lockfile SHA-256 and all entries with [npm-license-inventory.json](./npm-license-inventory.json). The normalization gives Windows CRLF and Linux LF checkouts of the same Git blob one digest. Regenerate with `node scripts/check-licenses.mjs --write-inventory` whenever the lockfile changes. The current inventory has **505 package entries** (including optional platform binaries), not just the direct dependencies in `package.json`.
 
 | Expression in lockfile | Entries | Distribution note |
 | --- | ---: | --- |

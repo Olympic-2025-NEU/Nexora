@@ -2,7 +2,7 @@
 
 ## Trạng thái xuất phát được kiểm tra
 
-- **P00 technical package (2026-11-17):** baseline/scope, ADR D01–D08/D14/D15, AGPL/SPDX/license inventory, clean CI and static contract v1 (OpenAPI 70 paths/87 operations, event/schema fixtures, Node/Python JCS hashes) đã có evidence. **G00 READY FOR REVIEW, chưa CLOSED** vì cần remote CI và hai chữ ký; T02 chờ BTC. Không coi contract/spike là app runtime.
+- **P00 technical package (2026-11-17):** baseline/scope, ADR D01–D08/D14/D15, AGPL/SPDX/license inventory, clean CI trên Ubuntu và static contract v1 (OpenAPI 70 paths/87 operations, event/schema fixtures, Node/Python JCS hashes) đã có evidence. **G00 READY FOR REVIEW, chưa CLOSED** vì cần hai chữ ký; T02 chờ BTC. Không coi contract/spike là app runtime.
 - `package.json`: Next.js 16, React 19, TypeScript, Tailwind; chưa có các dependency nghiệp vụ.
 - `app/page.tsx`: placeholder Nexora sau khi bỏ trang starter/tài sản không dùng; `app/api/v1/health/route.ts` trả `ok` tĩnh.
 - `deploy/docker-compose.yml`: chỉ PostgreSQL; `db/migrations/0001_platform.sql` rỗng — P01 chuyển sang Prisma Migrate (`prisma-migration-spec.md`, D03).

@@ -52,7 +52,7 @@
 
 - [ ] Hai người review và ký `evidence/G00.md` (Status hiện **READY FOR REVIEW**).
 - [x] Gói kỹ thuật: ADR D01–D08/D14/D15 đối chiếu evidence và owner runtime (D03 = Prisma); AGPL/SPDX/lockfile inventory; clean CI + negative guards; API/event contract v1. Không claim M01–M04 Done.
-- [ ] Kiểm GitHub Actions của nhánh remediation sau push và ghi kết quả vào `evidence/G00.md`.
+- [x] GitHub Actions của nhánh remediation pass trên Ubuntu sau fix hash CRLF/LF; run và lỗi ban đầu được ghi trong `evidence/G00.md`/`evidence/ci-local.md`.
 - **Bằng chứng:** `evidence/G00.md`, ADR, baseline, scope, license inventory, contract-validate.
 
 ## Hồ sơ giao AI theo từng task

@@ -36,4 +36,10 @@ Each mutation was temporary, restored immediately after its expected failure; no
 | Temporary source lacks SPDX header | `npm run check:spdx` | Exit 1, file named in missing-header report. |
 | Hand-edit generated OpenAPI description | `npm run check:openapi` | Exit 1, generated YAML reported stale. |
 
-The static contract suite detects malformed fixtures and request schemas, but route behavior requires running API/DB tests in the owning phases. GitHub Actions result for this branch must be added after push; local success alone does not prove the remote runner passed.
+The static contract suite detects malformed fixtures and request schemas, but route behavior requires running API/DB tests in the owning phases.
+
+## GitHub Actions verification
+
+The first branch run ([#5](https://github.com/Olympic-2025-NEU/Nexora/actions/runs/44018070773), commit `93a66c5`) failed only at `check:licenses`: Windows CRLF working-tree bytes had been hashed into the inventory, while GitHub checked out the same lockfile with LF. Commit `8be50b1` normalizes CRLF to LF before hashing and uses deterministic path ordering. The normalized worktree hash, committed Git blob hash and inventory hash were compared locally and matched.
+
+The follow-up [GitHub Actions run](https://github.com/Olympic-2025-NEU/Nexora/actions/runs/44018443706) for commit `8be50b1c6b90231b360d34ed7706dff3d34d0ed4` completed **success** on Ubuntu. Install, lint, Prisma generate, build, typecheck and the full `npm test` gate passed. The workflow runner still reported 13 npm audit advisories, tracked in `license-inventory.md`.
