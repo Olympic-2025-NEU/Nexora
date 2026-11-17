@@ -5,7 +5,8 @@
 - **P00 docs package (2026-11-16):** provisional delivered — `evidence/baseline.md`, `scope-v1.md`, `documents/adr/*` (Accepted-provisional), `contracts/` v1-provisional, scaffold/SPDX checklists. **G00 open** — xem `evidence/G00.md`. Không coi là đóng spike/runtime.
 - `package.json`: Next.js 16, React 19, TypeScript, Tailwind; chưa có các dependency nghiệp vụ.
 - `app/page.tsx`: trang starter; `app/api/v1/health/route.ts` trả `ok` tĩnh.
-- `deploy/docker-compose.yml`: chỉ PostgreSQL; `db/migrations/0001_platform.sql` rỗng — P01 chuyển sang Prisma Migrate (`prisma-migration-spec.md`, D03).
+- `deploy/compose.yml`: topology P01 (gateway publish loopback; PG/Keycloak/Flowable/SeaweedFS/Redis/ClamAV internal). Prisma Migrate schema vẫn P01-T03 (`prisma-migration-spec.md`, D03).
+- G00 **CLOSED** (owner waiver 2026-11-17). P01-T01 `config` A/B/C PASS — xem `evidence/p01-t01.md`.
 - `platform/`: type/interface và hàm domain nhỏ; chưa có Keycloak, gateway, Flowable, S3, outbox worker hoặc transaction adapter.
 - `contexts/sales|procurement|finance|master-data`: scaffold cũ, không tính là M01–M04. `contexts/inventory` hiện chỉ có reservation guard.
 - `LICENSE`, `CHANGELOG.md` và tài liệu kiến trúc đã có; header SPDX từng tệp mã, công khai repo/release/bug tracker vẫn cần xác minh.

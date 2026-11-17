@@ -1,0 +1,15 @@
+.git
+.github
+.next
+node_modules
+**/.env
+**/.env.*
+!**/.env.example
+deploy/instances/*.env
+documents/phase-plan/evidence/spikes
+**/.venv
+**/generated
+*.md
+!README.md
+agent-transcripts
+.cursor

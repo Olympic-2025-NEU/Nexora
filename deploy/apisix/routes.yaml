@@ -1,0 +1,11 @@
+# Minimal P01 gateway routes. Full OIDC / private matrix = P02.
+# Default topology does not require erp/core containers.
+routes:
+  - id: public-gateway-ping
+    uri: /gateway/ping
+    methods: [GET, HEAD]
+    plugins:
+      serverless-pre-function:
+        phase: access
+        functions:
+          - return function(conf, ctx) local core = require("apisix.core"); core.response.exit(200, "{\"ok\":true,\"service\":\"gateway\"}") end

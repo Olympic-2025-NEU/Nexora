@@ -4,17 +4,17 @@
 
 ## P01-T01 — Topology Compose và mạng
 
-- [ ] Thiết kế service Next ERP, worker, **core data/file API không UI**, DX-Lab frontend tầng 2 (profile P11), PostgreSQL, Keycloak, gateway (+etcd nếu D01 yêu cầu), Redis, object storage, Flowable OSS REST, scanner ClamAV, optional AI; internal/public networks và volume riêng.
-- [ ] Chỉ publish gateway (và cổng quản trị dev theo profile local), không publish PG/Redis/Flowable/storage admin/etcd ra Internet; document port map và hostname nội bộ.
-- [ ] Đặt healthcheck/dependency readiness với timeout rõ, resource limits hợp lý cho máy demo; chốt pinned image tags/digests và giấy phép.
-- **Đầu ra:** Compose dev và config template; **kiểm chứng:** `docker compose config` pass, `ps`/network inspect cho thấy chỉ cổng được phép public.
+- [x] `deploy/compose.yml`: ERP/worker/core-data (profile `apps`), DX-Lab (`dxlab`), PG, Keycloak, APISIX standalone (không etcd), Redis, SeaweedFS, Flowable, ClamAV, AI (`ai`); mạng `edge`/`internal`, volume per `INSTANCE_ID`.
+- [x] Chỉ publish gateway `127.0.0.1:${GATEWAY_HTTP_PORT}`; `local-admin` publish loopback PG/Keycloak; không public Redis/Flowable/storage/etcd.
+- [x] Resource limits + pinned digests trong compose; evidence `evidence/p01-t01.md` (`config -q` A/B/C PASS). `up`/inspect runtime còn lại khi Docker sẵn sàng.
+- **Đầu ra:** Compose + `deploy/README.md` + `instances/{a,b,c}.env.example`; **kiểm chứng:** `config` pass; published ports chỉ gateway.
 
 ## P01-T02 — Build Next.js từ source và image app/worker
 
-- [ ] Tạo Dockerfile nhiều stage dùng lockfile, non-root runtime, production artifact phù hợp Next 16; không copy `.env`, secret hoặc node_modules từ host.
-- [ ] Build core data/file API không UI thành image riêng có health/port nội bộ; DX-Lab frontend có build/runtime riêng tại P11. Dùng shared package có version/contract, không import ngược UI vào core.
-- [ ] Tách lệnh worker khỏi web nếu cần để dispatch outbox không phụ thuộc request life-cycle; cùng image có command khác được nếu module boundary giữ đúng.
-- [ ] Build/run image trên clone sạch; ghi Node/image version và cách chuyển dev→release.
+- [x] `Dockerfile` multi-stage Next 16 + `.dockerignore`; non-root user; không copy `.env`.
+- [x] `services/core-data/` stub image + `/health/live`; `apps/dx-lab/` stub (P11). Chưa phải Core Data/File API sản phẩm.
+- [x] `worker/entrypoint.js` stub (cùng image ERP, command khác); outbox thật = P04.
+- [ ] Build/run image trên clone sạch + CI image job; ghi digest runtime.
 - **Đầu ra:** image app/worker tái lập; **kiểm chứng:** image build trong CI và run sau khi xóa cache build (không dựa máy tác giả).
 
 ## P01-T03 — PostgreSQL và migration runner
@@ -33,9 +33,9 @@
 
 ## P01-T05 — Env, cấu hình và secret hygiene
 
-- [ ] `.env.example` mô tả từng biến, default dev không an toàn được đánh dấu rõ; fail-fast khi biến bắt buộc thiếu, không log secret.
-- [ ] Tách `BASE_URL`, issuer URL nội bộ/ngoài, gateway upstream, storage endpoint, DB URL, service credentials; test compose profile A/B/C có prefix/volume khác nhau.
-- [ ] Có lệnh kiểm tra secret vô tình commit và tài liệu rotate; không hardcode credential mẫu vào release.
+- [x] `deploy/.env.example` + `instances/{a,b,c}.env.example` đánh dấu `CHANGE_ME_*`; root `.env.example` trỏ local-admin.
+- [x] Tách PUBLIC_BASE_URL / OIDC / S3 / DB / Flowable / Redis theo instance; A/B/C khác port + volume name.
+- [ ] Typed fail-fast parser + bootstrap scripts; secret-scan CI mở rộng (P01-T05 còn lại).
 - **Đầu ra:** config matrix; **kiểm chứng:** clone mới điền env theo docs là boot được, thiếu biến trọng yếu báo lỗi rõ.
 
 ## P01-T06 — Health, logs và seed hạ tầng

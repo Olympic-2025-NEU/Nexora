@@ -1,0 +1,271 @@
+# Nexora P01 — single Compose entrypoint (instances A/B/C via -p + env file).
+# Default = infrastructure. Profiles: apps | dxlab | ai | local-admin
+name: nexora-${INSTANCE_ID:-a}
+
+networks:
+  edge:
+    name: nexora-${INSTANCE_ID:-a}-edge
+  internal:
+    name: nexora-${INSTANCE_ID:-a}-internal
+
+volumes:
+  pg_data:
+    name: nexora-${INSTANCE_ID:-a}-pg
+  redis_data:
+    name: nexora-${INSTANCE_ID:-a}-redis
+  seaweed_data:
+    name: nexora-${INSTANCE_ID:-a}-seaweed
+  clamav_data:
+    name: nexora-${INSTANCE_ID:-a}-clamav
+
+services:
+  postgres:
+    image: postgres:17.6@sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      KEYCLOAK_DB_USER: ${KEYCLOAK_DB_USER}
+      KEYCLOAK_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD}
+      KEYCLOAK_DB_NAME: ${KEYCLOAK_DB_NAME}
+      FLOWABLE_DB_USER: ${FLOWABLE_DB_USER}
+      FLOWABLE_DB_PASSWORD: ${FLOWABLE_DB_PASSWORD}
+      FLOWABLE_DB_NAME: ${FLOWABLE_DB_NAME}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ./postgres/init-databases.sh:/docker-entrypoint-initdb.d/01-init-databases.sh:ro
+    networks: [internal]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+
+  redis:
+    image: redis:7.4-alpine@sha256:7f7d30b7fdd09467bac58198a1f166dd69789d348d4fe859cccb20e0cf287fbe
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    volumes:
+      - redis_data:/data
+    networks: [internal]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.8.2@sha256:c68e286cacd87b942ac1939a0a1481461109d6acd3a57dc496969a319a76bbf0
+    command: ["start-dev", "--import-realm", "--http-port=8080"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD}
+      KC_HEALTH_ENABLED: "true"
+      KC_HTTP_ENABLED: "true"
+      KC_HOSTNAME_STRICT: "false"
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/${KEYCLOAK_DB_NAME}
+      KC_DB_USERNAME: ${KEYCLOAK_DB_USER}
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD}
+    volumes:
+      - ./keycloak/realm-template.json:/opt/keycloak/data/import/nexora-realm.json:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [internal]
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/8080"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+
+  gateway:
+    image: apache/apisix:3.20.0-debian@sha256:013de62a9dfba7d8e6006b3e85b524c28c9f1c3549fca3b91d5b258b0b9e759a
+    volumes:
+      - ./apisix/config.yaml:/usr/local/apisix/conf/config.yaml:ro
+      - ./apisix/routes.yaml:/usr/local/apisix/conf/apisix.yaml:ro
+    depends_on:
+      keycloak:
+        condition: service_started
+    networks: [edge, internal]
+    ports:
+      # Only public-facing bind in default topology (loopback).
+      - "127.0.0.1:${GATEWAY_HTTP_PORT:-19080}:9080"
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+
+  seaweedfs:
+    image: chrislusf/seaweedfs:4.53@sha256:ccad23e18639c8b98cee17e7100b95830a06077b56d8e5b006d6dcf8ec5e94a0
+    command: ["mini", "-dir=/data", "-ip.bind=0.0.0.0"]
+    environment:
+      AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY}
+      AWS_SECRET_ACCESS_KEY: ${S3_SECRET_KEY}
+    volumes:
+      - seaweed_data:/data
+      - ./seaweedfs/bucket-policy.json:/etc/seaweedfs/bucket-policy.json:ro
+    networks: [internal]
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+
+  flowable:
+    image: flowable/flowable-rest:8.0.0@sha256:708dfa32f27b93180bb6e7a30684d881d995fe257f5b8413e14b20a55c25672d
+    environment:
+      SERVER_PORT: "8080"
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${FLOWABLE_DB_NAME}
+      SPRING_DATASOURCE_USERNAME: ${FLOWABLE_DB_USER}
+      SPRING_DATASOURCE_PASSWORD: ${FLOWABLE_DB_PASSWORD}
+      SPRING_DATASOURCE_DRIVER-CLASS-NAME: org.postgresql.Driver
+      FLOWABLE_REST_APP_ADMIN_USER_ID: ${FLOWABLE_ADMIN_USER}
+      FLOWABLE_REST_APP_ADMIN_PASSWORD: ${FLOWABLE_ADMIN_PASSWORD}
+      FLOWABLE_REST_APP_CREATE_DEMO_DEFINITIONS: "false"
+      REST_VARIABLES_ALLOW_SERIALIZABLE: "false"
+    volumes:
+      - ./flowable/processes:/process-definitions:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [internal]
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+
+  clamav:
+    image: clamav/clamav:1.4@sha256:4cc4350d3fded380caf1799e76c0d1c93f3fa40af99c0cb2862ec0c9b117718a
+    volumes:
+      - clamav_data:/var/lib/clamav
+    networks: [internal]
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+
+  erp:
+    profiles: ["apps"]
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      target: runner
+    environment:
+      DATABASE_URL: ${APP_DATABASE_URL}
+      OIDC_ISSUER_URL: ${OIDC_ISSUER_URL}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [internal]
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+
+  worker:
+    profiles: ["apps"]
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      target: runner
+    command: ["node", "worker/entrypoint.js"]
+    environment:
+      DATABASE_URL: ${APP_DATABASE_URL}
+      FLOWABLE_BASE_URL: ${FLOWABLE_BASE_URL}
+      REDIS_URL: ${REDIS_URL}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks: [internal]
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+
+  core-data:
+    profiles: ["apps"]
+    build:
+      context: ../services/core-data
+      dockerfile: Dockerfile
+    environment:
+      CORE_DATABASE_URL: ${CORE_DATABASE_URL}
+      S3_ENDPOINT: ${S3_ENDPOINT}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY}
+      S3_BUCKET_PRIVATE: ${S3_BUCKET_PRIVATE}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      seaweedfs:
+        condition: service_started
+      clamav:
+        condition: service_started
+    networks: [internal]
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+
+  dx-lab:
+    profiles: ["dxlab"]
+    build:
+      context: ../apps/dx-lab
+      dockerfile: Dockerfile
+    environment:
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL}
+      OIDC_ISSUER_URL: ${OIDC_ISSUER_URL}
+    networks: [internal]
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+
+  ai:
+    profiles: ["ai"]
+    image: python:3.12-slim@sha256:78387bc3881b8273120a12ebe6c1ab22b018ccc2c9adf565ae1ac9b536e184ea
+    command:
+      [
+        "python",
+        "-c",
+        "import http.server; http.server.HTTPServer(('0.0.0.0', 8080), type('H', (http.server.BaseHTTPRequestHandler,), {'do_GET': lambda s: (s.send_response(200), s.end_headers(), s.wfile.write(b'ok'))})).serve_forever()",
+      ]
+    networks: [internal]
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+
+  # local-admin: loopback-only publishes for PG + Keycloak (never 0.0.0.0).
+  postgres-local:
+    profiles: ["local-admin"]
+    image: postgres:17.6@sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929
+    network_mode: "service:postgres"
+    entrypoint: ["sleep", "infinity"]
+    depends_on: [postgres]
+    ports:
+      - "127.0.0.1:${POSTGRES_HOST_PORT:-15432}:5432"
+
+  keycloak-local:
+    profiles: ["local-admin"]
+    image: quay.io/keycloak/keycloak:26.8.2@sha256:c68e286cacd87b942ac1939a0a1481461109d6acd3a57dc496969a319a76bbf0
+    network_mode: "service:keycloak"
+    entrypoint: ["sleep", "infinity"]
+    depends_on: [keycloak]
+    ports:
+      - "127.0.0.1:${KEYCLOAK_HOST_PORT:-18080}:8080"

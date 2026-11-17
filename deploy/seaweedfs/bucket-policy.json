@@ -1,0 +1,19 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "DenyPublicReadByDefault",
+      "Effect": "Deny",
+      "Principal": "*",
+      "Action": ["s3:GetObject"],
+      "Resource": [
+        "arn:aws:s3:::nexora-private/*",
+        "arn:aws:s3:::nexora-quarantine/*"
+      ],
+      "Condition": {
+        "Bool": { "aws:SecureTransport": "false" }
+      }
+    }
+  ],
+  "_nexora_comment": "Policy stub for P01 topology. Bucket bootstrap + least-privilege credentials land in P01-T04 / P03."
+}

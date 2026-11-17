@@ -33,6 +33,10 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 !.env.example
+!deploy/.env.example
+!deploy/instances/*.env.example
+deploy/instances/*.env
+!deploy/instances/*.env.example
 
 # vercel
 .vercel

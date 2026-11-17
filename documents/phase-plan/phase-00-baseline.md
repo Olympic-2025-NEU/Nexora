@@ -49,7 +49,7 @@
 
 ## P00-T07 — Gate G00
 
-- [ ] Hai người review và ký `evidence/G00.md` (Status hiện **READY FOR REVIEW**).
+- [x] G00 **CLOSED** 2026-11-17: owner waiver (không thu đủ 2 tên reviewer độc lập); gói kỹ thuật đã merge PR #49.
 - [x] Gói kỹ thuật: ADR promote D01/D02/D04/D06/D15 + Prisma D03; CI; SPDX; contracts; không claim M01–M04 Done.
 - **Bằng chứng:** `evidence/G00.md`, ADR, baseline, scope, license inventory, contract-validate.
 
