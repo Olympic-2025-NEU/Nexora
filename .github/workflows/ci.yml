@@ -40,4 +40,16 @@ jobs:
       - name: Build ERP image
         run: docker build -t nexora-erp:ci -f Dockerfile .
       - name: Build core-data image
-        run: docker build -t nexora-core-data:ci -f services/core-data/Dockerfile services/core-data
+        run: docker build -t nexora-core-data:ci -f services/core-data/Dockerfile .
+
+  secret-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Scan Git history including deploy config and scripts
+        run: |
+          docker run --rm -v "$PWD:/repo:ro" \
+            ghcr.io/gitleaks/gitleaks:v8.24.3@sha256:e1b35e12a8c6fa8901f060459cfb6b2fc4c484d3afbe3b029733a3bbfab07055 \
+            git /repo --redact --no-banner --gitleaks-ignore-path /repo/.gitleaksignore
