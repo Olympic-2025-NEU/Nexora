@@ -37,6 +37,7 @@ COPY --from=builder --chown=nexora:nexora /app/.next ./.next
 COPY --from=builder --chown=nexora:nexora /app/public ./public
 COPY --from=builder --chown=nexora:nexora /app/prisma ./prisma
 COPY --from=builder --chown=nexora:nexora /app/worker ./worker
+COPY --from=builder --chown=nexora:nexora /app/deploy/config.mjs ./deploy/config.mjs
 USER nexora
 EXPOSE 3000
 CMD ["npm", "run", "start"]

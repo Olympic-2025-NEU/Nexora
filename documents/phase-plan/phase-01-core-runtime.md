@@ -35,7 +35,7 @@
 
 - [x] `deploy/.env.example` + `instances/{a,b,c}.env.example` đánh dấu `CHANGE_ME_*`; root `.env.example` trỏ local-admin.
 - [x] Tách PUBLIC_BASE_URL / OIDC / S3 / DB / Flowable / Redis theo instance; A/B/C khác port + volume name.
-- [ ] Typed fail-fast parser + bootstrap scripts; secret-scan CI mở rộng (P01-T05 còn lại).
+- [x] Typed fail-fast parser + bootstrap scripts; secret-scan CI mở rộng. Evidence: [evidence/p01-t05.md](evidence/p01-t05.md).
 - **Đầu ra:** config matrix; **kiểm chứng:** clone mới điền env theo docs là boot được, thiếu biến trọng yếu báo lỗi rõ.
 
 ## P01-T06 — Health, logs và seed hạ tầng
