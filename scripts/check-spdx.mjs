@@ -1,46 +1,51 @@
-#!/usr/bin/env node
-/**
- * Fail if authored .ts/.tsx under allowlist paths lack SPDX-License-Identifier.
- * SPDX-License-Identifier: AGPL-3.0-only
- */
-import { readdirSync, readFileSync, statSync } from "node:fs";
-import { join, relative } from "node:path";
+// SPDX-License-Identifier: AGPL-3.0-only
+import { execFileSync } from "node:child_process";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { resolve } from "node:path";
 
-const ROOT = process.cwd();
-const ROOTS = ["app", "platform", "contexts", "composition", "components", "scripts"];
-const SKIP_NAMES = new Set(["next-env.d.ts"]);
-const MARKER = "SPDX-License-Identifier:";
+const SOURCE_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".mjs", ".css", ".prisma"]);
+const INVENTORY = "documents/phase-plan/evidence/source-inventory.json";
+const HEADER = /^\s*(?:\/\/|\/\*|\*)\s*SPDX-License-Identifier:\s*AGPL-3\.0-only\s*(?:\*\/)?\s*$/m;
 
-function walk(dir, out = []) {
-  for (const name of readdirSync(dir)) {
-    if (name === "node_modules" || name === ".next") continue;
-    const p = join(dir, name);
-    const st = statSync(p);
-    if (st.isDirectory()) walk(p, out);
-    else if (/\.tsx?$/.test(name) && !SKIP_NAMES.has(name)) out.push(p);
-  }
-  return out;
+function sourcePaths() {
+  const output = execFileSync(
+    "git",
+    ["ls-files", "--cached", "--others", "--exclude-standard", "-z"],
+    { encoding: "utf8" },
+  );
+  return [...new Set(output.split("\0").filter(Boolean))]
+    .filter((path) => {
+      if (!existsSync(path)) return false;
+      if (path === "next-env.d.ts" || path.startsWith("prisma/migrations/")) return false;
+      return [...SOURCE_EXTENSIONS].some((extension) => path.endsWith(extension));
+    })
+    .sort();
 }
 
-const files = ROOTS.flatMap((r) => {
-  const abs = join(ROOT, r);
-  try {
-    return walk(abs);
-  } catch {
-    return [];
-  }
+const paths = sourcePaths();
+const missing = paths.filter((path) => {
+  const firstLines = readFileSync(resolve(path), "utf8").split(/\r?\n/, 6).join("\n");
+  return !HEADER.test(firstLines);
 });
-
-const missing = [];
-for (const file of files) {
-  const head = readFileSync(file, "utf8").slice(0, 800);
-  if (!head.includes(MARKER)) missing.push(relative(ROOT, file).replaceAll("\\", "/"));
-}
-
 if (missing.length) {
-  console.error(`SPDX missing in ${missing.length} file(s):`);
-  for (const f of missing) console.error(`  - ${f}`);
+  console.error("Missing exact AGPL-3.0-only SPDX header:");
+  for (const path of missing) console.error(`  ${path}`);
   process.exit(1);
 }
 
-console.log(`check-spdx: OK (${files.length} files)`);
+const expected = {
+  license: "AGPL-3.0-only",
+  excludedGenerated: ["next-env.d.ts", "prisma/migrations/**"],
+  files: paths,
+};
+if (process.argv.includes("--write-inventory")) {
+  writeFileSync(INVENTORY, `${JSON.stringify(expected, null, 2)}\n`);
+  console.log(`Wrote ${INVENTORY} (${paths.length} sources)`);
+} else {
+  const actual = JSON.parse(readFileSync(INVENTORY, "utf8"));
+  if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+    console.error(`Source inventory is stale. Run node scripts/check-spdx.mjs --write-inventory`);
+    process.exit(1);
+  }
+  console.log(`check-spdx: OK (${paths.length} sources, exact license, inventory in sync)`);
+}

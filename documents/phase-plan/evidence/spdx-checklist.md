@@ -1,22 +1,13 @@
-# P00-T04 — SPDX checklist
+# P00-T04 — SPDX evidence
 
-**License project:** `AGPL-3.0-only` — full text in repo root `LICENSE`.  
-**Rule:** Authored `.ts`/`.tsx` under `app/`, `platform/`, `contexts/`, `composition/`, `components/`, `scripts/` need `SPDX-License-Identifier: AGPL-3.0-only`. Skip generated `next-env.d.ts`.
+**Project license:** `AGPL-3.0-only`; full text in `LICENSE`.
 
-**Status:** Done on `chore/p00-g00-close` (2026-11-17). Enforce with `npm run check:spdx` (CI).
+`npm run check:spdx` checks the **exact** identifier in the first six lines of every tracked or untracked non-ignored `.ts`, `.tsx`, `.js`, `.mjs`, `.css` and `.prisma` source/config file. It compares paths to [source-inventory.json](./source-inventory.json), so adding a source file requires an inventory update in the same PR. Regenerate with `node scripts/check-spdx.mjs --write-inventory`.
 
-| Area | SPDX |
-| --- | --- |
-| `app/**/*.ts(x)` | present |
-| `platform/**/*.ts` | present |
-| `contexts/**/*.ts` | present |
-| `composition/**/*.ts` | present |
-| `components/**/*.ts` | present |
-| `scripts/**/*.ts` + check/validate scripts | present |
+Excluded: `next-env.d.ts` (Next-generated); `prisma/migrations/**` (Prisma-generated SQL). `db/migrations/0001_platform.sql` is a zero-byte legacy placeholder and will be removed/replaced under D03/P01. The scanner does not relicense third-party source; new vendored code/assets require separate provenance and notices before merging.
 
-## Done when
-
-- [x] Authored sources have SPDX  
-- [x] `scripts/check-spdx.mjs` fails CI if missing  
-- [ ] `NOTICE` if third-party bundled assets require it (N/A for now)  
-- [x] No secrets committed (`.env*` gitignored except `.env.example`)  
+- [x] Nexora contributors' AGPL agreement confirmed by the team in the 2026-11-17 work session.
+- [x] Exact SPDX and complete path inventory checked on current authored source/config.
+- [x] Unused Next/Vercel SVG/favicon and Google font import removed; starter origin retained in `NOTICE`.
+- [x] CI fails when SPDX is absent, wrong or the source inventory drifts.
+- [ ] Reviewers independently verify contributor list and distribution notices at G00/P13.
