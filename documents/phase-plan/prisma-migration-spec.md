@@ -1,6 +1,6 @@
 # Prisma migration spec (D03)
 
-Baseline persistence Nexora: **Prisma Client + Prisma Migrate** trên PostgreSQL. Tài liệu này là quy ước thi công; chưa khẳng định `schema.prisma` đã có trong repo.
+Baseline persistence Nexora: **Prisma Client + Prisma Migrate** trên PostgreSQL — **chốt D03 2026-11-17** (ADR `0003-database-prisma.md`). Spike schema đã có; schema MVP đầy đủ theo `database-schema-v1.md` vào P01+. Không dùng `pg` PoolClient làm SoT (ADR `pg` trên `phase-00` superseded).
 
 ## 1. Layout đích
 

@@ -1,6 +1,7 @@
 # Spike D03 — Prisma TX evidence
 
 **Date:** 2026-11-16  
+**Locked as SoT:** 2026-11-17 (**chốt Prisma** — supersedes phase-00 `pg`+PoolClient ADR)  
 **Status:** PASS  
 **Command:** `npm run spike:d03` (after `prisma migrate deploy`)
 

@@ -1,12 +1,12 @@
 # Decision log và spike bắt buộc
 
-Quyết định ở đây là **Accepted-provisional** theo ADR trong [`documents/adr/`](../adr/README.md) — đủ để AI/dev không tự chọn stack khác, **chưa** đủ đóng G00. Mỗi ADR cần spike lặp lại được, pin version/digest/license/RAM, rồi promote status → Accepted. Không bắt đầu task runtime phụ thuộc khi spike của ADR chặn phase đó còn pending (trừ công việc thuần tài liệu).
+Quyết định ở đây theo ADR trong [`documents/adr/`](../adr/README.md). Phần lớn còn **Accepted-provisional** (spike/G00 chưa đủ). **D03 đã chốt cuối: Prisma** (2026-11-17) — mọi nhánh P00 (`phase-00/baseline-t03` chọn `pg`+SQL) phải tuân thủ Prisma khi merge vào `develop`. Không bắt đầu task runtime phụ thuộc khi spike của ADR chặn phase đó còn pending (trừ tài liệu).
 
 | ID | Chốt trước | Status | ADR | Đề xuất/điều kiện chấp nhận |
 | --- | --- | --- | --- | --- |
 | D01 Gateway | P01/P02 | Accepted-provisional (spike pending) | [0001](../adr/0001-gateway-apisix.md) | Apache APISIX + OIDC/Keycloak; route private/public/M2M; không thay bằng reverse proxy chỉ rewrite URL. |
 | D02 Object storage | P01/P03 | Accepted-provisional (spike pending) | [0002](../adr/0002-object-storage-seaweedfs.md) | SeaweedFS S3 tự host (ứng viên); buckets quarantine/private/public; kiểm MinIO Community nếu đổi. |
-| D03 Database adapter/migration | P00/P03 | **Accepted** (spike PASS 2026-11-16) | [0003](../adr/0003-database-prisma.md) | **Prisma Client + Prisma Migrate** 6.19.0; evidence [`evidence/spike-d03.md`](./evidence/spike-d03.md). Cấm Drizzle/`pg` Pool song song. |
+| D03 Database adapter/migration | P00/P03 | **Accepted — CHỐT** (2026-11-17) | [0003](../adr/0003-database-prisma.md) | **Prisma Client + Prisma Migrate** 6.19.0 only. Evidence [`evidence/spike-d03.md`](./evidence/spike-d03.md). Supersede ADR/`pg` PoolClient trên `phase-00/baseline-t03`. Cấm Drizzle/`pg` Pool app access. |
 | D04 Identity/session | P02 | Accepted-provisional (spike pending) | [0004](../adr/0004-identity-session-keycloak.md) | Keycloak OIDC + PKCE; RBAC trong app DB; CSRF/session theo Next 16 + `security.md`. |
 | D05 Federation trust | P02/P05 | Accepted-provisional (spike pending) | [0005](../adr/0005-federation-trust-m2m.md) | Receiver cấp M2M client; map `client_id`→partner; không tin org ID từ body. |
 | D06 Workflow process | P04/P07 | Accepted-provisional (spike pending) | [0006](../adr/0006-workflow-flowable-goods-issue.md) | Flowable OSS + PG; BPMN `goods-issue-approval` mọi GoodsIssue v1; Approver ≠ creator. |
