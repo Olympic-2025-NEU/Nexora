@@ -78,8 +78,8 @@ nexora/
   services/core-data/   # API dữ liệu/tệp headless (đích)
   services/ai/          # AI01
   composition/          # Wire ports giữa contexts
-  db/migrations/        # Schema PostgreSQL
-  deploy/               # Docker Compose, env mẫu
+  prisma/               # Prisma schema + Migrate (D03)
+  deploy/               # compose.yml, instances A/B/C, APISIX stubs
   documents/
     referents/          # Luật & nguồn chân lý cho Agent/DevOps
     plans/              # Plan tổng quan theo module
@@ -111,7 +111,7 @@ Tiêu chí nghiệm thu MVP (AC-01…AC-13): [documents/referents/ACCEPTANCE_MVP
 
 - Node.js (khuyến nghị bản LTS tương thích Next.js 16)
 - npm
-- Docker (cho PostgreSQL cục bộ)
+- Docker Engine cùng Docker Compose v2 (cho stack cục bộ)
 
 ### Chạy scaffold giao diện
 
@@ -122,15 +122,16 @@ npm run dev
 
 Mở [http://localhost:3000](http://localhost:3000).
 
-### PostgreSQL cục bộ
+### Cài toàn bộ stack từ clone sạch
 
 ```bash
-cp deploy/.env.example deploy/.env
-docker compose -f deploy/docker-compose.yml up -d
+bash deploy/scripts/bootstrap.sh a
+docker compose -f deploy/compose.yml --env-file deploy/instances/a.env -p nexora-a --profile apps config -q
+docker compose -f deploy/compose.yml --env-file deploy/instances/a.env -p nexora-a --profile apps up -d --build
+bash deploy/scripts/smoke.sh a
 ```
 
-- `deploy/.env` chỉ dùng máy dev — không commit secret.
-- `db/migrations/0001_platform.sql` hiện rỗng; Compose chỉ khởi động PostgreSQL, chưa khởi động app hoặc lõi DX-OS.
+`bootstrap.sh` tạo `deploy/instances/a.env` riêng từ `a.env.example`, sinh mật khẩu ngẫu nhiên và kiểm tra cấu hình; không cần tệp bí mật có sẵn. `up` chạy migration PostgreSQL qua `db-migrate` trước khi bật ERP/core-data/worker. Đợi các dịch vụ khởi động rồi chạy lại `smoke.sh` nếu chúng còn đang khởi động. Không commit tệp `.env`. Để chạy B đồng thời, thay `a` bằng `b` và `nexora-a` bằng `nexora-b` trong bốn lệnh trên; B dùng cổng gateway 19081 thay vì 19080. Xem [deploy/README.md](./deploy/README.md).
 
 ### Scripts
 
@@ -143,7 +144,7 @@ docker compose -f deploy/docker-compose.yml up -d
 
 ## Trạng thái hiện tại
 
-Repo đang ở giai đoạn **scaffold Next.js + định hướng kiến trúc + tài liệu Agent/plan module**. Trang chủ vẫn là trang mặc định; API health trả trạng thái tĩnh; các context cũ `sales`, `procurement`, `finance`, `master-data` không thuộc cấu trúc MVP đích. Chưa có triển khai M01–M04, AI01, Keycloak, API Gateway, Flowable, object storage hoặc demo ba instance. Bảng chênh lệch để lập plan nằm trong [OLP_2026_ALIGNMENT.md](./documents/referents/OLP_2026_ALIGNMENT.md).
+Phase 01 đã có Compose cho PostgreSQL, Keycloak, APISIX, Flowable, SeaweedFS, ERP và core-data/worker nền tảng. Chưa có nghiệp vụ M01–M04 hoặc AI01 hoàn chỉnh; xem [phase plan](./documents/phase-plan/README.md) để biết các gate còn mở.
 
 ## Giấy phép
 

@@ -15,7 +15,7 @@
 | Đọc theo thứ tự | Mục đích |
 | --- | --- |
 | [summary.md](./summary.md) | Bản đồ phase, đường găng và mốc Done |
-| [evidence/G00.md](./evidence/G00.md) | Gate G00 — **READY FOR REVIEW**, chưa CLOSED; CI từ xa pass, cần hai chữ ký người review |
+| [evidence/G00.md](./evidence/G00.md) | Gate G00 — **CLOSED** theo owner waiver trên `phase-01`; T02 BTC vẫn mở |
 | [../adr/README.md](../adr/README.md) | ADR D01–D08/D14/D15 đã có quyết định P00 và ranh giới test runtime; D09–D13 theo phase owner |
 | [decision-log.md](./decision-log.md) | Các quyết định cần chốt bằng spike/ADR trước khi code phụ thuộc |
 | [implementation-baseline.md](./implementation-baseline.md) | Lựa chọn mặc định, layout và quy ước thống nhất cho AI; đổi bằng ADR có kiểm chứng |
@@ -34,6 +34,7 @@
 
 ## Quy tắc chạy phase
 
+- **Nhánh Git:** `phase-XX` tích hợp phase; task trên `phase-XX/<Pxx-Tyy-slug>`; PR task → `phase-XX`, rồi `phase-XX` → `develop`. Chi tiết: `../../AGENTS.md` và `.cursor/rules/nexora-git-branch.mdc`.
 - Task ID dạng `Pxx-Tyy` là ổn định. Khi làm việc, ghi PR/commit và bằng chứng test ở issue hoặc nhật ký thực hiện; đừng biến tài liệu kế hoạch thành báo cáo giả.
 - Mỗi task có checklist gốc và **Hồ sơ giao AI theo từng task** ngay cuối file phase: path/đầu ra cụ thể, contract liên quan và phép thử phải pass. Đọc cả hai phần khi giao AI; tách PR theo lát cắt có thể kiểm thử.
 - Không bắt đầu phase phụ thuộc khi gate phase trước chưa đạt. Có thể nghiên cứu hoặc thiết kế trước, nhưng không đánh dấu Done cho đường găng.

@@ -1,6 +1,6 @@
 # Runtime/deploy/CI blueprint v1
 
-Đây là danh sách tệp và config để AI dựng hạ tầng. `deploy/docker-compose.yml` hiện chỉ có PostgreSQL và mount SQL rỗng; P01 thay/di chuyển nó sang `deploy/compose.yml`, cập nhật mọi script và README trong **cùng PR**, không để hai Compose file cùng được coi là entrypoint. `db/migrations/0001_platform.sql` rỗng được thay bằng **Prisma Migrate** (`prisma/migrations/`, xem `prisma-migration-spec.md`). Những tệp sau là **đích phải tạo**. Image tag/digest của dịch vụ ngoài repo phải được ghi vào D01/D02/D06/D13 sau spike P00; không đoán tag hợp lệ hoặc dùng `latest` ở release.
+Đây là danh sách tệp và config để AI dựng hạ tầng. **Entrypoint Compose:** `deploy/compose.yml` (P01). Legacy `deploy/docker-compose.yml` đã gỡ — không tái tạo entrypoint thứ hai. Schema đi qua **Prisma Migrate** (`prisma/migrations/`, xem `prisma-migration-spec.md`). Image tag/digest lấy từ D01/D02/D06/D13; không dùng `latest` ở release. Bootstrap Keycloak, APISIX, SeaweedFS và Flowable nằm dưới `deploy/` sau P01-T04.
 
 ## Layout đích
 

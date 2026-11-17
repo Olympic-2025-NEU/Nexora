@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only; disposable P00 engine spike. -->
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:flowable="http://flowable.org/bpmn" targetNamespace="http://nexora.example/p00">
+  <process id="goods-issue-approval" name="Goods Issue Approval P00" isExecutable="true">
+    <startEvent id="start" />
+    <sequenceFlow id="s1" sourceRef="start" targetRef="approveTask" />
+    <userTask id="approveTask" name="Approve goods issue" flowable:assignee="p00-approver" />
+    <sequenceFlow id="s2" sourceRef="approveTask" targetRef="decision" />
+    <exclusiveGateway id="decision" default="rejectFlow" />
+    <sequenceFlow id="approveFlow" sourceRef="decision" targetRef="approvedEnd"><conditionExpression xsi:type="tFormalExpression"><![CDATA[${approved == true}]]></conditionExpression></sequenceFlow>
+    <sequenceFlow id="rejectFlow" sourceRef="decision" targetRef="rejectedEnd" />
+    <endEvent id="approvedEnd" name="Approved" />
+    <endEvent id="rejectedEnd" name="Rejected" />
+  </process>
+</definitions>

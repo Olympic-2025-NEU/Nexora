@@ -27,7 +27,19 @@ This is a metadata/provenance check, **not** an automatic legal compatibility ve
 
 ## Container images
 
-Current `deploy/docker-compose.yml` has only `postgres:17.6` (PostgreSQL License). The D03 spike recorded digest `sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929`; the Compose tag is **not** a digest pin. APISIX, Keycloak, SeaweedFS and Flowable are spike images documented in D01/D02/D04/D06/D13, not in the application Compose yet. P01 must pin actual release image digests, source URLs, licenses and RAM for the selected architecture.
+**Reconcile P01-T01 (2026-11-17):** application Compose entrypoint is [`deploy/compose.yml`](../../../deploy/compose.yml) with pinned digests (see [`deploy/README.md`](../../../deploy/README.md) and [D13](../../adr/D13-versions-licenses-resources.md)). Legacy `deploy/docker-compose.yml` was removed.
+
+| Image in `deploy/compose.yml` | Digest / note | License (upstream) |
+| --- | --- | --- |
+| `postgres:17.6` | `sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929` (D03 pin; prefer over older D13 `postgres:17` major pin) | PostgreSQL License |
+| `apache/apisix:3.20.0-debian` | `sha256:013de62a9dfba7d8e6006b3e85b524c28c9f1c3549fca3b91d5b258b0b9e759a` | Apache-2.0 |
+| `quay.io/keycloak/keycloak:26.8.2` | `sha256:c68e286cacd87b942ac1939a0a1481461109d6acd3a57dc496969a319a76bbf0` | Apache-2.0 |
+| `chrislusf/seaweedfs:4.53` | `sha256:ccad23e18639c8b98cee17e7100b95830a06077b56d8e5b006d6dcf8ec5e94a0` | Apache-2.0 |
+| `flowable/flowable-rest:8.0.0` | `sha256:708dfa32f27b93180bb6e7a30684d881d995fe257f5b8413e14b20a55c25672d` | Apache-2.0 |
+| `redis:7.4-alpine` | `sha256:7f7d30b7fdd09467bac58198a1f166dd69789d348d4fe859cccb20e0cf287fbe` | BSD-3-Clause ([redis](https://github.com/redis/redis/blob/7.4/COPYING)) |
+| `clamav/clamav:1.4` | `sha256:4cc4350d3fded380caf1799e76c0d1c93f3fa40af99c0cb2862ec0c9b117718a`; Compose sets `platform: linux/amd64` (no arm64 manifest) | GPL-2.0-only ([clamav](https://github.com/Cisco-Talos/clamav/blob/main/COPYING.txt)) — inspect image obligations before redistribution |
+
+App/AI images (`nexora/erp:local`, etc.) are Compose profile placeholders until P01-T02. P13 still owns final distributed-artifact notice review.
 
 ## Security advisory triage
 
