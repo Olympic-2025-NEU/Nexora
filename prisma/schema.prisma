@@ -1,6 +1,4 @@
-// D03 spike schema — minimal multi-schema models for TX/rollback evidence.
-// Full MVP models land in P01+ per database-schema-v1.md; do not treat this as production schema.
-
+// SPDX-License-Identifier: AGPL-3.0-only
 generator client {
   provider = "prisma-client-js"
 }
@@ -8,67 +6,71 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
-  schemas  = ["platform", "inventory", "trading"]
+  schemas  = ["platform"]
 }
 
-model SpikeAuditLog {
-  id         String   @id @db.Uuid
-  action     String
-  targetType String   @map("target_type")
-  targetId   String   @map("target_id") @db.Uuid
-  outcome    String
-  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+model AuditLog {
+  id             String   @id @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  actorSub       String?  @map("actor_sub")
+  clientId       String?  @map("client_id")
+  action         String
+  targetType     String   @map("target_type")
+  targetId       String   @map("target_id")
+  outcome        String
+  requestId      String   @map("request_id")
+  correlationId  String?  @map("correlation_id")
+  beforeSummary  Json     @default("{}") @map("before_summary") @db.JsonB
+  afterSummary   Json     @default("{}") @map("after_summary") @db.JsonB
 
-  @@map("spike_audit_log")
+  @@index([targetType, targetId, createdAt(sort: Desc)])
+  @@index([requestId])
+  @@index([createdAt(sort: Desc)])
+  @@map("audit_log")
   @@schema("platform")
 }
 
-model SpikeOutboxMessage {
+model Attachment {
+  id                String   @id @db.Uuid
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+  version           Int      @default(1)
+  ownerType         String   @map("owner_type")
+  ownerId           String?  @map("owner_id") @db.Uuid
+  bucket            String
+  objectKey         String   @map("object_key")
+  sha256Hex         String   @map("sha256_hex") @db.Char(64)
+  mimeType          String   @map("mime_type")
+  sizeBytes         BigInt   @map("size_bytes")
+  scanState         String   @map("scan_state")
+  visibility        String   @default("private")
+  createdBySub      String   @map("created_by_sub")
+  scannedAt         DateTime? @map("scanned_at") @db.Timestamptz(6)
+  scanEngineVersion String?  @map("scan_engine_version")
+
+  @@unique([bucket, objectKey])
+  @@index([ownerType, ownerId])
+  @@index([scanState, createdAt])
+  @@map("attachment")
+  @@schema("platform")
+}
+
+model CoreRecord {
   id            String   @id @db.Uuid
-  aggregateType String   @map("aggregate_type")
-  aggregateId   String   @map("aggregate_id") @db.Uuid
-  eventType     String   @map("event_type")
-  payloadJson   Json     @map("payload_json")
   createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+  version       Int      @default(1)
+  kind          String
+  sourceType    String   @map("source_type")
+  sourceId      String   @map("source_id")
+  payload       Json     @db.JsonB
+  visibility    String   @default("private")
+  policyVersion String   @map("policy_version")
+  checksumHex   String   @map("checksum_hex") @db.Char(64)
+  builtAt       DateTime @map("built_at") @db.Timestamptz(6)
 
-  @@map("spike_outbox_message")
+  @@unique([kind, sourceType, sourceId])
+  @@index([kind, builtAt(sort: Desc)])
+  @@map("core_record")
   @@schema("platform")
-}
-
-model SpikeStockBalance {
-  id          String   @id @db.Uuid
-  warehouseId String   @map("warehouse_id") @db.Uuid
-  batchId     String   @map("batch_id") @db.Uuid
-  quantity    Decimal  @db.Decimal(20, 3)
-  version     Int      @default(1)
-  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
-
-  @@unique([warehouseId, batchId])
-  @@map("spike_stock_balance")
-  @@schema("inventory")
-}
-
-model SpikeStockMovement {
-  id               String   @id @db.Uuid
-  warehouseId      String   @map("warehouse_id") @db.Uuid
-  batchId          String   @map("batch_id") @db.Uuid
-  delta            Decimal  @db.Decimal(20, 3)
-  sourceDocumentId String   @map("source_document_id") @db.Uuid
-  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-
-  @@unique([sourceDocumentId])
-  @@map("spike_stock_movement")
-  @@schema("inventory")
-}
-
-model SpikeDocument {
-  id        String   @id @db.Uuid
-  status    String
-  version   Int      @default(1)
-  quantity  Decimal  @db.Decimal(20, 3)
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
-
-  @@map("spike_document")
-  @@schema("trading")
 }
