@@ -32,3 +32,9 @@ Result: **PASS**
 | test:contracts | envelope PASS; openapi structure PASS (59 paths) |
 
 CI workflow: `.github/workflows/ci.yml` mirrors these steps.
+
+## Push / PR
+
+- Branch pushed: `origin/chore/p00-g00-close` @ `d17fd4f`
+- Open PR → `develop`: https://github.com/Olympic-2025-NEU/Nexora/compare/develop...chore/p00-g00-close?expand=1
+- Note: local `gh` CLI not installed; create PR via the compare URL (do not push to develop/main).
