@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { parseEnv } from "node:util";
 
 // Validate the full deployment contract before Compose interpolation, and the
@@ -156,7 +158,7 @@ export function validateConfig(env, service) {
   return config;
 }
 
-if (process.argv[1]?.endsWith("/deploy/config.mjs")) {
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
     const [mode, argument] = process.argv.slice(2);
     if (mode === "--file" && argument) validateConfig(parseEnv(readFileSync(argument, "utf8")));

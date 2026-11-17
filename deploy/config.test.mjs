@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { parseEnv } from "node:util";
 import { test } from "node:test";
 import { strict as assert } from "node:assert";
@@ -48,4 +50,12 @@ test("runtime processes fail before serving with named missing variables", () =>
 test("optional AI reference is checked when supplied or when provider enabled", () => {
   assert.throws(() => validateConfig({ ...examples[0], AI_KEY_REF: "invalid" }), { message: "Invalid or missing AI_KEY_REF" });
   assert.throws(() => validateConfig({ ...examples[0], AI_PROVIDER: "local" }), { message: "Invalid or missing AI_KEY_REF" });
+});
+
+test("CLI rejects unfilled example without displaying its placeholder", () => {
+  const result = spawnSync(process.execPath, [fileURLToPath(new URL("./config.mjs", import.meta.url)),
+    "--file", fileURLToPath(new URL("./instances/a.env.example", import.meta.url))], { encoding: "utf8" });
+  assert.equal(result.status, 1);
+  assert.equal(result.stderr.trim(), "Invalid or missing POSTGRES_PASSWORD");
+  assert.ok(!result.stderr.includes("CHANGE_ME_"));
 });
