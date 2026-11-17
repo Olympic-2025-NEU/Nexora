@@ -26,9 +26,9 @@
 
 ## P01-T04 — Bootstrap Keycloak, gateway, Flowable, storage
 
-- [ ] Keycloak realm/client import có thể lặp, tài khoản dev tạo an toàn, issuer/redirect URL cấu hình được; không commit admin password.
-- [ ] Gateway có bootstrap route health, upstream core API và Next ERP, cấu hình admin API nội bộ; Flowable REST nối DB bền vững và health; storage tạo bucket/quarantine và credential tách.
-- [ ] Kiểm tra startup ordering, crash/restart riêng từng service; không dùng H2 mặc định cho Flowable ở môi trường nghiệm thu.
+- [x] Keycloak realm/client import có thể lặp, tài khoản dev tạo an toàn, issuer/redirect URL cấu hình được; không commit admin password. Evidence: [evidence/p01-t04.md](evidence/p01-t04.md).
+- [x] Gateway có bootstrap route health, upstream core API và Next ERP, cấu hình admin API nội bộ; Flowable REST nối DB bền vững và health; storage tạo bucket/quarantine và credential tách. Evidence: [evidence/p01-t04.md](evidence/p01-t04.md).
+- [x] Kiểm tra startup ordering, crash/restart riêng từng service; không dùng H2 mặc định cho Flowable ở môi trường nghiệm thu. Evidence: [evidence/p01-t04.md](evidence/p01-t04.md).
 - **Đầu ra:** service boots có persistence; **kiểm chứng:** restart container vẫn giữ realm/process test/bucket và gateway route.
 
 ## P01-T05 — Env, cấu hình và secret hygiene
