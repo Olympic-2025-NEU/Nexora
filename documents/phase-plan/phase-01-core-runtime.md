@@ -40,9 +40,9 @@
 
 ## P01-T06 — Health, logs và seed hạ tầng
 
-- [ ] `live` phản ánh process; `ready` của **từng service** kiểm đúng dependency của nó bằng timeout (app không gọi ngược gateway gây vòng readiness). Smoke tổng hợp bên ngoài kiểm PG/gateway/Keycloak/core API/Flowable/storage; tránh trả `ok` tĩnh hoặc tiết lộ nội bộ công khai.
-- [ ] Request/correlation ID qua gateway/app/worker, log JSON redacted; metrics cơ bản service up và worker queue depth (worker logic P04).
-- [ ] Seed chỉ dữ liệu dev hạ tầng, idempotent; không seed user/secret production vào repo.
+- [x] `live` phản ánh process; `ready` của **từng service** kiểm đúng dependency của nó bằng timeout (app không gọi ngược gateway gây vòng readiness). Smoke tổng hợp bên ngoài kiểm PG/gateway/Keycloak/core API/Flowable/storage; tránh trả `ok` tĩnh hoặc tiết lộ nội bộ công khai. Evidence: [evidence/p01-t06.md](evidence/p01-t06.md).
+- [x] Request/correlation ID qua gateway/app/worker, log JSON redacted; metrics cơ bản service up và worker queue depth (worker logic P04). Evidence: [evidence/p01-t06.md](evidence/p01-t06.md).
+- [x] Seed chỉ dữ liệu dev hạ tầng, idempotent; không seed user/secret production vào repo. Evidence: [evidence/p01-t06.md](evidence/p01-t06.md).
 - **Đầu ra:** health/log baseline; **kiểm chứng:** tắt PG hoặc Flowable, readiness thay đổi có lý do và không lộ secret.
 
 ## P01-T07 — Gate G01 cài lại độc lập

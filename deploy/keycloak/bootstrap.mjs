@@ -35,6 +35,7 @@ async function request(path, token, method = 'GET', body) {
 }
 
 async function main() {
+  let changes = 0;
   let token;
   for (let attempt = 0; attempt < 60; attempt++) {
     try {
@@ -57,28 +58,44 @@ async function main() {
   });
   if (!existing) {
     await request('/admin/realms', token, 'POST', realm);
+    changes++;
   } else {
     for (const client of realm.clients) {
       const found = await request(`/admin/realms/${realm.realm}/clients?clientId=${encodeURIComponent(client.clientId)}`, token);
-      if (found.length) await request(`/admin/realms/${realm.realm}/clients/${found[0].id}`, token, 'PUT', { ...found[0], ...client });
-      else await request(`/admin/realms/${realm.realm}/clients`, token, 'POST', client);
+      if (found.length) {
+        const current = await request(`/admin/realms/${realm.realm}/clients/${found[0].id}`, token);
+        const changed = Object.entries(client).some(([key, value]) =>
+          JSON.stringify(key === 'attributes' ? Object.fromEntries(Object.keys(value).map((name) => [name, current.attributes?.[name]])) : current[key]) !== JSON.stringify(value));
+        if (changed) {
+          await request(`/admin/realms/${realm.realm}/clients/${current.id}`, token, 'PUT', { ...current, ...client });
+          changes++;
+        }
+      }
+      else {
+        await request(`/admin/realms/${realm.realm}/clients`, token, 'POST', client);
+        changes++;
+      }
     }
   }
   if (process.env.KC_DEV_USER_PASSWORD) {
     const username = required('KC_DEV_USERNAME');
     const users = await request(`/admin/realms/${realm.realm}/users?username=${encodeURIComponent(username)}&exact=true`, token);
-    if (!users.length) await request(`/admin/realms/${realm.realm}/users`, token, 'POST', {
+    if (!users.length) {
+      await request(`/admin/realms/${realm.realm}/users`, token, 'POST', {
       username, enabled: true,
       credentials: [{ type: 'password', value: process.env.KC_DEV_USER_PASSWORD, temporary: true }],
-    });
+      });
+      changes++;
+    }
     const userId = users[0]?.id ?? (await request(`/admin/realms/${realm.realm}/users?username=${encodeURIComponent(username)}&exact=true`, token))[0].id;
     const role = await request(`/admin/realms/${realm.realm}/roles/staff`, token);
     const assigned = await request(`/admin/realms/${realm.realm}/users/${userId}/role-mappings/realm`, token);
     if (!assigned.some((item) => item.id === role.id)) {
       await request(`/admin/realms/${realm.realm}/users/${userId}/role-mappings/realm`, token, 'POST', [role]);
+      changes++;
     }
   }
-  console.log(`Keycloak realm ${realm.realm}: clients and optional dev user ready`);
+  console.log(`Keycloak realm ${realm.realm}: clients and optional dev user ready; changes=${changes}`);
 }
 
 main().catch((error) => { console.error(error.message); process.exitCode = 1; });

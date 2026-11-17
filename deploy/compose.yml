@@ -275,6 +275,8 @@ services:
       DATABASE_URL: ${APP_DATABASE_URL}
       FLOWABLE_BASE_URL: ${FLOWABLE_BASE_URL}
       REDIS_URL: ${REDIS_URL}
+      FLOWABLE_ADMIN_USER: ${FLOWABLE_ADMIN_USER}
+      FLOWABLE_ADMIN_PASSWORD: ${FLOWABLE_ADMIN_PASSWORD}
     depends_on:
       db-migrate:
         condition: service_completed_successfully
@@ -297,6 +299,7 @@ services:
       S3_ACCESS_KEY: ${S3_ACCESS_KEY}
       S3_SECRET_KEY: ${S3_SECRET_KEY}
       S3_BUCKET_PRIVATE: ${S3_BUCKET_PRIVATE}
+      S3_REGION: ${S3_REGION}
     depends_on:
       db-migrate:
         condition: service_completed_successfully

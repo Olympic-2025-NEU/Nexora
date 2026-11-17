@@ -19,6 +19,11 @@ const identities = Object.entries(policy).map(([name, actions]) => ({
 if (new Set(identities.map((identity) => identity.credentials[0].accessKey)).size !== identities.length) {
   throw new Error('S3 consumer access keys must be unique');
 }
-writeFileSync('/config/s3.json', JSON.stringify({ identities }), { mode: 0o644 });
-chmodSync('/config/s3.json', 0o644);
-console.log('SeaweedFS: per-consumer S3 config ready');
+const content = JSON.stringify({ identities });
+let previous;
+try { previous = readFileSync('/config/s3.json', 'utf8'); } catch (error) { if (error.code !== 'ENOENT') throw error; }
+if (previous !== content) {
+  writeFileSync('/config/s3.json', content, { mode: 0o644 });
+  chmodSync('/config/s3.json', 0o644);
+}
+console.log(`SeaweedFS: per-consumer S3 config ready; changes=${Number(previous !== content)}`);
