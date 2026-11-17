@@ -34,6 +34,7 @@
 
 ## Quy tắc chạy phase
 
+- **Nhánh Git:** `phase-XX` tích hợp phase; task trên `phase-XX/<Pxx-Tyy-slug>`; PR task → `phase-XX`, rồi `phase-XX` → `develop`. Chi tiết: `../../AGENTS.md` và `.cursor/rules/nexora-git-branch.mdc`.
 - Task ID dạng `Pxx-Tyy` là ổn định. Khi làm việc, ghi PR/commit và bằng chứng test ở issue hoặc nhật ký thực hiện; đừng biến tài liệu kế hoạch thành báo cáo giả.
 - Mỗi task có checklist gốc và **Hồ sơ giao AI theo từng task** ngay cuối file phase: path/đầu ra cụ thể, contract liên quan và phép thử phải pass. Đọc cả hai phần khi giao AI; tách PR theo lát cắt có thể kiểm thử.
 - Không bắt đầu phase phụ thuộc khi gate phase trước chưa đạt. Có thể nghiên cứu hoặc thiết kế trước, nhưng không đánh dấu Done cho đường găng.

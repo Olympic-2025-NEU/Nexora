@@ -42,6 +42,18 @@ Use project skills under `.cursor/skills/` when relevant:
 - `nexora-federation-events`
 - `nexora-ai-tools`
 
+## Git branch before work
+
+Tree: `main` ← `develop` ← `phase-XX` ← `phase-XX/<task-slug>`.
+
+1. Run `git branch --show-current` and `git status --short --branch`.
+2. Do not commit or push directly to `main` or `develop`.
+3. Phase work: ensure integration branch `phase-XX` (from `develop`), then task branch `phase-XX/pxx-tyy-slug`. PR **task → phase-XX**, then **phase-XX → develop**. Use `phase-00` … `phase-13` (not `phrase-`).
+4. If the current branch is unrelated / other phase, switch; if the tree is dirty with unrelated changes, stop and report unless the user already directed a switch/stash.
+5. Hotfix only: `hotfix/*` may target `develop` when the user says so.
+
+See `.cursor/rules/nexora-git-branch.mdc`.
+
 ## Hard constraints
 
 - Self-hosted single-org per instance; not SaaS multi-tenant.
