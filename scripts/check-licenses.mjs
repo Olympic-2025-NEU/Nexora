@@ -12,6 +12,9 @@ const knownExpressions = new Set([
 ]);
 
 const lockBytes = readFileSync(LOCKFILE);
+// Git may check out CRLF on Windows and LF on Linux. Inventory the normalized
+// repository content so the same committed lockfile has one cross-OS digest.
+const normalizedLockBytes = Buffer.from(lockBytes.toString("utf8").replaceAll("\r\n", "\n"));
 const lock = JSON.parse(lockBytes);
 if (lock.lockfileVersion !== 3 || !lock.packages) {
   throw new Error("Expected npm lockfile v3 with package entries");
@@ -28,7 +31,7 @@ const packages = Object.entries(lock.packages)
     dev: Boolean(entry.dev),
     optional: Boolean(entry.optional),
   }))
-  .sort((a, b) => a.path.localeCompare(b.path));
+  .sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
 
 const incomplete = packages.filter((entry) =>
   !entry.version || !entry.license || !entry.integrity ||
@@ -43,7 +46,7 @@ if (incomplete.length || unknown.length) {
 
 const inventory = {
   source: LOCKFILE,
-  lockSha256: createHash("sha256").update(lockBytes).digest("hex"),
+  lockSha256: createHash("sha256").update(normalizedLockBytes).digest("hex"),
   packageCount: packages.length,
   packages,
 };
