@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import http from "node:http";
+import { validateConfig } from "./config.mjs";
+
+validateConfig(process.env, "core-data");
 
 const port = Number(process.env.PORT || 8080);
 

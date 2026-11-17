@@ -2,8 +2,9 @@
 # Core Data/File API stub image (P01). Product API surface lands in P03.
 FROM node:22-bookworm-slim@sha256:e9f565d32859f0cbfb52125eafe8be39390f24dac302dc3cdf566e8ba3ab21ee
 WORKDIR /app
-COPY package.json ./
-COPY server.js ./
+COPY services/core-data/package.json ./
+COPY services/core-data/server.js ./
+COPY deploy/config.mjs ./config.mjs
 RUN npm install --omit=dev \
   && groupadd --system --gid 1001 nexora \
   && useradd --system --uid 1001 --gid nexora nexora \

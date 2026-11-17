@@ -289,8 +289,8 @@ services:
   core-data:
     profiles: ["apps"]
     build:
-      context: ../services/core-data
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: services/core-data/Dockerfile
     environment:
       CORE_DATABASE_URL: ${CORE_DATABASE_URL}
       S3_ENDPOINT: ${S3_ENDPOINT}

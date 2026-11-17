@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
+    "start": "node deploy/config.mjs --runtime erp && next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "db:generate": "prisma generate",
@@ -14,7 +14,7 @@
     "db:migrate:dev": "prisma migrate dev",
     "check:spdx": "node scripts/check-spdx.mjs",
     "test:contracts": "node scripts/validate-contracts.mjs",
-    "test": "npm run check:spdx && npm run test:contracts"
+    "test": "npm run check:spdx && npm run test:contracts && node --test deploy/config.test.mjs"
   },
   "dependencies": {
     "@prisma/client": "6.19.0",
