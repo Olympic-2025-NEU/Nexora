@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { Actor } from "../identity/actor";
 
 /** Phạm vi dòng, cùng nghĩa với DX-OS: all, read, own, unit, assigned. */

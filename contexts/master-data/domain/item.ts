@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { DomainError } from "@/platform/kernel/errors";
 import type { TenantId } from "@/platform/kernel/id";
 

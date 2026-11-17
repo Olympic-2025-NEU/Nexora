@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { TenantId } from "../kernel/id";
 
 /** Byte nằm ở object storage. Bảng platform.attachment chỉ giữ siêu dữ liệu. */

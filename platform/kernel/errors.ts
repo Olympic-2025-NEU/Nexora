@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 export class DomainError extends Error {
   readonly code: string;
   readonly httpStatus: number;
