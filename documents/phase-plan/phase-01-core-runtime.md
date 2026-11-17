@@ -19,9 +19,9 @@
 
 ## P01-T03 — PostgreSQL và migration runner
 
-- [ ] Một PG instance stack có DB/role riêng cho app, Keycloak và Flowable; cấp quyền tối thiểu. Không dùng DB `postgres` chung cho mọi service.
-- [ ] Chọn migration tool theo D03, tạo bảng version và script bootstrap; migration chạy một lần an toàn khi restart, không dựa initdb file chỉ chạy lúc volume rỗng.
-- [ ] Test từ DB trống và DB đã migrate; backup/restore bản nền; bảo vệ credential qua env/secret reference.
+- [x] Một PG instance stack có DB/role riêng cho app, Keycloak và Flowable; cấp quyền tối thiểu. Không dùng DB `postgres` chung cho mọi service. Evidence: [evidence/p01-t03.md](evidence/p01-t03.md).
+- [x] Chọn migration tool theo D03, tạo bảng version và script bootstrap; migration chạy một lần an toàn khi restart, không dựa initdb file chỉ chạy lúc volume rỗng. Evidence: [evidence/p01-t03.md](evidence/p01-t03.md).
+- [x] Test từ DB trống và DB đã migrate; backup/restore bản nền; bảo vệ credential qua env/secret reference. Evidence: [evidence/p01-t03.md](evidence/p01-t03.md).
 - **Đầu ra:** migration workflow; **kiểm chứng:** repeat deploy không drop dữ liệu và migration history đúng.
 
 ## P01-T04 — Bootstrap Keycloak, gateway, Flowable, storage
