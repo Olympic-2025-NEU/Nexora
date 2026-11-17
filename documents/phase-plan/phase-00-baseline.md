@@ -51,7 +51,8 @@
 ## P00-T07 — Gate G00
 
 - [ ] Hai người review và ký `evidence/G00.md` (Status hiện **READY FOR REVIEW**).
-- [x] Gói kỹ thuật: ADR promote D01/D02/D04/D06/D15 + Prisma D03; CI; SPDX; contracts; không claim M01–M04 Done.
+- [x] Gói kỹ thuật: ADR D01–D08/D14/D15 đối chiếu evidence và owner runtime (D03 = Prisma); AGPL/SPDX/lockfile inventory; clean CI + negative guards; API/event contract v1. Không claim M01–M04 Done.
+- [ ] Kiểm GitHub Actions của nhánh remediation sau push và ghi kết quả vào `evidence/G00.md`.
 - **Bằng chứng:** `evidence/G00.md`, ADR, baseline, scope, license inventory, contract-validate.
 
 ## Hồ sơ giao AI theo từng task

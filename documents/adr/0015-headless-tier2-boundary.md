@@ -35,7 +35,7 @@ Core Data/File API (services/core-data) is headless — no UI. ERP Next.js owns 
 ## Contract impact
 
 - See phase-plan docs linked from decision-log for this ID.
-- Machine-readable stubs may live under `contracts/` as `v1-provisional`.
+- Core record/file target routes and record schemas are versioned under `contracts/`; the product Core API is still P01/P03 work.
 
 ## Spike evidence
 
@@ -45,5 +45,3 @@ Core Data/File API (services/core-data) is headless — no UI. ERP Next.js owns 
 - [x] Product Core Data/File API still P01/P03
 
 **Evidence links:** ../phase-plan/evidence/spikes/infra/README.md + D15-headless-core-boundary.md
-
-**Evidence links:** _(none yet — Dev attaches logs/commits here)_

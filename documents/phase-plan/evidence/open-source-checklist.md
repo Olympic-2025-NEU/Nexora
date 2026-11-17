@@ -6,7 +6,7 @@
 | Contributors' right to license Nexora scaffold | Team confirmed 2026-11-17 | User confirmed agreement from contributors in this work session; G00 reviewers verify contributor list. |
 | Exact SPDX on authored source/config | Checked | `npm run check:spdx`, [source inventory](./source-inventory.json); generated/legacy SQL excluded explicitly. |
 | Starter assets/font provenance | Addressed for current tree | Removed unused starter SVG/favicon and Google font import; `NOTICE` records remaining starter origin. |
-| Full npm dependency provenance | Checked from lockfile | `npm run check:licenses`, [503-entry inventory](./npm-license-inventory.json). Metadata does not itself prove legal compatibility. |
+| Full npm dependency provenance | Checked from lockfile | `npm run check:licenses`, [505-entry inventory](./npm-license-inventory.json). Metadata does not itself prove legal compatibility. |
 | Third-party attribution | Prepared | Repo-root `NOTICE`; recheck actual bundled packages/assets for each release. |
 | Tracked-file secret scan | Checked | `npm run check:secrets` in CI plus `.gitignore` for `.env*`; scanner covers known token/key formats and is not a full history scan. |
 | Public repo and issue tracker | Present | https://github.com/Olympic-2025-NEU/Nexora and https://github.com/Olympic-2025-NEU/Nexora/issues. |

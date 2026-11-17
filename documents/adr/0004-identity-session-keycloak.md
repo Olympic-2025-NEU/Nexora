@@ -35,7 +35,7 @@ Keycloak OIDC. Browser: authorization-code + PKCE. App re-validates token/claims
 ## Contract impact
 
 - See phase-plan docs linked from decision-log for this ID.
-- Machine-readable stubs may live under `contracts/` as `v1-provisional`.
+- The current target API/auth matrix is `contracts/openapi/nexora-v1.yaml`; BFF/session and membership enforcement remain P02 runtime work.
 
 ## Spike evidence
 
@@ -45,5 +45,3 @@ Keycloak OIDC. Browser: authorization-code + PKCE. App re-validates token/claims
 - [x] P02 still owns HTTPS issuer/session cookie production
 
 **Evidence links:** ../phase-plan/evidence/spikes/infra/README.md + D04-identity-session.md
-
-**Evidence links:** _(none yet — Dev attaches logs/commits here)_

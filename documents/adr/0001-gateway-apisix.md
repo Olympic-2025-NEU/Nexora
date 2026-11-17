@@ -35,7 +35,7 @@ Use Apache APISIX as default-deny API Gateway with OIDC plugin integrated with K
 ## Contract impact
 
 - See phase-plan docs linked from decision-log for this ID.
-- Machine-readable stubs may live under `contracts/` as `v1-provisional`.
+- The current machine-readable target API is `contracts/openapi/nexora-v1.yaml`; the P00 gateway spike used a mock upstream.
 
 ## Spike evidence
 
@@ -45,5 +45,3 @@ Use Apache APISIX as default-deny API Gateway with OIDC plugin integrated with K
 - [x] RAM/license recorded in D01-api-gateway.md
 
 **Evidence links:** ../phase-plan/evidence/spikes/infra/README.md + D01-api-gateway.md
-
-**Evidence links:** _(none yet — Dev attaches logs/commits here)_

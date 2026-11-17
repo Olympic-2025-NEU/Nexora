@@ -12,7 +12,7 @@ Origin lot ID local do server cấp bất biến. `local_code` chỉ unique `(pr
 
 ## Spike và phép thử
 
-PostgreSQL 17.12 trong container D03; lệnh SQL/result:
+PostgreSQL trong spike SQL phase-00; lệnh SQL/result dưới đây kiểm semantics của kiểu `numeric`, còn spike Prisma SoT dùng `postgres:17.6` và được ghi riêng tại `evidence/spike-d03.md`:
 
 ```text
 SELECT '1.2345'::numeric(20,3), '1.2344'::numeric(20,3);
