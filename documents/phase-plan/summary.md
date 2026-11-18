@@ -6,7 +6,7 @@
 - `package.json`: Next.js 16, React 19, TypeScript, Tailwind; chưa có các dependency nghiệp vụ.
 - `app/page.tsx`: placeholder Nexora; health `live`/`ready` nằm ở `app/api/v1/health/`.
 - `deploy/compose.yml`: topology P01 (gateway publish loopback; PG/Keycloak/Flowable/SeaweedFS/Redis/ClamAV internal). Prisma Migrate platform baseline đã có (`prisma-migration-spec.md`, D03).
-- G00 **CLOSED** trên `phase-01` theo owner waiver 2026-11-17. Bằng chứng runtime P01 nằm ở `evidence/p01-t01.md` … `evidence/G01.md`.
+- G00 **CLOSED** trên `phase-01` theo owner waiver 2026-11-17. G01 **CLOSED** 2026-11-18 theo owner waiver (agent reinstall A/B làm bằng chứng kỹ thuật). Bằng chứng runtime P01: `evidence/p01-t01.md` … `evidence/G01.md`.
 - `contexts/sales|procurement|finance|master-data`: scaffold cũ, không tính là M01–M04. `contexts/inventory` hiện chỉ có reservation guard.
 - `LICENSE`, `NOTICE`, `CHANGELOG.md`, SPDX trên nguồn viết, repo và issue tracker công khai đã được kiểm trong T04; bản phát hành/PoF vẫn thuộc P13.
 

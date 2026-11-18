@@ -4,6 +4,11 @@ Các thay đổi của Nexora sẽ được ghi tại đây. Chưa có bản ph�
 
 ## Unreleased
 
+### Phase 01 runtime
+
+- Synced full P01 runtime package onto `phase-01` (Compose topology, Prisma migrate, bootstraps, health/smoke).
+- Closed Gate G01 under owner waiver (technical agent A/B reinstall retained; independent human teammate waived).
+
 ### Phase 00 remediation
 
 - Removed unused starter branding and Google font import; recorded source and dependency provenance.
