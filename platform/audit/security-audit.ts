@@ -81,6 +81,19 @@ export interface AuditEvent {
   detail?: string;
 }
 
+function safeRequestId(value: string | null): string | null {
+  return value && /^[A-Za-z0-9_-]{1,128}$/.test(value) ? value : null;
+}
+
+function safeReasonCode(value?: string): string | undefined {
+  if (!value) return undefined;
+  return /^[A-Z][A-Z0-9_]{0,63}$/.test(value) ? value : "REDACTED_DETAIL";
+}
+
+function safeAction(value: string): string {
+  return /^[A-Za-z0-9._:-]{1,100}$/.test(value) ? value : "unknown";
+}
+
 /**
  * Log a policy deny event.
  * Always logged (even if deny is expected) for security visibility.
@@ -93,11 +106,11 @@ export function auditDeny(
 ): void {
   const event: AuditEvent = {
     timestamp: new Date().toISOString(),
-    requestId,
-    action,
+    requestId: safeRequestId(requestId),
+    action: safeAction(action),
     outcome: "deny",
     actor: actorSummary(actor),
-    detail: detail ? redact(detail) : undefined,
+    detail: safeReasonCode(detail),
   };
   // Use structured JSON output — never use string interpolation that could leak tokens.
   console.warn(JSON.stringify({ service: "nexora-security-audit", ...event }));
@@ -114,10 +127,46 @@ export function auditAccess(
 ): void {
   const event: AuditEvent = {
     timestamp: new Date().toISOString(),
-    requestId,
-    action,
+    requestId: safeRequestId(requestId),
+    action: safeAction(action),
     outcome,
     actor: actorSummary(actor),
   };
   console.info(JSON.stringify({ service: "nexora-security-audit", ...event }));
+}
+
+/** Failure is logged outside the rolled-back business transaction. */
+export function auditFailure(
+  actor: AuditActor,
+  action: string,
+  requestId: string | null,
+  reasonCode: string,
+): void {
+  const event: AuditEvent = {
+    timestamp: new Date().toISOString(),
+    requestId: safeRequestId(requestId),
+    action: safeAction(action),
+    outcome: "failure",
+    actor: actorSummary(actor),
+    detail: safeReasonCode(reasonCode),
+  };
+  console.warn(JSON.stringify({ service: "nexora-security-audit", ...event }));
+}
+
+/** Auth failures have no verified actor; log only a bounded code and request ID. */
+export function auditAuthenticationFailure(
+  action: string,
+  requestId: string | null,
+  reasonCode: string,
+  outcome: "deny" | "failure" = "deny",
+): void {
+  const event: AuditEvent = {
+    timestamp: new Date().toISOString(),
+    requestId: safeRequestId(requestId),
+    action: safeAction(action),
+    outcome,
+    actor: { type: "unauthenticated" },
+    detail: safeReasonCode(reasonCode),
+  };
+  console.warn(JSON.stringify({ service: "nexora-security-audit", ...event }));
 }

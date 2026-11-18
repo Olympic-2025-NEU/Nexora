@@ -4194,7 +4194,7 @@ paths:
         - Operations
       operationId: getAuditLogs
       summary: Query audit logs
-      description: Target contract; runtime implementation is tracked by the owning phase.
+      description: Administrator-only audit query. Filters are allowlisted and summaries are never returned.
       security:
         - oidc: []
       x-nexora-roles:
@@ -4215,7 +4215,12 @@ paths:
           in: query
           schema:
             type: string
-            format: uuid
+            maxLength: 128
+        - name: requestId
+          in: query
+          schema:
+            type: string
+            maxLength: 128
         - name: from
           in: query
           schema:
@@ -4251,6 +4256,8 @@ paths:
                     type: string
                   page:
                     $ref: "#/components/schemas/Page"
+        "400":
+          $ref: "#/components/responses/Error"
         "401":
           $ref: "#/components/responses/Error"
         "403":
@@ -6297,6 +6304,8 @@ components:
         outcome:
           type: string
         requestId:
+          type: string
+        correlationId:
           type: string
     InventorySummary:
       type: object

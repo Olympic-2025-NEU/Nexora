@@ -18,9 +18,9 @@
 
 ## P03-T03 — Audit bất biến và correlation
 
-- [ ] `AuditRecorder` ghi actor/service, action, target, outcome, request/correlation ID, timestamp và snapshot tối thiểu đã redacted.
-- [ ] Ghi audit trong cùng transaction với action thành công; deny/failure security log riêng không làm rò token/PII. DB role runtime không được UPDATE/DELETE audit đã ghi nếu policy append-only.
-- [ ] Tài liệu retention/export và truy vấn theo document/message ID cho điều tra.
+- [x] `AuditRecorder` ghi actor/service, action, target, outcome, request/correlation ID, timestamp và snapshot tối thiểu đã redacted.
+- [x] Ghi audit trong cùng transaction với action thành công; deny/failure security log riêng không làm rò token/PII. DB role runtime không được UPDATE/DELETE audit đã ghi nếu policy append-only.
+- [x] Tài liệu retention/export và truy vấn theo document/message ID cho điều tra. Bằng chứng: [evidence/p03-t03.md](./evidence/p03-t03.md). Confirm/cancel/partner/AI thật phải được kiểm ở phase sở hữu use case.
 - **Đầu ra:** audit adapter + truy vấn quản trị; **kiểm chứng:** confirm/cancel/partner connection/AI tool có dấu vết, secret không xuất hiện trong log.
 
 ## P03-T04 — S3-compatible object storage

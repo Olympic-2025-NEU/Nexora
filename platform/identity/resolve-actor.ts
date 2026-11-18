@@ -56,7 +56,7 @@ export async function resolveActor(
   if (!membership) {
     throw new ActorResolutionError(
       "MEMBERSHIP_NOT_FOUND",
-      `No membership found for sub ${claims.sub}`,
+      "No active membership found for authenticated user",
       403,
     );
   }
@@ -64,7 +64,7 @@ export async function resolveActor(
   if (membership.status !== "active") {
     throw new ActorResolutionError(
       "MEMBERSHIP_INACTIVE",
-      `Membership status is ${membership.status} for sub ${claims.sub}`,
+      `Membership status is ${membership.status}`,
       403,
     );
   }
@@ -75,7 +75,7 @@ export async function resolveActor(
     // Intentionally not throwing — DB membership is source of truth; token may lag.
     // Caller can audit this via structured logging.
     console.warn(
-      `[resolve-actor] Token realm roles [${tokenRoles.join(",")}] do not include DB role '${membership.role}' for sub ${claims.sub}`,
+      `[resolve-actor] Token realm roles differ from DB role '${membership.role}' for sub prefix ${claims.sub.slice(0, 8)}`,
     );
   }
 

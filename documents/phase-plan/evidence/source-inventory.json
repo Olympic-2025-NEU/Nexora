@@ -5,6 +5,7 @@
     "prisma/migrations/**"
   ],
   "files": [
+    "app/api/v1/audit-logs/route.ts",
     "app/api/v1/federation/acks/route.ts",
     "app/api/v1/federation/events/route.ts",
     "app/api/v1/health/live/route.ts",
@@ -18,6 +19,7 @@
     "app/page.tsx",
     "apps/dx-lab/server.js",
     "components/shell/areas.ts",
+    "composition/audit.ts",
     "composition/context-map.ts",
     "contexts/finance/domain/invoice.ts",
     "contexts/finance/index.ts",
@@ -52,7 +54,12 @@
     "next.config.ts",
     "platform/access/policy.ts",
     "platform/access/scope.ts",
+    "platform/audit/audit-query.ts",
     "platform/audit/audit-recorder.ts",
+    "platform/audit/audit.test.ts",
+    "platform/audit/http-handler.ts",
+    "platform/audit/prisma-audit-query.ts",
+    "platform/audit/prisma-audit-recorder.ts",
     "platform/audit/security-audit.ts",
     "platform/files/file-store.ts",
     "platform/http/pipeline.ts",
@@ -92,6 +99,7 @@
     "tests/gateway/policy.test.mjs",
     "tests/gateway/private.test.mjs",
     "tests/gateway/public.test.mjs",
+    "tests/platform/audit.integration.test.ts",
     "tests/platform/schema.integration.mjs",
     "tests/platform/transaction.integration.test.ts",
     "worker/entrypoint.js"

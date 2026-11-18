@@ -6,10 +6,11 @@ import { join } from "node:path";
 const scripts = {
   schema: "tests/platform/run-schema.sh",
   transaction: "tests/platform/run-unit-of-work.sh",
+  audit: "tests/platform/run-audit.sh",
 };
 const script = scripts[process.argv[2]];
 if (!script) {
-  console.error("Expected platform test: schema or transaction");
+  console.error("Expected platform test: schema, transaction or audit");
   process.exit(2);
 }
 

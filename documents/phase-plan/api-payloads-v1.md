@@ -89,7 +89,7 @@ AI service chỉ gọi allowlist `getLot`, `getStock`, `getTrace`, `createReceip
 
 | Method/path | Request | Response/rule |
 | --- | --- | --- |
-| `GET /api/v1/audit-logs` | `?cursor&limit&action&targetType&targetId&from&to&outcome` — filter allowlist | Administrator: `{id,createdAt,actorSub,clientId,action,targetType,targetId,outcome,requestId}` không secret/PII trong summary |
+| `GET /api/v1/audit-logs` | `?cursor&limit&action&targetType&targetId&requestId&from&to&outcome` — filter allowlist; `targetId` là text <=128 vì message ID có thể không phải UUID | Administrator: `{data:[{id,createdAt,actorSub?,clientId?,action,targetType,targetId,outcome,requestId,correlationId?}],requestId,page:{limit,nextCursor?}}`; không trả summary chứa secret/PII |
 | `GET /api/v1/reports/inventory-summary` | `?warehouseId&productId&cursor&limit` | Staff+/Admin theo warehouse scope: `{warehouseId,productId,batchId,quantity,unit}` aggregate/list; sort allowlist |
 | `GET /api/v1/reports/document-counts` | `?from&to&type&status` | Actor authenticated với scope: `{documentType,status,count}[]`; không lộ chứng từ ngoài quyền |
 | `GET /api/v1/reports/open-quality-signals` | `?severity&cursor&limit` | Admin (và Staff nếu policy mở): `{id,ruleId,sourceType,sourceId,severity,state,lastDetectedAt}` từ quality_issue mở; P12 đầy đủ |

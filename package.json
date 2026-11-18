@@ -22,8 +22,10 @@
     "test:platform:schema": "node scripts/run-platform-test.mjs schema",
     "test:transaction:unit": "node --test --require tsx/cjs platform/persistence/transaction.test.ts",
     "test:platform:transaction": "node scripts/run-platform-test.mjs transaction",
+    "test:audit:unit": "node --test --require tsx/cjs platform/audit/audit.test.ts",
+    "test:platform:audit": "node scripts/run-platform-test.mjs audit",
     "test:gateway": "node --test tests/gateway/private.test.mjs tests/gateway/public.test.mjs tests/gateway/m2m.test.mjs tests/gateway/policy.test.mjs",
-    "test": "npm run check:spdx && npm run check:licenses && npm run check:secrets && npm run test:contracts && node --test deploy/config.test.mjs && npm run test:identity && npm run test:gateway && npm run test:transaction:unit"
+    "test": "npm run check:spdx && npm run check:licenses && npm run check:secrets && npm run test:contracts && node --test deploy/config.test.mjs && npm run test:identity && npm run test:gateway && npm run test:transaction:unit && npm run test:audit:unit"
   },
   "dependencies": {
     "@prisma/client": "6.19.0",

@@ -1,14 +1,21 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import type { OrganizationId, UserId } from "../kernel/id";
+/** Trusted identity from the verified user or service context, never request JSON. */
+export type AuditIdentity =
+  | { kind: "user"; sub: string }
+  | { kind: "service"; clientId: string };
 
 export type AuditEntry = {
-  organizationId: OrganizationId;
-  actorId: UserId;
+  actor: AuditIdentity;
   action: string;
   targetType: string;
   targetId: string;
+  requestId: string;
+  correlationId?: string;
+  before?: unknown;
+  after?: unknown;
 };
 
-export type AuditRecorder = {
-  record(entry: AuditEntry): Promise<void>;
+/** The caller supplies the same transaction context as the aggregate write. */
+export type AuditRecorder<Context = unknown> = {
+  record(context: Context, entry: AuditEntry): Promise<string>;
 };
