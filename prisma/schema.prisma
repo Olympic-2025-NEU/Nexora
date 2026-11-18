@@ -121,3 +121,56 @@ model Membership {
   @@map("membership")
   @@schema("system")
 }
+
+// ---------------------------------------------------------------------------
+// system schema — P02-T04 partner federation (database-schema-v1.md § P05)
+// ---------------------------------------------------------------------------
+
+model Partner {
+  id               String    @id @db.Uuid
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+  version          Int       @default(1)
+  /// Keycloak issuer URL of the remote instance; enforces uniqueness per partner.
+  issuerInstanceId String    @unique @map("issuer_instance_id")
+  code             String    @unique
+  displayName      String    @map("display_name")
+  status           String    @default("active")
+  contactEmail     String?   @map("contact_email")
+  createdBySub     String    @map("created_by_sub")
+
+  connection       PartnerConnection?
+
+  @@map("partner")
+  @@schema("system")
+}
+
+model PartnerConnection {
+  id                   String    @id @db.Uuid
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+  version              Int       @default(1)
+  partnerId            String    @unique @map("partner_id") @db.Uuid
+  /// Remote API endpoint for outbound events.
+  endpointUrl          String    @map("endpoint_url")
+  /// Token endpoint of the remote Keycloak realm (outbound M2M).
+  outboundTokenUrl     String    @map("outbound_token_url")
+  /// Client ID granted by the remote realm for outbound calls.
+  outboundClientId     String    @map("outbound_client_id")
+  /// Reference to secret store key (never stored plaintext).
+  outboundSecretRef    String    @map("outbound_secret_ref")
+  /// Expected audience when calling remote.
+  outboundAudience     String    @map("outbound_audience")
+  /// Client ID registered in this local Keycloak realm for the partner's inbound calls.
+  inboundClientId      String    @unique @map("inbound_client_id")
+  /// Scope the partner must present on inbound tokens.
+  allowedInboundScope  String    @default("federation:write") @map("allowed_inbound_scope")
+  status               String    @default("active")
+  lastVerifiedAt       DateTime? @map("last_verified_at") @db.Timestamptz(6)
+  rotatedAt            DateTime? @map("rotated_at") @db.Timestamptz(6)
+
+  partner              Partner   @relation(fields: [partnerId], references: [id])
+
+  @@map("partner_connection")
+  @@schema("system")
+}

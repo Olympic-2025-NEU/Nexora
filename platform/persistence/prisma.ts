@@ -13,3 +13,8 @@ export const prisma =
 if (process.env.NODE_ENV !== "production") {
   globalForPrisma.nexoraPrisma = prisma;
 }
+
+/** Convenience accessor — preferred in route handlers (testable). */
+export function getPrismaClient(): PrismaClient {
+  return prisma;
+}
