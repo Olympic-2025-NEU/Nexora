@@ -4,6 +4,25 @@ Các thay đổi của Nexora sẽ được ghi tại đây. Chưa có bản ph�
 
 ## Unreleased
 
+### Phase 02 — P02-T02 through P02-T08 (identity, gateway, policy, HTTPS, docs)
+
+- **T02 Private routes:** `deploy/apisix/routes.yaml` updated — `core-api-v1` and `files-api-v1` before catch-all `erp-api-v1`; OIDC `bearer_only: true` on all private routes; `serverless-pre-function` strips forged identity headers (`x-userinfo`, `x-access-token`, `x-authenticated-user`, etc.); `limit-req` and `request-id` plugins on all routes.
+- **New:** `platform/identity/request-auth.ts` — `authenticate()`, `detectForgedHeaders()`, `authOptionsFromEnv()`, `authErrorResponse()`, `AuthError`.
+- **New:** `app/api/v1/me/route.ts` — protected sample route returning safe Actor projection; rejects unauthenticated and policy-denied calls.
+- **New:** `tests/gateway/private.test.mjs` — route matrix documentation + header-stripping unit tests + routes.yaml static assertions.
+- **T03 Public route:** `app/api/v1/public/passport/[token]/route.ts` — anonymous GET/HEAD only; token format validation; 404 safe stub (no batch ID leak); 405 for POST/PUT/etc.
+- **New:** `tests/gateway/public.test.mjs` — public route matrix + token format validation.
+- **T04 M2M + partner DB:** Prisma `Partner` + `PartnerConnection` models in `system` schema; migration `20261118010000_system_partner`.
+- **New:** `platform/identity/partner-actor.ts` — `resolvePartnerActor()` maps `azp`/`client_id` → active `PartnerConnection`; `PartnerActor` type.
+- **New:** `app/api/v1/federation/events/route.ts` and `acks/route.ts` — M2M stubs returning 202 after partner-actor resolution (inbox deferred to P09).
+- **New:** `tests/gateway/m2m.test.mjs` — M2M matrix + partner-actor unit tests (mocked DB).
+- **T05 App policy:** `platform/access/policy.ts` — `checkPolicy()`, `requirePolicy()`, `PolicyError`; role matrix (administrator/staff/approver/viewer/partner/public × actions); federation endpoints `adminAlwaysAllowed: false`.
+- **New:** `platform/audit/security-audit.ts` — `redact()` strips JWT/Bearer/secret patterns; `auditDeny()` / `auditAccess()` structured JSON output; `actorSummary()` safe truncated log.
+- **New:** `tests/gateway/policy.test.mjs` — separation-of-duties matrix; staff cannot call admin actions; approver cannot create; partner cannot access user endpoints.
+- **T06 HTTPS hardening:** `deploy/apisix/config.yaml` updated — SSL listener on port 9443; `client_max_body_size: 10m`; Compose gateway publishes `127.0.0.1:GATEWAY_HTTPS_PORT:9443`. `deploy/certs/.gitignore` added. `deploy/scripts/gen-local-certs.sh` and `.ps1` for mkcert. `platform/security/ssrf.ts` — HTTPS-only validation, private IP/loopback/internal-hostname blocking for partner URLs.
+- **T07 OpenAPI security schemes:** `contracts/openapi/nexora-v1.yaml` — `bearerUser` scheme added; `bearerM2M` and `oidc` descriptions expanded; info section with Bearer/M2M sample redacted claims and 401/403 error codes. `deploy/README.md` expanded with realm/client provisioning runbook, rotate/revoke instructions, HTTPS mkcert link, error codes table.
+- **T08 Gate G02:** `evidence/G02.md` closed under owner waiver (Docker daemon unavailable); all unit tests pass; technical package complete. `summary.md` updated.
+
 ### Phase 02 — P02-T01 identity core
 
 - **Bearer API auth (D04):** authorization-code + PKCE to obtain tokens; Bearer on all API calls; CSRF N/A for Bearer-only API layer.
