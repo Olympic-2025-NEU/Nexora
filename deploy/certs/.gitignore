@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Never commit TLS private keys or certificate files.
+*.pem
+*.key
+*.crt
+*.cer
+*.p12
+*.pfx
+# Allow README and gitkeep/placeholder.
+!README.md
+!.gitkeep

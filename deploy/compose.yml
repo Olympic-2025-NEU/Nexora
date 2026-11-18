@@ -147,13 +147,19 @@ services:
     volumes:
       - ./apisix/config.yaml:/usr/local/apisix/conf/config.yaml:ro,z
       - ./apisix/routes.yaml:/usr/local/apisix/conf/apisix.yaml:ro,z
+      # TLS certs (gitignored). Generate with scripts/gen-local-certs.ps1 / .sh
+      # If certs are absent, the HTTP port still works for smoke tests.
+      - ./certs:/usr/local/apisix/conf/certs:ro,z
     depends_on:
       keycloak-bootstrap:
         condition: service_completed_successfully
     networks: [edge, internal]
     ports:
-      # Only public-facing bind in default topology (loopback).
+      # HTTP — loopback only; kept for local smoke and redirect.
       - "127.0.0.1:${GATEWAY_HTTP_PORT:-19080}:9080"
+      # HTTPS — loopback only (P02-T06). Requires certs in deploy/certs/.
+      # If certs missing, gateway starts but SSL listener may fail silently.
+      - "127.0.0.1:${GATEWAY_HTTPS_PORT:-19443}:9443"
     deploy:
       resources:
         limits:
