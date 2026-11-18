@@ -8,6 +8,16 @@
   "editUsernameAllowed": false,
   "bruteForceProtected": true,
   "sslRequired": "external",
+
+  "otpPolicy": {
+    "type": "totp",
+    "algorithm": "HmacSHA1",
+    "initialCounter": 0,
+    "digits": 6,
+    "lookAheadWindow": 1,
+    "period": 30
+  },
+
   "roles": {
     "realm": [
       { "name": "administrator" },
@@ -16,6 +26,7 @@
       { "name": "viewer" }
     ]
   },
+
   "clients": [
     {
       "clientId": "erp-browser",
@@ -41,7 +52,54 @@
       "redirectUris": [],
       "webOrigins": [],
       "attributes": { "pkce.code.challenge.method": "S256" }
+    },
+    {
+      "clientId": "gateway-oidc",
+      "name": "APISIX Gateway OIDC",
+      "description": "Confidential client used by API Gateway (APISIX) for token introspection and userinfo. Not for direct browser auth.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "bearerOnly": false,
+      "redirectUris": [],
+      "webOrigins": [],
+      "secret": "REPLACE_IN_ENV",
+      "attributes": {}
     }
   ],
+
+  "requiredActions": [
+    {
+      "alias": "CONFIGURE_TOTP",
+      "name": "Configure OTP",
+      "providerId": "CONFIGURE_TOTP",
+      "enabled": true,
+      "defaultAction": false,
+      "priority": 10,
+      "config": {}
+    },
+    {
+      "alias": "VERIFY_EMAIL",
+      "name": "Verify Email",
+      "providerId": "VERIFY_EMAIL",
+      "enabled": true,
+      "defaultAction": false,
+      "priority": 50,
+      "config": {}
+    },
+    {
+      "alias": "UPDATE_PASSWORD",
+      "name": "Update Password",
+      "providerId": "UPDATE_PASSWORD",
+      "enabled": true,
+      "defaultAction": false,
+      "priority": 30,
+      "config": {}
+    }
+  ],
+
   "users": []
 }

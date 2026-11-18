@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import type { TenantId, UserId } from "../kernel/id";
+import type { OrganizationId, UserId } from "../kernel/id";
 
 export type AuditEntry = {
-  tenantId: TenantId;
+  organizationId: OrganizationId;
   actorId: UserId;
   action: string;
   targetType: string;

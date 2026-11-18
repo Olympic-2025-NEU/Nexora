@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { DomainError } from "@/platform/kernel/errors";
-import type { TenantId, UserId } from "@/platform/kernel/id";
+import type { OrganizationId, UserId } from "@/platform/kernel/id";
 import { applyAction, type ProcessAction } from "@/platform/workflow/process";
 
 export const salesOrderActions = {
@@ -29,7 +29,7 @@ export type SalesOrderLine = {
 
 export type SalesOrder = {
   id: string;
-  tenantId: TenantId;
+  organizationId: OrganizationId;
   customerId: string;
   createdBy: UserId;
   status: SalesOrderStatus;
@@ -40,7 +40,7 @@ export const salesOrderConfirmed = "sales.order.confirmed";
 
 export function createDraft(input: {
   id: string;
-  tenantId: TenantId;
+  organizationId: OrganizationId;
   customerId: string;
   createdBy: UserId;
   lines: readonly SalesOrderLine[];

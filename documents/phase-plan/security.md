@@ -6,14 +6,18 @@ Internet chỉ đến Gateway HTTPS. User token từ Keycloak, partner token t�
 
 ## 2. Danh tính và quyền
 
-| Chủ thể | Xác thực | Quyền mẫu |
-| --- | --- | --- |
-| Administrator | OIDC user | Org, members, partner connection, retry, policy; không tự duyệt nếu separation-of-duties cấm |
-| Staff | OIDC user | Tạo Draft, confirm trong kho được cấp, xem lot/trace và file theo scope |
-| Approver | Vai/quyền nghiệp vụ gắn một Flowable task | Approve/reject task; không đồng nghĩa tự confirm document |
-| Partner client | Client credentials cấp ở receiver | Chỉ federation endpoints/phạm vi partner, không xem ERP private |
-| Public consumer | Không đăng nhập | Chỉ Passport projection theo QR/policy/rate limit |
-| AI service | Internal service identity | Chỉ inference/tool request allowlist, không có DB credential ghi |
+**Auth model (D04 P02-T01):** Bearer API auth — browser lấy token qua authorization-code + PKCE; mọi API call dùng `Authorization: Bearer <token>`. Không có BFF/cookie session trên API layer ở P02. `organizationId` lấy từ DB membership row, không bao giờ từ token body hoặc payload.
+
+**MFA bắt buộc cho Administrator và Approver:** Keycloak gán required action `CONFIGURE_TOTP` khi tạo user có role administrator/approver. Staff và viewer không yêu cầu MFA mặc định.
+
+| Chủ thể | Xác thực | MFA | Quyền mẫu |
+| --- | --- | --- | --- |
+| Administrator | OIDC user (Bearer) | **Bắt buộc TOTP** | Org, members, partner connection, retry, policy; không tự duyệt nếu separation-of-duties cấm |
+| Staff | OIDC user (Bearer) | Không bắt buộc | Tạo Draft, confirm trong kho được cấp, xem lot/trace và file theo scope |
+| Approver | OIDC user (Bearer) | **Bắt buộc TOTP** | Approve/reject task; không đồng nghĩa tự confirm document |
+| Partner client | Client credentials cấp ở receiver | N/A | Chỉ federation endpoints/phạm vi partner, không xem ERP private |
+| Public consumer | Không đăng nhập | N/A | Chỉ Passport projection theo QR/policy/rate limit |
+| AI service | Internal service identity | N/A | Chỉ inference/tool request allowlist, không có DB credential ghi |
 
 M01 quản lý mapping `Keycloak sub -> membership/role/scope`. Vai membership v1: `administrator`, `staff`, `approver`, `viewer` (một nguồn với schema). Approver gắn Flowable task; không đồng nghĩa quyền confirm document. Resource authz theo product/warehouse/partner/row chạy trong app kể cả khi gateway đã chấp nhận token. Mọi 403 phải có audit an toàn; tránh phân biệt tài nguyên không tồn tại với không được phép nếu gây lộ ID.
 
@@ -23,7 +27,7 @@ M01 quản lý mapping `Keycloak sub -> membership/role/scope`. Vai membership v
 | --- | --- |
 | **SQL Injection** | Chỉ Prisma Client API; `$queryRaw`/`$executeRaw` dùng tagged template hoặc bind values — **cấm** nối chuỗi SQL từ input. Sort/filter/report: allowlist cột trong code. |
 | **XSS** | React escape mặc định; cấm `dangerouslySetInnerHTML` trừ allowlist + sanitize. CSP qua Next/gateway. Passport/public chỉ field projection; không render HTML từ partner payload thô. Encode output API khi đưa vào UI. |
-| **CSRF** | Cookie session (D04 BFF): `SameSite=Lax` hoặc `Strict`, `Secure`, CSRF token hoặc double-submit cookie cho mutative browser calls. API bearer M2M/federation: không dùng cookie session → không áp CSRF cookie. Origin/Referer check bổ sung khi dùng cookie. |
+| **CSRF** | **Bearer primary (P02): CSRF N/A cho Bearer-only API — không có session cookie trên API layer.** Nếu BFF/cookie layer được thêm trong tương lai: `SameSite=Lax` hoặc `Strict`, `Secure`, CSRF token hoặc double-submit cookie cho mutative browser calls. API bearer M2M/federation: không dùng cookie session → không áp CSRF cookie. Origin/Referer check bổ sung khi dùng cookie. |
 | **Mass assignment** | Zod schema cố định; bỏ field `role`, `orgId`, `createdBy`, `status` từ body nếu client tự gửi. |
 
 Threat-test tối thiểu: XSS reflection trên field text chứng từ/Passport; CSRF thiếu token → 403; filter report với payload SQL → 400 và không đổi dữ liệu.

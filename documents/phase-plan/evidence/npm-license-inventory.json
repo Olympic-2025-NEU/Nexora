@@ -1,7 +1,7 @@
 {
   "source": "package-lock.json",
-  "lockSha256": "863dde132700d73ba86092a400c58f0a7fac3749ca57d7fce0297ebc788a0b02",
-  "packageCount": 505,
+  "lockSha256": "5093a7a188e03b066e9cdf6dba9036d7d588df0550e18372526c186d1f17a81c",
+  "packageCount": 506,
   "packages": [
     {
       "path": "node_modules/@alloc/quick-lru",
@@ -3168,6 +3168,15 @@
       "license": "MIT",
       "resolved": "https://registry.npmjs.org/jiti/-/jiti-2.7.0.tgz",
       "integrity": "sha512-AC/7JofJvZGrrneWNaEnJeOLUx+JlGt7tNa0wZiRPT4MY1wmfKjt2+6O2p2uz2+skll8OZZmJMNqeke7kKbNgQ==",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/jose",
+      "version": "6.2.17",
+      "license": "MIT",
+      "resolved": "https://registry.npmjs.org/jose/-/jose-6.2.17.tgz",
+      "integrity": "sha512-wOuK9V1yujQFH5S0ZWmLcDZN7+IKh9bUCC2ZPCf2HDlol3WWHy+PPyNjEI75FXRLMp3vDKQcupP59xhVU95hcg==",
       "dev": false,
       "optional": false
     },

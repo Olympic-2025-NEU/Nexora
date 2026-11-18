@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { DomainError } from "@/platform/kernel/errors";
-import type { TenantId } from "@/platform/kernel/id";
+import type { OrganizationId } from "@/platform/kernel/id";
 
 export type Item = {
   id: string;
-  tenantId: TenantId;
+  organizationId: OrganizationId;
   sku: string;
   name: string;
   unitCode: string;

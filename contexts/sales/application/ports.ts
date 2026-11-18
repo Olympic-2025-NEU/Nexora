@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import type { TenantId } from "@/platform/kernel/id";
+import type { OrganizationId } from "@/platform/kernel/id";
 
 /**
- * Cổng do sales sở hữu.
- * Inventory hiện thực cổng này. Sales không import context inventory.
+ * Port owned by sales.
+ * Inventory implements this port. Sales does not import the inventory context.
  */
 export type StockReservation = {
   reserve(input: {
-    tenantId: TenantId;
+    organizationId: OrganizationId;
     orderId: string;
     lines: readonly { itemId: string; quantity: number }[];
   }): Promise<void>;

@@ -1,4 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+// P02-T01: Bootstrap Keycloak realm, clients, optional boot users.
+// - Staff user: no MFA required action.
+// - Administrator user (KC_ADMIN_USERNAME / KC_ADMIN_PASSWORD env): CONFIGURE_TOTP assigned.
+// - Approver user (KC_APPROVER_USERNAME / KC_APPROVER_PASSWORD env): CONFIGURE_TOTP assigned.
 import { readFileSync } from 'node:fs';
 
 const required = (name) => {
@@ -34,6 +38,58 @@ async function request(path, token, method = 'GET', body) {
   return response.status === 204 || response.status === 201 ? null : response.json();
 }
 
+/** Ensure a realm user exists; return their Keycloak user id. */
+async function ensureUser(token, username, password, { temporary = true } = {}) {
+  const existing = await request(
+    `/admin/realms/${realm.realm}/users?username=${encodeURIComponent(username)}&exact=true`,
+    token,
+  );
+  if (!existing.length) {
+    await request(`/admin/realms/${realm.realm}/users`, token, 'POST', {
+      username,
+      enabled: true,
+      credentials: [{ type: 'password', value: password, temporary }],
+    });
+  }
+  const users = await request(
+    `/admin/realms/${realm.realm}/users?username=${encodeURIComponent(username)}&exact=true`,
+    token,
+  );
+  return users[0].id;
+}
+
+/** Assign a realm role to a user (idempotent). */
+async function assignRole(token, userId, roleName) {
+  const role = await request(`/admin/realms/${realm.realm}/roles/${roleName}`, token);
+  const assigned = await request(
+    `/admin/realms/${realm.realm}/users/${userId}/role-mappings/realm`,
+    token,
+  );
+  if (!assigned.some((r) => r.id === role.id)) {
+    await request(
+      `/admin/realms/${realm.realm}/users/${userId}/role-mappings/realm`,
+      token,
+      'POST',
+      [role],
+    );
+  }
+}
+
+/**
+ * Assign CONFIGURE_TOTP required action (MFA) to a user.
+ * Required for administrator and approver roles per security.md / ADR 0004.
+ */
+async function assignMfaRequiredAction(token, userId) {
+  const user = await request(`/admin/realms/${realm.realm}/users/${userId}`, token);
+  const existing = user.requiredActions ?? [];
+  if (!existing.includes('CONFIGURE_TOTP')) {
+    await request(`/admin/realms/${realm.realm}/users/${userId}`, token, 'PUT', {
+      ...user,
+      requiredActions: [...existing, 'CONFIGURE_TOTP'],
+    });
+  }
+}
+
 async function main() {
   let changes = 0;
   let token;
@@ -41,7 +97,12 @@ async function main() {
     try {
       const response = await fetch(`${base}/realms/master/protocol/openid-connect/token`, {
         method: 'POST',
-        body: new URLSearchParams({ grant_type: 'password', client_id: 'admin-cli', username: required('KC_BOOTSTRAP_ADMIN_USERNAME'), password: required('KC_BOOTSTRAP_ADMIN_PASSWORD') }),
+        body: new URLSearchParams({
+          grant_type: 'password',
+          client_id: 'admin-cli',
+          username: required('KC_BOOTSTRAP_ADMIN_USERNAME'),
+          password: required('KC_BOOTSTRAP_ADMIN_PASSWORD'),
+        }),
         signal: AbortSignal.timeout(10000),
       });
       if (!response.ok) throw new Error(`Admin token: HTTP ${response.status}`);
@@ -52,6 +113,7 @@ async function main() {
       await new Promise((resolve) => setTimeout(resolve, 2000));
     }
   }
+
   const existing = await request(`/admin/realms/${realm.realm}`, token).catch((error) => {
     if (error.message.endsWith('HTTP 404')) return null;
     throw error;
@@ -61,41 +123,78 @@ async function main() {
     changes++;
   } else {
     for (const client of realm.clients) {
-      const found = await request(`/admin/realms/${realm.realm}/clients?clientId=${encodeURIComponent(client.clientId)}`, token);
+      const found = await request(
+        `/admin/realms/${realm.realm}/clients?clientId=${encodeURIComponent(client.clientId)}`,
+        token,
+      );
       if (found.length) {
-        const current = await request(`/admin/realms/${realm.realm}/clients/${found[0].id}`, token);
+        const current = await request(
+          `/admin/realms/${realm.realm}/clients/${found[0].id}`,
+          token,
+        );
         const changed = Object.entries(client).some(([key, value]) =>
-          JSON.stringify(key === 'attributes' ? Object.fromEntries(Object.keys(value).map((name) => [name, current.attributes?.[name]])) : current[key]) !== JSON.stringify(value));
+          JSON.stringify(
+            key === 'attributes'
+              ? Object.fromEntries(
+                  Object.keys(value).map((name) => [name, current.attributes?.[name]]),
+                )
+              : current[key],
+          ) !== JSON.stringify(value),
+        );
         if (changed) {
-          await request(`/admin/realms/${realm.realm}/clients/${current.id}`, token, 'PUT', { ...current, ...client });
+          await request(
+            `/admin/realms/${realm.realm}/clients/${current.id}`,
+            token,
+            'PUT',
+            { ...current, ...client },
+          );
           changes++;
         }
-      }
-      else {
+      } else {
         await request(`/admin/realms/${realm.realm}/clients`, token, 'POST', client);
         changes++;
       }
     }
   }
+
+  // -------------------------------------------------------------------------
+  // Optional dev staff user (KC_DEV_USER_PASSWORD) — no MFA required.
+  // -------------------------------------------------------------------------
   if (process.env.KC_DEV_USER_PASSWORD) {
     const username = required('KC_DEV_USERNAME');
-    const users = await request(`/admin/realms/${realm.realm}/users?username=${encodeURIComponent(username)}&exact=true`, token);
-    if (!users.length) {
-      await request(`/admin/realms/${realm.realm}/users`, token, 'POST', {
-      username, enabled: true,
-      credentials: [{ type: 'password', value: process.env.KC_DEV_USER_PASSWORD, temporary: true }],
-      });
-      changes++;
-    }
-    const userId = users[0]?.id ?? (await request(`/admin/realms/${realm.realm}/users?username=${encodeURIComponent(username)}&exact=true`, token))[0].id;
-    const role = await request(`/admin/realms/${realm.realm}/roles/staff`, token);
-    const assigned = await request(`/admin/realms/${realm.realm}/users/${userId}/role-mappings/realm`, token);
-    if (!assigned.some((item) => item.id === role.id)) {
-      await request(`/admin/realms/${realm.realm}/users/${userId}/role-mappings/realm`, token, 'POST', [role]);
-      changes++;
-    }
+    const userId = await ensureUser(token, username, process.env.KC_DEV_USER_PASSWORD);
+    await assignRole(token, userId, 'staff');
+    changes++;
   }
-  console.log(`Keycloak realm ${realm.realm}: clients and optional dev user ready; changes=${changes}`);
+
+  // -------------------------------------------------------------------------
+  // Optional admin boot user (KC_ADMIN_USERNAME / KC_ADMIN_PASSWORD) — MFA required.
+  // -------------------------------------------------------------------------
+  if (process.env.KC_ADMIN_PASSWORD) {
+    const username = required('KC_ADMIN_USERNAME');
+    const userId = await ensureUser(token, username, process.env.KC_ADMIN_PASSWORD);
+    await assignRole(token, userId, 'administrator');
+    await assignMfaRequiredAction(token, userId);
+    changes++;
+  }
+
+  // -------------------------------------------------------------------------
+  // Optional approver boot user (KC_APPROVER_USERNAME / KC_APPROVER_PASSWORD) — MFA required.
+  // -------------------------------------------------------------------------
+  if (process.env.KC_APPROVER_PASSWORD) {
+    const username = required('KC_APPROVER_USERNAME');
+    const userId = await ensureUser(token, username, process.env.KC_APPROVER_PASSWORD);
+    await assignRole(token, userId, 'approver');
+    await assignMfaRequiredAction(token, userId);
+    changes++;
+  }
+
+  console.log(
+    `Keycloak realm ${realm.realm}: clients and optional boot users ready; changes=${changes}`,
+  );
 }
 
-main().catch((error) => { console.error(error.message); process.exitCode = 1; });
+main().catch((error) => {
+  console.error(error.message);
+  process.exitCode = 1;
+});

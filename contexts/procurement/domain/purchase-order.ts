@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { DomainError } from "@/platform/kernel/errors";
-import type { TenantId, UserId } from "@/platform/kernel/id";
+import type { OrganizationId, UserId } from "@/platform/kernel/id";
 import { applyAction, type ProcessAction } from "@/platform/workflow/process";
 
 export const purchaseOrderActions = {
@@ -28,7 +28,7 @@ export type PurchaseOrderStatus =
 
 export type PurchaseOrder = {
   id: string;
-  tenantId: TenantId;
+  organizationId: OrganizationId;
   supplierId: string;
   createdBy: UserId;
   status: PurchaseOrderStatus;

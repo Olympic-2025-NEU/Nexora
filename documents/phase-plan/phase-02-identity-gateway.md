@@ -2,12 +2,17 @@
 
 **Mục tiêu:** đường vào user, partner và public có xác thực/chính sách khác nhau; route protected không bị bypass. **Phụ thuộc:** G01, D01/D04/D05. **Unblock:** P04–P05, P09.
 
-## P02-T01 — Realm, clients và vòng đời user
+## P02-T01 — Realm, clients và vòng đời user ✅ (branch phase02/p02-t01-realm-membership)
 
-- [ ] Cấu hình realm một instance, OIDC client riêng cho Next ERP và DX-Lab frontend (redirect URI tối thiểu), client cho gateway và service account federation; audience/scope tối thiểu. Chọn MFA cho Admin/Approver hoặc ghi ADR nếu không khả thi, test recovery an toàn.
-- [ ] Quyết định cookie/session và authorization-code+PKCE theo Next 16 docs tại thời điểm code; logout/refresh/expired token và user disabled được test.
-- [ ] `Actor` lấy `sub`, role/scope từ token rồi đối chiếu membership DB (sau P05); không nhận role/org từ body.
-- **Đầu ra:** realm export không secret và auth flow diagram; **kiểm chứng:** login/logout/expired/disabled test trên gateway+app.
+> **Quyết định chốt (2026-11-18):** Bearer API auth — auth-code+PKCE chỉ để lấy token; MFA bắt buộc cho administrator/approver (CONFIGURE_TOTP); `organizationId` thay `tenantId`; `gateway-oidc` confidential client; `jose` JWKS verify.
+> `system.organization` và `system.membership` schema được kéo sớm vào P02-T01 (đã design cho P05).
+
+- [x] Cấu hình realm một instance, OIDC client riêng cho Next ERP và DX-Lab frontend, confidential client `gateway-oidc` cho APISIX.
+- [x] Bearer API auth; MFA CONFIGURE_TOTP cho administrator/approver.
+- [x] `Actor` lấy `sub`, role/scope từ token rồi đối chiếu membership DB; không nhận role/org từ body.
+- [x] `platform/identity/token.ts` và `resolve-actor.ts`; `system.organization` + `system.membership` migration.
+- [x] `organizationId` thay `tenantId` trong platform/* và legacy contexts; unit tests pass.
+- **Đầu ra:** realm export không secret, identity modules, schema migration; **kiểm chứng:** xem evidence/p02-t01.md.
 
 ## P02-T02 — API Gateway private route
 

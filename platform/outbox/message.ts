@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import type { TenantId } from "../kernel/id";
+import type { OrganizationId } from "../kernel/id";
 
-/** Ghi trong cùng giao dịch với thay đổi nghiệp vụ. Gửi đi sau khi commit. */
+/** Written in the same transaction as the business change. Dispatched after commit. */
 export type OutboxMessage<TPayload = unknown> = {
-  tenantId: TenantId;
+  organizationId: OrganizationId;
   type: string;
   payload: TPayload;
 };

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-// Platform baseline (P01-T03). Extend per database-schema-v1.md in later phases.
+// Platform baseline (P01-T03) + system identity core (P02-T01).
+// Extend per database-schema-v1.md in later phases.
 generator client {
   provider = "prisma-client-js"
 }
@@ -7,7 +8,7 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
-  schemas  = ["platform"]
+  schemas  = ["platform", "system"]
 }
 
 model AuditLog {
@@ -74,4 +75,49 @@ model CoreRecord {
   @@index([kind, builtAt(sort: Desc)])
   @@map("core_record")
   @@schema("platform")
+}
+
+// ---------------------------------------------------------------------------
+// system schema — P02-T01 identity core (database-schema-v1.md § P05)
+// ---------------------------------------------------------------------------
+
+model Organization {
+  id            String   @id @db.Uuid
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+  version       Int      @default(1)
+  /// Enforces single-organization constraint — always 1.
+  singletonSlot Int      @default(1) @map("singleton_slot") @db.SmallInt
+  instanceId    String   @unique @map("instance_id")
+  code          String   @unique
+  name          String
+  contactEmail  String?  @map("contact_email")
+  timezone      String   @default("Asia/Ho_Chi_Minh")
+  status        String   @default("active")
+
+  memberships   Membership[]
+
+  @@unique([singletonSlot])
+  @@map("organization")
+  @@schema("system")
+}
+
+model Membership {
+  id             String    @id @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+  version        Int       @default(1)
+  organizationId String    @map("organization_id") @db.Uuid
+  keycloakSub    String    @unique @map("keycloak_sub")
+  displayName    String    @map("display_name")
+  email          String?
+  role           String
+  status         String    @default("invited")
+  lastSyncedAt   DateTime? @map("last_synced_at") @db.Timestamptz(6)
+
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([role, status])
+  @@map("membership")
+  @@schema("system")
 }

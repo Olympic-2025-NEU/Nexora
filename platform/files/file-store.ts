@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import type { TenantId } from "../kernel/id";
+import type { OrganizationId } from "../kernel/id";
 
-/** Byte nằm ở object storage. Bảng platform.attachment chỉ giữ siêu dữ liệu. */
+/** Bytes live in object storage. platform.attachment holds only metadata. */
 export type StoredFile = {
   id: string;
-  tenantId: TenantId;
+  organizationId: OrganizationId;
   fileName: string;
   mediaType: string;
   byteSize: number;
@@ -12,7 +12,7 @@ export type StoredFile = {
 
 export type FileStore = {
   put(input: {
-    tenantId: TenantId;
+    organizationId: OrganizationId;
     fileName: string;
     mediaType: string;
     body: Uint8Array;

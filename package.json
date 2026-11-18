@@ -18,10 +18,12 @@
     "generate:openapi": "node scripts/generate-openapi.mjs",
     "check:openapi": "node scripts/generate-openapi.mjs --check && redocly lint contracts/openapi/nexora-v1.yaml --format=summary",
     "test:contracts": "npm run check:openapi && node scripts/validate-contracts.mjs && python3 scripts/check-jcs-python.py",
-    "test": "npm run check:spdx && npm run check:licenses && npm run check:secrets && npm run test:contracts && node --test deploy/config.test.mjs"
+    "test:identity": "node --test --require tsx/cjs platform/identity/token.test.ts",
+    "test": "npm run check:spdx && npm run check:licenses && npm run check:secrets && npm run test:contracts && node --test deploy/config.test.mjs && npm run test:identity"
   },
   "dependencies": {
     "@prisma/client": "6.19.0",
+    "jose": "^6.2.17",
     "next": "16.4.6",
     "react": "19.3.0",
     "react-dom": "19.3.0"

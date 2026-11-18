@@ -4,12 +4,15 @@
 
 ## P05-T01 — Organization một instance
 
-- [ ] Migration `system.organization`: một organization active, mã/định danh public ổn định, tên, thông tin liên hệ, timezone và phiên bản; không dùng `tenantId` để chứa nhiều doanh nghiệp trong một DB.
+> **Note (P02-T01, 2026-11-18):** `system.organization` schema (singleton slot, instance_id, code, name, timezone, status) và `system.membership` schema (keycloak_sub, role, status) đã được tạo trong migration `20261118000000_system_org_membership`. Prisma models `Organization` và `Membership` đã có. P05-T01 tiêu thụ schema đã tồn tại — không tạo migration mới cho hai bảng này.
+
 - [ ] Bootstrap organization trong mỗi instance A/B/C qua setup bảo vệ; khóa đường tạo organization thứ hai. Chỉnh sửa thông tin có audit và optimistic version.
 - [ ] API read/update có field allowlist; public projection không tự lộ địa chỉ/điện thoại nội bộ.
-- **Đầu ra:** schema, use case, API và trang hồ sơ; **kiểm chứng:** A/B/C có org ID khác nhau, Staff bị 403 khi sửa.
+- **Đầu ra:** use case, API và trang hồ sơ; **kiểm chứng:** A/B/C có org ID khác nhau, Staff bị 403 khi sửa.
 
 ## P05-T02 — Membership và vòng đời user
+
+> **Note (P02-T01, 2026-11-18):** `platform/identity/resolve-actor.ts` và `MembershipRepository` port đã có. P05-T02 implement `MembershipRepository` với PrismaClient và xây application service invite/disable.
 
 - [ ] Map Keycloak `sub`/realm/client vào membership local; không tin role gửi từ body/header. Chốt JIT provisioning hay admin invite tại D04; disable user phải có hiệu lực ở API ngay sau mức trễ đã định.
 - [ ] Vai trò tối thiểu Admin, Staff, Approver, Viewer; scope theo thao tác và kho nếu D04 chọn. Kiểm tra authorization tại application service, gateway chỉ là lớp biên.

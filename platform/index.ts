@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 export { DomainError } from "./kernel/errors";
-export type { OrgUnitId, TenantId, UserId } from "./kernel/id";
+export type { OrgUnitId, OrganizationId, TenantId, UserId } from "./kernel/id";
 export type { Actor } from "./identity/actor";
-export { tenantOf } from "./tenancy/tenant";
-export type { Tenant } from "./tenancy/tenant";
+export { organizationOf, tenantOf } from "./tenancy/organization";
+export type { Organization, Tenant } from "./tenancy/organization";
 export { canTouch, rowScopes } from "./access/scope";
 export type { RowAccess, RowScope } from "./access/scope";
 export type { AuditEntry, AuditRecorder } from "./audit/audit-recorder";
