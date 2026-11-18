@@ -5,3 +5,5 @@
 3a5a540acfcad1ca6254a3baa1a87111301b52a8:documents/phase-plan/evidence/p01-t04.md:curl-auth-user:59
 3a5a540acfcad1ca6254a3baa1a87111301b52a8:documents/phase-plan/evidence/p01-t04.md:curl-auth-user:64
 3a5a540acfcad1ca6254a3baa1a87111301b52a8:documents/phase-plan/evidence/p01-t04.md:curl-auth-user:84
+# P02 G02 command deliberately passes a 13-character invalid-token fixture (not a credential).
+cfea7759d617bf19711c699d60f87649eefefa70:documents/phase-plan/evidence/G02.md:curl-auth-header:83
