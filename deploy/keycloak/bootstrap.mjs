@@ -26,6 +26,16 @@ for (const [client, idVar, redirectVar] of [
   client.redirectUris = [redirect.href];
   client.webOrigins = [redirect.origin];
 }
+// Local smoke uses Resource-Owner password grant against erp-browser (G02 curl matrix).
+// Browser production path remains auth-code + PKCE; do not expose ROPC on public internet demos.
+const erpClient = realm.clients.find((c) => c.clientId === process.env.OIDC_CLIENT_ID_ERP) ?? realm.clients[0];
+erpClient.directAccessGrantsEnabled = true;
+
+const gatewayClient = realm.clients.find((c) => c.clientId === 'gateway-oidc' || c.clientId === process.env.OIDC_GATEWAY_CLIENT_ID);
+if (gatewayClient) {
+  if (process.env.OIDC_GATEWAY_CLIENT_ID) gatewayClient.clientId = process.env.OIDC_GATEWAY_CLIENT_ID;
+  gatewayClient.secret = required('OIDC_GATEWAY_CLIENT_SECRET');
+}
 
 async function request(path, token, method = 'GET', body) {
   const response = await fetch(`${base}${path}`, {
@@ -162,7 +172,10 @@ async function main() {
   // -------------------------------------------------------------------------
   if (process.env.KC_DEV_USER_PASSWORD) {
     const username = required('KC_DEV_USERNAME');
-    const userId = await ensureUser(token, username, process.env.KC_DEV_USER_PASSWORD);
+    // temporary=false so local smoke can use Resource-Owner password grant (G02 matrix).
+    const userId = await ensureUser(token, username, process.env.KC_DEV_USER_PASSWORD, {
+      temporary: false,
+    });
     await assignRole(token, userId, 'staff');
     changes++;
   }

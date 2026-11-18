@@ -13,11 +13,11 @@
 
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import { authenticate, authErrorResponse, AuthError } from "../../../../platform/identity/request-auth.js";
-import { TokenError } from "../../../../platform/identity/token.js";
-import { ActorResolutionError } from "../../../../platform/identity/resolve-actor.js";
-import { checkPolicy } from "../../../../platform/access/policy.js";
-import { getPrismaClient } from "../../../../platform/persistence/prisma.js";
+import { authenticate, authErrorResponse, AuthError } from "@/platform/identity/request-auth";
+import { TokenError } from "@/platform/identity/token";
+import { ActorResolutionError } from "@/platform/identity/resolve-actor";
+import { checkPolicy } from "@/platform/access/policy";
+import { getPrismaClient } from "@/platform/persistence/prisma";
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const requestId = request.headers.get("x-request-id");

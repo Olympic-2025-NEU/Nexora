@@ -132,6 +132,8 @@ services:
       OIDC_CLIENT_ID_DXLAB: ${OIDC_CLIENT_ID_DXLAB}
       OIDC_REDIRECT_URI_ERP: ${OIDC_REDIRECT_URI_ERP}
       OIDC_REDIRECT_URI_DXLAB: ${OIDC_REDIRECT_URI_DXLAB}
+      OIDC_GATEWAY_CLIENT_ID: ${OIDC_GATEWAY_CLIENT_ID}
+      OIDC_GATEWAY_CLIENT_SECRET: ${OIDC_GATEWAY_CLIENT_SECRET}
       KC_DEV_USERNAME: ${KC_DEV_USERNAME:-}
       KC_DEV_USER_PASSWORD: ${KC_DEV_USER_PASSWORD:-}
     volumes:
@@ -146,7 +148,8 @@ services:
     image: apache/apisix:3.20.0-debian@sha256:013de62a9dfba7d8e6006b3e85b524c28c9f1c3549fca3b91d5b258b0b9e759a
     volumes:
       - ./apisix/config.yaml:/usr/local/apisix/conf/config.yaml:ro,z
-      - ./apisix/routes.yaml:/usr/local/apisix/conf/apisix.yaml:ro,z
+      # Rendered from routes.yaml via deploy/scripts/render-apisix-routes.mjs (placeholders substituted).
+      - ./apisix/apisix.generated.yaml:/usr/local/apisix/conf/apisix.yaml:ro,z
       # TLS certs (gitignored). Generate with scripts/gen-local-certs.ps1 / .sh
       # If certs are absent, the HTTP port still works for smoke tests.
       - ./certs:/usr/local/apisix/conf/certs:ro,z
@@ -253,6 +256,8 @@ services:
     environment:
       DATABASE_URL: ${APP_DATABASE_URL}
       OIDC_ISSUER_URL: ${OIDC_ISSUER_URL}
+      OIDC_JWKS_URL: ${OIDC_JWKS_URL}
+      OIDC_AUDIENCE: ${OIDC_AUDIENCE}
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL}
     depends_on:
       db-migrate:

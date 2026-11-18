@@ -8,16 +8,6 @@
   "editUsernameAllowed": false,
   "bruteForceProtected": true,
   "sslRequired": "external",
-
-  "otpPolicy": {
-    "type": "totp",
-    "algorithm": "HmacSHA1",
-    "initialCounter": 0,
-    "digits": 6,
-    "lookAheadWindow": 1,
-    "period": 30
-  },
-
   "roles": {
     "realm": [
       { "name": "administrator" },

@@ -16,11 +16,11 @@
 
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import { verifyBearerToken, type TokenVerifyOptions } from "./token.js";
-import { resolveActor, type MembershipRepository } from "./resolve-actor.js";
-import type { Actor } from "./actor.js";
-import { TokenError } from "./token.js";
-import { ActorResolutionError } from "./resolve-actor.js";
+import { verifyBearerToken, type TokenVerifyOptions } from "./token";
+import { resolveActor, type MembershipRepository } from "./resolve-actor";
+import type { Actor } from "./actor";
+import { TokenError } from "./token";
+import { ActorResolutionError } from "./resolve-actor";
 
 // ---------------------------------------------------------------------------
 // Forged-header guard

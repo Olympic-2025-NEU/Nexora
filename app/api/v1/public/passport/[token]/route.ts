@@ -41,9 +41,9 @@ interface PassportProjection {
 
 export async function GET(
   _request: NextRequest,
-  { params }: { params: { token: string } },
+  { params }: { params: Promise<{ token: string }> },
 ): Promise<NextResponse> {
-  const { token } = params;
+  const { token } = await params;
 
   // Validate token format: alphanumeric + hyphens, 10-128 chars.
   // Rejects path traversal, SQL injection attempts, etc.

@@ -13,9 +13,9 @@
 
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import { verifyBearerToken, TokenError } from "../../../../../platform/identity/token.js";
-import { resolvePartnerActor, PartnerActorError } from "../../../../../platform/identity/partner-actor.js";
-import { getPrismaClient } from "../../../../../platform/persistence/prisma.js";
+import { verifyBearerToken, TokenError } from "@/platform/identity/token";
+import { resolvePartnerActor, PartnerActorError } from "@/platform/identity/partner-actor";
+import { getPrismaClient } from "@/platform/persistence/prisma";
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   const requestId = request.headers.get("x-request-id");

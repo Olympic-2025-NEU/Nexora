@@ -1,28 +1,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # APISIX standalone data plane (D01). OIDC route bodies live in routes.yaml.
-# P02-T06: Added SSL listener on 9443.
+# P02-T06: HTTP 9080 + HTTPS port 9443 published; SSL certs optional for local smoke.
 apisix:
   node_listen:
-    # HTTP listener (redirect or local ping / smoke).
-    - port: 9080
-      enable_http2: false
-    # HTTPS listener (P02-T06 — requires TLS cert mount).
-    # Compose publishes 127.0.0.1:GATEWAY_HTTPS_PORT:9443.
-    # Cert files: deploy/certs/local.pem + local-key.pem (gitignored).
-    # Generate with: scripts/gen-local-certs.ps1 (Windows) or gen-local-certs.sh (Linux/macOS).
-    - port: 9443
-      enable_http2: true
-      # ssl: true  # Uncomment once APISIX standalone supports per-listener SSL.
-      # ssl_cert: /usr/local/apisix/conf/certs/local.pem
-      # ssl_cert_key: /usr/local/apisix/conf/certs/local-key.pem
+    - 9080
+    - 9443
+  enable_http2: true
   enable_admin: false
-
-  # TLS global config (P02-T06).
-  # In APISIX 3.x standalone, SSL is configured via ssl resources in apisix.yaml.
-  # For the demo stack, HTTP is acceptable for local smoke; HTTPS should be used
-  # in staging/production and in instances where Keycloak requires https:// issuers.
-  ssl:
-    ssl_trusted_certificate: /usr/local/apisix/conf/certs/local.pem
 
 deployment:
   role: data_plane
@@ -34,6 +18,4 @@ nginx_config:
   http:
     access_log_format: '{"service":"gateway","requestId":"$request_id","correlationId":"$upstream_http_x_request_id","status":$status,"path":"$uri","method":"$request_method"}'
     access_log_format_escape: json
-  # Client max body size for upstream proxy (P02-T02).
-  # Large uploads go via /api/v1/files/* which proxies to core-data; limit on that route.
   client_max_body_size: "10m"
