@@ -11,9 +11,9 @@
 
 ## P03-T02 — Unit of Work và optimistic/concurrent write
 
-- [ ] Triển khai `Transaction.run(work)` cho toàn bộ command, transaction context truyền vào repository; timeout, error mapping, retry có giới hạn chỉ cho lỗi retryable.
-- [ ] Tạo spike ghi aggregate + audit + outbox, cố ý ném lỗi ở từng bước; tất cả rollback hoặc tất cả commit.
-- [ ] Chọn row lock/conditional update/version policy, áp dụng lock ordering nhất quán; đo deadlock/concurrent write.
+- [x] Triển khai `Transaction.run(work)` cho toàn bộ command, transaction context truyền vào repository; timeout, error mapping, retry có giới hạn chỉ cho lỗi retryable.
+- [x] Tạo spike ghi aggregate + audit + outbox, cố ý ném lỗi ở từng bước; tất cả rollback hoặc tất cả commit.
+- [x] Chọn row lock/conditional update/version policy, áp dụng lock ordering nhất quán; đo deadlock/concurrent write. Bằng chứng: [evidence/p03-t02.md](./evidence/p03-t02.md); Inventory/Outbox sản phẩm thuộc P04/P06/P07.
 - **Đầu ra:** transaction adapter và test atomicity; **kiểm chứng:** không có audit/outbox mồ côi hoặc aggregate confirmed thiếu event.
 
 ## P03-T03 — Audit bất biến và correlation

@@ -70,6 +70,7 @@
     "platform/observability/readiness.ts",
     "platform/outbox/message.ts",
     "platform/persistence/prisma.ts",
+    "platform/persistence/transaction.test.ts",
     "platform/persistence/transaction.ts",
     "platform/security/ssrf.ts",
     "platform/tenancy/organization.ts",
@@ -82,6 +83,7 @@
     "scripts/check-spdx.mjs",
     "scripts/generate-openapi.mjs",
     "scripts/openapi-v1-schemas.mjs",
+    "scripts/run-platform-test.mjs",
     "scripts/run-python-jcs.mjs",
     "scripts/validate-contracts.mjs",
     "services/core-data/repositories.mjs",
@@ -91,6 +93,7 @@
     "tests/gateway/private.test.mjs",
     "tests/gateway/public.test.mjs",
     "tests/platform/schema.integration.mjs",
+    "tests/platform/transaction.integration.test.ts",
     "worker/entrypoint.js"
   ]
 }
