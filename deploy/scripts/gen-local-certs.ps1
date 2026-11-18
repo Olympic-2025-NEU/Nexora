@@ -19,6 +19,13 @@ $CertsDir = Join-Path $ScriptDir "..\certs"
 $CertsDir = Resolve-Path $CertsDir
 
 Write-Host "==> Checking mkcert installation..." -ForegroundColor Cyan
+# Chocolatey installs often miss the current session PATH until a new shell opens.
+if (-not (Get-Command mkcert -ErrorAction SilentlyContinue)) {
+    $chocoMkcert = "C:\ProgramData\chocolatey\bin\mkcert.exe"
+    if (Test-Path $chocoMkcert) {
+        $env:Path = "C:\ProgramData\chocolatey\bin;" + $env:Path
+    }
+}
 try {
     $null = Get-Command mkcert -ErrorAction Stop
 } catch {
@@ -29,6 +36,7 @@ ERROR: mkcert not found. Install via one of:
   scoop install mkcert
 
 See: https://github.com/FiloSottile/mkcert
+Then open a new terminal (or ensure C:\ProgramData\chocolatey\bin is on PATH).
 "@
     exit 1
 }

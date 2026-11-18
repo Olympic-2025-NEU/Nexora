@@ -1,12 +1,14 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # APISIX standalone data plane (D01). OIDC route bodies live in routes.yaml.
-# P02-T06: HTTP 9080 + HTTPS port 9443 published; SSL certs optional for local smoke.
+# P02-T06: HTTP 9080 + HTTPS SSL listen 9443; certs optional (ssls injected by render).
 apisix:
-  node_listen:
-    - 9080
-    - 9443
+  node_listen: 9080
   enable_http2: true
   enable_admin: false
+  ssl:
+    enable: true
+    listen:
+      - port: 9443
 
 deployment:
   role: data_plane

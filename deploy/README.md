@@ -148,7 +148,15 @@ Also disable the Keycloak client to prevent new token issuance.
 ```
 
 Generates `deploy/certs/local.pem` and `local-key.pem` (gitignored).  
-Set `PUBLIC_BASE_URL=https://127.0.0.1:19443` in your instance env.
+Set `PUBLIC_BASE_URL=https://localhost:19443` (prefer `localhost` over `127.0.0.1` for mkcert clients) and matching `OIDC_REDIRECT_URI_*`, then re-render routes and recreate the gateway:
+
+```powershell
+node deploy/scripts/render-apisix-routes.mjs deploy/instances/a.env
+docker compose -f deploy/compose.yml --env-file deploy/instances/a.env -p nexora-a up -d --force-recreate gateway
+docker compose -f deploy/compose.yml --env-file deploy/instances/a.env -p nexora-a run --rm keycloak-bootstrap
+$env:NODE_EXTRA_CA_CERTS = "$(mkcert -CAROOT)\rootCA.pem"
+node deploy/scripts/smoke-https-local.mjs a
+```
 
 For Node.js to trust the local CA:
 
