@@ -9,6 +9,7 @@ RUN npm ci \
 COPY prisma ./prisma
 RUN npx prisma generate
 COPY services/core-data/server.js ./
+COPY services/core-data/repositories.mjs ./
 COPY deploy/config.mjs ./config.mjs
 COPY deploy/health.mjs ./health.mjs
 RUN groupadd --system --gid 1001 nexora \

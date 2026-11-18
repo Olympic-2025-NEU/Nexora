@@ -15,34 +15,15 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
-/** Safe public fields returned for a valid passport token. */
-interface PassportProjection {
-  /** Opaque token identifier — same as the route param. */
-  token: string;
-  /** Display-friendly product name (no SKU or internal ID). */
-  productName: string;
-  /** Product category label. */
-  category: string;
-  /** ISO 8601 date string for manufactured date, if available. */
-  manufacturedOn: string | null;
-  /** ISO 8601 date string for expiry, if available. */
-  expiresOn: string | null;
-  /** Quality status (safe label — not the internal code). */
-  qualityLabel: string;
-  /** Issuing organization display name. */
-  issuedBy: string;
-  /** True if the QR code is still valid/active. */
-  isActive: boolean;
-}
-
 // ---------------------------------------------------------------------------
 // Route handler
 // ---------------------------------------------------------------------------
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ token: string }> },
 ): Promise<NextResponse> {
+  void request; // The first route argument is required when reading dynamic params.
   const { token } = await params;
 
   // Validate token format: alphanumeric + hyphens, 10-128 chars.
@@ -80,18 +61,18 @@ export async function GET(
 
 // Explicit method handlers — Next.js will return 405 for other methods automatically,
 // but explicit denial makes the intent clear and allows custom response bodies.
-export async function POST(_request: NextRequest): Promise<NextResponse> {
+export async function POST(): Promise<NextResponse> {
   return NextResponse.json({ error: "METHOD_NOT_ALLOWED" }, { status: 405 });
 }
 
-export async function PUT(_request: NextRequest): Promise<NextResponse> {
+export async function PUT(): Promise<NextResponse> {
   return NextResponse.json({ error: "METHOD_NOT_ALLOWED" }, { status: 405 });
 }
 
-export async function PATCH(_request: NextRequest): Promise<NextResponse> {
+export async function PATCH(): Promise<NextResponse> {
   return NextResponse.json({ error: "METHOD_NOT_ALLOWED" }, { status: 405 });
 }
 
-export async function DELETE(_request: NextRequest): Promise<NextResponse> {
+export async function DELETE(): Promise<NextResponse> {
   return NextResponse.json({ error: "METHOD_NOT_ALLOWED" }, { status: 405 });
 }

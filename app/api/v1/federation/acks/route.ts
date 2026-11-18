@@ -57,9 +57,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "AUTH_FAILED" }, { status: 401 });
   }
 
-  let _partnerActor;
   try {
-    _partnerActor = await resolvePartnerActor(
+    await resolvePartnerActor(
       claims as Parameters<typeof resolvePartnerActor>[0],
       connectionRepo,
     );

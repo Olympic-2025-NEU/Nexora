@@ -17,8 +17,9 @@
     "check:licenses": "node scripts/check-licenses.mjs",
     "generate:openapi": "node scripts/generate-openapi.mjs",
     "check:openapi": "node scripts/generate-openapi.mjs --check && redocly lint contracts/openapi/nexora-v1.yaml --format=summary",
-    "test:contracts": "npm run check:openapi && node scripts/validate-contracts.mjs && python3 scripts/check-jcs-python.py",
+    "test:contracts": "npm run check:openapi && node scripts/validate-contracts.mjs && node scripts/run-python-jcs.mjs",
     "test:identity": "node --test --require tsx/cjs platform/identity/token.test.ts",
+    "test:platform:schema": "bash tests/platform/run-schema.sh",
     "test:gateway": "node --test tests/gateway/private.test.mjs tests/gateway/public.test.mjs tests/gateway/m2m.test.mjs tests/gateway/policy.test.mjs",
     "test": "npm run check:spdx && npm run check:licenses && npm run check:secrets && npm run test:contracts && node --test deploy/config.test.mjs && npm run test:identity && npm run test:gateway"
   },

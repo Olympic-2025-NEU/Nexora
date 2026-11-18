@@ -84,11 +84,11 @@ export class PartnerActorError extends Error {
  * - Partner.status is not checked here — connection row is authoritative for access.
  */
 export async function resolvePartnerActor(
-  claims: NexoraClaims & { azp?: string; scope?: string },
+  claims: NexoraClaims & { azp?: string; client_id?: string; scope?: string },
   repo: PartnerConnectionRepository,
 ): Promise<PartnerActor> {
   // Extract client_id from azp claim (Keycloak sets azp for service accounts).
-  const clientId = claims.azp ?? (claims as Record<string, unknown>)["client_id"] as string | undefined;
+  const clientId = claims.azp ?? claims.client_id;
   if (!clientId) {
     throw new PartnerActorError(
       "MISSING_CLIENT_ID",

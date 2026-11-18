@@ -4,9 +4,9 @@
 
 ## P03-T01 — Versioned platform schema và quyền DB
 
-- [ ] Xác minh `0001_platform_core.sql` đã thay migration rỗng ở P01 chứa `audit_log`, `attachment`, `core_record` và bảng version; **không sửa migration đã áp dụng**, thay đổi sau này bằng migration bù số mới. Tách migration/ERP/core API runtime roles, quyền tối thiểu và FK/check/unique cần thiết. Core API chỉ ghi tài nguyên nó sở hữu, không ghi stock/document tables.
-- [ ] Chuẩn hóa adapter PG với một transaction client được truyền qua application ports; không mở transaction riêng bên trong Inventory/Audit/Outbox khi cùng command.
-- [ ] Chạy migration từ DB rỗng/đã có, rollback bằng migration hoặc restore đã thử; test thiếu quyền DB thì fail rõ.
+- [x] Xác minh migration P01 `20261117000000_platform_baseline` chứa `audit_log`, `attachment`, `core_record` và bảng version; **không sửa migration đã áp dụng**, thay đổi sau này bằng migration bù số mới. Tách migration/ERP/core API runtime roles, quyền tối thiểu và FK/check/unique cần thiết. Core API chỉ ghi tài nguyên nó sở hữu, không ghi stock/document tables.
+- [x] Chuẩn hóa adapter PG với một transaction client được truyền qua application ports; không mở transaction riêng bên trong Inventory/Audit/Outbox khi cùng command. Repository core nhận Prisma client/transaction client từ caller; Inventory/Outbox thật thuộc P04/P06 và phải tuân theo cùng port.
+- [x] Chạy migration từ DB rỗng/đã có, rollback bằng migration hoặc restore đã thử; test thiếu quyền DB thì fail rõ. Bằng chứng: [evidence/p03-t01.md](./evidence/p03-t01.md).
 - **Đầu ra:** migration versioned + repository tests; **kiểm chứng:** PG có bảng/constraint và restart không chạy lại DDL gây lỗi.
 
 ## P03-T02 — Unit of Work và optimistic/concurrent write

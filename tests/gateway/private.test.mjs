@@ -11,7 +11,7 @@
  * Integration smoke tests (gateway + Docker) are documented in evidence/p02-t02.md.
  */
 
-import { describe, it, mock } from "node:test";
+import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
 // ---------------------------------------------------------------------------

@@ -64,9 +64,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   // 2. Resolve partner actor.
-  let _partnerActor;
   try {
-    _partnerActor = await resolvePartnerActor(
+    await resolvePartnerActor(
       claims as Parameters<typeof resolvePartnerActor>[0],
       connectionRepo,
     );
