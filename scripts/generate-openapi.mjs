@@ -20,7 +20,7 @@ const doc = {
   info: {
     title: "Nexora API",
     version: "1.0.0",
-    description: "Phase 00 contract v1. The operations describe target behavior; only the scaffold health route is implemented today. Runtime conformance is tested in later phases.",
+    description: "Nexora ERP API v1. P02-T07: Bearer security schemes (bearerUser, bearerM2M, oidc). Operations describe target behavior; runtime conformance tested per phase. See deploy/README.md for provisioning runbook.",
     license: { name: "AGPL-3.0-only", url: "https://www.gnu.org/licenses/agpl-3.0.html" },
   },
   servers: [{ url: "https://{host}", variables: { host: { default: "nexora.example" } } }],
@@ -29,8 +29,24 @@ const doc = {
   paths: {},
   components: {
     securitySchemes: {
-      oidc: { type: "openIdConnect", openIdConnectUrl: "https://keycloak.example/.well-known/openid-configuration" },
-      bearerM2M: { type: "http", scheme: "bearer", bearerFormat: "JWT" },
+      // P02-T07: Bearer security schemes.
+      oidc: {
+        type: "openIdConnect",
+        openIdConnectUrl: "https://keycloak.example/.well-known/openid-configuration",
+        description: "Authorization Code + PKCE. MFA required for administrator and approver roles.",
+      },
+      bearerUser: {
+        type: "http",
+        scheme: "bearer",
+        bearerFormat: "JWT",
+        description: "User Bearer JWT. Audience: OIDC_AUDIENCE (erp-browser). Issued via auth-code+PKCE.",
+      },
+      bearerM2M: {
+        type: "http",
+        scheme: "bearer",
+        bearerFormat: "JWT",
+        description: "Service-account Bearer JWT for M2M partner federation. Required scope: federation:write.",
+      },
     },
     parameters: {
       IfMatch: { name: "If-Match", in: "header", required: true, schema: str({ pattern: '^"[1-9][0-9]*"$' }), description: "Current aggregate version ETag." },

@@ -1,4 +1,4 @@
-# Nexora deploy (P01)
+# Nexora deploy (P01–P02)
 
 Single Compose entrypoint: [`compose.yml`](./compose.yml).  
 Legacy `docker-compose.yml` (Postgres-only) is removed; do not reintroduce a second entrypoint.
@@ -75,6 +75,102 @@ docker compose -f deploy/compose.yml --env-file deploy/instances/a.env -p nexora
 ```
 
 The default example issuer uses Docker's internal `keycloak` hostname. Set a browser-reachable Keycloak base URL and matching issuer for browser login in a trusted deployment; public OIDC gateway routes and access policies belong to P02.
+
+## P02-T07 — Realm/Client Provisioning, HTTPS, Rotate/Revoke
+
+### Keycloak realm setup
+
+The bootstrap script (`deploy/keycloak/bootstrap.mjs`) provisions the `nexora` realm with:
+
+- ERP browser client (`erp-browser`) — public, auth-code+PKCE, redirect to `OIDC_REDIRECT_URI_ERP`
+- DX-Lab browser client (`dxlab-browser`) — public, auth-code+PKCE
+- Gateway OIDC client (`gateway-oidc`) — confidential, used by APISIX OIDC plugin for token introspection
+- Partner inbound client (`partner-inbound-a`) — service accounts enabled, scope `federation:write`
+
+**After bootstrap:**
+
+1. Set `OIDC_GATEWAY_CLIENT_ID=gateway-oidc` and `OIDC_GATEWAY_CLIENT_SECRET=<secret>` in your instance env.
+2. Add these to the APISIX routes.yaml substitution (or set literal value in the YAML).
+3. For MFA: Keycloak → Realm → Authentication → Required Actions → enable `CONFIGURE_TOTP` for administrator/approver users.
+
+### Create a partner receiver client (B for A)
+
+```
+1. Log in to Keycloak admin for Instance B
+2. Create client: "partner-inbound-a"
+   - Client type: OpenID Connect
+   - Service accounts enabled: ON
+   - Standard flow: OFF
+3. Add scope "federation:write" to client scopes
+4. Copy client secret
+5. In Instance A DB:
+   INSERT INTO system.partner_connection (inbound_client_id, ...) VALUES ('partner-inbound-a', ...)
+6. Test:
+   curl -X POST https://<b-host>/realms/nexora/protocol/openid-connect/token \
+     -d "grant_type=client_credentials&client_id=partner-inbound-a&client_secret=<secret>&scope=federation:write"
+   # → access_token
+   curl -X POST https://<a-gateway>/api/v1/federation/events \
+     -H "Authorization: Bearer <access_token>" \
+     -H "Content-Type: application/json" -d '{...}'
+   # → 202
+```
+
+### Rotate partner credentials
+
+```
+1. In Keycloak: regenerate client secret for partner-inbound-a
+2. In DB: UPDATE system.partner_connection SET status='rotating', rotated_at=now() WHERE inbound_client_id='partner-inbound-a'
+3. Update secret in secret store (do NOT put in DB)
+4. Notify partner of new secret
+5. After partner confirms: UPDATE ... SET status='active'
+```
+
+### Revoke partner access immediately
+
+```sql
+UPDATE system.partner_connection SET status='disabled' WHERE inbound_client_id='partner-inbound-a';
+-- Next request from that partner → 403 PARTNER_CONNECTION_INACTIVE
+-- No token blacklist needed — DB row is checked on every request
+```
+
+Also disable the Keycloak client to prevent new token issuance.
+
+### HTTPS local setup (mkcert)
+
+```powershell
+# Windows
+.\deploy\scripts\gen-local-certs.ps1
+```
+
+```bash
+# Linux / macOS
+./deploy/scripts/gen-local-certs.sh
+```
+
+Generates `deploy/certs/local.pem` and `local-key.pem` (gitignored).  
+Set `PUBLIC_BASE_URL=https://127.0.0.1:19443` in your instance env.
+
+For Node.js to trust the local CA:
+
+```bash
+export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
+```
+
+**HTTP fallback (no certs):** Set `PUBLIC_BASE_URL=http://127.0.0.1:19080`. The gateway HTTP port still works for local smoke when certs are absent. OIDC issuer must use the same scheme; for HTTP smoke, set `OIDC_ISSUER_URL=http://keycloak:8080/realms/nexora`.
+
+### 401/403 error codes reference
+
+| Code | Status | Meaning |
+|---|---|---|
+| `MISSING_BEARER` | 401 | Authorization header absent or not `Bearer` prefix |
+| `INVALID_TOKEN` | 401 | Token expired, wrong issuer/audience, invalid signature |
+| `MEMBERSHIP_NOT_FOUND` | 403 | `sub` not in `system.membership` |
+| `MEMBERSHIP_INACTIVE` | 403 | Membership status is not `active` |
+| `POLICY_DENIED` | 403 | Insufficient role for requested action |
+| `PARTNER_NOT_FOUND` | 403 | M2M `client_id` not in `system.partner_connection` |
+| `PARTNER_CONNECTION_INACTIVE` | 403 | Partner connection disabled/rotating |
+| `MISSING_SCOPE` | 403 | M2M token missing `federation:write` scope |
+| `FORGED_IDENTITY_HEADER` | 403 | Client sent `X-Userinfo` / `X-Authenticated-User` etc. |
 
 ## Image pins
 
