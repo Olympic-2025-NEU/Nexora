@@ -54,7 +54,7 @@
 
 ## P03-T08 — Gate G03
 
-- [ ] Chạy transaction rollback/concurrency, upload/scan/privacy, backup/restore và migration tests trên clone sạch.
+- [x] Chạy transaction rollback/concurrency, upload/scan/privacy, backup/restore và migration tests trên clone sạch.
 - **Bằng chứng:** schema dump đã redacted, test logs, checksum file, restore drill và gateway request trace.
 
 ## Hồ sơ giao AI theo từng task
