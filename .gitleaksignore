@@ -7,3 +7,5 @@
 3a5a540acfcad1ca6254a3baa1a87111301b52a8:documents/phase-plan/evidence/p01-t04.md:curl-auth-user:84
 # P02 G02 command deliberately passes a 13-character invalid-token fixture (not a credential).
 cfea7759d617bf19711c699d60f87649eefefa70:documents/phase-plan/evidence/G02.md:curl-auth-header:83
+# P03-T04 S3 client reads the runtime environment; the source line contains no credential literal.
+652c93a0267d6c8970e4223f07569ad0414e2b42:services/core-data/files/s3-store.mjs:generic-api-key:17
