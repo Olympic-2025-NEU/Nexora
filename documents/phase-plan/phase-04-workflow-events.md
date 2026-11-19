@@ -6,7 +6,7 @@
 
 - [ ] Biến `commandPipeline` từ danh sách string thành middleware/use-case boundary thực: authenticate → authorize → idempotency → validate/domain → transaction → response/dispatch sau commit.
 - [ ] Có request ID, actor/correlation, mapping DomainError thành API error; route handler chỉ parse/dispatch/map response.
-- [ ] Unit/contract test thứ tự và khi bước trước fail thì không chạy bước sau; confirm chưa auth không có side effect.
+- [x] Unit/contract test thứ tự và khi bước trước fail thì không chạy bước sau; confirm chưa auth không có side effect.
 - **Đầu ra:** pipeline adapter; **kiểm chứng:** trace log và negative tests.
 
 ## P04-T02 — Idempotency cho lệnh ghi
