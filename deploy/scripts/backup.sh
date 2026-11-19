@@ -36,10 +36,15 @@ while IFS= read -r service; do
   esac
 done <<< "$services"
 stopped=()
+writer_stopped_at=''
 cleanup() {
   status=$?
   trap - EXIT
   if ((${#stopped[@]})); then docker start "${stopped[@]}" >/dev/null || status=1; fi
+  if [[ -n "$writer_stopped_at" ]]; then
+    writer_restarted_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+    echo "Writer stop window: $writer_stopped_at to $writer_restarted_at ($((($(date +%s%N) - writer_stopped_ns) / 1000000)) ms)"
+  fi
   if ((status)); then echo 'Backup incomplete; source writers restarted' >&2; fi
   exit "$status"
 }
@@ -66,6 +71,8 @@ while IFS= read -r service; do
     stopped+=("$id")
   done < <(docker ps -q --filter "label=com.docker.compose.project=$project" --filter "label=com.docker.compose.service=$service")
 done <<< "$services"
+writer_stopped_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+writer_stopped_ns=$(date +%s%N)
 # Refuse active non-backup PostgreSQL sessions; external writers cannot be quiesced by Compose.
 active=$(pg sh -ec 'psql -XAt -h postgres -U "$POSTGRES_USER" -d postgres -c "SELECT count(*) FROM pg_stat_activity WHERE datname <> '\''postgres'\'' AND pid <> pg_backend_pid() AND state <> '\''idle'\''"')
 [[ "$active" = 0 ]] || { echo 'Active database sessions remain' >&2; exit 1; }

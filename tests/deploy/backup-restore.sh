@@ -18,6 +18,13 @@ chmod 700 "$root"
 original="$root/original"
 after="$root/after"
 compose=(docker compose -f deploy/compose.yml --env-file "deploy/instances/$instance.env" -p "$target_project")
+cleanup() {
+  status=$?
+  trap - EXIT
+  ( cd "$target"; "${compose[@]}" --profile apps down -v --remove-orphans ) || status=1
+  exit "$status"
+}
+trap cleanup EXIT
 pg_image='postgres:17.6@sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929'
 pg() {
   docker run --rm --security-opt label=disable --network "${target_project}_internal" --env-file "$target/deploy/instances/$instance.env" -v "$original:/backup:ro" "$pg_image" sh -ec 'export PGPASSWORD="$POSTGRES_PASSWORD"; exec "$@"' sh "$@"
@@ -49,6 +56,8 @@ for label in app keycloak flowable; do
   case "$label" in app) variable=APP_DB_NAME;; keycloak) variable=KEYCLOAK_DB_NAME;; flowable) variable=FLOWABLE_DB_NAME;; esac
   pg sh -ec 'eval "db=\${'"$variable"'}"; while IFS="|" read -r name expected; do
     [ -n "$name" ] || continue
+    # Keycloak creates/deletes runtime sessions on startup; they are not restored business data.
+    case "'"$label"':$name" in keycloak:public.*_session) continue;; esac
     case "$name" in *[!a-zA-Z0-9_.]*|.*|*.*.*) exit 1;; esac
     schema=${name%%.*}; table=${name#*.}
     actual=$(psql -XAt -h postgres -U "$POSTGRES_USER" -d "$db" -c "SELECT count(*) FROM \"$schema\".\"$table\"")
@@ -72,7 +81,7 @@ echo 'PASS isolated restore: row counts, attachment metadata, object hashes veri
 echo 'CASE source unchanged'
 bash deploy/scripts/backup.sh "$instance" "$source_project" "$after"
 node deploy/scripts/verify-backup.mjs "$after"
-node -e 'const fs=require("fs");const [a,b]=process.argv.slice(1).map(p=>JSON.parse(fs.readFileSync(p)));for(const key of ["counts","attachments","objects"]){if(JSON.stringify(a[key])!==JSON.stringify(b[key]))throw Error(`Source changed: ${key}`)}' "$original/manifest.json" "$after/manifest.json"
+node -e 'const fs=require("fs");const [a,b]=process.argv.slice(1).map(p=>JSON.parse(fs.readFileSync(p)));for(const key of ["counts","attachments","objects"]){const stable=m=>key==="counts"?{...m.counts,keycloak:Object.fromEntries(Object.entries(m.counts.keycloak).filter(([name])=>!/^public\.[a-z0-9_]*_session$/.test(name)))}:m[key];if(JSON.stringify(stable(a))!==JSON.stringify(stable(b)))throw Error(`Source changed: ${key}`)}' "$original/manifest.json" "$after/manifest.json"
 bash deploy/scripts/smoke.sh "$instance" "$source_project"
 echo 'PASS source unchanged: row counts, attachment metadata and object hashes; smoke'
 echo "Test payload outside checkout: $root"
