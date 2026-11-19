@@ -118,6 +118,7 @@
     "tests/gateway/private.test.mjs",
     "tests/gateway/public.test.mjs",
     "tests/platform/audit.integration.test.ts",
+    "tests/platform/core-evidence.integration.test.mjs",
     "tests/platform/core-records.integration.test.mjs",
     "tests/platform/files.integration.test.mjs",
     "tests/platform/scan.integration.test.mjs",
