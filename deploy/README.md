@@ -53,7 +53,7 @@ One PostgreSQL instance holds separate `nexora`, `keycloak`, and `flowable` data
 docker compose -f deploy/compose.yml --env-file deploy/instances/a.env -p nexora-a run --rm db-migrate
 ```
 
-For baseline backup, use `pg_dump -Fc` for each database (`nexora`, `keycloak`, `flowable`). Keep dumps outside Git. Restore to a new database with `pg_restore --no-owner`, check migration history and rows before routing services to the restored database. Do not restore over a running database.
+For the three-database and object-storage backup, verification, isolated restore and retention procedure, see [backup-restore.md](./backup-restore.md). Keep backup payload outside Git; never restore over a running source project.
 
 ## Profiles
 
