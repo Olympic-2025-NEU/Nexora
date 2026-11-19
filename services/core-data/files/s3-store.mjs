@@ -53,11 +53,11 @@ export function createS3FileStore(env, client) {
       await s3.send(new DeleteObjectCommand({ Bucket: bucket(kind), Key: key }),
         { abortSignal: AbortSignal.timeout(10000) });
     },
-    async *listQuarantine() {
+    async *list(kind, prefix) {
       let continuation;
       do {
-        const page = await s3.send(new ListObjectsV2Command({ Bucket: bucket('quarantine'),
-          Prefix: 'pending/', MaxKeys: 1000, ContinuationToken: continuation }),
+        const page = await s3.send(new ListObjectsV2Command({ Bucket: bucket(kind),
+          Prefix: prefix, MaxKeys: 1000, ContinuationToken: continuation }),
           { abortSignal: AbortSignal.timeout(10000) });
         for (const object of page.Contents ?? []) {
           if (object.Key && object.LastModified) yield { key: object.Key, lastModified: object.LastModified };
@@ -65,5 +65,7 @@ export function createS3FileStore(env, client) {
         continuation = page.NextContinuationToken;
       } while (continuation);
     },
+    listQuarantine() { return this.list('quarantine', 'pending/'); },
+    listPrivate() { return this.list('private', 'clean/'); },
   };
 }

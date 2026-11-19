@@ -4207,6 +4207,104 @@ paths:
           $ref: "#/components/responses/Error"
         "503":
           $ref: "#/components/responses/Error"
+  /api/v1/files/{id}/retry-scan:
+    post:
+      tags:
+        - Core
+      operationId: postFilesByIdRetryScan
+      summary: Retry failed file scan
+      description: Administrator only. Resets an error state to pending; infected files cannot be retried or released. Empty request body.
+      security:
+        - oidc: []
+      x-nexora-roles:
+        - administrator
+      x-nexora-scope: resource
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "202":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - data
+                  - requestId
+                properties:
+                  data:
+                    $ref: "#/components/schemas/FileScanRetry"
+                  requestId:
+                    type: string
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
+  /api/v1/files/{id}/discard:
+    post:
+      tags:
+        - Core
+      operationId: postFilesByIdDiscard
+      summary: Discard infected quarantine bytes
+      description: Administrator only. Deletes infected quarantine bytes, retains metadata and audit, and never releases the file. Repeated requests are safe. Empty request body.
+      security:
+        - oidc: []
+      x-nexora-roles:
+        - administrator
+      x-nexora-scope: resource
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "202":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - data
+                  - requestId
+                properties:
+                  data:
+                    $ref: "#/components/schemas/FileDiscarded"
+                  requestId:
+                    type: string
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
   /api/v1/audit-logs:
     get:
       tags:
@@ -6278,6 +6376,21 @@ components:
         checksum:
           type: string
           pattern: ^[0-9a-f]{64}$
+        scanAttempts:
+          type: integer
+          minimum: 0
+          maximum: 5
+        scanErrorCode:
+          type: string
+          nullable: true
+        nextScanAt:
+          type: string
+          format: date-time
+          nullable: true
+        quarantinePurgedAt:
+          type: string
+          format: date-time
+          nullable: true
     FileAccepted:
       type: object
       additionalProperties: false
@@ -6292,6 +6405,42 @@ components:
           type: string
           enum:
             - pending
+            - clean
+            - infected
+            - error
+    FileScanRetry:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - scanState
+      properties:
+        id:
+          type: string
+          format: uuid
+        scanState:
+          type: string
+          enum:
+            - pending
+    FileDiscarded:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - scanState
+        - discarded
+      properties:
+        id:
+          type: string
+          format: uuid
+        scanState:
+          type: string
+          enum:
+            - infected
+        discarded:
+          type: boolean
+          enum:
+            - true
     AuditEntry:
       type: object
       additionalProperties: false
