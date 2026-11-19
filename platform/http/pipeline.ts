@@ -4,7 +4,7 @@ import type { Actor } from "../identity/actor";
 import type { PartnerActor } from "../identity/partner-actor";
 import { requirePolicy } from "../access/policy";
 import { transaction, type AppTransaction } from "../persistence/transaction";
-import { UnimplementedDispatch, UnimplementedIdempotency, type DispatchPort, type IdempotencyPort } from "./command-ports";
+import { UnimplementedIdempotency, type DispatchPort, type IdempotencyPort } from "./command-ports";
 
 /** Thứ tự bắt buộc của một lệnh ghi. Route handler không được đảo các bước. */
 export const commandPipeline = [
