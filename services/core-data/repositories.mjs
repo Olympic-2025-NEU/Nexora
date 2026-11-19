@@ -47,3 +47,12 @@ export function attachmentRepository(db) {
     },
   };
 }
+
+/** @param {import('@prisma/client').PrismaClient | import('@prisma/client').Prisma.TransactionClient} db */
+export function evidenceAccessRepository(db) {
+  return {
+    membership(id) { return db.membership.findUnique({ where: { id } }); },
+    organization(id) { return db.organization.findUnique({ where: { id } }); },
+    attachment(id) { return db.attachment.findUnique({ where: { id } }); },
+  };
+}

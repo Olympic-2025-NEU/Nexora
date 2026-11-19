@@ -207,7 +207,10 @@ action("/api/v1/federation/deliveries/{id}/retry", "M04", "Retry outbound delive
 add("post", "/api/v1/ai/chat", "AI01", "AI chat with delegated tools", "AiChatResult", { body: "AiChatInput", status: 200, roles: EVERY_USER });
 create("/api/v1/ai/drafts", "AI01", "Create AI-assisted draft", "AiDraftResult", "AiDraftInput", WRITER, { idempotent: true, status: 201 });
 detail("/api/v1/ai/tool-calls/{id}", "AI01", "Get redacted AI tool call", "AiToolCall");
-create("/api/v1/core/records", "Core", "Create structured core record", "CoreRecordCreated", "CoreRecordCreate", ["administrator", "staff", "service"], { idempotent: true, description: "Kind-specific JSON Schema and writer policy apply. User-created evidence metadata gets its source key from the server." });
+create("/api/v1/core/records", "Core", "Create private evidence record", "CoreRecord", "CoreRecordCreate", WRITER, { idempotent: true, errors: [401, 403, 404, 409, 422, 503], description: "Only evidence_metadata with an authorized active membership or organization owner and clean private attachment. Server assigns source key, visibility and policy version. Same Idempotency-Key and payload returns 200; different payload returns 409 unless If-Match names the current version and owner remains unchanged." });
+doc.paths["/api/v1/core/records"].post.responses["200"] = doc.paths["/api/v1/core/records"].post.responses["201"];
+doc.paths["/api/v1/core/records"].post.parameters.push({ name: "If-Match", in: "header", required: false,
+  schema: str({ pattern: '^"[1-9][0-9]*"$' }), description: "Optional current version for a change to existing evidence." });
 detail("/api/v1/core/records/{id}", "Core", "Get structured core record", "CoreRecord");
 add("post", "/api/v1/files", "Core", "Upload quarantined file", "FileAccepted", { body: "FileUpload", multipart: true, status: 202, idempotent: true, roles: WRITER, description: "Only scanned clean files may be downloaded or shared." });
 add("get", "/api/v1/files/{id}", "Core", "Get file metadata or content", "FileMetadata", {

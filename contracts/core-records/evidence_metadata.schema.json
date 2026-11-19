@@ -18,7 +18,9 @@
       "enum": [
         "document",
         "batch",
-        "trace_event"
+        "trace_event",
+        "membership",
+        "organization"
       ]
     },
     "ownerId": {

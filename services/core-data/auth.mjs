@@ -33,8 +33,12 @@ export function createAuthenticator(db, env) {
       throw new CoreAuthError('TOKEN_INVALID', 401);
     }
     if (typeof claims.sub !== 'string' || !claims.sub) throw new CoreAuthError('TOKEN_INVALID', 401);
-    const member = await db.membership.findUnique({ where: { keycloakSub: claims.sub } });
-    if (!member || member.status !== 'active') throw new CoreAuthError('MEMBERSHIP_INACTIVE', 403);
-    return { sub: member.keycloakSub, role: member.role, organizationId: member.organizationId };
+    const member = await db.membership.findUnique({ where: { keycloakSub: claims.sub },
+      include: { organization: true } });
+    if (!member || member.status !== 'active' || member.organization.status !== 'active') {
+      throw new CoreAuthError('MEMBERSHIP_INACTIVE', 403);
+    }
+    return { sub: member.keycloakSub, actorSub: member.keycloakSub, role: member.role,
+      membershipId: member.id, organizationId: member.organizationId };
   };
 }

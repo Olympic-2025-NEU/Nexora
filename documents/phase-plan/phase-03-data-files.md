@@ -46,9 +46,10 @@
 
 ## P03-T07 — Structured/unstructured data API chứng minh lõi
 
-- [ ] Triển khai **core data/file API riêng không UI** theo D15: structured resource allowlist (metadata/projection versioned) ghi/đọc có authz và upload/download tệp private có scan; browser và DX-Lab chỉ qua gateway, không truy cập DB/storage trực tiếp.
+- [x] Triển khai **core data/file API riêng không UI** theo D15: structured resource allowlist (metadata/projection versioned) ghi/đọc có authz và upload/download tệp private có scan; browser và DX-Lab chỉ qua gateway, không truy cập DB/storage trực tiếp.
 - [ ] Chứng minh cả hai dùng cùng actor/policy/audit; file evidence có link tới document/lot nhưng không tự động public. ERP vẫn giữ transaction document/stock/outbox tại app DB, đồng bộ projection sang core API sau commit có retry; không gọi core API giữa transaction M03.
-- [ ] Tắt UI Next ERP và DX-Lab rồi smoke core API/SSO/gateway/file/Flowable; không cần business app để chứng minh nền tảng lõi vẫn có API sống.
+- **Còn lại:** ERP projection sync và owner document/lot chờ P04/P08 (owner còn phụ thuộc P06/P07); xem [evidence/p03-t07.md](./evidence/p03-t07.md).
+- [x] Tắt UI Next ERP và DX-Lab rồi smoke core API/SSO/gateway/file/Flowable; không cần business app để chứng minh nền tảng lõi vẫn có API sống.
 - **Đầu ra:** runtime + smoke script cho hai loại dữ liệu; **kiểm chứng:** 200/401/403, scan states và core API hoạt động không UI.
 
 ## P03-T08 — Gate G03
