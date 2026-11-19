@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { randomUUID, createHmac, createHash } from "node:crypto";
-import { connect } from "node:net";
 
 export const requestId = (value) => /^[a-zA-Z0-9_-]{1,64}$/.test(value || "") ? value : randomUUID();
 export const log = (service, id, event, status) => console.log(JSON.stringify({ timestamp: new Date().toISOString(), service, requestId: id, event, status }));
@@ -14,16 +13,6 @@ export async function timed(promise, ms = 2000) {
   try {
     return await Promise.race([promise, new Promise((_, reject) => { timer = setTimeout(() => reject(Error("timeout")), ms); })]);
   } finally { clearTimeout(timer); }
-}
-
-export function scannerPing() {
-  return timed(new Promise((resolve, reject) => {
-    const socket = connect(3310, "clamav");
-    socket.once("connect", () => socket.write("zPING\0"));
-    socket.once("data", (data) => { socket.destroy(); if (data.toString().includes("PONG")) resolve(); else reject(Error("scanner")); });
-    socket.once("error", reject);
-    socket.once("close", () => reject(Error("scanner")));
-  }));
 }
 
 // Signed S3 HEAD confirms bucket access, not merely an open TCP port.

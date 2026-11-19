@@ -49,6 +49,12 @@ model Attachment {
   createdBySub      String   @map("created_by_sub")
   scannedAt         DateTime? @map("scanned_at") @db.Timestamptz(6)
   scanEngineVersion String?  @map("scan_engine_version")
+  scanAttempts      Int      @default(0) @map("scan_attempts")
+  scanErrorCode     String?  @map("scan_error_code")
+  nextScanAt        DateTime? @map("next_scan_at") @db.Timestamptz(6)
+  scanLeaseId       String?  @map("scan_lease_id") @db.Uuid
+  scanLeaseUntil    DateTime? @map("scan_lease_until") @db.Timestamptz(6)
+  quarantinePurgedAt DateTime? @map("quarantine_purged_at") @db.Timestamptz(6)
   uploadKeyHash     String?  @unique @map("upload_key_hash") @db.Char(64)
   uploadPayloadHash String?  @map("upload_payload_hash") @db.Char(64)
 

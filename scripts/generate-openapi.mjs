@@ -214,6 +214,14 @@ add("get", "/api/v1/files/{id}", "Core", "Get file metadata or content", "FileMe
   roles: EVERY_USER, query: ["download"], errors: [400, 401, 403, 404, 423, 429, 503],
   description: "Returns metadata by default. download=1 streams bytes only after a clean scan and resource authorization.",
 });
+add("post", "/api/v1/files/{id}/retry-scan", "Core", "Retry failed file scan", "FileScanRetry", {
+  status: 202, roles: ADMIN, errors: [400, 401, 403, 404, 409, 429, 503],
+  description: "Administrator only. Resets an error state to pending; infected files cannot be retried or released. Empty request body.",
+});
+add("post", "/api/v1/files/{id}/discard", "Core", "Discard infected quarantine bytes", "FileDiscarded", {
+  status: 202, roles: ADMIN, errors: [400, 401, 403, 404, 409, 429, 503],
+  description: "Administrator only. Deletes infected quarantine bytes, retains metadata and audit, and never releases the file. Repeated requests are safe. Empty request body.",
+});
 
 add("get", "/api/v1/audit-logs", "Operations", "Query audit logs", "AuditEntry", {
   list: true, roles: ADMIN,

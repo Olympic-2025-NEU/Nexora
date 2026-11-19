@@ -245,6 +245,22 @@
       ]
     },
     {
+      "method": "POST",
+      "path": "/api/v1/files/{id}/retry-scan",
+      "auth": "protected",
+      "roles": ["administrator"],
+      "scope": "resource",
+      "success": ["202"]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/files/{id}/discard",
+      "auth": "protected",
+      "roles": ["administrator"],
+      "scope": "resource",
+      "success": ["202"]
+    },
+    {
       "method": "GET",
       "path": "/api/v1/health/live",
       "auth": "public",

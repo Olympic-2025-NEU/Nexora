@@ -32,9 +32,9 @@
 
 ## P03-T05 — Kiểm dịch tệp
 
-- [ ] Kết nối ClamAV/engine nguồn mở đã chốt, cập nhật signature DB; scan stream/quarantine trước khi chuyển `clean` và cho phép download/chia sẻ.
-- [ ] Scan timeout/service down = fail closed, retry có trạng thái; tệp nhiễm/malformed bị reject/quarantine, có audit và thao tác xử lý admin.
-- [ ] Dùng fixture EICAR hoặc cách kiểm thử an toàn theo hướng dẫn engine, không đưa mẫu độc hại thật vào repo.
+- [x] Kết nối ClamAV/engine nguồn mở đã chốt, cập nhật signature DB; scan stream/quarantine trước khi chuyển `clean` và cho phép download/chia sẻ. Bằng chứng: [evidence/p03-t05.md](./evidence/p03-t05.md).
+- [x] Scan timeout/service down = fail closed, retry có trạng thái; tệp nhiễm/malformed bị reject/quarantine, có audit và thao tác xử lý admin. Bằng chứng: [evidence/p03-t05.md](./evidence/p03-t05.md).
+- [x] Dùng fixture EICAR hoặc cách kiểm thử an toàn theo hướng dẫn engine, không đưa mẫu độc hại thật vào repo. Bằng chứng: [evidence/p03-t05.md](./evidence/p03-t05.md).
 - **Đầu ra:** file scan pipeline; **kiểm chứng:** sạch được dùng, nhiễm/scan lỗi không phát tán.
 
 ## P03-T06 — DB/volume backup và restore

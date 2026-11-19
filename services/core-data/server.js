@@ -2,20 +2,22 @@
 import http from "node:http";
 import { PrismaClient } from "@prisma/client";
 import { validateConfig } from "./config.mjs";
-import { requestId, response, timed, bucketProbe, scannerPing, log } from "./health.mjs";
+import { requestId, response, timed, bucketProbe, log } from "./health.mjs";
 import { createAuthenticator } from "./auth.mjs";
 import { createFileService } from "./files/upload-service.mjs";
 import { createS3FileStore } from "./files/s3-store.mjs";
 import { handleFileRequest } from "./files/http.mjs";
+import { createClamAvScanner } from "./files/clamav.mjs";
 
 validateConfig(process.env, "core-data");
 const prisma = new PrismaClient({ datasources: { db: { url: process.env.CORE_DATABASE_URL } } });
 const store = createS3FileStore(process.env);
+const scanner = createClamAvScanner();
 const fileHandler = { authenticate: createAuthenticator(prisma, process.env),
   files: createFileService(prisma, store) };
 async function ready() {
   try {
-    await Promise.all([timed(prisma.$queryRaw`SELECT 1`), bucketProbe(process.env), scannerPing()]);
+    await Promise.all([timed(prisma.$queryRaw`SELECT 1`), bucketProbe(process.env), timed(scanner.version())]);
     return true;
   } catch { return false; }
 }

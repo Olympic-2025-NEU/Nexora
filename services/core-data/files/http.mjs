@@ -20,7 +20,9 @@ export async function handleFileRequest(req, res, { authenticate, files }) {
   const path = new URL(req.url, 'http://localhost').pathname;
   const root = path === '/files' || path === '/files/' || path === '/api/v1/files';
   const match = /^\/(?:api\/v1\/)?files\/([0-9a-f-]+)$/i.exec(path);
-  if (!root && !match) return false;
+  const retry = /^\/(?:api\/v1\/)?files\/([0-9a-f-]+)\/retry-scan$/i.exec(path);
+  const discard = /^\/(?:api\/v1\/)?files\/([0-9a-f-]+)\/discard$/i.exec(path);
+  if (!root && !match && !retry && !discard) return false;
   const suppliedId = req.headers['x-request-id'];
   const requestId = typeof suppliedId === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(suppliedId)
     ? suppliedId : randomUUID();
@@ -30,6 +32,16 @@ export async function handleFileRequest(req, res, { authenticate, files }) {
       const upload = await parseFileUpload(req);
       const data = await files.upload({ actor, ...upload,
         idempotencyKey: req.headers['idempotency-key'], requestId });
+      json(res, 202, { data, requestId }, requestId);
+      return true;
+    }
+    if ((retry || discard) && req.method === 'POST') {
+      if ((req.headers['content-length'] !== undefined && req.headers['content-length'] !== '0') ||
+          req.headers['transfer-encoding']) {
+        throw new FileError('FILE_REQUEST_INVALID', 400);
+      }
+      const data = retry ? await files.retryScan({ actor, id: retry[1], requestId })
+        : await files.discardInfected({ actor, id: discard[1], requestId });
       json(res, 202, { data, requestId }, requestId);
       return true;
     }

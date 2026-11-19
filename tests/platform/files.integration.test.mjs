@@ -168,7 +168,7 @@ test('Core File API: OIDC, quarantine, idempotency, privacy, compensation and re
   assert.equal((await reconcileFiles(core, store, { now: future })).missingObjects, 0);
   const lateReplay = await upload(form(content), key);
   assert.equal(lateReplay.status, 202);
-  assert.deepEqual((await lateReplay.json()).data, accepted);
+  assert.deepEqual((await lateReplay.json()).data, { id: accepted.id, scanState: 'error' });
 
   const cleanId = randomUUID();
   const cleanKey = `clean/${randomUUID()}`;

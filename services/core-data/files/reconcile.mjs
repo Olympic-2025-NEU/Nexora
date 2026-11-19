@@ -6,6 +6,7 @@ import { recordCoreAudit } from '../audit.mjs';
 export async function reconcileFiles(db, store, { now = new Date(), graceMs = 15 * 60_000 } = {}) {
   const cutoff = new Date(now.getTime() - graceMs);
   let orphanObjects = 0;
+  let orphanPrivateObjects = 0;
   let missingObjects = 0;
   for await (const object of store.listQuarantine()) {
     if (object.lastModified >= cutoff) continue;
@@ -15,6 +16,16 @@ export async function reconcileFiles(db, store, { now = new Date(), graceMs = 15
     if (!row) {
       await store.delete('quarantine', object.key);
       orphanObjects++;
+    }
+  }
+  for await (const object of store.listPrivate()) {
+    if (object.lastModified >= cutoff) continue;
+    const row = await db.attachment.findUnique({
+      where: { bucket_objectKey: { bucket: 'private', objectKey: object.key } },
+    });
+    if (!row) {
+      await store.delete('private', object.key);
+      orphanPrivateObjects++;
     }
   }
   const pending = await db.attachment.findMany({ where: {
@@ -33,5 +44,5 @@ export async function reconcileFiles(db, store, { now = new Date(), graceMs = 15
       missingObjects++;
     });
   }
-  return { orphanObjects, missingObjects };
+  return { orphanObjects, orphanPrivateObjects, missingObjects };
 }

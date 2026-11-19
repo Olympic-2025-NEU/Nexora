@@ -36,6 +36,8 @@ test("versioned schema contains platform tables, expected constraints and migrat
     "id", "created_at", "updated_at", "version", "owner_type", "owner_id", "bucket",
     "object_key", "sha256_hex", "mime_type", "size_bytes", "scan_state", "visibility",
     "created_by_sub", "scanned_at", "scan_engine_version", "upload_key_hash", "upload_payload_hash",
+    "scan_attempts", "scan_error_code", "next_scan_at", "scan_lease_id", "scan_lease_until",
+    "quarantine_purged_at",
   ]);
   assert.deepEqual(byTable("core_record"), [
     "id", "created_at", "updated_at", "version", "kind", "source_type", "source_id",
@@ -52,6 +54,8 @@ test("versioned schema contains platform tables, expected constraints and migrat
     "audit_log_actor_check", "audit_log_outcome_check", "audit_log_correlation_id_check",
     "attachment_sha256_check", "attachment_size_check", "attachment_scan_state_check",
     "attachment_upload_hash_pair_check", "attachment_upload_key_hash_check", "attachment_upload_payload_hash_check",
+    "attachment_scan_attempts_check", "attachment_scan_lease_pair_check", "attachment_scan_error_code_check",
+    "attachment_quarantine_purged_state_check",
     "core_record_kind_check", "core_record_checksum_check",
   ]) assert.ok(names.has(name), `missing constraint ${name}`);
 
@@ -60,6 +64,7 @@ test("versioned schema contains platform tables, expected constraints and migrat
     WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL ORDER BY migration_name`;
   assert.ok(migrations.some((row) => row.migration_name === "20261118020000_platform_core_audit_grant"));
   assert.ok(migrations.some((row) => row.migration_name === "20261119000000_file_upload_idempotency"));
+  assert.ok(migrations.some((row) => row.migration_name === "20261119010000_file_scan_retry"));
   const stock = await migrator.$queryRaw`
     SELECT to_regclass('inventory.stock_balance')::text AS relation`;
   assert.equal(stock[0].relation, null, "P03 must not create P06 stock tables");
