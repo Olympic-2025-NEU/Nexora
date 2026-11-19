@@ -233,8 +233,9 @@ test('PostgreSQL: record, idempotency and audit share core_data transaction', {
   const admin = new PrismaClient({ datasources: { db: { url: process.env.DATABASE_URL } } });
   const core = new PrismaClient({ datasources: { db: { url: process.env.CORE_DATABASE_URL } } });
   try {
-    const organization = await admin.organization.findFirst({ where: { status: 'active' } });
-    assert.ok(organization, 'Isolated test DB needs an active organization');
+    const organization = await admin.organization.create({ data: { id: randomUUID(),
+      instanceId: `records-${randomUUID().slice(0, 8)}`,
+      code: `records-${randomUUID().slice(0, 8)}`, name: 'Core records integration', status: 'active' } });
     const sub = `core-record-${randomUUID()}`;
     const member = await admin.membership.create({ data: { id: randomUUID(), organizationId: organization.id,
       keycloakSub: sub, displayName: 'Core records integration', role: 'staff', status: 'active' } });
