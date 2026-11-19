@@ -59,7 +59,7 @@ routes:
       request-id: {}
       <<: *strip-identity-headers
       openid-connect:
-        # Bearer-only: gateway validates token, sets X-Userinfo for upstream.
+        # Bearer-only: gateway verifies token; core verifies Authorization again.
         # OIDC_ISSUER_URL placeholder — substitute actual value from instance env.
         # Internal Keycloak URL for Docker Compose: http://keycloak:8080/realms/nexora
         discovery: "${OIDC_ISSUER_URL}/.well-known/openid-configuration"
@@ -70,7 +70,7 @@ routes:
         realm: nexora
         introspection_endpoint_auth_method: client_secret_post
         set_access_token_header: false
-        set_userinfo_header: true
+        set_userinfo_header: false
         access_token_in_authorization_header: true
       limit-req:
         rate: 100
@@ -84,7 +84,7 @@ routes:
   # 2. Files API — specific prefix BEFORE catch-all /api/v1/*
   # -------------------------------------------------------------------------
   - id: files-api-v1
-    uri: /api/v1/files/*
+    uris: [/api/v1/files, /api/v1/files/*]
     methods: [GET, HEAD, POST, PUT, PATCH, DELETE]
     upstream:
       type: roundrobin
@@ -101,7 +101,7 @@ routes:
         use_jwks: true
         realm: nexora
         set_access_token_header: false
-        set_userinfo_header: true
+        set_userinfo_header: false
         access_token_in_authorization_header: true
       limit-req:
         rate: 50
@@ -109,7 +109,7 @@ routes:
         key: remote_addr
         rejected_code: 429
       proxy-rewrite:
-        regex_uri: ["^/api/v1/files/(.*)", "/files/$1"]
+        regex_uri: ["^/api/v1/files/?(.*)$", "/files/$1"]
 
   # -------------------------------------------------------------------------
   # 3. Public passport route — anonymous, GET/HEAD only, rate-limited
@@ -151,7 +151,7 @@ routes:
         use_jwks: true
         realm: nexora
         set_access_token_header: false
-        set_userinfo_header: true
+        set_userinfo_header: false
         access_token_in_authorization_header: true
         # Required scope for M2M federation partners.
         # APISIX openid-connect >= 3.x supports scope_claim_name + required_scopes.
@@ -183,7 +183,7 @@ routes:
         use_jwks: true
         realm: nexora
         set_access_token_header: false
-        set_userinfo_header: true
+        set_userinfo_header: false
         access_token_in_authorization_header: true
         scope_claim_name: scope
       limit-req:
@@ -218,7 +218,7 @@ routes:
         realm: nexora
         introspection_endpoint_auth_method: client_secret_post
         set_access_token_header: false
-        set_userinfo_header: true
+        set_userinfo_header: false
         access_token_in_authorization_header: true
       limit-req:
         rate: 200

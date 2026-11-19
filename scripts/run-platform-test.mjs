@@ -7,10 +7,11 @@ const scripts = {
   schema: "tests/platform/run-schema.sh",
   transaction: "tests/platform/run-unit-of-work.sh",
   audit: "tests/platform/run-audit.sh",
+  files: "tests/platform/run-files.sh",
 };
 const script = scripts[process.argv[2]];
 if (!script) {
-  console.error("Expected platform test: schema, transaction or audit");
+  console.error("Expected platform test: schema, transaction, audit or files");
   process.exit(2);
 }
 

@@ -14,8 +14,8 @@ Success write: `{data:{id,status,version,...},requestId}`; list: `{data:[...],pa
 | `GET /api/v1/health/live`, `/ready` | Không body | `{status,service,version}`; ready nội bộ có dependency summary an toàn, không secret |
 | `POST /api/v1/core/records` | `{kind,sourceType?,sourceId?,payload,visibility,policyVersion}` theo `core-record-payloads-v1.md`; user evidence_metadata không gửi source key, server cấp `sourceType='evidence'`/UUID; service kinds phải gửi source key đúng quy tắc | `{id,version,checksum,builtAt}`; service-only cho trace/OT/archive, user chỉ evidence_metadata thuộc resource được cấp; duplicate same hash idempotent, khác hash 409 nếu không phải update `If-Match`; không ghi arbitrary SQL |
 | `GET /api/v1/core/records/{id}` | Không body | Record sau policy; 404 cho resource không thuộc scope |
-| `POST /api/v1/files` | multipart `{file,ownerType?,ownerId?,visibility?}`; MIME/size allowlist | 202 `{id,scanState:'pending'}`; private cho tới clean, không URL public |
-| `GET /api/v1/files/{id}` | Không body | metadata `{id,mimeType,sizeBytes,scanState,visibility,checksum}` hoặc 302/stream chỉ khi clean và authorized |
+| `POST /api/v1/files` | multipart `{file,ownerType?,ownerId?,visibility?}`; `Idempotency-Key` bắt buộc; MIME/size allowlist. P03-T04 chỉ nhận file chưa link owner với `visibility=private`, owner fields chờ policy tài nguyên ở T07. | 202 `{id,scanState:'pending'}`; tệp nằm quarantine, không URL public; retry cùng key/payload trả ID cũ, key khác payload trả 409 |
+| `GET /api/v1/files/{id}` | `?download=1` nếu muốn bytes | metadata `{id,mimeType,sizeBytes,scanState,visibility,checksum}`; `download=1` trả stream chỉ khi clean, bucket private và actor có quyền; pending/infected/error trả 423 |
 | `GET /api/v1/organization` | Không body | `{id,instanceId,code,name,timezone,status}`; user authenticated |
 | `PATCH /api/v1/organization` | `{name?,contactEmail?,timezone?}`, `If-Match` | `{id,version,...}`; Administrator; `instanceId/code` bất biến |
 | `GET /api/v1/members` | `?cursor&limit&status&role` | `{id,keycloakSub,displayName,role,status}`; Administrator |

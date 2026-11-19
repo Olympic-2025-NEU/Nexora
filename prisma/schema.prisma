@@ -49,6 +49,8 @@ model Attachment {
   createdBySub      String   @map("created_by_sub")
   scannedAt         DateTime? @map("scanned_at") @db.Timestamptz(6)
   scanEngineVersion String?  @map("scan_engine_version")
+  uploadKeyHash     String?  @unique @map("upload_key_hash") @db.Char(64)
+  uploadPayloadHash String?  @map("upload_payload_hash") @db.Char(64)
 
   @@unique([bucket, objectKey])
   @@index([ownerType, ownerId])

@@ -37,8 +37,8 @@ cp prisma/schema.prisma "$temp_root/schema.prisma"
 cp prisma/migrations/migration_lock.toml "$temp_root/migrations/"
 for migration in prisma/migrations/*/; do
   case "$migration" in
-    *20261118020000_platform_core_audit_grant/) ;;
-    *) cp -R "$migration" "$temp_root/migrations/" ;;
+    *20261117000000_platform_baseline/|*20261118000000_system_org_membership/|*20261118010000_system_partner/)
+      cp -R "$migration" "$temp_root/migrations/" ;;
   esac
 done
 

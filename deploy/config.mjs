@@ -51,6 +51,8 @@ const runtime = {
   "core-data": {
     CORE_DATABASE_URL: "database", S3_ENDPOINT: "url", S3_ACCESS_KEY: "secret",
     S3_SECRET_KEY: "secret", S3_BUCKET_PRIVATE: "bucket",
+    S3_BUCKET_QUARANTINE: "bucket", S3_BUCKET_PUBLIC: "bucket",
+    OIDC_ISSUER_URL: "url", OIDC_JWKS_URL: "url", OIDC_AUDIENCE: "id",
   },
 };
 

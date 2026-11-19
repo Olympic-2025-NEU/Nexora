@@ -4139,7 +4139,7 @@ paths:
         - Core
       operationId: getFilesById
       summary: Get file metadata or content
-      description: Target contract; runtime implementation is tracked by the owning phase.
+      description: Returns metadata by default. download=1 streams bytes only after a clean scan and resource authorization.
       security:
         - oidc: []
       x-nexora-roles:
@@ -4155,6 +4155,12 @@ paths:
           schema:
             type: string
             format: uuid
+        - name: download
+          in: query
+          schema:
+            type: string
+            enum:
+              - "1"
       responses:
         "200":
           description: Success
@@ -4171,18 +4177,31 @@ paths:
                     $ref: "#/components/schemas/FileMetadata"
                   requestId:
                     type: string
-        "302":
-          description: Authorized clean-file redirect
-          headers:
-            Location:
+            application/pdf:
               schema:
                 type: string
-                format: uri
+                format: binary
+            image/png:
+              schema:
+                type: string
+                format: binary
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            text/plain:
+              schema:
+                type: string
+                format: binary
+        "400":
+          $ref: "#/components/responses/Error"
         "401":
           $ref: "#/components/responses/Error"
         "403":
           $ref: "#/components/responses/Error"
         "404":
+          $ref: "#/components/responses/Error"
+        "423":
           $ref: "#/components/responses/Error"
         "429":
           $ref: "#/components/responses/Error"

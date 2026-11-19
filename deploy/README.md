@@ -59,7 +59,7 @@ For baseline backup, use `pg_dump -Fc` for each database (`nexora`, `keycloak`, 
 
 - default: infrastructure (PG, Redis, Keycloak, gateway, SeaweedFS, Flowable, ClamAV)
 - `local-admin`: loopback publish for Postgres + Keycloak only
-- `apps`: ERP + worker + core-data
+- `apps`: ERP + worker + core-data + file-reconciler
 - `dxlab`: DX-Lab frontend (P11)
 - `ai`: optional AI stub
 
@@ -67,7 +67,7 @@ For baseline backup, use `pg_dump -Fc` for each database (`nexora`, `keycloak`, 
 
 Set `OIDC_BASE_URL` to the Keycloak URL advertised to token consumers, `OIDC_ISSUER_URL` to `${OIDC_BASE_URL}/realms/nexora`, and both exact `OIDC_REDIRECT_URI_*` values for browser clients. Choose per-instance passwords and S3 access keys in the untracked env file. `KC_DEV_USER_PASSWORD` is optional; when set, bootstrap creates `KC_DEV_USERNAME` once with a temporary password that must be changed on first login. Re-running bootstrap updates client redirect settings without resetting the dev user's password.
 
-`keycloak-bootstrap` waits for Keycloak and provisions the realm/clients via the admin REST API. APISIX then starts with `/gateway/ping`, read-only `/core/*` and `/erp/*` upstreams. Its admin API is disabled. `storage-bootstrap` writes consumer-scoped SeaweedFS S3 identities into an instance-specific Docker volume. SeaweedFS `mini -bucket` creates the private, quarantine, and public buckets only when absent; storage files and filer metadata live in `seaweed_data`. Core-data uses `S3_ACCESS_KEY` / `S3_SECRET_KEY`; scanner access to quarantine uses `S3_SCANNER_*`; `S3_ADMIN_*` stays with storage bootstrap. The SeaweedFS admin UI binds to container loopback. Flowable REST uses its dedicated PostgreSQL role and authenticated engine health check. Bootstrap jobs rerun safely with Compose `up` or explicitly:
+`keycloak-bootstrap` waits for Keycloak and provisions the realm/clients via the admin REST API. APISIX then starts with `/gateway/ping`, protected `/api/v1/core/*` and `/api/v1/files*` to Core Data, and ERP routes. Its admin API is disabled. `storage-bootstrap` writes consumer-scoped SeaweedFS S3 identities into an instance-specific Docker volume. SeaweedFS `mini -bucket` creates the private, quarantine, and public buckets only when absent; storage files and filer metadata live in `seaweed_data`. Core-data uses `S3_ACCESS_KEY` / `S3_SECRET_KEY`; scanner access to quarantine uses `S3_SCANNER_*`; `S3_ADMIN_*` stays with storage bootstrap. Core Data verifies the Bearer token and membership again; gateway does not forward `X-Userinfo`. The SeaweedFS admin UI binds to container loopback. Flowable REST uses its dedicated PostgreSQL role and authenticated engine health check. Bootstrap jobs rerun safely with Compose `up` or explicitly:
 
 ```sh
 docker compose -f deploy/compose.yml --env-file deploy/instances/a.env -p nexora-a run --rm keycloak-bootstrap
@@ -75,6 +75,8 @@ docker compose -f deploy/compose.yml --env-file deploy/instances/a.env -p nexora
 ```
 
 The default example issuer uses Docker's internal `keycloak` hostname. Set a browser-reachable Keycloak base URL and matching issuer for browser login in a trusted deployment; public OIDC gateway routes and access policies belong to P02.
+
+From P03-T04, `POST /api/v1/files` accepts a private, unlinked quarantine upload and `GET /api/v1/files/{id}` returns authorized metadata. `?download=1` only streams a clean private object after checksum verification; the scan worker is delivered by P03-T05. `file-reconciler` removes stale unreferenced quarantine objects and marks missing pending objects as error. See [file-storage.md](../documents/phase-plan/file-storage.md) for policy and failure recovery.
 
 ## P02-T07 — Realm/Client Provisioning, HTTPS, Rotate/Revoke
 

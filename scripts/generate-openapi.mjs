@@ -13,6 +13,7 @@ const filterTypes = {
   depth: { type: "integer", minimum: 1, maximum: 10 },
   id: uuid, warehouseId: uuid, productId: uuid, batchId: uuid, partnerId: uuid,
   targetId: str({ maxLength: 128 }), requestId: str({ maxLength: 128 }),
+  download: str({ enum: ["1"] }),
   from: str({ format: "date-time" }), to: str({ format: "date-time" }),
 };
 
@@ -125,9 +126,9 @@ function add(method, path, tag, summary, response, options = {}) {
     responses: { [String(responseCode)]: success, ...errors(errorCodes) },
   };
   if (path === "/api/v1/files/{id}") {
-    op.responses["302"] = { description: "Authorized clean-file redirect", headers: {
-      Location: { schema: str({ format: "uri" }) },
-    } };
+    for (const mediaType of ["application/pdf", "image/png", "image/jpeg", "text/plain"]) {
+      op.responses["200"].content[mediaType] = { schema: str({ format: "binary" }) };
+    }
   }
   (doc.paths[path] ??= {})[verb] = op;
 }
@@ -209,7 +210,10 @@ detail("/api/v1/ai/tool-calls/{id}", "AI01", "Get redacted AI tool call", "AiToo
 create("/api/v1/core/records", "Core", "Create structured core record", "CoreRecordCreated", "CoreRecordCreate", ["administrator", "staff", "service"], { idempotent: true, description: "Kind-specific JSON Schema and writer policy apply. User-created evidence metadata gets its source key from the server." });
 detail("/api/v1/core/records/{id}", "Core", "Get structured core record", "CoreRecord");
 add("post", "/api/v1/files", "Core", "Upload quarantined file", "FileAccepted", { body: "FileUpload", multipart: true, status: 202, idempotent: true, roles: WRITER, description: "Only scanned clean files may be downloaded or shared." });
-detail("/api/v1/files/{id}", "Core", "Get file metadata or content", "FileMetadata");
+add("get", "/api/v1/files/{id}", "Core", "Get file metadata or content", "FileMetadata", {
+  roles: EVERY_USER, query: ["download"], errors: [400, 401, 403, 404, 423, 429, 503],
+  description: "Returns metadata by default. download=1 streams bytes only after a clean scan and resource authorization.",
+});
 
 add("get", "/api/v1/audit-logs", "Operations", "Query audit logs", "AuditEntry", {
   list: true, roles: ADMIN,

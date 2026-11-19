@@ -25,9 +25,9 @@
 
 ## P03-T04 — S3-compatible object storage
 
-- [ ] Chốt D02 và dựng bucket `quarantine`, `private`, `public` hoặc policy tương đương; object key ngẫu nhiên, checksum SHA-256, MIME/size allowlist và metadata PG.
-- [ ] Upload chỉ ghi attachment `pending_scan`, không cho dùng làm evidence public; download qua API/presigned URL ngắn hạn sau authz và policy.
-- [ ] Xử lý orphan khi PG transaction fail sau upload hoặc storage fail sau metadata: cleanup/reconciliation job, idempotent.
+- [x] Chốt D02 và dựng bucket `quarantine`, `private`, `public` hoặc policy tương đương; object key ngẫu nhiên, checksum SHA-256, MIME/size allowlist và metadata PG.
+- [x] Upload chỉ ghi attachment `pending` (tên v1 của `pending_scan`), không cho dùng làm evidence public; download qua API sau authz và policy, chỉ với fixture `clean` trong T04; T05 sở hữu scan thật.
+- [x] Xử lý orphan khi PG transaction fail sau upload hoặc storage fail sau metadata: cleanup/reconciliation job, idempotent. Bằng chứng: [evidence/p03-t04.md](./evidence/p03-t04.md).
 - **Đầu ra:** FileStore adapter và policy; **kiểm chứng:** file private không tải bằng URL public, checksum đúng, restart giữ dữ liệu.
 
 ## P03-T05 — Kiểm dịch tệp
