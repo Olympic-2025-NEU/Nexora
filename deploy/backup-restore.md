@@ -23,6 +23,8 @@ bash deploy/scripts/smoke.sh a nexora-a
 
 Chỉ coi gói có `manifest.json` và verify thành công là hoàn chỉnh. Ghi thời gian chạy và khoảng gateway/writer dừng theo log vận hành. Nếu backup lỗi, kiểm nguồn đã chạy lại, sửa nguyên nhân, tạo **tên gói mới**; không dùng gói chưa hoàn chỉnh. Không xóa volume nguồn.
 
+Script backup chỉ hoàn tất sau khi stack nguồn khoẻ lại (chờ tối đa khoảng 180 giây sau khi khởi động lại writer).
+
 Script tạo thư mục gói `0700`, file `0600`; container xuất object và manifest chạy bằng UID/GID của người gọi script. Chính người đó có thể đọc/ghi toàn bộ gói để verify, mã hóa và chuyển máy; group/other không có quyền.
 
 ## Chuyển máy và retention

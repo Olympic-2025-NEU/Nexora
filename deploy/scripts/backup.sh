@@ -45,7 +45,17 @@ cleanup() {
     writer_restarted_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
     echo "Writer stop window: $writer_stopped_at to $writer_restarted_at ($((($(date +%s%N) - writer_stopped_ns) / 1000000)) ms)"
   fi
-  if ((status)); then echo 'Backup incomplete; source writers restarted' >&2; fi
+  deadline=$((SECONDS + 180))
+  until bash deploy/scripts/smoke.sh "$instance" "$project" >/dev/null 2>&1; do
+    if ((SECONDS >= deadline)); then
+      echo 'Source stack not healthy within 180 seconds after writer restart' >&2
+      status=1
+      break
+    fi
+    sleep 5
+  done
+  if ((status)); then echo 'Backup incomplete; source writers restarted' >&2
+  else echo "Backup complete: $output"; fi
   exit "$status"
 }
 trap cleanup EXIT
@@ -87,4 +97,3 @@ pg sh -ec 'exists=$(psql -XAt -h postgres -U "$POSTGRES_USER" -d "$FLOWABLE_DB_N
 docker run --rm --network "$network" --env-file "$env_file" -e BACKUP_PROJECT="$project" -e BACKUP_STARTED="$started" \
   -e BACKUP_COMMIT="$(git rev-parse HEAD)" --security-opt label=disable --user "$(id -u):$(id -g)" \
   -v "$PWD:/work:ro" -v "$output:/backup" -w /work "$node_image" node deploy/scripts/backup-objects.mjs /backup "$instance"
-echo "Backup complete: $output"
