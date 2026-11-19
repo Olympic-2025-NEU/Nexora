@@ -114,7 +114,8 @@ function checkOpenApi() {
       assert(Array.isArray(op.security), `Security declaration missing: ${name}`);
       assert(Array.isArray(op["x-nexora-roles"]) && op["x-nexora-scope"], `Role/scope missing: ${name}`);
       const success = Object.keys(op.responses).filter((code) => code.startsWith("2"));
-      assert(success.length === 1, `Exactly one primary success response required: ${name}`);
+      assert(success.length === 1 || (name === "POST /api/v1/core/records" &&
+        JSON.stringify(success) === '["200","201"]'), `Unexpected success responses: ${name}`);
       const expected = routeMatrix.operations.find((entry) => entry.method === method.toUpperCase() && entry.path === path);
       assert(expected, `Unexpected operation: ${name}`);
       assert(JSON.stringify(op["x-nexora-roles"]) === JSON.stringify(expected.roles) &&
@@ -138,9 +139,9 @@ function checkOpenApi() {
         path === "/api/v1/ai/drafts" || path === "/api/v1/core/records") {
         assert(headers.includes("IdempotencyKey"), `Missing Idempotency-Key: ${name}`);
       }
-      const primary = op.responses[success[0]];
-      if (success[0] !== "204") {
-        const schema = primary.content?.["application/json"]?.schema;
+      for (const code of success) {
+        if (code === "204") continue;
+        const schema = op.responses[code].content?.["application/json"]?.schema;
         assert(schema && !JSON.stringify(schema).includes("Generic"), `Untyped response: ${name}`);
         if (path === "/api/v1/federation/events" || path.startsWith("/api/v1/health/")) {
           assert(schema.$ref, `Protocol response must be raw: ${name}`);

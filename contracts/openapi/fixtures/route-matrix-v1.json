@@ -142,11 +142,11 @@
       "auth": "protected",
       "roles": [
         "administrator",
-        "staff",
-        "service"
+        "staff"
       ],
       "scope": "resource",
       "success": [
+        "200",
         "201"
       ]
     },

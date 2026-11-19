@@ -3987,17 +3987,23 @@ paths:
       tags:
         - Core
       operationId: postCoreRecords
-      summary: Create structured core record
-      description: Kind-specific JSON Schema and writer policy apply. User-created evidence metadata gets its source key from the server.
+      summary: Create private evidence record
+      description: Only evidence_metadata with an authorized active membership or organization owner and clean private attachment. Server assigns source key, visibility and policy version. Same Idempotency-Key and payload returns 200; different payload returns 409 unless If-Match names the current version and owner remains unchanged.
       security:
         - oidc: []
       x-nexora-roles:
         - administrator
         - staff
-        - service
       x-nexora-scope: resource
       parameters:
         - $ref: "#/components/parameters/IdempotencyKey"
+        - name: If-Match
+          in: header
+          required: false
+          schema:
+            type: string
+            pattern: ^"[1-9][0-9]*"$
+          description: Optional current version for a change to existing evidence.
       requestBody:
         required: true
         content:
@@ -4005,6 +4011,21 @@ paths:
             schema:
               $ref: "#/components/schemas/CoreRecordCreate"
       responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - data
+                  - requestId
+                properties:
+                  data:
+                    $ref: "#/components/schemas/CoreRecord"
+                  requestId:
+                    type: string
         "201":
           description: Success
           content:
@@ -4017,20 +4038,18 @@ paths:
                   - requestId
                 properties:
                   data:
-                    $ref: "#/components/schemas/CoreRecordCreated"
+                    $ref: "#/components/schemas/CoreRecord"
                   requestId:
                     type: string
-        "400":
-          $ref: "#/components/responses/Error"
         "401":
           $ref: "#/components/responses/Error"
         "403":
           $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
         "409":
           $ref: "#/components/responses/Error"
         "422":
-          $ref: "#/components/responses/Error"
-        "429":
           $ref: "#/components/responses/Error"
         "503":
           $ref: "#/components/responses/Error"
@@ -6238,34 +6257,13 @@ components:
       required:
         - kind
         - payload
-        - visibility
-        - policyVersion
       properties:
         kind:
           type: string
           enum:
             - evidence_metadata
-            - trace_projection
-            - ot_reading
-            - archive_manifest
-        sourceType:
-          type: string
-        sourceId:
-          type: string
         payload:
-          oneOf:
-            - $ref: "#/components/schemas/EvidenceMetadataPayload"
-            - $ref: "#/components/schemas/TraceProjectionPayload"
-            - $ref: "#/components/schemas/OtReadingPayload"
-            - $ref: "#/components/schemas/ArchiveManifestPayload"
-        visibility:
-          type: string
-          enum:
-            - private
-            - partner
-            - public
-        policyVersion:
-          type: string
+          $ref: "#/components/schemas/EvidenceMetadataPayload"
     CoreRecord:
       type: object
       additionalProperties: false
@@ -6275,6 +6273,7 @@ components:
         - version
         - checksum
         - builtAt
+        - visibility
         - payload
       properties:
         id:
@@ -6293,12 +6292,10 @@ components:
           format: date-time
         visibility:
           type: string
+          enum:
+            - private
         payload:
-          oneOf:
-            - $ref: "#/components/schemas/EvidenceMetadataPayload"
-            - $ref: "#/components/schemas/TraceProjectionPayload"
-            - $ref: "#/components/schemas/OtReadingPayload"
-            - $ref: "#/components/schemas/ArchiveManifestPayload"
+          $ref: "#/components/schemas/EvidenceMetadataPayload"
     CoreRecordCreated:
       type: object
       additionalProperties: false
@@ -6616,6 +6613,8 @@ components:
             - document
             - batch
             - trace_event
+            - membership
+            - organization
         ownerId:
           type: string
           format: uuid

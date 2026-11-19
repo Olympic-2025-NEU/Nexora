@@ -50,13 +50,11 @@
         "kind": "evidence_metadata",
         "payload": {
           "schemaVersion": 1,
-          "ownerType": "batch",
+          "ownerType": "membership",
           "ownerId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
           "attachmentId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
           "title": "Quality document"
-        },
-        "visibility": "private",
-        "policyVersion": "v1"
+        }
       },
       "invalid": {
         "payload": {
@@ -66,8 +64,7 @@
           "attachmentId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
           "title": "Quality document"
         },
-        "visibility": "private",
-        "policyVersion": "v1"
+        "sourceType": "evidence"
       }
     },
     "FederationEnvelope": {
