@@ -85,6 +85,6 @@ done
 pg sh -ec 'psql -XAt -h postgres -U "$POSTGRES_USER" -d "$APP_DB_NAME" -c "SELECT row_to_json(a) FROM (SELECT id, bucket, object_key, sha256_hex, size_bytes::text, scan_state, quarantine_purged_at FROM platform.attachment ORDER BY id) a"' > "$output/attachments.jsonl"
 pg sh -ec 'exists=$(psql -XAt -h postgres -U "$POSTGRES_USER" -d "$FLOWABLE_DB_NAME" -c "SELECT to_regclass('\''public.act_re_procdef'\'') IS NOT NULL"); if [ "$exists" = t ]; then psql -XAt -h postgres -U "$POSTGRES_USER" -d "$FLOWABLE_DB_NAME" -c "SELECT row_to_json(p) FROM (SELECT key_, version_, deployment_id_, id_ FROM act_re_procdef ORDER BY key_, version_) p"; fi' > "$output/process-definitions.jsonl"
 docker run --rm --network "$network" --env-file "$env_file" -e BACKUP_PROJECT="$project" -e BACKUP_STARTED="$started" \
-  -e BACKUP_COMMIT="$(git rev-parse HEAD)" --security-opt label=disable \
+  -e BACKUP_COMMIT="$(git rev-parse HEAD)" --security-opt label=disable --user "$(id -u):$(id -g)" \
   -v "$PWD:/work:ro" -v "$output:/backup" -w /work "$node_image" node deploy/scripts/backup-objects.mjs /backup "$instance"
 echo "Backup complete: $output"
