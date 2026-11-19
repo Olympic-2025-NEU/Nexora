@@ -39,9 +39,9 @@
 
 ## P03-T06 — DB/volume backup và restore
 
-- [ ] Script backup có kiểm tra nhất quán cho app DB, Keycloak/Flowable DB và object storage; lưu cấu hình gateway/realm/process version và chỉ secret references.
-- [ ] Thử restore vào stack mới không đè môi trường nguồn; đối chiếu row counts, attachment checksums, quyền truy cập và state process.
-- [ ] Đặt RPO/RTO mục tiêu theo tài nguyên nhóm, lịch backup/retention và cách phát hiện backup hỏng; không tuyên bố disaster recovery nếu chưa diễn tập.
+- [x] Script backup có kiểm tra nhất quán cho app DB, Keycloak/Flowable DB và object storage; lưu cấu hình gateway/realm/process version và chỉ secret references.
+- [x] Thử restore vào stack mới không đè môi trường nguồn; đối chiếu row counts, attachment checksums, quyền truy cập và state process.
+- [x] Đặt RPO/RTO mục tiêu theo tài nguyên nhóm, lịch backup/retention và cách phát hiện backup hỏng; không tuyên bố disaster recovery nếu chưa diễn tập. Bằng chứng: [evidence/p03-t06.md](./evidence/p03-t06.md).
 - **Đầu ra:** runbook restore; **kiểm chứng:** một người khác restore được ít nhất một instance từ backup.
 
 ## P03-T07 — Structured/unstructured data API chứng minh lõi
