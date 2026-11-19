@@ -6,7 +6,8 @@
 
 - [ ] Biến `commandPipeline` từ danh sách string thành middleware/use-case boundary thực: authenticate → authorize → idempotency → validate/domain → transaction → response/dispatch sau commit.
 - [ ] Có request ID, actor/correlation, mapping DomainError thành API error; route handler chỉ parse/dispatch/map response.
-- [ ] Unit/contract test thứ tự và khi bước trước fail thì không chạy bước sau; confirm chưa auth không có side effect.
+- [x] Unit/contract test thứ tự và khi bước trước fail thì không chạy bước sau; confirm chưa auth không có side effect.
+- **Ghi chú (2026-11-19):** Lõi pipeline và contract tests đã hoàn thành (bằng chứng: `evidence/p04-t01.md`). Việc cắm route thật được để trống có chủ đích: chưa có route ghi thật để cắm; route `federation/events` hiện chỉ trả 202 stub, chưa lưu inbox hoặc chống trùng (thuộc P09). Hai ô đầu sẽ được tick khi có consumer thật đầu tiên (module nghiệp vụ P05+ hoặc P09).
 - **Đầu ra:** pipeline adapter; **kiểm chứng:** trace log và negative tests.
 
 ## P04-T02 — Idempotency cho lệnh ghi
