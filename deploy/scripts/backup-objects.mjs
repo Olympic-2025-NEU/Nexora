@@ -8,13 +8,17 @@ import { resolve, join } from 'node:path';
 
 const directory = process.argv[2];
 const instance = process.argv[3];
-if (!directory || !instance) throw new Error('Usage: backup-objects.mjs /backup instance');
+if (!directory || (!instance && directory !== '--preflight')) throw new Error('Usage: backup-objects.mjs /backup instance');
 const kinds = ['private', 'quarantine', 'public'];
 const buckets = Object.fromEntries(kinds.map(kind => [kind, process.env[`S3_BUCKET_${kind.toUpperCase()}`]]));
 if (Object.values(buckets).some(value => !value) || new Set(Object.values(buckets)).size !== 3) throw new Error('Invalid bucket mapping');
 const client = new S3Client({ endpoint: process.env.S3_ENDPOINT, region: process.env.S3_REGION || 'us-east-1',
   forcePathStyle: true, credentials: { accessKeyId: process.env.S3_ADMIN_ACCESS_KEY,
     secretAccessKey: process.env.S3_ADMIN_SECRET_KEY }, requestChecksumCalculation: 'WHEN_REQUIRED' });
+if (directory === '--preflight') {
+  for (const bucket of Object.values(buckets)) await client.send(new ListObjectsV2Command({ Bucket: bucket, MaxKeys: 1 }));
+  process.exit(0);
+}
 const hashFile = async file => {
   const hash = createHash('sha256');
   for await (const chunk of createReadStream(file)) hash.update(chunk);
@@ -58,8 +62,8 @@ const referenced = new Set(attachments.map(a => `${a.bucket}\0${a.object_key}`))
 const orphanObjects = objects.filter(o => !referenced.has(`${o.bucket}\0${o.key}`)).map(o => ({ bucket: o.bucket, key: o.key }));
 const files = {};
 for (const name of ['app.dump', 'keycloak.dump', 'flowable.dump', 'app.counts', 'keycloak.counts',
-  'flowable.counts', 'attachments.jsonl', ...objects.map(o => o.file)]) files[name] = await hashFile(join(directory, name));
-const configFiles = ['deploy/apisix/config.yaml', 'deploy/apisix/routes.yaml',
+  'flowable.counts', 'attachments.jsonl', 'process-definitions.jsonl', ...objects.map(o => o.file)]) files[name] = await hashFile(join(directory, name));
+const configFiles = ['deploy/compose.yml', 'deploy/apisix/config.yaml', 'deploy/apisix/routes.yaml',
   'deploy/keycloak/realm-template.json', 'deploy/seaweedfs/bucket-policy.json'];
 for (const name of await readdir('deploy/flowable/processes')) {
   if (name.endsWith('.bpmn')) configFiles.push(`deploy/flowable/processes/${name}`);
@@ -76,6 +80,8 @@ const manifest = { version: 1, source: { instance, project: process.env.BACKUP_P
   roles: Object.fromEntries(['POSTGRES_USER', 'APP_DB_USER', 'CORE_DB_USER', 'MIGRATOR_DB_USER',
     'KEYCLOAK_DB_USER', 'FLOWABLE_DB_USER'].map(name => [name, process.env[name]])),
   buckets, files, objects, attachments, purged, orphanObjects, counts, config,
+  processDefinitions: (await readFile(join(directory, 'process-definitions.jsonl'), 'utf8')).trim()
+    .split('\n').filter(Boolean).map(line => JSON.parse(line)),
   secretReferences: ['FLOWABLE_AUTH_REF', 'S3_SECRET_REF', 'PARTNER_OUTBOUND_SECRET_REF',
     'env:OIDC_GATEWAY_CLIENT_SECRET'], processState: 'N/A' };
 await writeFile(join(directory, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n', { flag: 'wx', mode: 0o600 });
