@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # Nexora P01 — single Compose entrypoint (instances A/B/C via -p + env file).
-# Default = infrastructure. Profiles: apps | dxlab | ai | local-admin
+# Default = infrastructure. Profiles: apps | core | dxlab | ai | local-admin
 name: nexora-${INSTANCE_ID:-a}
 
 networks:
@@ -293,7 +293,7 @@ services:
           memory: 512m
 
   core-data:
-    profiles: ["apps"]
+    profiles: ["apps", "core"]
     build:
       context: ..
       dockerfile: services/core-data/Dockerfile
@@ -323,7 +323,7 @@ services:
           memory: 512m
 
   file-reconciler:
-    profiles: ["apps"]
+    profiles: ["apps", "core"]
     build:
       context: ..
       dockerfile: services/core-data/Dockerfile
@@ -349,7 +349,7 @@ services:
           memory: 512m
 
   file-scanner:
-    profiles: ["apps"]
+    profiles: ["apps", "core"]
     build:
       context: ..
       dockerfile: services/core-data/Dockerfile

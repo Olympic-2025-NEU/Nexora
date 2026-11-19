@@ -43,6 +43,7 @@
     "deploy/scripts/render-apisix-routes.mjs",
     "deploy/scripts/reset-dev-password.mjs",
     "deploy/scripts/seed-system.mjs",
+    "deploy/scripts/smoke-core.mjs",
     "deploy/scripts/smoke-https-local.mjs",
     "deploy/scripts/smoke.mjs",
     "deploy/scripts/verify-backup.mjs",
