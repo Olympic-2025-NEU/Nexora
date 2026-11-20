@@ -2,10 +2,11 @@
 import { randomUUID } from "node:crypto";
 import type { PrismaClient } from "@prisma/client";
 import { createOutboxDispatcher } from "../platform/outbox/dispatcher";
+import { buildHandlerMap } from "../composition/event-handlers";
 
 export function main(client: PrismaClient) {
   const dispatcher = createOutboxDispatcher({ client, workerId: `worker-${randomUUID()}`,
-    handlers: new Map() });
+    handlers: buildHandlerMap() });
   let stopped = false;
   const poll = async () => {
     if (stopped) return;
