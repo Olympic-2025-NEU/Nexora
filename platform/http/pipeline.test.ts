@@ -6,12 +6,13 @@ import { DomainError } from "../kernel/errors";
 import { TokenError } from "../identity/token";
 import { resolveCommandTenant } from "../tenancy/resolve-command-tenant";
 import type { AppTransaction } from "../persistence/transaction";
-import { IdempotencyClaimLostError, UnimplementedDispatch, UnimplementedIdempotency, type IdempotencyPort } from "./command-ports";
+import { IdempotencyClaimLostError, UnimplementedIdempotency, type IdempotencyPort } from "./command-ports";
 import { mapCommandError } from "./error-mapping";
 import { commandPipeline, runCommand, type CommandContext, type CommandOptions } from "./pipeline";
 
 const actor = { userId: "user-1", organizationId: "org-1", unitIds: [], roles: ["staff"] };
-const tx = {} as Prisma.TransactionClient;
+const written: unknown[] = [];
+const tx = { outboxMessage: { createMany: async ({ data }: { data: unknown[] }) => { written.push(...data); } } } as unknown as Prisma.TransactionClient;
 
 function fakePort(overrides: Partial<IdempotencyPort>): IdempotencyPort {
   const unused = async (): Promise<never> => { throw new Error("unexpected port call"); };
@@ -103,21 +104,12 @@ it("rejects replacement of actor or transaction in domain, before commit", async
   }
 });
 
-it("idempotency and dispatch ports fail closed; dispatch failure after commit cannot change result", async () => {
+it("idempotency port fails closed before transaction", async () => {
   const sample = setup();
   sample.options.idempotencyKey = "key-1";
   sample.options.idempotencyPort = new UnimplementedIdempotency();
   await assert.rejects(runCommand(sample.ctx, sample.options), /not implemented/);
   assert.equal(sample.factoryCalls(), 0);
-  await assert.rejects(new UnimplementedDispatch().dispatch(), /not implemented/);
-
-  const committed = setup();
-  committed.options.dispatchPort = { dispatch: async () => { throw new Error("offline"); } };
-  const original = console.error;
-  console.error = () => {};
-  try { assert.equal(await runCommand(committed.ctx, committed.options), "ok"); }
-  finally { console.error = original; }
-  assert.equal(committed.runs(), 1);
 });
 
 it("maps errors into contract envelope without leaking exception text", () => {
@@ -132,12 +124,11 @@ it("maps errors into contract envelope without leaking exception text", () => {
   });
 });
 
-it("replay checks identity and policy, then skips domain, transaction and dispatch", async () => {
+it("replay checks identity and policy, then skips domain and transaction", async () => {
   const sample = setup();
   sample.options.idempotencyKey = "valid-key-12345678";
   sample.options.payload = { b: 2, a: 1 };
   sample.options.domain = async () => { throw new Error("domain reached on replay"); };
-  sample.options.dispatchPort = { dispatch: async () => { throw new Error("dispatch reached on replay"); } };
   sample.options.idempotencyPort = fakePort({
     lookup: async (scope) => {
       assert.deepEqual({ actor: scope.actorOrClient, method: scope.method, route: scope.routeKey },
@@ -158,8 +149,22 @@ it("replay checks identity and policy, then skips domain, transaction and dispat
   assert.deepEqual(denied.order, ["authenticate", "resolve-tenant", "authorize"]);
 });
 
-it("claim and completion use domain transaction before commit, dispatch only afterwards", async () => {
+it("claim, outbox insert and completion use domain transaction before commit", async () => {
   const sample = setup();
+  written.length = 0;
+  const originalCreateMany = tx.outboxMessage.createMany;
+  tx.outboxMessage.createMany = (async (args: { data: unknown[] }) => {
+    sample.order.push("outbox-in-transaction");
+    return originalCreateMany(args as never);
+  }) as unknown as typeof originalCreateMany;
+  const domain = sample.options.domain;
+  sample.options.domain = async (current) => {
+    const result = await domain(current);
+    current.emit({ aggregateType: "test", aggregateId: "00000000-0000-4000-8000-000000000001",
+      aggregateVersion: 1, eventType: "test.created.v1", schemaVersion: "1", payload: { eventId: "e1" },
+      destination: "local", correlationId: current.requestId });
+    return result;
+  };
   sample.options.idempotencyKey = "valid-key-12345678";
   sample.options.idempotencyPort = fakePort({
     lookup: async () => ({ kind: "fresh" }),
@@ -169,15 +174,36 @@ it("claim and completion use domain transaction before commit, dispatch only aft
       sample.order.push("complete");
     },
   });
-  sample.options.dispatchPort = { dispatch: async () => { sample.order.push("dispatch"); } };
-  assert.equal(await runCommand(sample.ctx, sample.options), "ok");
+  try { assert.equal(await runCommand(sample.ctx, sample.options), "ok"); }
+  finally { tx.outboxMessage.createMany = originalCreateMany; }
+  assert.equal(written.length, 1);
   assert.deepEqual(sample.order, [
     "authenticate", "resolve-tenant", "authorize", "idempotency", "domain",
-    "transaction-open", "claim", "audit-in-transaction", "complete", "transaction-committed", "commit", "dispatch",
+    "transaction-open", "claim", "audit-in-transaction", "outbox-in-transaction", "complete", "transaction-committed", "commit",
   ]);
 });
 
-it("lost claim escapes UoW, re-looks up and replays without dispatch", async () => {
+it("transaction retry resets emitted events from the rolled-back attempt", async () => {
+  const sample = setup();
+  const inserts: number[] = [];
+  sample.options.domain = async (current) => {
+    current.emit({ aggregateType: "test", aggregateId: "00000000-0000-4000-8000-000000000001",
+      aggregateVersion: 1, eventType: "test.created.v1", schemaVersion: "1", payload: { eventId: "e1" },
+      destination: "local", correlationId: current.requestId });
+    return "ok";
+  };
+  sample.options.unitOfWork = () => ({ run: async (work) => {
+    const fake = { outboxMessage: { createMany: async ({ data }: { data: unknown[] }) => {
+      inserts.push(data.length);
+    } } } as unknown as Prisma.TransactionClient;
+    await work(fake); // Simulate commit failure: first attempt rolls back.
+    return work(fake);
+  } });
+  assert.equal(await runCommand(sample.ctx, sample.options), "ok");
+  assert.deepEqual(inserts, [1, 1]);
+});
+
+it("lost claim escapes UoW, re-looks up and replays", async () => {
   const sample = setup();
   sample.options.idempotencyKey = "valid-key-12345678";
   let lookups = 0;
@@ -186,7 +212,6 @@ it("lost claim escapes UoW, re-looks up and replays without dispatch", async () 
     claim: async () => { throw new IdempotencyClaimLostError(); },
   });
   sample.options.domain = async () => { throw new Error("domain reached"); };
-  sample.options.dispatchPort = { dispatch: async () => { throw new Error("dispatch reached"); } };
   assert.equal(await runCommand(sample.ctx, sample.options), "stored");
   assert.equal(sample.runs(), 1);
   assert.equal(lookups, 2);

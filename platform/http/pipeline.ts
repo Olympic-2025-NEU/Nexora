@@ -5,8 +5,10 @@ import type { PartnerActor } from "../identity/partner-actor";
 import { requirePolicy } from "../access/policy";
 import { transaction, type AppTransaction } from "../persistence/transaction";
 import { DomainError } from "../kernel/errors";
-import { IdempotencyClaimLostError, UnimplementedIdempotency, type DispatchPort, type IdempotencyPort, type IdempotencyScope } from "./command-ports";
+import { IdempotencyClaimLostError, UnimplementedIdempotency, type IdempotencyPort, type IdempotencyScope } from "./command-ports";
 import { hashPayload, validateIdempotencyKey } from "./idempotency";
+import { appendOutbox } from "../outbox/writer";
+import type { OutboxEventInput } from "../outbox/message";
 
 /** Thứ tự bắt buộc của một lệnh ghi. Route handler không được đảo các bước. */
 export const commandPipeline = [
@@ -25,6 +27,7 @@ export type CommandContext = {
   actor?: Actor | PartnerActor;
   tenantId?: string;
   tx?: Prisma.TransactionClient;
+  emit?: (event: OutboxEventInput) => void;
 };
 
 type CommandActor = Actor | PartnerActor;
@@ -34,14 +37,13 @@ export type CommandOptions<T> = {
   /** Read the organization from trusted DB state, never from request headers. */
   resolveTenant(actor: CommandActor): Promise<string>;
   action: string;
-  domain(ctx: CommandContext & { actor: CommandActor; tenantId: string; tx: Prisma.TransactionClient }): Promise<T>;
+  domain(ctx: CommandContext & { actor: CommandActor; tenantId: string; tx: Prisma.TransactionClient; emit(event: OutboxEventInput): void }): Promise<T>;
   unitOfWork?: () => AppTransaction;
   idempotencyKey?: string;
   payload?: unknown;
   method?: string;
   routeKey?: string;
   idempotencyPort?: IdempotencyPort;
-  dispatchPort?: DispatchPort;
   onStep?: (step: CommandStep) => void;
 };
 
@@ -57,6 +59,9 @@ async function runCommandAttempt<T>(ctx: CommandContext, options: CommandOptions
   let result: T;
   let scope: IdempotencyScope | undefined;
   let replayed = false;
+  const events: OutboxEventInput[] = [];
+  ctx.emit = (event) => { events.push(event); };
+  const emit = ctx.emit;
   const port = options.idempotencyPort ?? new UnimplementedIdempotency();
   const handlers: { [Step in CommandStep]: (ctx: CommandContext) => Promise<void> } = {
     async authenticate(current) {
@@ -98,34 +103,27 @@ async function runCommandAttempt<T>(ctx: CommandContext, options: CommandOptions
     },
     async domain(current) {
       result = await (options.unitOfWork ?? (() => transaction))().run(async (tx) => {
+        events.length = 0; // A serializable transaction may rerun this callback after rollback.
         current.tx = tx;
         const actor = current.actor!;
         const tenantId = current.tenantId!;
         try {
           const claim = scope ? await port.claim(tx, scope) : undefined;
-          const value = await options.domain(current as CommandContext & {
-            actor: CommandActor; tenantId: string; tx: Prisma.TransactionClient;
+           const value = await options.domain(current as CommandContext & {
+             actor: CommandActor; tenantId: string; tx: Prisma.TransactionClient; emit(event: OutboxEventInput): void;
           });
-          if (current.actor !== actor || current.tenantId !== tenantId || current.tx !== tx) {
+           if (current.actor !== actor || current.tenantId !== tenantId || current.tx !== tx || current.emit !== emit) {
             throw new Error("Command context replaced during domain");
           }
-          if (claim) await port.complete(tx, claim.recordId, value);
+           await appendOutbox(tx, events);
+           if (claim) await port.complete(tx, claim.recordId, value);
           return value;
         } finally {
           current.tx = undefined;
         }
       });
     },
-    async commit(current) {
-      if (options.dispatchPort) {
-        try {
-          await options.dispatchPort.dispatch(current.requestId);
-        } catch (error) {
-          // Committed work cannot roll back; T03 will retry delivery from durable outbox.
-          console.error("Post-commit dispatch failed", { requestId: current.requestId, error });
-        }
-      }
-    },
+    async commit() {},
   };
   let actor: CommandActor | undefined;
   let tx: Prisma.TransactionClient | undefined;
@@ -138,7 +136,7 @@ async function runCommandAttempt<T>(ctx: CommandContext, options: CommandOptions
       if (!(error instanceof IdempotencyClaimLostError) || step !== "domain" || !scope) throw error;
       const outcome = await port.lookup(scope);
       if (outcome.kind === "replay") return outcome.result as T;
-      if (retryAllowed) return runCommandAttempt({ requestId: ctx.requestId }, options, false);
+       if (retryAllowed) return runCommandAttempt({ requestId: ctx.requestId }, options, false);
       throw new DomainError("IDEMPOTENCY_IN_PROGRESS", 409);
     }
     if (replayed) return result!;

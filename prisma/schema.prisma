@@ -105,6 +105,31 @@ model IdempotencyRecord {
   @@schema("platform")
 }
 
+model OutboxMessage {
+  id               String    @id @db.Uuid
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  aggregateType    String    @map("aggregate_type")
+  aggregateId      String    @map("aggregate_id") @db.Uuid
+  aggregateVersion Int       @map("aggregate_version")
+  eventType        String    @map("event_type")
+  schemaVersion    String    @map("schema_version")
+  payload          Json      @db.JsonB
+  destination      String
+  correlationId    String    @map("correlation_id")
+  status           String    @default("pending")
+  attemptCount     Int       @default(0) @map("attempt_count")
+  nextAttemptAt    DateTime  @default(now()) @map("next_attempt_at") @db.Timestamptz(6)
+  leaseOwner       String?   @map("lease_owner")
+  leaseUntil       DateTime? @map("lease_until") @db.Timestamptz(6)
+  lastErrorCode    String?   @map("last_error_code")
+  deliveredAt      DateTime? @map("delivered_at") @db.Timestamptz(6)
+
+  @@unique([aggregateType, aggregateId, aggregateVersion, eventType, destination])
+  @@index([correlationId])
+  @@map("outbox_message")
+  @@schema("platform")
+}
+
 // ---------------------------------------------------------------------------
 // system schema — P02-T01 identity core (database-schema-v1.md § P05)
 // ---------------------------------------------------------------------------

@@ -21,18 +21,9 @@ export interface IdempotencyPort {
   purgeExpired(now?: Date): Promise<number>;
 }
 
-/** T03 owns post-commit delivery. Delivery failure cannot roll back committed work. */
-export interface DispatchPort {
-  dispatch(requestId: string): Promise<void>;
-}
-
 export class UnimplementedIdempotency implements IdempotencyPort {
   async lookup(scope: IdempotencyScope): Promise<never> { void scope; throw new Error("IdempotencyPort is not implemented (P04-T02)"); }
   async claim(): Promise<never> { throw new Error("IdempotencyPort is not implemented (P04-T02)"); }
   async complete(): Promise<never> { throw new Error("IdempotencyPort is not implemented (P04-T02)"); }
   async purgeExpired(): Promise<never> { throw new Error("IdempotencyPort is not implemented (P04-T02)"); }
-}
-
-export class UnimplementedDispatch implements DispatchPort {
-  async dispatch(): Promise<never> { throw new Error("DispatchPort is not implemented (P04-T03)"); }
 }

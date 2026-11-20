@@ -83,7 +83,10 @@
     "platform/modules.ts",
     "platform/observability/health.ts",
     "platform/observability/readiness.ts",
+    "platform/outbox/admin.ts",
+    "platform/outbox/dispatcher.ts",
     "platform/outbox/message.ts",
+    "platform/outbox/writer.ts",
     "platform/persistence/prisma.ts",
     "platform/persistence/transaction.test.ts",
     "platform/persistence/transaction.ts",
@@ -129,9 +132,12 @@
     "tests/platform/core-records.integration.test.mjs",
     "tests/platform/files.integration.test.mjs",
     "tests/platform/idempotency.integration.test.ts",
+    "tests/platform/outbox-worker.child.ts",
+    "tests/platform/outbox.integration.test.ts",
     "tests/platform/scan.integration.test.mjs",
     "tests/platform/schema.integration.mjs",
     "tests/platform/transaction.integration.test.ts",
-    "worker/entrypoint.js"
+    "worker/entrypoint.js",
+    "workers/outbox-dispatcher.ts"
   ]
 }

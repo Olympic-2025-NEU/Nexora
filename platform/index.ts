@@ -7,7 +7,7 @@ export type { Organization, Tenant } from "./tenancy/organization";
 export { canTouch, rowScopes } from "./access/scope";
 export type { RowAccess, RowScope } from "./access/scope";
 export type { AuditEntry, AuditRecorder } from "./audit/audit-recorder";
-export type { Outbox, OutboxMessage } from "./outbox/message";
+export type { OutboxEventInput, OutboxMessage, OutboxHandler } from "./outbox/message";
 export { applyAction } from "./workflow/process";
 export type { ActionInput, ProcessAction } from "./workflow/process";
 export type { FileStore, StoredFile } from "./files/file-store";
