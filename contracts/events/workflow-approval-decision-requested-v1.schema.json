@@ -11,7 +11,8 @@
     "decision",
     "requestedBySub",
     "requestedAt",
-    "lineSnapshotSha256"
+    "lineSnapshotSha256",
+    "intentVersion"
   ],
   "properties": {
     "eventId": {
@@ -29,6 +30,10 @@
     "taskId": {
       "type": "string",
       "minLength": 1
+    },
+    "intentVersion": {
+      "type": "integer",
+      "minimum": 2
     },
     "decision": {
       "type": "string",

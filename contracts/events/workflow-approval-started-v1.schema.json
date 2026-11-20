@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "workflow.approval.started.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eventId", "approvalRequestId", "processInstanceId", "definitionId", "definitionVersion"],
+  "properties": {
+    "eventId": { "type": "string", "format": "uuid" },
+    "approvalRequestId": { "type": "string", "format": "uuid" },
+    "processInstanceId": { "type": "string", "minLength": 1 },
+    "definitionId": { "type": "string", "minLength": 1 },
+    "definitionVersion": { "type": "integer", "minimum": 1 }
+  }
+}
