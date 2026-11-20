@@ -58,8 +58,8 @@ export function createRetryHandlers(deps: () => Dependencies) {
       }
       try {
         const result = await retryMessage(deps().db, auth.actor!, (body as { messageId: string }).messageId, id);
-        const { httpStatus, ...body } = result;
-        return reply(id, body, httpStatus);
+        const { httpStatus, ...responseBody } = result;
+        return reply(id, responseBody, httpStatus);
       } catch { auditFailure(auth.actor!, action, id, "OPS_RETRY_FAILED"); return reply(id, { code: "OPS_UNAVAILABLE" }, 503); }
     },
   };
