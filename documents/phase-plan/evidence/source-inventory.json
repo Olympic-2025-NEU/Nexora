@@ -97,6 +97,8 @@
     "platform/tenancy/organization.ts",
     "platform/tenancy/resolve-command-tenant.ts",
     "platform/tenancy/tenant.ts",
+    "platform/workflow/flowable-client.test.ts",
+    "platform/workflow/flowable-client.ts",
     "platform/workflow/process.ts",
     "prisma/schema.prisma",
     "scripts/check-jcs-python.py",
@@ -141,6 +143,7 @@
     "tests/platform/scan.integration.test.mjs",
     "tests/platform/schema.integration.mjs",
     "tests/platform/transaction.integration.test.ts",
+    "tests/platform/workflow.integration.test.ts",
     "worker/entrypoint.js",
     "workers/outbox-dispatcher.ts"
   ]

@@ -22,7 +22,12 @@ try {
     signal: AbortSignal.timeout(3000),
   });
   if (!result.ok) throw Error("unavailable");
-  console.log("flowable: up");
+  const definition = await fetch("http://flowable:8080/flowable-rest/service/repository/process-definitions?key=goods-issue-approval&latest=true", {
+    headers: { authorization: `Basic ${Buffer.from(`${process.env.FLOWABLE_ADMIN_USER}:${process.env.FLOWABLE_ADMIN_PASSWORD}`).toString("base64")}` },
+    signal: AbortSignal.timeout(3000),
+  });
+  if (!definition.ok || !(await definition.json()).data?.some((row) => row.key === "goods-issue-approval")) throw Error("definition missing");
+  console.log("flowable: up; goods-issue-approval: deployed");
 } catch { console.log("flowable: down"); failed = true; }
 try {
   await bucketProbe(process.env);

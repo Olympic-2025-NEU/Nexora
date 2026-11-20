@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only -->
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:flowable="http://flowable.org/bpmn" targetNamespace="https://nexora.org/workflow">
+  <process id="goods-issue-approval" name="Goods Issue Approval" isExecutable="true">
+    <startEvent id="start" />
+    <sequenceFlow id="s1" sourceRef="start" targetRef="approveGoodsIssue" />
+    <userTask id="approveGoodsIssue" name="Approve goods issue v2" flowable:candidateGroups="approver" />
+    <sequenceFlow id="s2" sourceRef="approveGoodsIssue" targetRef="decision" />
+    <exclusiveGateway id="decision" default="rejectFlow" />
+    <sequenceFlow id="approveFlow" sourceRef="decision" targetRef="approvedEnd"><conditionExpression xsi:type="tFormalExpression"><![CDATA[${decision == 'approved'}]]></conditionExpression></sequenceFlow>
+    <sequenceFlow id="rejectFlow" sourceRef="decision" targetRef="rejectedEnd" />
+    <endEvent id="approvedEnd" name="Approved" />
+    <endEvent id="rejectedEnd" name="Rejected" />
+  </process>
+</definitions>

@@ -59,7 +59,7 @@ export class FlowableClient {
       throw error;
     }
     if (!response.ok) throw new FlowableHttpError(response.status);
-    return response.status === 204 ? undefined as T : response.json() as Promise<T>;
+    return response.status === 204 || !response.headers.get("content-type")?.includes("json") ? undefined as T : response.json() as Promise<T>;
   }
 
   async startProcess({ businessKey, variables }: { businessKey: string; variables: StartVariables }): Promise<ProcessInstance> {
@@ -111,11 +111,13 @@ export class FlowableClient {
 
   async getHistory(processInstanceId: string): Promise<History> {
     const id = encodeURIComponent(processInstanceId);
-    const [instance, activities] = await Promise.all([
-      this.request<Omit<History, "endActivityIds">>("GET", `/history/historic-process-instances/${id}?includeProcessVariables=true`),
+    const [instance, activities, variables] = await Promise.all([
+      this.request<Omit<History, "endActivityIds">>("GET", `/history/historic-process-instances/${id}`),
       this.request<Page<{ activityId: string; activityType: string }>>("GET", `/history/historic-activity-instances?${new URLSearchParams({ processInstanceId })}`),
+      this.request<Page<{ variable: Variable }>>("GET", `/history/historic-variable-instances?${new URLSearchParams({ processInstanceId })}`),
     ]);
-    return { ...instance, endActivityIds: activities.data.filter((row) => row.activityType === "endEvent").map((row) => row.activityId) };
+    return { ...instance, variables: variables.data.map((row) => row.variable),
+      endActivityIds: activities.data.filter((row) => row.activityType === "endEvent").map((row) => row.activityId) };
   }
 
   async latestDefinition(): Promise<Definition | null> {
