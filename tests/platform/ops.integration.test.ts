@@ -9,10 +9,11 @@ import { createRetryHandlers } from "../../platform/operations/http-handler";
 import { scanStuckWork } from "../../platform/observability/alerts";
 import { TokenError } from "../../platform/identity/token";
 
-if (process.env.NEXORA_TEST_DB !== "1" || !process.env.APP_DATABASE_URL ||
+if (process.env.NEXORA_TEST_DB !== "1" || !process.env.APP_DATABASE_URL || !process.env.MIGRATOR_DATABASE_URL ||
     process.env.DATABASE_URL !== process.env.APP_DATABASE_URL) throw Error("Isolated DB required");
 const db = new PrismaClient({ datasources: { db: { url: process.env.APP_DATABASE_URL } } });
-after(async () => db.$disconnect());
+const migrator = new PrismaClient({ datasources: { db: { url: process.env.MIGRATOR_DATABASE_URL } } });
+after(async () => { await Promise.all([db.$disconnect(), migrator.$disconnect()]); });
 const sentinel = "ops-secret-sentinel-DO-NOT-LEAK";
 const request = (sub: string, method = "GET", body?: object) => new Request("http://localhost/api/v1/admin/retries", {
   method, headers: { "x-fixture-sub": sub, "x-request-id": randomUUID(), ...(body ? { "content-type": "application/json" } : {}) },
@@ -23,9 +24,9 @@ test("metrics, scan, permissioned list/retry and non-leakage", async () => {
   const orgId = randomUUID(), messageId = randomUUID(), correlationId = randomUUID();
   const stuckId = randomUUID(), haltedId = randomUUID();
   const old = new Date(Date.now() - 20 * 60_000);
-  await db.organization.create({ data: { id: orgId, instanceId: `ops-${orgId}`, code: `ops-${orgId}`, name: "Ops" } });
+  await migrator.organization.create({ data: { id: orgId, instanceId: `ops-${orgId}`, code: `ops-${orgId}`, name: "Ops" } });
   for (const [sub, role] of [["ops-admin", "administrator"], ["ops-staff", "staff"]]) {
-    await db.membership.create({ data: { id: randomUUID(), organizationId: orgId, keycloakSub: sub,
+    await migrator.membership.create({ data: { id: randomUUID(), organizationId: orgId, keycloakSub: sub,
       displayName: sub, role, status: "active" } });
   }
   await db.$executeRaw`INSERT INTO platform.outbox_message

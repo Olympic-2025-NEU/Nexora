@@ -22,5 +22,6 @@ export NEXORA_TEST_DB=1
 export DATABASE_URL="postgresql://migrator:test_migrator@127.0.0.1:$port/nexora_fresh"
 export APP_DATABASE_URL="postgresql://app_runtime:test_app@127.0.0.1:$port/nexora_fresh"
 npx prisma migrate deploy
+export MIGRATOR_DATABASE_URL="$DATABASE_URL"
 export DATABASE_URL="$APP_DATABASE_URL"
 node --test --require tsx/cjs tests/platform/ops.integration.test.ts
