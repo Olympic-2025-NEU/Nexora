@@ -37,9 +37,9 @@ export function createFlowableStarter(db: PrismaClient, engine: FlowableClient) 
       (row.state === "pending" && row.flowableProcessId)) return;
     if (row.state === "requested") row = await transition(db, id, ["requested"], "starting", {}, row.version);
     if (!row) return;
-    await withApprovalLock(db, id, async () => {
+    const locked = await withApprovalLock(db, id, async () => {
       const current = await getApproval(db, id);
-      if (!current || current.state !== "starting") return;
+      if (!current || current.state !== "starting") return true;
       const valid = /^[0-9a-f]{64}$/.test(current.lineSnapshotSha256) &&
         /^[0-9a-f-]{36}$/i.test(current.id) && /^[0-9a-f-]{36}$/i.test(current.documentId) &&
         current.creatorSub.trim() && current.submittedDocumentVersion > 0 &&
@@ -50,7 +50,7 @@ export function createFlowableStarter(db: PrismaClient, engine: FlowableClient) 
         throw new PermanentDeliveryError("INVALID_START_VARIABLES");
       }
       let bound = await findBoundProcess(engine, current);
-      if (bound && "halt" in bound) { await haltApproval(db, current, bound.halt); return; }
+      if (bound && "halt" in bound) { await haltApproval(db, current, bound.halt); return true; }
       if (!bound) {
         try {
           const instance = await engine.startProcess({ businessKey: id, variables: {
@@ -78,6 +78,8 @@ export function createFlowableStarter(db: PrismaClient, engine: FlowableClient) 
         console.log(JSON.stringify({ event: "workflow.start.created", approvalRequestId: id, businessKey: id,
           processInstanceId: bound.instance.id }));
       }
+      return true;
     });
+    if (!locked) throw new Error("Approval lock busy; retry delivery");
   };
 }
