@@ -12,9 +12,10 @@
 
 ## P04-T02 — Idempotency cho lệnh ghi
 
-- [ ] Migration `idempotency_record` theo `database.md`; scope key theo actor/client + route/action, payload hash, expiry và response reference.
-- [ ] Đồng thời hai request cùng key chỉ một transaction tạo effect; cùng key khác payload trả 409; retry sau timeout trả kết quả cũ, không tạo outbox mới.
-- [ ] Phân biệt idempotency của user command và dedupe của federation inbox, không dùng một cache Redis làm nguồn duy nhất.
+- [x] Migration `idempotency_record` theo `database.md`; scope key theo actor/client + route/action, payload hash, expiry và response reference.
+- [x] Đồng thời hai request cùng key chỉ một transaction tạo effect; cùng key khác payload trả 409; retry sau timeout trả kết quả cũ, không tạo outbox mới.
+- [x] Phân biệt idempotency của user command và dedupe của federation inbox, không dùng một cache Redis làm nguồn duy nhất.
+- **Ghi chú (2026-11-20):** PostgreSQL integration test chứng minh 20 request cùng key tạo đúng một effect và dispatch đúng một lần; retry replay response, body khác trả 409. Outbox-row assertion chờ P04-T03 tạo bảng outbox; kiểm chứng literal tại G04. Xem `evidence/p04-t02.md`.
 - **Đầu ra:** idempotency adapter; **kiểm chứng:** parallel/retry tests với DB assertions.
 
 ## P04-T03 — Transactional outbox và worker
