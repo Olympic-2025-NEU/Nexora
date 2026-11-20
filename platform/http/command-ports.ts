@@ -27,7 +27,7 @@ export interface DispatchPort {
 }
 
 export class UnimplementedIdempotency implements IdempotencyPort {
-  async lookup(): Promise<never> { throw new Error("IdempotencyPort is not implemented (P04-T02)"); }
+  async lookup(_scope: IdempotencyScope): Promise<never> { throw new Error("IdempotencyPort is not implemented (P04-T02)"); }
   async claim(): Promise<never> { throw new Error("IdempotencyPort is not implemented (P04-T02)"); }
   async complete(): Promise<never> { throw new Error("IdempotencyPort is not implemented (P04-T02)"); }
   async purgeExpired(): Promise<never> { throw new Error("IdempotencyPort is not implemented (P04-T02)"); }

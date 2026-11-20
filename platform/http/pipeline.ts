@@ -6,7 +6,7 @@ import { requirePolicy } from "../access/policy";
 import { transaction, type AppTransaction } from "../persistence/transaction";
 import { DomainError } from "../kernel/errors";
 import { IdempotencyClaimLostError, UnimplementedIdempotency, type DispatchPort, type IdempotencyPort, type IdempotencyScope } from "./command-ports";
-import { hashPayload } from "./idempotency";
+import { hashPayload, validateIdempotencyKey } from "./idempotency";
 
 /** Thứ tự bắt buộc của một lệnh ghi. Route handler không được đảo các bước. */
 export const commandPipeline = [
@@ -79,10 +79,8 @@ async function runCommandAttempt<T>(ctx: CommandContext, options: CommandOptions
     },
     async idempotency(current) {
       if (options.idempotencyKey !== undefined) {
-        if (!options.idempotencyPort) await port.lookup({} as IdempotencyScope);
-        if (!/^[A-Za-z0-9._:-]{16,128}$/.test(options.idempotencyKey)) {
-          throw new DomainError("IDEMPOTENCY_KEY_INVALID", 400);
-        }
+        if (port instanceof UnimplementedIdempotency) await port.lookup({} as IdempotencyScope);
+        validateIdempotencyKey(options.idempotencyKey);
         const actor = current.actor!;
         scope = {
           key: options.idempotencyKey,
