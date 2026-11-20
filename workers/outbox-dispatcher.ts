@@ -9,6 +9,7 @@ import { FlowableClient } from "../platform/workflow/flowable-client";
 import { createFlowableStarter } from "../platform/workflow/flowable-starter";
 import { createFlowableDecider } from "../platform/workflow/flowable-decider";
 import { createReconciler } from "../platform/workflow/reconciler";
+import { scanStuckWork } from "../platform/observability/alerts";
 
 export function main(client: PrismaClient) {
   const engine = FlowableClient.fromEnv();
@@ -27,5 +28,10 @@ export function main(client: PrismaClient) {
   };
   void poll();
   const interval = setInterval(() => { if (!stopped) void reconciler.tick(); }, 5_000);
-  return { dispatcher, stop: () => { stopped = true; clearInterval(interval); } };
+  const scan = () => { if (!stopped) void scanStuckWork(client).catch(() => {
+    console.error(JSON.stringify({ event: "ops.scan.failed", service: "outbox-dispatcher" }));
+  }); };
+  scan();
+  const alertInterval = setInterval(scan, 60_000);
+  return { dispatcher, stop: () => { stopped = true; clearInterval(interval); clearInterval(alertInterval); } };
 }
