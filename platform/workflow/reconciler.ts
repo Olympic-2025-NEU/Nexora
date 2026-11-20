@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import type { ApprovalRequest, PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "@prisma/client";
 import { getApproval, transitionAudited, withApprovalLock } from "./approval-repository";
 import { historyDecision, readHistory } from "./flowable-decider";
 import { FlowableClient, FlowableHttpError } from "./flowable-client";

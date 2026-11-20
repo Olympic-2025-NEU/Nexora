@@ -22,7 +22,7 @@ test("versioned schema contains platform tables, expected constraints and migrat
   const tables = await migrator.$queryRaw`
     SELECT table_name FROM information_schema.tables
     WHERE table_schema = 'platform' ORDER BY table_name`;
-  assert.deepEqual(tables.map((row) => row.table_name), ["attachment", "audit_log", "core_record", "idempotency_record", "outbox_message"]);
+  assert.deepEqual(tables.map((row) => row.table_name), ["approval_request", "attachment", "audit_log", "core_record", "idempotency_record", "outbox_message"]);
 
   const columns = await migrator.$queryRaw`
     SELECT table_name, column_name FROM information_schema.columns
