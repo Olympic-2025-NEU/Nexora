@@ -7,7 +7,7 @@ import { PrismaClient } from "@prisma/client";
 import { createOutboxDispatcher } from "../../platform/outbox/dispatcher";
 import { retryDeadLetter } from "../../platform/outbox/admin";
 import { appendOutbox } from "../../platform/outbox/writer";
-import type { OutboxEventInput, OutboxHandler } from "../../platform/outbox/message";
+import { PermanentDeliveryError, type OutboxEventInput, type OutboxHandler } from "../../platform/outbox/message";
 import { createPrismaIdempotency } from "../../platform/http/idempotency";
 import { runCommand, type CommandOptions } from "../../platform/http/pipeline";
 import { createTransaction } from "../../platform/persistence/transaction";
@@ -200,6 +200,24 @@ test("full-jitter retry through attempt 8, dead-letter retry, unknown destinatio
   assert.equal(capped.claimed, 0);
   assert.equal(capped.deadLettered, 1);
   assert.equal((await row(abandoned.aggregateId)).lastErrorCode, "LEASE_EXPIRED");
+});
+
+test("permanent handler errors dead-letter on first attempt; transient errors retain retry policy", async () => {
+  for (const failure of [new PermanentDeliveryError("INVALID_EVENT_PAYLOAD"),
+    Object.assign(new Error("unsupported"), { code: "NON_RETRYABLE", reason: "UNSUPPORTED_EVENT_VERSION" })]) {
+    const input = event(); await enqueue(input);
+    const target = dispatcher("permanent", async () => { throw failure; });
+    assert.deepEqual(await target.tick(), { claimed: 1, delivered: 0, retried: 0, deadLettered: 1, leaseLost: 0 });
+    const current = await row(input.aggregateId);
+    assert.equal(current.status, "dead_letter");
+    assert.equal(current.attemptCount, 1);
+    assert.equal(current.lastErrorCode, failure.reason);
+    assert.equal((await target.tick()).claimed, 0);
+  }
+  const input = event(); await enqueue(input);
+  assert.equal((await dispatcher("transient", async () => { throw Error("offline"); }).tick()).retried, 1);
+  assert.equal((await row(input.aggregateId)).status, "retry_due");
+  assert.equal((await row(input.aggregateId)).lastErrorCode, "DELIVERY_FAILED");
 });
 
 test("ordering gate blocks retry_due predecessor; dead-letter unblocks successor", async () => {
