@@ -18,11 +18,21 @@ export async function auditApproval(db: ApprovalDb, row: ApprovalRequest, action
     beforeSummary: before ? { status: before } : {}, afterSummary: { status: row.state, version: row.version } } });
 }
 
+export function transitionAudited(db: PrismaClient, id: string, from: ApprovalRequestState[],
+  to: ApprovalRequestState, patch: Prisma.ApprovalRequestUpdateManyMutationInput,
+  version: number, action: string, before?: string) {
+  return db.$transaction(async (tx) => {
+    const changed = await transition(tx, id, from, to, patch, version);
+    if (changed) await auditApproval(tx, changed, action, null, before);
+    return changed;
+  });
+}
+
 export async function withApprovalLock<T>(client: PrismaClient, id: string, work: () => Promise<T>): Promise<T | undefined> {
   const connection = await client.$transaction(async (tx) => {
     const [{ locked }] = await tx.$queryRaw<{ locked: boolean }[]>`SELECT pg_try_advisory_xact_lock(hashtext(${id})) AS locked`;
     if (!locked) return { locked: false as const };
     return { locked: true as const, result: await work() };
-  }, { timeout: 30000 });
+  }, { timeout: 120000 });
   return connection.locked ? connection.result : undefined;
 }

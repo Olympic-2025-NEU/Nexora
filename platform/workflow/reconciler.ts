@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { ApprovalRequest, PrismaClient } from "@prisma/client";
-import { auditApproval, getApproval, transition, withApprovalLock } from "./approval-repository";
+import { getApproval, transitionAudited, withApprovalLock } from "./approval-repository";
 import { historyDecision, readHistory } from "./flowable-decider";
 import { FlowableClient, FlowableHttpError } from "./flowable-client";
 import { findBoundProcess, haltApproval } from "./flowable-starter";
@@ -17,19 +17,18 @@ export async function reconcileApproval(db: PrismaClient, engine: FlowableClient
           await engine.cancelProcess(instance.id, row.cancelReason ?? "Approval cancelled");
         } catch (error) { if (!(error instanceof FlowableHttpError && error.status === 404)) throw error; }
       }
-      const changed = await transition(db, id, ["cancelled"], "cancelled", { engineCleanupAt: new Date() }, row.version);
-      if (changed) await auditApproval(db, changed, "workflow.approval.engine_cleanup");
+      await transitionAudited(db, id, ["cancelled"], "cancelled", { engineCleanupAt: new Date() },
+        row.version, "workflow.approval.engine_cleanup");
       return;
     }
     if (row.state === "starting" && !row.flowableProcessId && Date.now() - row.updatedAt.getTime() > 30000) {
       const bound = await findBoundProcess(engine, row);
       if (!bound) return;
       if ("halt" in bound) return haltApproval(db, row, bound.halt);
-      const changed = await transition(db, id, ["starting"], "pending", {
+      await transitionAudited(db, id, ["starting"], "pending", {
         flowableProcessId: bound.instance.id, flowableDefinitionId: bound.instance.processDefinitionId,
         flowableDefinitionVersion: bound.definitionVersion,
-      }, row.version);
-      if (changed) await auditApproval(db, changed, "workflow.start.adopted");
+      }, row.version, "workflow.start.adopted");
       return;
     }
     if (!["pending", "decision_pending"].includes(row.state) || !row.flowableProcessId) return;
@@ -48,8 +47,8 @@ export async function reconcileApproval(db: PrismaClient, engine: FlowableClient
         const tasks = await engine.queryTasks({ processInstanceId: row.flowableProcessId });
         const task = tasks.find((candidate) => candidate.taskDefinitionKey === "approveGoodsIssue");
         if (task) {
-          const changed = await transition(db, id, ["pending"], "pending", { flowableTaskId: task.id }, row.version);
-          if (changed) await auditApproval(db, changed, "workflow.task.discovered");
+          await transitionAudited(db, id, ["pending"], "pending", { flowableTaskId: task.id },
+            row.version, "workflow.task.discovered");
         }
       }
       return;
@@ -69,13 +68,12 @@ export async function reconcileApproval(db: PrismaClient, engine: FlowableClient
     if (historyDecision(history, row) !== "match") return haltApproval(db, row, "DECISION_CONFLICT");
     const variables = Object.fromEntries(history.variables.map(({ name, value }) => [name, value]));
     const decision = row.decisionIntent as "approved" | "rejected";
-    const changed = await transition(db, id, ["decision_pending"], decision, {
+    const changed = await transitionAudited(db, id, ["decision_pending"], decision, {
       decision, decisionReason: typeof variables.decisionReason === "string" ? variables.decisionReason : null,
       approverSub: row.decisionRequestedBySub, decidedAt: row.decisionRequestedAt,
       engineCompletedAt: new Date(history.endTime),
-    }, row.version);
+    }, row.version, "workflow.reconcile.synced");
     if (changed) {
-      await auditApproval(db, changed, "workflow.reconcile.synced");
       console.log(JSON.stringify({ event: "workflow.reconcile.synced", approvalRequestId: id, businessKey: id,
         processInstanceId: row.flowableProcessId, decision, decisionLatencyMs: 0 }));
     }

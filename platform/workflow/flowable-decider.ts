@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { ApprovalRequest, PrismaClient } from "@prisma/client";
 import type { OutboxMessage } from "../outbox/message";
-import { auditApproval, getApproval, transition, withApprovalLock } from "./approval-repository";
+import { getApproval, transitionAudited, withApprovalLock } from "./approval-repository";
 import { hasScope, type ActorResolver, type Decision } from "./approval-request";
 import { FlowableClient, FlowableHttpError, type History } from "./flowable-client";
 import { haltApproval } from "./flowable-starter";
@@ -58,11 +58,10 @@ export function createFlowableDecider(db: PrismaClient, engine: FlowableClient, 
       }
       const actor = await resolveActor(row.decisionRequestedBySub);
       if (!hasScope(actor, row.warehouseIds, "approver") || actor?.sub === row.creatorSub) {
-        const changed = await transition(db, row.id, ["decision_pending"], "pending", {
+        await transitionAudited(db, row.id, ["decision_pending"], "pending", {
           decisionIntent: null, decisionIntentReason: null, decisionRequestedBySub: null,
           decisionRequestedAt: null, flowableTaskId: null,
-        }, row.version);
-        if (changed) await auditApproval(db, changed, "workflow.decision.revoked", null, row.state);
+        }, row.version, "workflow.decision.revoked", row.state);
         return true;
       }
       await engine.completeTask(row.flowableTaskId, { decision: row.decisionIntent as Decision,

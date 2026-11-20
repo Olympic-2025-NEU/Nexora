@@ -2,7 +2,7 @@
 import type { PrismaClient, ApprovalRequest } from "@prisma/client";
 import type { OutboxMessage } from "../outbox/message";
 import { PermanentDeliveryError } from "../outbox/message";
-import { auditApproval, getApproval, transition, withApprovalLock } from "./approval-repository";
+import { getApproval, transition, transitionAudited, withApprovalLock } from "./approval-repository";
 import { FlowableClient, FlowableHttpError, PROCESS_KEY, type ProcessInstance } from "./flowable-client";
 
 export async function findBoundProcess(client: FlowableClient, row: ApprovalRequest): Promise<
@@ -20,10 +20,9 @@ export async function findBoundProcess(client: FlowableClient, row: ApprovalRequ
 }
 
 export async function haltApproval(db: PrismaClient, row: ApprovalRequest, reason: string): Promise<void> {
-  const changed = await transition(db, row.id, ["requested", "starting", "pending", "decision_pending"],
-    "halted", { haltReason: reason }, row.version);
+  const changed = await transitionAudited(db, row.id, ["requested", "starting", "pending", "decision_pending"],
+    "halted", { haltReason: reason }, row.version, `workflow.approval.halted.${reason}`);
   if (changed) {
-    await auditApproval(db, changed, `workflow.approval.halted.${reason}`);
     console.log(JSON.stringify({ event: "workflow.reconcile.diverged", approvalRequestId: row.id,
       businessKey: row.id, processInstanceId: row.flowableProcessId, reason }));
   }
@@ -40,11 +39,12 @@ export function createFlowableStarter(db: PrismaClient, engine: FlowableClient) 
     const locked = await withApprovalLock(db, id, async () => {
       const current = await getApproval(db, id);
       if (!current || current.state !== "starting") return true;
+      const uuid = /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i;
       const valid = /^[0-9a-f]{64}$/.test(current.lineSnapshotSha256) &&
-        /^[0-9a-f-]{36}$/i.test(current.id) && /^[0-9a-f-]{36}$/i.test(current.documentId) &&
+        uuid.test(current.id) && uuid.test(current.documentId) &&
         current.creatorSub.trim() && current.submittedDocumentVersion > 0 &&
         Array.isArray(current.warehouseIds) && current.warehouseIds.length > 0 &&
-        current.warehouseIds.every((value) => typeof value === "string" && /^[0-9a-f-]{36}$/i.test(value));
+        current.warehouseIds.every((value) => typeof value === "string" && uuid.test(value));
       if (!valid) {
         await haltApproval(db, current, "INVALID_START_VARIABLES");
         throw new PermanentDeliveryError("INVALID_START_VARIABLES");
@@ -69,12 +69,11 @@ export function createFlowableStarter(db: PrismaClient, engine: FlowableClient) 
           throw error;
         }
       }
-      const changed = await transition(db, id, ["starting"], "pending", {
+      const changed = await transitionAudited(db, id, ["starting"], "pending", {
         flowableProcessId: bound.instance.id, flowableDefinitionId: bound.instance.processDefinitionId,
         flowableDefinitionVersion: bound.definitionVersion,
-      }, current.version);
+      }, current.version, "workflow.start.created");
       if (changed) {
-        await auditApproval(db, changed, "workflow.start.created");
         console.log(JSON.stringify({ event: "workflow.start.created", approvalRequestId: id, businessKey: id,
           processInstanceId: bound.instance.id }));
       }
