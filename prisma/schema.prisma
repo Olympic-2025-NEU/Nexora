@@ -85,6 +85,26 @@ model CoreRecord {
   @@schema("platform")
 }
 
+model IdempotencyRecord {
+  id             String   @id @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  actorOrClient  String   @map("actor_or_client")
+  method         String
+  routeKey       String   @map("route_key")
+  idempotencyKey String   @map("idempotency_key")
+  payloadSha256  String   @map("payload_sha256") @db.Char(64)
+  state          String
+  responseStatus Int?     @map("response_status") @db.SmallInt
+  responseBody   Json?    @map("response_body") @db.JsonB
+  resourceId     String?  @map("resource_id") @db.Uuid
+  expiresAt      DateTime @map("expires_at") @db.Timestamptz(6)
+
+  @@unique([actorOrClient, method, routeKey, idempotencyKey])
+  @@index([expiresAt])
+  @@map("idempotency_record")
+  @@schema("platform")
+}
+
 // ---------------------------------------------------------------------------
 // system schema — P02-T01 identity core (database-schema-v1.md § P05)
 // ---------------------------------------------------------------------------

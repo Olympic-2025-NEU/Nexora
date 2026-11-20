@@ -11,10 +11,11 @@ const scripts = {
   evidence: "tests/platform/run-evidence.sh",
   files: "tests/platform/run-files.sh",
   scan: "tests/platform/run-scan.sh",
+  idempotency: "tests/platform/run-idempotency.sh",
 };
 const script = scripts[process.argv[2]];
 if (!script) {
-  console.error("Expected platform test: schema, transaction, audit, records, evidence, files or scan");
+  console.error("Expected platform test: schema, transaction, audit, records, evidence, files, scan or idempotency");
   process.exit(2);
 }
 

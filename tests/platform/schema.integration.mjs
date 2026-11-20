@@ -22,7 +22,7 @@ test("versioned schema contains platform tables, expected constraints and migrat
   const tables = await migrator.$queryRaw`
     SELECT table_name FROM information_schema.tables
     WHERE table_schema = 'platform' ORDER BY table_name`;
-  assert.deepEqual(tables.map((row) => row.table_name), ["attachment", "audit_log", "core_record"]);
+  assert.deepEqual(tables.map((row) => row.table_name), ["attachment", "audit_log", "core_record", "idempotency_record"]);
 
   const columns = await migrator.$queryRaw`
     SELECT table_name, column_name FROM information_schema.columns
@@ -43,12 +43,17 @@ test("versioned schema contains platform tables, expected constraints and migrat
     "id", "created_at", "updated_at", "version", "kind", "source_type", "source_id",
     "payload", "visibility", "policy_version", "checksum_hex", "built_at",
   ]);
+  assert.deepEqual(byTable("idempotency_record"), [
+    "id", "created_at", "actor_or_client", "method", "route_key", "idempotency_key",
+    "payload_sha256", "state", "response_status", "response_body", "resource_id", "expires_at",
+  ]);
 
   const constraints = await migrator.$queryRaw`
     SELECT conname FROM pg_constraint
     WHERE conrelid IN ('platform.audit_log'::regclass,
                        'platform.attachment'::regclass,
-                       'platform.core_record'::regclass)`;
+                        'platform.core_record'::regclass,
+                        'platform.idempotency_record'::regclass)`;
   const names = new Set(constraints.map((row) => row.conname));
   for (const name of [
     "audit_log_actor_check", "audit_log_outcome_check", "audit_log_correlation_id_check",
@@ -57,6 +62,7 @@ test("versioned schema contains platform tables, expected constraints and migrat
     "attachment_scan_attempts_check", "attachment_scan_lease_pair_check", "attachment_scan_error_code_check",
     "attachment_quarantine_purged_state_check",
     "core_record_kind_check", "core_record_checksum_check",
+    "idempotency_record_state_check", "idempotency_record_payload_sha256_check",
   ]) assert.ok(names.has(name), `missing constraint ${name}`);
 
   const migrations = await migrator.$queryRaw`
@@ -65,6 +71,7 @@ test("versioned schema contains platform tables, expected constraints and migrat
   assert.ok(migrations.some((row) => row.migration_name === "20261118020000_platform_core_audit_grant"));
   assert.ok(migrations.some((row) => row.migration_name === "20261119000000_file_upload_idempotency"));
   assert.ok(migrations.some((row) => row.migration_name === "20261119010000_file_scan_retry"));
+  assert.ok(migrations.some((row) => row.migration_name === "20261120000000_platform_delivery_idempotency"));
   const stock = await migrator.$queryRaw`
     SELECT to_regclass('inventory.stock_balance')::text AS relation`;
   assert.equal(stock[0].relation, null, "P03 must not create P06 stock tables");
@@ -88,12 +95,19 @@ test("runtime roles are separate, least privilege and fail closed", async () => 
       has_table_privilege('app_runtime', 'platform.attachment', 'INSERT') AS app_file_insert,
       has_table_privilege('core_data', 'platform.core_record', 'UPDATE') AS core_record_update,
       has_table_privilege('core_data', 'system.membership', 'SELECT') AS core_membership_select,
-      has_table_privilege('core_data', 'system.membership', 'INSERT') AS core_membership_insert`;
+      has_table_privilege('core_data', 'system.membership', 'INSERT') AS core_membership_insert,
+      has_table_privilege('core_data', 'platform.idempotency_record', 'SELECT') AS core_idempotency_select,
+      has_table_privilege('app_runtime', 'platform.idempotency_record', 'SELECT') AS app_idempotency_select,
+      has_table_privilege('app_runtime', 'platform.idempotency_record', 'INSERT') AS app_idempotency_insert,
+      has_table_privilege('app_runtime', 'platform.idempotency_record', 'UPDATE') AS app_idempotency_update,
+      has_table_privilege('app_runtime', 'platform.idempotency_record', 'DELETE') AS app_idempotency_delete`;
   assert.deepEqual(rights[0], {
     core_audit_insert: true, core_audit_select: true,
     core_audit_update: false, core_audit_delete: false,
     app_audit_insert: true, app_record_update: false, app_file_insert: false,
     core_record_update: true, core_membership_select: true, core_membership_insert: false,
+    core_idempotency_select: false, app_idempotency_select: true, app_idempotency_insert: true,
+    app_idempotency_update: true, app_idempotency_delete: true,
   });
 });
 

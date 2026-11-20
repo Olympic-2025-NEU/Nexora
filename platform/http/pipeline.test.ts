@@ -6,12 +6,17 @@ import { DomainError } from "../kernel/errors";
 import { TokenError } from "../identity/token";
 import { resolveCommandTenant } from "../tenancy/resolve-command-tenant";
 import type { AppTransaction } from "../persistence/transaction";
-import { UnimplementedDispatch, UnimplementedIdempotency } from "./command-ports";
+import { IdempotencyClaimLostError, UnimplementedDispatch, UnimplementedIdempotency, type IdempotencyPort } from "./command-ports";
 import { mapCommandError } from "./error-mapping";
 import { commandPipeline, runCommand, type CommandContext, type CommandOptions } from "./pipeline";
 
 const actor = { userId: "user-1", organizationId: "org-1", unitIds: [], roles: ["staff"] };
 const tx = {} as Prisma.TransactionClient;
+
+function fakePort(overrides: Partial<IdempotencyPort>): IdempotencyPort {
+  const unused = async (): Promise<never> => { throw new Error("unexpected port call"); };
+  return { lookup: unused, claim: unused, complete: unused, purgeExpired: unused, ...overrides };
+}
 
 function setup() {
   const order: string[] = [];
@@ -124,5 +129,112 @@ it("maps errors into contract envelope without leaking exception text", () => {
   });
   assert.deepEqual(mapCommandError(new Error("secret"), "rid"), {
     status: 503, body: { code: "COMMAND_UNAVAILABLE", message: "Command unavailable", requestId: "rid" },
+  });
+});
+
+it("replay checks identity and policy, then skips domain, transaction and dispatch", async () => {
+  const sample = setup();
+  sample.options.idempotencyKey = "valid-key-12345678";
+  sample.options.payload = { b: 2, a: 1 };
+  sample.options.domain = async () => { throw new Error("domain reached on replay"); };
+  sample.options.dispatchPort = { dispatch: async () => { throw new Error("dispatch reached on replay"); } };
+  sample.options.idempotencyPort = fakePort({
+    lookup: async (scope) => {
+      assert.deepEqual({ actor: scope.actorOrClient, method: scope.method, route: scope.routeKey },
+        { actor: actor.userId, method: "POST", route: sample.options.action });
+      assert.match(scope.payloadSha256, /^[0-9a-f]{64}$/);
+      return { kind: "replay", result: "stored" };
+    },
+  });
+  assert.equal(await runCommand(sample.ctx, sample.options), "stored");
+  assert.deepEqual(sample.order, ["authenticate", "resolve-tenant", "authorize", "idempotency"]);
+  assert.equal(sample.factoryCalls(), 0);
+
+  const denied = setup();
+  denied.options.action = "admin:partner:manage";
+  denied.options.idempotencyKey = sample.options.idempotencyKey;
+  denied.options.idempotencyPort = sample.options.idempotencyPort;
+  await assert.rejects(runCommand(denied.ctx, denied.options), { name: "PolicyError" });
+  assert.deepEqual(denied.order, ["authenticate", "resolve-tenant", "authorize"]);
+});
+
+it("claim and completion use domain transaction before commit, dispatch only afterwards", async () => {
+  const sample = setup();
+  sample.options.idempotencyKey = "valid-key-12345678";
+  sample.options.idempotencyPort = fakePort({
+    lookup: async () => ({ kind: "fresh" }),
+    claim: async (client) => { assert.equal(client, tx); sample.order.push("claim"); return { recordId: "record" }; },
+    complete: async (client, id, result) => {
+      assert.equal(client, tx); assert.equal(id, "record"); assert.equal(result, "ok");
+      sample.order.push("complete");
+    },
+  });
+  sample.options.dispatchPort = { dispatch: async () => { sample.order.push("dispatch"); } };
+  assert.equal(await runCommand(sample.ctx, sample.options), "ok");
+  assert.deepEqual(sample.order, [
+    "authenticate", "resolve-tenant", "authorize", "idempotency", "domain",
+    "transaction-open", "claim", "audit-in-transaction", "complete", "transaction-committed", "commit", "dispatch",
+  ]);
+});
+
+it("lost claim escapes UoW, re-looks up and replays without dispatch", async () => {
+  const sample = setup();
+  sample.options.idempotencyKey = "valid-key-12345678";
+  let lookups = 0;
+  sample.options.idempotencyPort = fakePort({
+    lookup: async () => ++lookups === 1 ? { kind: "fresh" } : { kind: "replay", result: "stored" },
+    claim: async () => { throw new IdempotencyClaimLostError(); },
+  });
+  sample.options.domain = async () => { throw new Error("domain reached"); };
+  sample.options.dispatchPort = { dispatch: async () => { throw new Error("dispatch reached"); } };
+  assert.equal(await runCommand(sample.ctx, sample.options), "stored");
+  assert.equal(sample.runs(), 1);
+  assert.equal(lookups, 2);
+  assert.equal(sample.ctx.tx, undefined);
+});
+
+it("lost claim after rollback retries once; unresolved conflict returns 409", async () => {
+  const sample = setup();
+  sample.options.idempotencyKey = "valid-key-12345678";
+  let attempts = 0;
+  sample.options.idempotencyPort = fakePort({
+    lookup: async () => ({ kind: "fresh" }),
+    claim: async () => {
+      if (++attempts < 2) throw new IdempotencyClaimLostError();
+      return { recordId: "record" };
+    },
+    complete: async () => {},
+  });
+  assert.equal(await runCommand(sample.ctx, sample.options), "ok");
+  assert.equal(attempts, 2);
+
+  const stuck = setup();
+  stuck.options.idempotencyKey = "valid-key-12345678";
+  stuck.options.idempotencyPort = fakePort({
+    lookup: async () => ({ kind: "fresh" }),
+    claim: async () => { throw new IdempotencyClaimLostError(); },
+  });
+  await assert.rejects(runCommand(stuck.ctx, stuck.options), (error) => {
+    assert.deepEqual(mapCommandError(error, "rid"), {
+      status: 409, body: { code: "IDEMPOTENCY_IN_PROGRESS", message: "Conflict", requestId: "rid" },
+    });
+    return true;
+  });
+});
+
+it("invalid key fails before lookup and conflict maps to 409", async () => {
+  const sample = setup();
+  sample.options.idempotencyKey = "short";
+  sample.options.idempotencyPort = fakePort({ lookup: async () => { throw new Error("unexpected lookup"); } });
+  await assert.rejects(runCommand(sample.ctx, sample.options), { code: "IDEMPOTENCY_KEY_INVALID" });
+  assert.equal(sample.factoryCalls(), 0);
+  sample.options.idempotencyKey = "valid-key-12345678";
+  const conflict = new DomainError("IDEMPOTENCY_CONFLICT", 409);
+  sample.options.idempotencyPort = fakePort({ lookup: async () => { throw conflict; } });
+  await assert.rejects(runCommand({ requestId: "new" }, sample.options), (error) => {
+    assert.deepEqual(mapCommandError(error, "rid"), {
+      status: 409, body: { code: "IDEMPOTENCY_CONFLICT", message: "Conflict", requestId: "rid" },
+    });
+    return true;
   });
 });

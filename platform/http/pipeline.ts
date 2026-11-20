@@ -4,7 +4,9 @@ import type { Actor } from "../identity/actor";
 import type { PartnerActor } from "../identity/partner-actor";
 import { requirePolicy } from "../access/policy";
 import { transaction, type AppTransaction } from "../persistence/transaction";
-import { UnimplementedIdempotency, type DispatchPort, type IdempotencyPort } from "./command-ports";
+import { DomainError } from "../kernel/errors";
+import { IdempotencyClaimLostError, UnimplementedIdempotency, type DispatchPort, type IdempotencyPort, type IdempotencyScope } from "./command-ports";
+import { hashPayload, validateIdempotencyKey } from "./idempotency";
 
 /** Thứ tự bắt buộc của một lệnh ghi. Route handler không được đảo các bước. */
 export const commandPipeline = [
@@ -35,6 +37,9 @@ export type CommandOptions<T> = {
   domain(ctx: CommandContext & { actor: CommandActor; tenantId: string; tx: Prisma.TransactionClient }): Promise<T>;
   unitOfWork?: () => AppTransaction;
   idempotencyKey?: string;
+  payload?: unknown;
+  method?: string;
+  routeKey?: string;
   idempotencyPort?: IdempotencyPort;
   dispatchPort?: DispatchPort;
   onStep?: (step: CommandStep) => void;
@@ -42,10 +47,17 @@ export type CommandOptions<T> = {
 
 /** Run each named step once, in registry order; reject replacement of trusted context. */
 export async function runCommand<T>(ctx: CommandContext, options: CommandOptions<T>): Promise<T> {
+  return runCommandAttempt(ctx, options, true);
+}
+
+async function runCommandAttempt<T>(ctx: CommandContext, options: CommandOptions<T>, retryAllowed: boolean): Promise<T> {
   if (ctx.actor !== undefined || ctx.tx !== undefined || ctx.tenantId !== undefined) {
     throw new Error("Command context must start without trusted identity or transaction");
   }
   let result: T;
+  let scope: IdempotencyScope | undefined;
+  let replayed = false;
+  const port = options.idempotencyPort ?? new UnimplementedIdempotency();
   const handlers: { [Step in CommandStep]: (ctx: CommandContext) => Promise<void> } = {
     async authenticate(current) {
       current.actor = await options.authenticate();
@@ -67,10 +79,21 @@ export async function runCommand<T>(ctx: CommandContext, options: CommandOptions
     },
     async idempotency(current) {
       if (options.idempotencyKey !== undefined) {
+        if (port instanceof UnimplementedIdempotency) await port.lookup({} as IdempotencyScope);
+        validateIdempotencyKey(options.idempotencyKey);
         const actor = current.actor!;
-        await (options.idempotencyPort ?? new UnimplementedIdempotency()).reserve(
-          options.idempotencyKey, "organizationId" in actor ? actor.userId : actor.clientId, options.action,
-        );
+        scope = {
+          key: options.idempotencyKey,
+          actorOrClient: "organizationId" in actor ? actor.userId : actor.clientId,
+          method: options.method ?? "POST",
+          routeKey: options.routeKey ?? options.action,
+          payloadSha256: hashPayload(options.payload ?? null),
+        };
+        const outcome = await port.lookup(scope);
+        if (outcome.kind === "replay") {
+          result = outcome.result as T;
+          replayed = true;
+        }
       }
     },
     async domain(current) {
@@ -79,12 +102,14 @@ export async function runCommand<T>(ctx: CommandContext, options: CommandOptions
         const actor = current.actor!;
         const tenantId = current.tenantId!;
         try {
+          const claim = scope ? await port.claim(tx, scope) : undefined;
           const value = await options.domain(current as CommandContext & {
             actor: CommandActor; tenantId: string; tx: Prisma.TransactionClient;
           });
           if (current.actor !== actor || current.tenantId !== tenantId || current.tx !== tx) {
             throw new Error("Command context replaced during domain");
           }
+          if (claim) await port.complete(tx, claim.recordId, value);
           return value;
         } finally {
           current.tx = undefined;
@@ -92,9 +117,6 @@ export async function runCommand<T>(ctx: CommandContext, options: CommandOptions
       });
     },
     async commit(current) {
-      if (options.idempotencyKey !== undefined) {
-        await (options.idempotencyPort ?? new UnimplementedIdempotency()).complete(options.idempotencyKey, result);
-      }
       if (options.dispatchPort) {
         try {
           await options.dispatchPort.dispatch(current.requestId);
@@ -110,7 +132,16 @@ export async function runCommand<T>(ctx: CommandContext, options: CommandOptions
   let tenantId: string | undefined;
   for (const step of commandPipeline) {
     options.onStep?.(step);
-    await handlers[step](ctx);
+    try {
+      await handlers[step](ctx);
+    } catch (error) {
+      if (!(error instanceof IdempotencyClaimLostError) || step !== "domain" || !scope) throw error;
+      const outcome = await port.lookup(scope);
+      if (outcome.kind === "replay") return outcome.result as T;
+      if (retryAllowed) return runCommandAttempt({ requestId: ctx.requestId }, options, false);
+      throw new DomainError("IDEMPOTENCY_IN_PROGRESS", 409);
+    }
+    if (replayed) return result!;
     if ((actor !== undefined && ctx.actor !== actor) || (tx !== undefined && ctx.tx !== tx) ||
         (tenantId !== undefined && ctx.tenantId !== tenantId)) {
       throw new Error(`Command context replaced during ${step}`);
