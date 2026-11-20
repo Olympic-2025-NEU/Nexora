@@ -17,7 +17,7 @@ export type Definition = { id: string; key: string; version: number; deploymentI
 export type History = ProcessInstance & { endTime: string | null; deleteReason?: string | null; variables: Variable[]; endActivityIds: string[] };
 
 export class FlowableHttpError extends Error {
-  constructor(public readonly status: number) { super(`Flowable HTTP ${status}`); this.name = "FlowableHttpError"; }
+  constructor(public readonly status: number, readonly detail = "") { super(`Flowable HTTP ${status}: ${detail}`); this.name = "FlowableHttpError"; }
 }
 
 export class FlowableUnknownOutcomeError extends Error {
@@ -58,7 +58,7 @@ export class FlowableClient {
       if (method === "POST") throw new FlowableUnknownOutcomeError({ cause: error });
       throw error;
     }
-    if (!response.ok) throw new FlowableHttpError(response.status);
+    if (!response.ok) throw new FlowableHttpError(response.status, await response.text());
     return response.status === 204 || !response.headers.get("content-type")?.includes("json") ? undefined as T : response.json() as Promise<T>;
   }
 
@@ -78,6 +78,28 @@ export class FlowableClient {
     const history = await this.request<Page<ProcessInstance>>("GET", `/history/historic-process-instances?${query}`);
     if (history.data.length > 1) throw new Error("Duplicate Flowable businessKey");
     return history.data[0] ?? null;
+  }
+
+  async findInstances(businessKey: string): Promise<ProcessInstance[]> {
+    const params = new URLSearchParams({ businessKey, size: "201" });
+    const [runtime, history] = await Promise.all([
+      this.request<Page<ProcessInstance>>( "GET", `/runtime/process-instances?${params}`),
+      this.request<Page<ProcessInstance>>( "GET", `/history/historic-process-instances?${params}`),
+    ]);
+    return [...new Map([...runtime.data, ...history.data].map((row) => [row.id, row])).values()];
+  }
+
+  getDefinition(id: string): Promise<Definition> {
+    return this.request("GET", `/repository/process-definitions/${encodeURIComponent(id)}`);
+  }
+
+  getTask(id: string): Promise<Task> {
+    return this.request("GET", `/runtime/tasks/${encodeURIComponent(id)}`);
+  }
+
+  async listRuntimeInstances(start = 0): Promise<ProcessInstance[]> {
+    const params = new URLSearchParams({ processDefinitionKey: PROCESS_KEY, start: String(start), size: "200" });
+    return (await this.request<Page<ProcessInstance>>("GET", `/runtime/process-instances?${params}`)).data;
   }
 
   getInstance(processInstanceId: string): Promise<ProcessInstance> {

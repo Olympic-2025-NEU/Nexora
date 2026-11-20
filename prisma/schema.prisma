@@ -130,6 +130,56 @@ model OutboxMessage {
   @@schema("platform")
 }
 
+enum ApprovalRequestState {
+  requested
+  starting
+  pending
+  decision_pending
+  approved
+  rejected
+  confirmed
+  cancelled
+  halted
+
+  @@map("approval_request_state")
+  @@schema("platform")
+}
+
+model ApprovalRequest {
+  id                        String               @id @db.Uuid
+  documentId                String               @unique @map("document_id") @db.Uuid
+  submittedDocumentVersion  Int                  @map("submitted_document_version")
+  creatorSub                String               @map("creator_sub")
+  warehouseIds              Json                 @map("warehouse_ids") @db.JsonB
+  lineSnapshotSha256        String               @map("line_snapshot_sha256") @db.Char(64)
+  state                     ApprovalRequestState @default(requested)
+  flowableProcessId         String?              @unique @map("flowable_process_id")
+  flowableDefinitionId      String?              @map("flowable_definition_id")
+  flowableDefinitionVersion Int?                 @map("flowable_definition_version")
+  flowableTaskId            String?              @map("flowable_task_id")
+  decisionIntent            String?              @map("decision_intent")
+  decisionIntentReason      String?              @map("decision_intent_reason")
+  decisionRequestedBySub    String?              @map("decision_requested_by_sub")
+  decisionRequestedAt       DateTime?            @map("decision_requested_at") @db.Timestamptz(6)
+  decision                  String?
+  decisionReason            String?              @map("decision_reason")
+  approverSub               String?              @map("approver_sub")
+  decidedAt                 DateTime?            @map("decided_at") @db.Timestamptz(6)
+  engineCompletedAt         DateTime?            @map("engine_completed_at") @db.Timestamptz(6)
+  cancelReason              String?              @map("cancel_reason")
+  engineCleanupAt           DateTime?            @map("engine_cleanup_at") @db.Timestamptz(6)
+  haltReason                String?              @map("halt_reason")
+  confirmedBySub            String?              @map("confirmed_by_sub")
+  confirmedAt               DateTime?            @map("confirmed_at") @db.Timestamptz(6)
+  version                   Int                  @default(1)
+  createdAt                 DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                 DateTime             @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  @@index([state, updatedAt])
+  @@map("approval_request")
+  @@schema("platform")
+}
+
 // ---------------------------------------------------------------------------
 // system schema — P02-T01 identity core (database-schema-v1.md § P05)
 // ---------------------------------------------------------------------------

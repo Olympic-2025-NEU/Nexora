@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "workflow.approval.approved.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eventId", "approvalRequestId", "processInstanceId", "approverSub", "decidedAt"],
+  "properties": {
+    "eventId": { "type": "string", "format": "uuid" },
+    "approvalRequestId": { "type": "string", "format": "uuid" },
+    "processInstanceId": { "type": "string", "minLength": 1 },
+    "approverSub": { "type": "string", "minLength": 1 },
+    "decidedAt": { "type": "string", "format": "date-time" },
+    "decisionReason": { "type": "string" }
+  }
+}

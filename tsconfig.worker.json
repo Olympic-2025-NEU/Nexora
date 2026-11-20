@@ -11,5 +11,6 @@
     "outDir": "worker/dist"
   },
   "include": ["workers/outbox-dispatcher.ts", "platform/outbox/*.ts", "platform/http/idempotency.ts",
-    "composition/event-handlers.ts", "contracts/events/registry.ts"]
+    "composition/event-handlers.ts", "composition/workflow.ts", "contracts/events/registry.ts",
+    "platform/workflow/*.ts"]
 }

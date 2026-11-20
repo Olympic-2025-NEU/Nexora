@@ -15,6 +15,7 @@ const scripts = {
   outbox: "tests/platform/run-outbox.sh",
   events: "tests/platform/run-events.sh",
   workflow: "tests/platform/run-workflow.sh",
+  "workflow-bridge": "tests/platform/run-workflow-bridge.sh",
 };
 const script = scripts[process.argv[2]];
 if (!script) {

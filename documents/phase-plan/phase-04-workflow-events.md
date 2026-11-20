@@ -44,9 +44,9 @@
 
 ## P04-T06 — Kết nối app↔Flowable không distributed transaction
 
-- [ ] Lưu local approval request/state và outbox khi tạo yêu cầu; worker start Flowable process bằng correlation key idempotent. Poller/reconciler theo `workflow-spec-v1.md` đồng bộ local state sau khi verify process/task; không dựng webhook chưa có hợp đồng xác thực.
-- [ ] Tình huống Flowable down: document chờ, không tự approve; kết quả task lặp/đến muộn không confirm document; timeout/rejection có lý do và audit.
-- [ ] GoodsIssue luôn cần Approver khác creator ở v1; final `confirm` kiểm trạng thái approval được đồng bộ và quyền actor hiện tại.
+- [x] Lưu local approval request/state và outbox khi tạo yêu cầu; worker start Flowable process bằng correlation key idempotent. Poller/reconciler theo `workflow-spec-v1.md` đồng bộ local state sau khi verify process/task; không dựng webhook chưa có hợp đồng xác thực.
+- [x] Tình huống Flowable down: document chờ, không tự approve; kết quả task lặp/đến muộn không confirm document; timeout/rejection có lý do và audit.
+- [x] GoodsIssue luôn cần Approver khác creator ở v1; final `confirm` kiểm trạng thái approval được đồng bộ và quyền actor hiện tại.
 - **Đầu ra:** workflow integration contract; **kiểm chứng:** kill Flowable giữa start/complete, phục hồi không tạo process/confirm trùng.
 
 ## P04-T07 — Quan sát và quyền vận hành
