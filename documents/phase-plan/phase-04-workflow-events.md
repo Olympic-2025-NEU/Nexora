@@ -28,9 +28,10 @@
 
 ## P04-T04 — Event handlers và ownership
 
-- [ ] Định nghĩa type/version cho `trading.receipt.confirmed`, `issue.confirmed`, `transfer.confirmed`, `receiving.confirmed`, `sale.recorded`; event nội bộ khác federation envelope.
-- [ ] Wire handler ở `composition/` để Traceability/Federation tiêu thụ qua port, không import domain context khác; lỗi handler có retry và dead-letter.
-- [ ] Không phát event truy xuất cho Draft hoặc transaction rollback.
+- [x] Định nghĩa type/version cho `trading.receipt.confirmed`, `issue.confirmed`, `transfer.confirmed`, `receiving.confirmed`, `sale.recorded`; event nội bộ khác federation envelope.
+- [x] Wire handler ở `composition/` để Traceability/Federation tiêu thụ qua port, không import domain context khác; lỗi handler có retry và dead-letter.
+- [x] Không phát event truy xuất cho Draft hoặc transaction rollback.
+- **Ghi chú (2026-11-20):** Schema và payload có sẵn từ P00; T04 đưa năm event trading vào runtime registry/serializer (`.v1`, `schemaVersion: "1"`, khác envelope federation `"1.0"`). Worker đăng ký hai destination và routing port; lỗi tạm thời retry, lỗi vĩnh viễn dead-letter ngay lần đầu. Consumer thật của Traceability/Federation thuộc P08/P09, chưa có body trong T04; event hợp lệ chưa có consumer được giữ trong dead-letter để replay. Test Draft không emit và rollback qua pipeline + PostgreSQL thật, nhưng chưa có chứng từ trading thật; P07 sẽ ràng buộc emit chỉ khi confirm. Xem `evidence/p04-t04.md`.
 - **Đầu ra:** event registry/contract tests; **kiểm chứng:** một confirm→một event cùng source document ID.
 
 ## P04-T05 — Flowable OSS REST/BPMN bền vững
