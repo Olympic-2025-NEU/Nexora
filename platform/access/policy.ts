@@ -54,6 +54,7 @@ const ACTION_POLICIES: Record<string, ActionPolicy> = {
   "platform:me:read": { roles: ["administrator", "staff", "approver", "viewer"], adminAlwaysAllowed: true },
   "platform:health:read": { roles: "*" },
   "platform:audit:read": { roles: ["administrator"], adminAlwaysAllowed: true },
+  "platform:operations:retry": { roles: ["administrator"], adminAlwaysAllowed: true },
 
   // --- Federation (M2M partner only) ---
   "federation:events:write": { roles: ["partner"], adminAlwaysAllowed: false },
