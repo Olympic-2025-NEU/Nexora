@@ -27,7 +27,7 @@ test("five trading schemas serialize valid fixtures, reject invalid fixtures and
     { ok: false, reason: "UNSUPPORTED_EVENT_VERSION" });
   assert.deepEqual(validateDomainEvent(TRADING_EVENT_TYPES.receipt, "2", {}),
     { ok: false, reason: "UNSUPPORTED_EVENT_VERSION" });
-  assert.deepEqual(validateDomainEvent("workflow.approval.requested.v1", "1", {}),
+  assert.deepEqual(validateDomainEvent("workflow.unknown.v1", "1", {}),
     { ok: false, reason: "UNSUPPORTED_EVENT_TYPE" });
   assert.deepEqual(serializeDomainEvent({ type: TRADING_EVENT_TYPES.receipt, payload: cases[0][1].valid,
     aggregateType: "trading", aggregateId: randomUUID(), aggregateVersion: 2, correlationId: randomUUID(),

@@ -59,8 +59,8 @@
 
 ## P04-T08 — Gate G04
 
-- [ ] Một command mẫu ghi aggregate/audit/outbox atomically, worker dispatch và retry; một BPMN user task được hoàn thành qua engine, app phản ánh state.
-- [ ] Kiểm tra `applyAction` chỉ guard state; không dùng nó để claim AC-12. AC-12 còn chờ chứng từ M03 ở P07.
+- [x] Một command mẫu ghi aggregate/audit/outbox atomically, worker dispatch và retry; một BPMN user task được hoàn thành qua engine, app phản ánh state.
+- [x] Kiểm tra `applyAction` chỉ guard state; không dùng nó để claim AC-12. AC-12 còn chờ chứng từ M03 ở P07.
 - **Bằng chứng:** transaction/worker/Flowable logs, DB assertions, process definition version và failure tests.
 
 ## Hồ sơ giao AI theo từng task

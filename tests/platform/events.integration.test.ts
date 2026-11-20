@@ -108,7 +108,8 @@ test("unknown version, invalid payload and unknown type fast dead-letter; succes
   assert.equal(next.status, "dead_letter");
   assert.equal(next.attemptCount, 1);
   assert.equal(next.lastErrorCode, "NO_CONSUMER_REGISTERED");
-  assert.deepEqual([...buildHandlerMap().keys()], [EVENT_DESTINATIONS.traceability, EVENT_DESTINATIONS.federation]);
+  assert.deepEqual([...buildHandlerMap().keys()], [EVENT_DESTINATIONS.traceability, EVENT_DESTINATIONS.federation,
+    EVENT_DESTINATIONS.workflow]);
   assert.equal(await retryDeadLetter(client, next.id), true);
   let replayed = 0;
   assert.equal((await dispatch(buildHandlerMap({ traceability: new Map([[TRADING_EVENT_TYPES.receipt,
