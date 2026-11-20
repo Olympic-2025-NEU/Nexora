@@ -1,13 +1,27 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import type { OrganizationId } from "../kernel/id";
+import type { Prisma } from "@prisma/client";
 
-/** Written in the same transaction as the business change. Dispatched after commit. */
-export type OutboxMessage<TPayload = unknown> = {
-  organizationId: OrganizationId;
-  type: string;
-  payload: TPayload;
+export type OutboxEventInput = {
+  aggregateType: string;
+  aggregateId: string;
+  aggregateVersion: number;
+  eventType: string;
+  schemaVersion: string;
+  payload: Prisma.InputJsonValue;
+  destination: string;
+  correlationId: string;
 };
 
-export type Outbox = {
-  enqueue(message: OutboxMessage): Promise<void>;
+export type OutboxMessage = OutboxEventInput & {
+  id: string;
+  createdAt: Date;
+  status: string;
+  attemptCount: number;
+  nextAttemptAt: Date;
+  leaseOwner: string | null;
+  leaseUntil: Date | null;
+  lastErrorCode: string | null;
+  deliveredAt: Date | null;
 };
+
+export type OutboxHandler = (message: OutboxMessage) => Promise<void>;
