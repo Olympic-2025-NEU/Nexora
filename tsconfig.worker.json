@@ -5,9 +5,11 @@
     "moduleResolution": "Node",
     "strict": true,
     "esModuleInterop": true,
+    "resolveJsonModule": true,
     "skipLibCheck": true,
     "rootDir": ".",
     "outDir": "worker/dist"
   },
-  "include": ["workers/outbox-dispatcher.ts", "platform/outbox/*.ts", "platform/http/idempotency.ts"]
+  "include": ["workers/outbox-dispatcher.ts", "platform/outbox/*.ts", "platform/http/idempotency.ts",
+    "composition/event-handlers.ts", "contracts/events/registry.ts"]
 }

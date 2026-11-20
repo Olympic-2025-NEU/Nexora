@@ -25,3 +25,8 @@ export type OutboxMessage = OutboxEventInput & {
 };
 
 export type OutboxHandler = (message: OutboxMessage) => Promise<void>;
+
+export class PermanentDeliveryError extends Error {
+  readonly code = "NON_RETRYABLE";
+  constructor(readonly reason: string, message?: string) { super(message ?? reason); }
+}

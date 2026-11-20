@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { PrismaClient } from "@prisma/client";
-import type { OutboxHandler, OutboxMessage } from "./message";
+import { PermanentDeliveryError, type OutboxHandler, type OutboxMessage } from "./message";
 
 type Settings = {
   client: PrismaClient;
@@ -57,6 +57,7 @@ export function createOutboxDispatcher({ client, handlers, workerId, leaseMs = 3
       for (const row of claimed.claimed) {
         const message = row as OutboxMessage;
         let errorCode: string | undefined;
+        let permanent = false;
         try {
           const handler = handlers.get(message.destination);
           if (!handler) errorCode = "UNKNOWN_DESTINATION";
@@ -64,6 +65,10 @@ export function createOutboxDispatcher({ client, handlers, workerId, leaseMs = 3
         } catch (error) {
           errorCode = error instanceof Error && "code" in error && typeof error.code === "string"
             ? error.code : "DELIVERY_FAILED";
+          permanent = error instanceof PermanentDeliveryError ||
+            (error instanceof Error && "code" in error && error.code === "NON_RETRYABLE");
+          if (permanent) errorCode = error instanceof Error && "reason" in error && typeof error.reason === "string"
+            ? error.reason : "NON_RETRYABLE";
         }
         let changed: number;
         let outcome: string;
@@ -75,9 +80,9 @@ export function createOutboxDispatcher({ client, handlers, workerId, leaseMs = 3
               AND attempt_count = ${message.attemptCount}`;
           outcome = "delivered";
         } else {
-          const dead = message.attemptCount >= maxAttempts;
-          const ceiling = Math.min(maxBackoffMs, baseBackoffMs * 2 ** (message.attemptCount - 1));
-          const delay = Math.floor(Math.random() * ceiling);
+          const dead = permanent || message.attemptCount >= maxAttempts;
+          const delay = permanent ? 0 : Math.floor(Math.random() *
+            Math.min(maxBackoffMs, baseBackoffMs * 2 ** (message.attemptCount - 1)));
           changed = await client.$executeRaw`
             UPDATE platform.outbox_message SET status = ${dead ? "dead_letter" : "retry_due"},
               next_attempt_at = now() + (${delay} * interval '1 millisecond'),
