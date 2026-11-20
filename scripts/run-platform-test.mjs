@@ -14,10 +14,11 @@ const scripts = {
   idempotency: "tests/platform/run-idempotency.sh",
   outbox: "tests/platform/run-outbox.sh",
   events: "tests/platform/run-events.sh",
+  workflow: "tests/platform/run-workflow.sh",
 };
 const script = scripts[process.argv[2]];
 if (!script) {
-  console.error("Expected platform test: schema, transaction, audit, records, evidence, files, scan, idempotency, outbox or events");
+  console.error("Expected platform test: schema, transaction, audit, records, evidence, files, scan, idempotency, outbox, events or workflow");
   process.exit(2);
 }
 

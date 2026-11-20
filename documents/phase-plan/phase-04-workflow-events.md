@@ -36,9 +36,10 @@
 
 ## P04-T05 — Flowable OSS REST/BPMN bền vững
 
-- [ ] Pin Flowable OSS REST, cấu hình PostgreSQL/credential riêng, deploy một BPMN process versioned từ source repo; admin endpoint nội bộ.
-- [ ] Tạo user task approve/reject với assignee/group và reason; không dùng password mặc định hoặc H2 ở demo/release.
-- [ ] Test process start, query task, complete, cancel, version upgrade và restart container không mất process.
+- [x] Pin Flowable OSS REST, cấu hình PostgreSQL/credential riêng, deploy một BPMN process versioned từ source repo; admin endpoint chỉ trên loopback và Compose internal.
+- [x] Tạo user task approve/reject với candidate group `approver` và process variable `decisionReason`; test từ chối mật khẩu mặc định và xác nhận bảng `ACT_*` trong PostgreSQL.
+- [x] Test process start, query task, complete, cancel, version upgrade và restart container không mất process.
+- **Ghi chú (2026-11-20):** Chạy trên stack `nexora-b`, version 1→2 và restart Flowable pass; bằng chứng ở `evidence/p04-t05.md`. Group là string contract phía Flowable, chưa đồng bộ Keycloak. Bridge/reconciliation thuộc T06; backup drill Flowable DB còn mở ở G04/P12.
 - **Đầu ra:** process definition + adapter; **kiểm chứng:** Flowable API/process history chứng minh engine đã chạy.
 
 ## P04-T06 — Kết nối app↔Flowable không distributed transaction

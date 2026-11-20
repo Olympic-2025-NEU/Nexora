@@ -15,14 +15,14 @@ const examples = ["a", "b", "c"].map((instance) => {
 
 test("all instance contracts parse and isolate ports, buckets and credentials", () => {
   for (const env of examples) validateConfig(env);
-  for (const field of ["GATEWAY_HTTP_PORT", "S3_BUCKET_PRIVATE", "POSTGRES_PASSWORD", "ORG_CODE"]) {
+  for (const field of ["GATEWAY_HTTP_PORT", "FLOWABLE_HOST_PORT", "S3_BUCKET_PRIVATE", "POSTGRES_PASSWORD", "ORG_CODE"]) {
     assert.equal(new Set(examples.map((env) => env[field])).size, 3, field);
   }
 });
 
 for (const field of [
   "INSTANCE_ID", "APP_DATABASE_URL", "OIDC_ISSUER_URL", "PARTNER_OUTBOUND_TOKEN_URL",
-  "S3_BUCKET_PRIVATE", "FLOWABLE_BASE_URL", "REDIS_URL", "AI_BASE_URL",
+  "S3_BUCKET_PRIVATE", "FLOWABLE_BASE_URL", "FLOWABLE_HOST_PORT", "REDIS_URL", "AI_BASE_URL",
 ]) {
   test(`${field}: missing and malformed values report name only`, () => {
     for (const value of [undefined, "invalid-DO_NOT_PRINT_THIS_VALUE"]) {
@@ -45,6 +45,17 @@ test("runtime processes fail before serving with named missing variables", () =>
     delete env[field];
     assert.throws(() => validateConfig(env, service), { message: `Invalid or missing ${field}` });
   }
+});
+
+test("Flowable port and REST contract are fixed", () => {
+  for (const field of ["FLOWABLE_DB_PASSWORD", "FLOWABLE_ADMIN_USER", "FLOWABLE_ADMIN_PASSWORD"]) {
+    const env = { ...examples[0] };
+    delete env[field];
+    assert.throws(() => validateConfig(env), { message: `Invalid or missing ${field}` });
+  }
+  assert.throws(() => validateConfig({ ...examples[0], FLOWABLE_HOST_PORT: examples[0].KEYCLOAK_HOST_PORT }), { message: "Invalid or missing FLOWABLE_HOST_PORT" });
+  assert.throws(() => validateConfig({ ...examples[0], FLOWABLE_PROCESS_KEY: "other" }), { message: "Invalid or missing FLOWABLE_BASE_URL" });
+  assert.throws(() => validateConfig({ ...examples[0], FLOWABLE_ADMIN_USER: "rest-admin", FLOWABLE_ADMIN_PASSWORD: "test" }), { message: "Invalid or missing FLOWABLE_ADMIN_PASSWORD" });
 });
 
 test("optional AI reference is checked when supplied or when provider enabled", () => {

@@ -214,8 +214,8 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${FLOWABLE_DB_NAME}
       SPRING_DATASOURCE_USERNAME: ${FLOWABLE_DB_USER}
       SPRING_DATASOURCE_PASSWORD: ${FLOWABLE_DB_PASSWORD}
-      SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
-      SPRING_PROFILES_ACTIVE: postgres
+      SPRING_DATASOURCE_DRIVER-CLASS-NAME: org.postgresql.Driver
+      FLOWABLE_DATABASE_SCHEMA_UPDATE: "true"
       FLOWABLE_REST_APP_ADMIN_USER_ID: ${FLOWABLE_ADMIN_USER}
       FLOWABLE_REST_APP_ADMIN_PASSWORD: ${FLOWABLE_ADMIN_PASSWORD}
       FLOWABLE_REST_APP_CREATE_DEMO_DEFINITIONS: "false"
@@ -226,6 +226,8 @@ services:
       db-bootstrap:
         condition: service_completed_successfully
     networks: [internal]
+    ports:
+      - "127.0.0.1:${FLOWABLE_HOST_PORT:?FLOWABLE_HOST_PORT required}:8080"
     healthcheck:
       test: ["CMD-SHELL", "auth=$$(printf '%s:%s' \"$$FLOWABLE_REST_APP_ADMIN_USER_ID\" \"$$FLOWABLE_REST_APP_ADMIN_PASSWORD\" | base64 -w0); wget -q -O /dev/null --header \"Authorization: Basic $$auth\" http://127.0.0.1:8080/flowable-rest/service/management/engine"]
       interval: 10s

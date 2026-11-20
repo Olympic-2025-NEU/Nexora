@@ -9,7 +9,7 @@ import { parseEnv } from "node:util";
 const groups = {
   instance: {
     INSTANCE_ID: "id", ORG_CODE: "id", PUBLIC_BASE_URL: "url", GATEWAY_HTTP_PORT: "port",
-    GATEWAY_HTTPS_PORT: "port", POSTGRES_HOST_PORT: "port", KEYCLOAK_HOST_PORT: "port",
+    GATEWAY_HTTPS_PORT: "port", POSTGRES_HOST_PORT: "port", KEYCLOAK_HOST_PORT: "port", FLOWABLE_HOST_PORT: "port",
   },
   database: {
     POSTGRES_USER: "id", POSTGRES_PASSWORD: "secret", APP_DB_NAME: "id", APP_DB_USER: "id",
@@ -139,8 +139,11 @@ export function validateConfig(env, service) {
   if (config.PUBLIC_BASE_URL.hostname !== "127.0.0.1" && config.PUBLIC_BASE_URL.protocol !== "https:")
     fail("PUBLIC_BASE_URL");
   if (config.PUBLIC_BASE_URL.port !== String(config.GATEWAY_HTTP_PORT)) fail("GATEWAY_HTTP_PORT");
-  if (new Set([config.GATEWAY_HTTP_PORT, config.POSTGRES_HOST_PORT, config.KEYCLOAK_HOST_PORT]).size !== 3)
-    fail("GATEWAY_HTTP_PORT");
+  if (new Set([config.GATEWAY_HTTP_PORT, config.POSTGRES_HOST_PORT, config.KEYCLOAK_HOST_PORT, config.FLOWABLE_HOST_PORT]).size !== 4 ||
+      [config.POSTGRES_HOST_PORT, config.KEYCLOAK_HOST_PORT, config.FLOWABLE_HOST_PORT].includes(config.GATEWAY_HTTPS_PORT)) fail("FLOWABLE_HOST_PORT");
+  if (config.FLOWABLE_BASE_URL.href !== "http://flowable:8080/flowable-rest/service" ||
+      env.FLOWABLE_PROCESS_KEY !== "goods-issue-approval") fail("FLOWABLE_BASE_URL");
+  if (["admin", "rest-admin"].includes(env.FLOWABLE_ADMIN_USER) && env.FLOWABLE_ADMIN_PASSWORD === "test") fail("FLOWABLE_ADMIN_PASSWORD");
   if (config.PARTNER_OUTBOUND_TOKEN_URL.origin !== config.OIDC_BASE_URL.origin) fail("PARTNER_OUTBOUND_TOKEN_URL");
   for (const name of ["S3_BUCKET_PRIVATE", "S3_BUCKET_PUBLIC", "S3_BUCKET_QUARANTINE"]) {
     if (!env[name].includes(`-${env.INSTANCE_ID}-`)) fail(name);
