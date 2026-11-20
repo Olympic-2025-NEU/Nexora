@@ -51,9 +51,10 @@
 
 ## P04-T07 — Quan sát và quyền vận hành
 
-- [ ] Metrics pending/retry/dead outbox, process pending/failed, latency; log có requestId, messageId, processId nhưng redacted secret.
-- [ ] Admin xem/retry theo quyền, retry có audit; không cho sửa payload đã phát hoặc mark delivered thủ công không căn cứ.
-- [ ] Runbook xử lý queue/process stuck và cảnh báo ngưỡng dựa trên test failure thực.
+- [x] Metrics pending/retry/dead outbox, process pending/failed, latency; log có requestId, messageId, processId nhưng redacted secret.
+- [x] Admin xem/retry theo quyền, retry có audit; không cho sửa payload đã phát hoặc mark delivered thủ công không căn cứ.
+- [x] Runbook xử lý queue/process stuck và cảnh báo ngưỡng dựa trên test failure thực.
+- **Ghi chú:** Triển khai và suite đã có tại `evidence/p04-t07.md`; kiểm chứng PostgreSQL live do verifier ghi sau, chưa tuyên bố suite pass.
 - **Đầu ra:** dashboard/log/runbook ban đầu; **kiểm chứng:** inject failure tạo cảnh báo và thao tác retry khôi phục.
 
 ## P04-T08 — Gate G04

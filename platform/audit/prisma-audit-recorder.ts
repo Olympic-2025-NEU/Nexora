@@ -2,6 +2,7 @@
 import { randomUUID } from "node:crypto";
 import type { Prisma } from "@prisma/client";
 import type { AuditEntry, AuditRecorder } from "./audit-recorder";
+import { safeErrorCode } from "../observability/diagnostics";
 
 const statuses = new Set([
   "draft", "pending", "pending_approval", "approved", "rejected", "confirmed",
@@ -22,6 +23,7 @@ export function sanitizeAuditSummary(input: unknown): Prisma.InputJsonObject {
   const value = input as Record<string, unknown>;
   const safe: Record<string, Prisma.InputJsonValue> = {};
   if (typeof value.status === "string" && statuses.has(value.status)) safe.status = value.status;
+  if (typeof value.lastErrorCode === "string") safe.lastErrorCode = safeErrorCode(value.lastErrorCode) ?? "REDACTED";
   if (typeof value.kind === "string" && kinds.has(value.kind)) safe.kind = value.kind;
   if (typeof value.visibility === "string" && visibilities.has(value.visibility)) safe.visibility = value.visibility;
   if (typeof value.scanState === "string" && scanStates.has(value.scanState)) safe.scanState = value.scanState;

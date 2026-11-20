@@ -16,10 +16,11 @@ const scripts = {
   events: "tests/platform/run-events.sh",
   workflow: "tests/platform/run-workflow.sh",
   "workflow-bridge": "tests/platform/run-workflow-bridge.sh",
+  ops: "tests/platform/run-ops.sh",
 };
 const script = scripts[process.argv[2]];
 if (!script) {
-  console.error("Expected platform test: schema, transaction, audit, records, evidence, files, scan, idempotency, outbox, events or workflow");
+  console.error("Expected platform test: schema, transaction, audit, records, evidence, files, scan, idempotency, outbox, events, workflow, workflow-bridge or ops");
   process.exit(2);
 }
 
