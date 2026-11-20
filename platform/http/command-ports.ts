@@ -1,8 +1,24 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-/** T02 owns persistence and replay semantics; never simulate successful reservation here. */
+import type { Prisma } from "@prisma/client";
+
+export type IdempotencyScope = {
+  key: string;
+  actorOrClient: string;
+  method: string;
+  routeKey: string;
+  payloadSha256: string;
+};
+
+export type LookupOutcome = { kind: "fresh" } | { kind: "replay"; result: unknown };
+
+/** Concurrent transaction owns the unique key; recheck after its transaction resolves. */
+export class IdempotencyClaimLostError extends Error {}
+
 export interface IdempotencyPort {
-  reserve(key: string, actorId: string, action: string): Promise<void>;
-  complete(key: string, result: unknown): Promise<void>;
+  lookup(scope: IdempotencyScope): Promise<LookupOutcome>;
+  claim(tx: Prisma.TransactionClient, scope: IdempotencyScope): Promise<{ recordId: string }>;
+  complete(tx: Prisma.TransactionClient, recordId: string, result: unknown): Promise<void>;
+  purgeExpired(now?: Date): Promise<number>;
 }
 
 /** T03 owns post-commit delivery. Delivery failure cannot roll back committed work. */
@@ -11,8 +27,10 @@ export interface DispatchPort {
 }
 
 export class UnimplementedIdempotency implements IdempotencyPort {
-  async reserve(): Promise<never> { throw new Error("IdempotencyPort is not implemented (P04-T02)"); }
+  async lookup(): Promise<never> { throw new Error("IdempotencyPort is not implemented (P04-T02)"); }
+  async claim(): Promise<never> { throw new Error("IdempotencyPort is not implemented (P04-T02)"); }
   async complete(): Promise<never> { throw new Error("IdempotencyPort is not implemented (P04-T02)"); }
+  async purgeExpired(): Promise<never> { throw new Error("IdempotencyPort is not implemented (P04-T02)"); }
 }
 
 export class UnimplementedDispatch implements DispatchPort {
