@@ -20,9 +20,10 @@
 
 ## P04-T03 — Transactional outbox và worker
 
-- [ ] Migration outbox, payload version, aggregate/correlation/destination; insert trong cùng PG transaction của command.
-- [ ] Worker riêng claim row với lease, backoff+jitter, max attempts, dead-letter và admin retry; gửi sau commit, không gọi HTTP partner trong transaction.
-- [ ] Redis nếu dùng cho coordination/cache không thay PG outbox; kill/restart worker, chứng minh message không mất.
+- [x] Migration outbox, payload version, aggregate/correlation/destination; insert trong cùng PG transaction của command.
+- [x] Worker riêng claim row với lease, backoff+jitter, max attempts, dead-letter và admin retry; gửi sau commit, không gọi HTTP partner trong transaction.
+- [x] Redis nếu dùng cho coordination/cache không thay PG outbox; kill/restart worker, chứng minh message không mất.
+- **Ghi chú (2026-11-20):** Hàm nội bộ `retryDeadLetter` và kiểm thử ship trong T03; API admin có phân quyền/audit thuộc P04-T07. Dispatcher gửi qua handler port sau commit; production chưa đăng ký handler, kiểm thử delivery là mô phỏng. `test:platform:outbox` kiểm chứng literal caveat T02: 20 lệnh cùng key → một effect, một idempotency row, một outbox row, một simulated delivery. SIGKILL/restart worker test chứng minh 20 message không mất; Redis không giữ outbox. Xem `evidence/p04-t03.md`; G04 vẫn cần kiểm chứng riêng.
 - **Đầu ra:** dispatcher + metrics/ops API; **kiểm chứng:** crash-before/after-send và receiver duplicate tests.
 
 ## P04-T04 — Event handlers và ownership

@@ -190,6 +190,16 @@ test("full-jitter retry through attempt 8, dead-letter retry, unknown destinatio
   await due((await row(missing.aggregateId)).id);
   assert.equal((await unknown.tick()).deadLettered, 1);
   assert.equal((await row(missing.aggregateId)).status, "dead_letter");
+
+  const abandoned = event(); await enqueue(abandoned);
+  const abandonedRow = await row(abandoned.aggregateId);
+  await client.outboxMessage.update({ where: { id: abandonedRow.id },
+    data: { status: "leased", leaseOwner: "crashed", attemptCount: 8,
+      leaseUntil: new Date(0) } });
+  const capped = await dispatcher("max-attempts", receiver().handler).tick();
+  assert.equal(capped.claimed, 0);
+  assert.equal(capped.deadLettered, 1);
+  assert.equal((await row(abandoned.aggregateId)).lastErrorCode, "LEASE_EXPIRED");
 });
 
 test("ordering gate blocks retry_due predecessor; dead-letter unblocks successor", async () => {

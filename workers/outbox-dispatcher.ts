@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+import { randomUUID } from "node:crypto";
 import type { PrismaClient } from "@prisma/client";
 import { createOutboxDispatcher } from "../platform/outbox/dispatcher";
 
 export function main(client: PrismaClient) {
-  const dispatcher = createOutboxDispatcher({ client, workerId: `worker-${process.pid}`,
+  const dispatcher = createOutboxDispatcher({ client, workerId: `worker-${randomUUID()}`,
     handlers: new Map() });
   let stopped = false;
   const poll = async () => {

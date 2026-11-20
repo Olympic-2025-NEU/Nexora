@@ -103,6 +103,7 @@ async function runCommandAttempt<T>(ctx: CommandContext, options: CommandOptions
     },
     async domain(current) {
       result = await (options.unitOfWork ?? (() => transaction))().run(async (tx) => {
+        events.length = 0; // A serializable transaction may rerun this callback after rollback.
         current.tx = tx;
         const actor = current.actor!;
         const tenantId = current.tenantId!;

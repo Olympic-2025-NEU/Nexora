@@ -183,6 +183,26 @@ it("claim, outbox insert and completion use domain transaction before commit", a
   ]);
 });
 
+it("transaction retry resets emitted events from the rolled-back attempt", async () => {
+  const sample = setup();
+  const inserts: number[] = [];
+  sample.options.domain = async (current) => {
+    current.emit({ aggregateType: "test", aggregateId: "00000000-0000-4000-8000-000000000001",
+      aggregateVersion: 1, eventType: "test.created.v1", schemaVersion: "1", payload: { eventId: "e1" },
+      destination: "local", correlationId: current.requestId });
+    return "ok";
+  };
+  sample.options.unitOfWork = () => ({ run: async (work) => {
+    const fake = { outboxMessage: { createMany: async ({ data }: { data: unknown[] }) => {
+      inserts.push(data.length);
+    } } } as unknown as Prisma.TransactionClient;
+    await work(fake); // Simulate commit failure: first attempt rolls back.
+    return work(fake);
+  } });
+  assert.equal(await runCommand(sample.ctx, sample.options), "ok");
+  assert.deepEqual(inserts, [1, 1]);
+});
+
 it("lost claim escapes UoW, re-looks up and replays", async () => {
   const sample = setup();
   sample.options.idempotencyKey = "valid-key-12345678";

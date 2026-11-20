@@ -26,13 +26,19 @@ export function createOutboxDispatcher({ client, handlers, workerId, leaseMs = 3
   return {
     async tick() {
       const claimed = await client.$transaction(async (tx) => {
+        const exhausted = await tx.$queryRaw<{ id: string }[]>`
+          UPDATE platform.outbox_message SET status = 'dead_letter', lease_owner = NULL,
+            lease_until = NULL, last_error_code = 'LEASE_EXPIRED'
+          WHERE status = 'leased' AND lease_until < now() AND attempt_count >= ${maxAttempts}
+          RETURNING id`;
         const ids = await tx.$queryRaw<{ id: string }[]>`
           UPDATE platform.outbox_message SET status = 'leased', lease_owner = ${workerId},
             lease_until = now() + (${leaseMs} * interval '1 millisecond'), attempt_count = attempt_count + 1
           WHERE id IN (
             SELECT m.id FROM platform.outbox_message m
-            WHERE ((m.status IN ('pending','retry_due') AND m.next_attempt_at <= now())
-              OR (m.status = 'leased' AND m.lease_until < now()))
+            WHERE m.attempt_count < ${maxAttempts}
+              AND ((m.status IN ('pending','retry_due') AND m.next_attempt_at <= now())
+                OR (m.status = 'leased' AND m.lease_until < now()))
               AND NOT EXISTS (
                 SELECT 1 FROM platform.outbox_message o
                 WHERE o.aggregate_type = m.aggregate_type AND o.aggregate_id = m.aggregate_id
@@ -42,10 +48,13 @@ export function createOutboxDispatcher({ client, handlers, workerId, leaseMs = 3
             ORDER BY m.next_attempt_at, m.created_at
             LIMIT ${batchSize} FOR UPDATE SKIP LOCKED
           ) RETURNING id`;
-        return tx.outboxMessage.findMany({ where: { id: { in: ids.map((row) => row.id) } } });
+        return { claimed: await tx.outboxMessage.findMany({ where: { id: { in: ids.map((row) => row.id) } } }),
+          exhausted: await tx.outboxMessage.findMany({ where: { id: { in: exhausted.map((row) => row.id) } } }) };
       });
-      const result = { claimed: claimed.length, delivered: 0, retried: 0, deadLettered: 0, leaseLost: 0 };
-      for (const row of claimed) {
+      const result = { claimed: claimed.claimed.length, delivered: 0, retried: 0,
+        deadLettered: claimed.exhausted.length, leaseLost: 0 };
+      for (const row of claimed.exhausted) log(row as OutboxMessage, "dead_letter");
+      for (const row of claimed.claimed) {
         const message = row as OutboxMessage;
         let errorCode: string | undefined;
         try {
