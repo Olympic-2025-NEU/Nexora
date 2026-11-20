@@ -9,6 +9,7 @@
     "start": "node deploy/config.mjs --runtime erp && next start",
     "lint": "eslint --max-warnings=0",
     "typecheck": "tsc --noEmit",
+    "build:worker": "tsc -p tsconfig.worker.json",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate deploy",
     "db:migrate:dev": "prisma migrate dev",

@@ -4,9 +4,22 @@ import { connect } from "node:net";
 import { PrismaClient } from "@prisma/client";
 import { validateConfig } from "../deploy/config.mjs";
 import { requestId, response, log, timed } from "../deploy/health.mjs";
+import { main as startOutbox } from "./dist/workers/outbox-dispatcher.js";
+import { createPrismaIdempotency } from "./dist/platform/http/idempotency.js";
 
 validateConfig(process.env, "worker");
 const prisma = new PrismaClient();
+const { dispatcher } = startOutbox(prisma);
+const idempotency = createPrismaIdempotency(prisma);
+async function purgeIdempotency() {
+  try {
+    const deleted = await idempotency.purgeExpired();
+    console.log(JSON.stringify({ service: "worker", outcome: "idempotency_purge", deleted }));
+  } catch {
+    console.error(JSON.stringify({ service: "worker", outcome: "idempotency_purge_failed" }));
+  }
+}
+setInterval(() => { void purgeIdempotency(); }, 60 * 60 * 1_000);
 function redisPing() {
   return timed(new Promise((resolve, reject) => {
     const url = new URL(process.env.REDIS_URL);
@@ -40,9 +53,11 @@ http.createServer(async (req, res) => {
   if (req.url === "/metrics") {
     const up = await ready(id);
     log("worker", id, "metrics", up ? "up" : "down");
+    let stats;
+    try { stats = await dispatcher.stats(); }
+    catch { res.writeHead(503); res.end(); return; }
     res.writeHead(200, { "content-type": "text/plain; version=0.0.4", "cache-control": "no-store", "x-request-id": id });
-    // Queue has no dispatcher until P04. NaN means depth unavailable, not empty.
-    res.end(`# TYPE service_up gauge\nservice_up{service="worker"} ${Number(up)}\n# TYPE worker_queue_depth gauge\nworker_queue_depth NaN\n`);
+    res.end(`# TYPE service_up gauge\nservice_up{service="worker"} ${Number(up)}\n# TYPE worker_queue_depth gauge\nworker_queue_depth ${stats.pending + stats.retryDue + stats.leased}\n# TYPE worker_outbox_dead_letter gauge\nworker_outbox_dead_letter ${stats.deadLetter}\n`);
     return;
   }
   res.writeHead(404); res.end();
