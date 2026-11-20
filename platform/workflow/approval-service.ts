@@ -5,7 +5,7 @@ import { serializeDomainEvent, WORKFLOW_EVENT_TYPES } from "../../contracts/even
 import { appendOutbox } from "../outbox/writer";
 import { auditApproval, getApproval, transition } from "./approval-repository";
 import { ApprovalNotReadyError, ApprovalScopeError, DecisionConflictError, SelfApprovalError,
-  VersionConflictError, hasScope, type ActorResolver, type Decision } from "./approval-request";
+  SnapshotMismatchError, VersionConflictError, hasScope, type ActorResolver, type Decision } from "./approval-request";
 
 export async function createRequest(tx: Prisma.TransactionClient, input: {
   documentId: string; submittedDocumentVersion: number; creatorSub: string;
@@ -68,5 +68,39 @@ export async function recordDecisionIntent(tx: Prisma.TransactionClient, resolve
       requestedBySub: actor.sub, requestedAt: changed.decisionRequestedAt!.toISOString(),
       lineSnapshotSha256: row.lineSnapshotSha256, intentVersion: changed.version,
     } }));
+  return changed;
+}
+
+export async function cancelRequest(tx: Prisma.TransactionClient, input: {
+  approvalRequestId: string; actorSub: string; reason: string;
+}) {
+  if (!input.reason.trim()) throw new Error("Cancellation reason required");
+  const row = await getApproval(tx, input.approvalRequestId);
+  if (!row) throw new ApprovalNotReadyError("Approval request missing");
+  const changed = await transition(tx, row.id, ["requested", "starting", "pending", "decision_pending"],
+    "cancelled", { cancelReason: input.reason.trim() }, row.version);
+  if (!changed) throw new VersionConflictError("Approval version changed");
+  await auditApproval(tx, changed, "workflow.approval.cancelled", input.actorSub, row.state);
+  return changed;
+}
+
+export async function confirmApproval(tx: Prisma.TransactionClient, resolver: ActorResolver,
+  reconcile: (id: string) => Promise<void>, input: {
+    approvalRequestId: string; actorSub: string; currentLineSnapshotSha256: string;
+  }) {
+  await reconcile(input.approvalRequestId);
+  await tx.$queryRaw`SELECT id FROM platform.approval_request WHERE id = ${input.approvalRequestId}::uuid FOR UPDATE`;
+  const row = await getApproval(tx, input.approvalRequestId);
+  if (!row) throw new ApprovalNotReadyError("Approval request missing");
+  const actor = await resolver(input.actorSub);
+  if (!hasScope(actor, row.warehouseIds)) throw new ApprovalScopeError("Current warehouse scope incomplete");
+  if (row.state !== "approved" || row.haltReason) throw new ApprovalNotReadyError("Approval not approved");
+  if (row.lineSnapshotSha256 !== input.currentLineSnapshotSha256)
+    throw new SnapshotMismatchError("Approved line snapshot changed");
+  const changed = await transition(tx, row.id, ["approved"], "confirmed", {
+    confirmedBySub: input.actorSub, confirmedAt: new Date(),
+  }, row.version);
+  if (!changed) throw new VersionConflictError("Approval version changed");
+  await auditApproval(tx, changed, "workflow.approval.confirmed", input.actorSub, row.state);
   return changed;
 }

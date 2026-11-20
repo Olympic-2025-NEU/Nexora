@@ -2,13 +2,25 @@
 import type { ApprovalRequest, PrismaClient } from "@prisma/client";
 import { auditApproval, getApproval, transition, withApprovalLock } from "./approval-repository";
 import { historyDecision, readHistory } from "./flowable-decider";
-import { FlowableClient } from "./flowable-client";
+import { FlowableClient, FlowableHttpError } from "./flowable-client";
 import { findBoundProcess, haltApproval } from "./flowable-starter";
 
 export async function reconcileApproval(db: PrismaClient, engine: FlowableClient, id: string): Promise<void> {
   await withApprovalLock(db, id, async () => {
     const row = await getApproval(db, id);
     if (!row) return;
+    if (row.state === "cancelled" && !row.engineCleanupAt) {
+      const instances = await engine.findInstances(id);
+      for (const instance of instances) {
+        try {
+          await engine.getInstance(instance.id);
+          await engine.cancelProcess(instance.id, row.cancelReason ?? "Approval cancelled");
+        } catch (error) { if (!(error instanceof FlowableHttpError && error.status === 404)) throw error; }
+      }
+      const changed = await transition(db, id, ["cancelled"], "cancelled", { engineCleanupAt: new Date() }, row.version);
+      if (changed) await auditApproval(db, changed, "workflow.approval.engine_cleanup");
+      return;
+    }
     if (row.state === "starting" && !row.flowableProcessId && Date.now() - row.updatedAt.getTime() > 30000) {
       const bound = await findBoundProcess(engine, row);
       if (!bound) return;
