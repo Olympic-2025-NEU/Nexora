@@ -40,12 +40,15 @@ export function createRoutingHandler(destination: string, consumers: EventConsum
   };
 }
 
-export function buildHandlerMap(consumers: { traceability?: EventConsumerMap; federation?: EventConsumerMap } = {}):
+export function buildHandlerMap(consumers: { traceability?: EventConsumerMap; federation?: EventConsumerMap;
+  workflow?: EventConsumerMap } = {}):
   Map<string, OutboxHandler> {
   return new Map([
     [EVENT_DESTINATIONS.traceability, createRoutingHandler(EVENT_DESTINATIONS.traceability,
       consumers.traceability ?? new Map())],
     [EVENT_DESTINATIONS.federation, createRoutingHandler(EVENT_DESTINATIONS.federation,
       consumers.federation ?? new Map())],
+    [EVENT_DESTINATIONS.workflow, createRoutingHandler(EVENT_DESTINATIONS.workflow,
+      consumers.workflow ?? new Map())],
   ]);
 }
