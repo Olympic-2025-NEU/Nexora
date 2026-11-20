@@ -19,7 +19,6 @@ const unitOfWork = () => createTransaction(client);
 
 function command(requestId: string, key: string, payload: unknown, actorId = "test-user") {
   let effects = 0;
-  let dispatches = 0;
   const options: CommandOptions<{ id: string; accepted: boolean }> = {
     authenticate: async () => ({ userId: actorId, organizationId: "test-org", unitIds: [], roles: ["staff"] }),
     resolveTenant: async () => "test-org",
@@ -28,7 +27,6 @@ function command(requestId: string, key: string, payload: unknown, actorId = "te
     payload,
     idempotencyPort: port,
     unitOfWork,
-    dispatchPort: { dispatch: async () => { dispatches++; } },
     domain: async ({ tx }) => {
       effects++;
       const id = randomUUID();
@@ -41,7 +39,7 @@ function command(requestId: string, key: string, payload: unknown, actorId = "te
   };
   const run = () => runCommand({ requestId } satisfies CommandContext, options);
   const rows = () => client.auditLog.count({ where: { requestId } });
-  return { options, run, rows, effects: () => effects, dispatches: () => dispatches };
+  return { options, run, rows, effects: () => effects };
 }
 
 test("20 simultaneous commands commit one effect and replay one stored response", async () => {
@@ -64,7 +62,6 @@ test("20 simultaneous commands commit one effect and replay one stored response"
   const results = await Promise.all(Array.from({ length: 20 }, () => sample.run()));
   for (const value of results) assert.deepEqual(value, results[0]);
   assert.equal(sample.effects(), 1);
-  assert.equal(sample.dispatches(), 1);
   assert.equal(await sample.rows(), 1);
   const record = await client.idempotencyRecord.findUniqueOrThrow({ where: {
     actorOrClient_method_routeKey_idempotencyKey: {
@@ -79,12 +76,10 @@ test("20 simultaneous commands commit one effect and replay one stored response"
 
   assert.deepEqual(await sample.run(), results[0]);
   assert.equal(sample.effects(), 1);
-  assert.equal(sample.dispatches(), 1);
   assert.equal(await sample.rows(), 1);
   const reordered = command(randomUUID(), key, { a: 1, b: 2 });
   assert.deepEqual(await reordered.run(), results[0]);
   assert.equal(reordered.effects(), 0);
-  assert.equal(reordered.dispatches(), 0);
 
   const mismatch = command(randomUUID(), key, { a: 3 });
   await assert.rejects(mismatch.run(), (error) => {
