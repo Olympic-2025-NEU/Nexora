@@ -12,7 +12,7 @@ Legacy `docker-compose.yml` (Postgres-only) is removed; do not reintroduce a sec
 | `redis` | `internal` | none |
 | `keycloak` | `internal` | none (use `--profile local-admin`) |
 | `seaweedfs` | `internal` | none |
-| `flowable` | `internal` | none |
+| `flowable` | `internal` | `127.0.0.1:${FLOWABLE_HOST_PORT}` → 8080 (authenticated REST) |
 | `clamav` | `internal` | none |
 | `erp` / `worker` / `core-data` | `internal` | none — `--profile apps` |
 | `dx-lab` | `internal` | none — `--profile dxlab` |
@@ -27,9 +27,12 @@ From repository root with Node 22+, Docker Engine and Docker Compose v2:
 ```sh
 bash deploy/scripts/bootstrap.sh a  # use b or c for another isolated instance
 docker compose -f deploy/compose.yml --env-file deploy/instances/a.env -p nexora-a --profile apps up -d --build
+bash deploy/scripts/deploy-flowable.sh a nexora-a
 ```
 
 PowerShell: `./deploy/scripts/bootstrap.ps1 a`, then run the same Compose `up` command. Both scripts copy only a missing instance env file, replace matching `CHANGE_ME_*` markers with the same random value in each password/URL pair, validate the complete deployment contract, then run `compose config -q`. Existing env files are never overwritten; edit local values before rerunning validation. Instance env files stay ignored by Git (mode `0600` when generated). Never run `docker compose config` without `-q`: expanded output contains credentials. The demo defaults use loopback HTTP; Internet deployments require HTTPS for `PUBLIC_BASE_URL` and reachable OIDC endpoints. `GATEWAY_HTTPS_PORT` reserves the external HTTPS port; this P01 Compose gateway still listens on loopback HTTP. Partner secret references identify external secrets for later integration; no partner credential is created by this bootstrap. Optional AI uses `AI_PROVIDER=none`; set `AI_KEY_REF` to a secret reference for another provider. Config matrix and verification: [P01-T05 evidence](../documents/phase-plan/evidence/p01-t05.md).
+
+Flowable bootstrap is the `deploy-flowable.sh` call after Compose `up`: it polls authenticated engine health, rejects `admin:test`, deploys the BPMN only when absent, and confirms `ACT_*` tables in the dedicated PostgreSQL database. Repeating it keeps the definition version unchanged; `--force [bpmn-file]` explicitly deploys an upgrade. Existing ignored instance env files created before P04-T05 need `FLOWABLE_HOST_PORT` (distinct from other host ports) and `FLOWABLE_BASE_URL=http://flowable:8080/flowable-rest/service`; bootstrap never overwrites those files. On first boot against a fresh Flowable database, the REST admin identity is seeded from `FLOWABLE_ADMIN_USER/PASSWORD`. Changing those env values after first boot does not rotate the seeded identity; rotation requires a Flowable database reset and redeployment. Do not reset a database containing live process state. Run `npm run test:platform:workflow` against a fresh instance with version 1; the test deploys version 2, restarts only Flowable, and retains process history. Set `FLOWABLE_INSTANCE` and `FLOWABLE_PROJECT` for another instance/project.
 
 If Docker Engine works but `docker compose version` reports `unknown command: docker compose`, install the Compose plugin, or use this Bash-only fallback from repository root. It runs Compose v5.7.1 in the Docker CLI container, mounts the checkout at the same absolute path for build contexts and bind mounts, and works with `bootstrap.sh` and `smoke.sh` when invoked with `bash`:
 
