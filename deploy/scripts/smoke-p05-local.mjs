@@ -41,7 +41,7 @@ const seedProc = compose([
   "-v",
   `${resolve(root, "scripts/seed-system.mjs")}:/app/seed-system.mjs:ro`,
   "-e",
-  // Seed needs write on system.organization; app_runtime only has SELECT (grant gap).
+  // Seed uses migrator URL (creates org row; app_runtime has SELECT/UPDATE only).
   `DATABASE_URL=${env.MIGRATOR_DATABASE_URL}`,
   "-e",
   `OIDC_BASE_URL=${env.OIDC_BASE_URL}`,

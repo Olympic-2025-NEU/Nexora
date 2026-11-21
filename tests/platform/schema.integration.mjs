@@ -120,7 +120,18 @@ test("runtime roles are separate, least privilege and fail closed", async () => 
        has_table_privilege('app_runtime', 'platform.outbox_message', 'SELECT') AS app_outbox_select,
        has_table_privilege('app_runtime', 'platform.outbox_message', 'INSERT') AS app_outbox_insert,
        has_table_privilege('app_runtime', 'platform.outbox_message', 'UPDATE') AS app_outbox_update,
-       has_table_privilege('app_runtime', 'platform.outbox_message', 'DELETE') AS app_outbox_delete`;
+       has_table_privilege('app_runtime', 'platform.outbox_message', 'DELETE') AS app_outbox_delete,
+       has_table_privilege('app_runtime', 'system.organization', 'SELECT') AS app_org_select,
+       has_table_privilege('app_runtime', 'system.organization', 'UPDATE') AS app_org_update,
+       has_table_privilege('app_runtime', 'system.organization', 'INSERT') AS app_org_insert,
+       has_table_privilege('app_runtime', 'system.partner', 'SELECT') AS app_partner_select,
+       has_table_privilege('app_runtime', 'system.partner', 'INSERT') AS app_partner_insert,
+       has_table_privilege('app_runtime', 'system.partner', 'UPDATE') AS app_partner_update,
+       has_table_privilege('app_runtime', 'system.partner', 'DELETE') AS app_partner_delete,
+       has_table_privilege('app_runtime', 'system.partner_connection', 'SELECT') AS app_conn_select,
+       has_table_privilege('app_runtime', 'system.partner_connection', 'INSERT') AS app_conn_insert,
+       has_table_privilege('app_runtime', 'system.partner_connection', 'UPDATE') AS app_conn_update,
+       has_table_privilege('app_runtime', 'system.partner_connection', 'DELETE') AS app_conn_delete`;
   assert.deepEqual(rights[0], {
     core_audit_insert: true, core_audit_select: true,
     core_audit_update: false, core_audit_delete: false,
@@ -130,6 +141,9 @@ test("runtime roles are separate, least privilege and fail closed", async () => 
     app_idempotency_update: true, app_idempotency_delete: true,
     core_outbox_select: false, app_outbox_select: true, app_outbox_insert: true,
     app_outbox_update: true, app_outbox_delete: false,
+    app_org_select: true, app_org_update: true, app_org_insert: false,
+    app_partner_select: true, app_partner_insert: true, app_partner_update: true, app_partner_delete: false,
+    app_conn_select: true, app_conn_insert: true, app_conn_update: true, app_conn_delete: false,
   });
 });
 
