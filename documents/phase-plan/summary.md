@@ -7,8 +7,10 @@
 - `app/page.tsx`: placeholder Nexora; health `live`/`ready` nằm ở `app/api/v1/health/`.
 - `deploy/compose.yml`: topology P01 (gateway publish loopback; PG/Keycloak/Flowable/SeaweedFS/Redis/ClamAV internal). Prisma Migrate platform baseline đã có (`prisma-migration-spec.md`, D03).
 - G00 **CLOSED** trên `phase-01` theo owner waiver 2026-11-17. G01 **CLOSED** 2026-11-18 theo owner waiver (agent reinstall A/B làm bằng chứng kỹ thuật). Bằng chứng runtime P01: `evidence/p01-t01.md` … `evidence/G01.md`.
-- **P02 (T01–T08) DONE 2026-11-18:** Bearer auth, APISIX private/public/M2M routes, system.partner+partner_connection DB, policy matrix, HTTPS config, OpenAPI security schemes, SSRF allowlist. G02 **CLOSED** theo owner waiver (Docker daemon unavailable; technical package + unit tests complete). Bằng chứng: `evidence/p02-t02.md` … `evidence/G02.md`.
-- `contexts/sales|procurement|finance|master-data`: scaffold cũ, không tính là M01–M04. `contexts/inventory` hiện chỉ có reservation guard.
+- **P02 (T01–T08) DONE 2026-11-18:** Bearer auth, APISIX private/public/M2M routes, system.partner+partner_connection DB, policy matrix, HTTPS config, OpenAPI security schemes, SSRF allowlist. G02 **CLOSED** (live HTTP/HTTPS smoke). Bằng chứng: `evidence/p02-t02.md` … `evidence/G02.md`.
+- **P03/P04 DONE trên `phase-03`/`phase-04`:** G03/G04 CLOSED (data/files + workflow/events). `develop` vẫn có thể chưa merge đủ tip phase.
+- **P05 (M01 System & Partner) DONE 2026-11-21** trên `phase-05` (base `phase-04`): consume schema P02; admin-invite membership; API/UI org/members/partners/connection; M2M harden; G05 **CLOSED** (`evidence/G05.md`). Live MFA A/B/C demo still operator follow-up.
+- `contexts/sales|procurement|finance|master-data`: scaffold cũ, không tính là M01–M04. `contexts/system` là M01. `contexts/inventory` hiện chỉ có reservation guard.
 - `LICENSE`, `NOTICE`, `CHANGELOG.md`, SPDX trên nguồn viết, repo và issue tracker công khai đã được kiểm trong T04; bản phát hành/PoF vẫn thuộc P13.
 
 ## Định nghĩa hoàn thành dự án trong phạm vi này

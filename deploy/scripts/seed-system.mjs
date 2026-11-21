@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 /**
- * Seed system.organization + system.membership for the Keycloak dev-staff user.
+ * Idempotent seed for system.organization + membership (+ optional partner stubs).
  *
  * Env: KC_BOOTSTRAP_ADMIN_*, KC_DEV_USERNAME, OIDC_BASE_URL, DATABASE_URL, ORG_CODE, INSTANCE_ID
+ * Optional: KC_ADMIN_USERNAME (defaults to creating administrator membership for same or separate user)
+ * Optional partner stubs (no secrets): SEED_PARTNER_ISSUER, SEED_PARTNER_CODE, SEED_PARTNER_NAME
  */
 import { createHash, randomUUID } from "node:crypto";
 import { PrismaClient } from "@prisma/client";
@@ -40,10 +42,32 @@ async function userSub(token, username) {
   return users[0].id;
 }
 
+async function upsertMembership(prisma, organizationId, sub, displayName, role) {
+  await prisma.membership.upsert({
+    where: { keycloakSub: sub },
+    create: {
+      id: randomUUID(),
+      organizationId,
+      keycloakSub: sub,
+      displayName,
+      role,
+      status: "active",
+      lastSyncedAt: new Date(),
+    },
+    update: {
+      organizationId,
+      displayName,
+      role,
+      status: "active",
+      lastSyncedAt: new Date(),
+    },
+  });
+}
+
 async function main() {
   const token = await adminToken();
-  const username = required("KC_DEV_USERNAME");
-  const sub = await userSub(token, username);
+  const staffUsername = required("KC_DEV_USERNAME");
+  const staffSub = await userSub(token, staffUsername);
   const orgCode = required("ORG_CODE");
   const instanceId = required("INSTANCE_ID");
   required("DATABASE_URL");
@@ -64,27 +88,45 @@ async function main() {
       update: { updatedAt: new Date() },
     });
 
-    await prisma.membership.upsert({
-      where: { keycloakSub: sub },
-      create: {
-        id: randomUUID(),
-        organizationId: organization.id,
-        keycloakSub: sub,
-        displayName: username,
-        role: "staff",
-        status: "active",
-        lastSyncedAt: new Date(),
-      },
-      update: {
-        organizationId: organization.id,
-        role: "staff",
-        status: "active",
-        lastSyncedAt: new Date(),
-      },
-    });
+    // Prefer a dedicated admin user when present; otherwise promote note in logs.
+    const adminUsername = process.env.KC_ADMIN_USERNAME || staffUsername;
+    let adminSub = staffSub;
+    if (adminUsername !== staffUsername) {
+      adminSub = await userSub(token, adminUsername);
+    }
 
-    const fingerprint = createHash("sha256").update(sub).digest("hex").slice(0, 12);
-    console.log(`Seeded org ${organization.id}; membership for ${username} sub_fp=${fingerprint}`);
+    await upsertMembership(prisma, organization.id, adminSub, adminUsername, "administrator");
+    if (adminSub !== staffSub) {
+      await upsertMembership(prisma, organization.id, staffSub, staffUsername, "staff");
+    }
+
+    const partnerIssuer = process.env.SEED_PARTNER_ISSUER;
+    const partnerCode = process.env.SEED_PARTNER_CODE;
+    const partnerName = process.env.SEED_PARTNER_NAME;
+    if (partnerIssuer && partnerCode && partnerName) {
+      await prisma.partner.upsert({
+        where: { issuerInstanceId: partnerIssuer },
+        create: {
+          id: randomUUID(),
+          issuerInstanceId: partnerIssuer,
+          code: partnerCode,
+          displayName: partnerName,
+          status: "active",
+          createdBySub: adminSub,
+        },
+        update: {
+          code: partnerCode,
+          displayName: partnerName,
+          updatedAt: new Date(),
+        },
+      });
+      console.log(`Seeded partner stub code=${partnerCode} (no connection secrets)`);
+    }
+
+    const fingerprint = createHash("sha256").update(adminSub).digest("hex").slice(0, 12);
+    console.log(
+      `Seeded org ${organization.id}; administrator sub_fp=${fingerprint}; role enum=administrator|staff|approver|viewer`,
+    );
   } finally {
     await prisma.$disconnect();
   }

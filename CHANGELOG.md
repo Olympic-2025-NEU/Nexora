@@ -4,6 +4,14 @@ Các thay đổi của Nexora sẽ được ghi tại đây. Chưa có bản ph�
 
 ## Unreleased
 
+### Phase 05 — M01 System & Partner (P05-T01–T08 / G05)
+
+- Plan updated: no duplicate system migrations; admin-invite membership; T03 scoped to M01; T06 ≠ P09 inbox.
+- New `contexts/system` + `composition/system.ts`; APIs `/organization`, `/members`, `/partners`, `/partners/{id}/connection`.
+- Admin UI under `/admin/*`; seed + `partner-handshake.mjs` + `runbook-m01-provisioning.md`.
+- M2M harden (`partner-actor` partner status/scope) + `/api/v1/federation/connectivity` probe route.
+- Gate: `evidence/G05.md` CLOSED (technical package).
+
 ### Phase 02 — P02-T02 through P02-T08 (identity, gateway, policy, HTTPS, docs)
 
 - **T02 Private routes:** `deploy/apisix/routes.yaml` updated — `core-api-v1` and `files-api-v1` before catch-all `erp-api-v1`; OIDC `bearer_only: true` on all private routes; `serverless-pre-function` strips forged identity headers (`x-userinfo`, `x-access-token`, `x-authenticated-user`, etc.); `limit-req` and `request-id` plugins on all routes.

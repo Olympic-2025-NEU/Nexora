@@ -60,10 +60,23 @@ const ACTION_POLICIES: Record<string, ActionPolicy> = {
   "federation:events:write": { roles: ["partner"], adminAlwaysAllowed: false },
   "federation:acks:write": { roles: ["partner"], adminAlwaysAllowed: false },
 
-  // --- Admin management ---
-  "admin:membership:manage": { roles: ["administrator"], adminAlwaysAllowed: true },
+  // --- Admin / M01 System & Partner ---
+  "admin:organization:read": {
+    roles: ["administrator", "staff", "approver", "viewer"],
+    adminAlwaysAllowed: true,
+  },
   "admin:organization:manage": { roles: ["administrator"], adminAlwaysAllowed: true },
+  "admin:membership:read": { roles: ["administrator"], adminAlwaysAllowed: true },
+  "admin:membership:manage": { roles: ["administrator"], adminAlwaysAllowed: true },
+  "admin:partner:read": {
+    roles: ["administrator", "staff", "approver", "viewer"],
+    adminAlwaysAllowed: true,
+  },
   "admin:partner:manage": { roles: ["administrator"], adminAlwaysAllowed: true },
+  "admin:partner:connection:manage": { roles: ["administrator"], adminAlwaysAllowed: true },
+
+  // Connectivity probe (M2M) — distinct from inbox (P09)
+  "federation:connectivity:probe": { roles: ["partner"], adminAlwaysAllowed: false },
 
   // --- Trading (placeholder until P07) ---
   "trading:goods-issue:create": { roles: ["staff"], adminAlwaysAllowed: true },

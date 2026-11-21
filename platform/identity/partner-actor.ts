@@ -45,6 +45,8 @@ export interface PartnerConnectionRow {
   id: string;
   partnerId: string;
   partnerCode: string;
+  /** Partner.status — must be active for M2M trust. */
+  partnerStatus?: "active" | "suspended";
   inboundClientId: string;
   allowedInboundScope: string;
   status: "active" | "rotating" | "disabled";
@@ -81,7 +83,8 @@ export class PartnerActorError extends Error {
  * - `azp` (authorized party / client_id) must match an active PartnerConnection row.
  * - PartnerConnection.status must be 'active' (not 'rotating' or 'disabled').
  * - Token must contain the required `federation:write` scope (checked here as defence-in-depth).
- * - Partner.status is not checked here — connection row is authoritative for access.
+ * - Partner.status must be active when provided by the repository (P05 harden).
+ * - Self-declared issuerInstanceId in request bodies is never trusted here.
  */
 export async function resolvePartnerActor(
   claims: NexoraClaims & { azp?: string; client_id?: string; scope?: string },
@@ -99,15 +102,16 @@ export async function resolvePartnerActor(
 
   // Scope check (defence-in-depth; gateway also enforces this).
   const scope = claims.scope ?? "";
-  if (!scope.split(" ").includes("federation:write")) {
+  const requiredScope = "federation:write";
+  if (!scope.split(" ").includes(requiredScope)) {
     throw new PartnerActorError(
       "MISSING_SCOPE",
-      `Token scope '${scope}' does not include required 'federation:write'`,
+      `Token scope '${scope}' does not include required '${requiredScope}'`,
       403,
     );
   }
 
-  // DB lookup.
+  // DB lookup — client_id mapping is authoritative; ignore any caller-supplied issuer.
   const connection = await repo.findByInboundClientId(clientId);
   if (!connection) {
     throw new PartnerActorError(
@@ -121,6 +125,26 @@ export async function resolvePartnerActor(
     throw new PartnerActorError(
       "PARTNER_CONNECTION_INACTIVE",
       `PartnerConnection status is '${connection.status}' for client_id '${clientId}'`,
+      403,
+    );
+  }
+
+  if (connection.partnerStatus && connection.partnerStatus !== "active") {
+    throw new PartnerActorError(
+      "PARTNER_SUSPENDED",
+      `Partner status is '${connection.partnerStatus}' for client_id '${clientId}'`,
+      403,
+    );
+  }
+
+  if (
+    connection.allowedInboundScope &&
+    connection.allowedInboundScope !== requiredScope &&
+    !scope.split(" ").includes(connection.allowedInboundScope)
+  ) {
+    throw new PartnerActorError(
+      "SCOPE_MISMATCH",
+      `Token scope does not satisfy connection allowedInboundScope`,
       403,
     );
   }

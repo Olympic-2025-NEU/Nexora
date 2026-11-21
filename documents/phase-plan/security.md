@@ -19,7 +19,9 @@ Internet chỉ đến Gateway HTTPS. User token từ Keycloak, partner token t�
 | Public consumer | Không đăng nhập | N/A | Chỉ Passport projection theo QR/policy/rate limit |
 | AI service | Internal service identity | N/A | Chỉ inference/tool request allowlist, không có DB credential ghi |
 
-M01 quản lý mapping `Keycloak sub -> membership/role/scope`. Vai membership v1: `administrator`, `staff`, `approver`, `viewer` (một nguồn với schema). Approver gắn Flowable task; không đồng nghĩa quyền confirm document. Resource authz theo product/warehouse/partner/row chạy trong app kể cả khi gateway đã chấp nhận token. Mọi 403 phải có audit an toàn; tránh phân biệt tài nguyên không tồn tại với không được phép nếu gây lộ ID.
+M01 quản lý mapping `Keycloak sub -> membership/role/scope` qua **admin invite** (không open JIT). Vai membership v1: `administrator`, `staff`, `approver`, `viewer` (một nguồn với schema; không dùng alias `admin`). Approver gắn Flowable task; không đồng nghĩa quyền confirm document.
+
+Permission keys M01 trong `platform/access/policy.ts`: `admin:organization:read|manage`, `admin:membership:read|manage`, `admin:partner:read|manage`, `admin:partner:connection:manage`, `federation:connectivity:probe` (M2M; inbox = P09). Resource authz product/batch/document đầy đủ ở P06+; P05 negative tests cover org/member/partner/me/federation stub. Mọi 403 phải có audit an toàn; tránh phân biệt tài nguyên không tồn tại với không được phép nếu gây lộ ID.
 
 ## 2.1. XSS, CSRF, SQL Injection (bắt buộc)
 

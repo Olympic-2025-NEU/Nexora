@@ -193,6 +193,36 @@ routes:
         rejected_code: 429
 
   # -------------------------------------------------------------------------
+  # 5b. Federation M2M connectivity probe — not inbox (P09)
+  # -------------------------------------------------------------------------
+  - id: federation-connectivity-v1
+    uri: /api/v1/federation/connectivity
+    methods: [POST]
+    upstream:
+      type: roundrobin
+      nodes:
+        "erp:3000": 1
+    plugins:
+      request-id: {}
+      <<: *strip-identity-headers
+      openid-connect:
+        discovery: "${OIDC_ISSUER_URL}/.well-known/openid-configuration"
+        client_id: "${OIDC_GATEWAY_CLIENT_ID}"
+        client_secret: "${OIDC_GATEWAY_CLIENT_SECRET}"
+        bearer_only: true
+        use_jwks: true
+        realm: nexora
+        set_access_token_header: false
+        set_userinfo_header: false
+        access_token_in_authorization_header: true
+        scope_claim_name: scope
+      limit-req:
+        rate: 20
+        burst: 10
+        key: remote_addr
+        rejected_code: 429
+
+  # -------------------------------------------------------------------------
   # 6. ERP app API catch-all /api/v1/* — MUST be AFTER specific prefixes above
   # -------------------------------------------------------------------------
   - id: erp-api-v1
