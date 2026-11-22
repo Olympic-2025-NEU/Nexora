@@ -2,6 +2,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useT } from "@/app/i18n/LocaleProvider";
+import { adminApi } from "@/app/lib/admin-api";
 
 type Partner = {
   id: string;
@@ -14,6 +16,7 @@ type Partner = {
 };
 
 export default function PartnersAdminPage() {
+  const t = useT();
   const [partners, setPartners] = useState<Partner[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -22,31 +25,33 @@ export default function PartnersAdminPage() {
     void (async () => {
       setLoading(true);
       try {
-        const res = await fetch("/api/v1/partners");
-        if (!res.ok) throw new Error(`Load failed (${res.status})`);
+        const res = await adminApi("/api/v1/partners");
+        if (res.status === 403) throw new Error(t("admin.forbidden"));
+        if (!res.ok) throw new Error(`${t("admin.loadFailed")} (${res.status})`);
         const json = await res.json();
         setPartners(json.data ?? []);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load");
+        setError(err instanceof Error ? err.message : t("admin.loadFailed"));
       } finally {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [t]);
 
-  if (loading) return <p className="text-sm text-slate-500">Loading partners…</p>;
+  if (loading) return <p className="text-sm text-slate-500">{t("admin.loading")}</p>;
   if (error) return <p className="text-sm text-red-600">{error}</p>;
   if (!partners.length) {
     return (
-      <p className="text-sm text-slate-500">
-        No federated partners. Create via Admin API; connection secrets use references only.
-      </p>
+      <section className="space-y-2">
+        <h1 className="text-2xl font-semibold">{t("admin.partnersTitle")}</h1>
+        <p className="text-sm text-slate-500">{t("admin.empty")}</p>
+      </section>
     );
   }
 
   return (
     <section className="space-y-4">
-      <h1 className="text-2xl font-semibold">Federated partners</h1>
+      <h1 className="text-2xl font-semibold">{t("admin.partnersTitle")}</h1>
       <p className="text-sm text-slate-600">
         Trust id is <code>issuerInstanceId</code>, not display name or URL. Connection secrets are
         never rendered after save.

@@ -2,6 +2,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useT } from "@/app/i18n/LocaleProvider";
+import { adminApi } from "@/app/lib/admin-api";
 
 type Member = {
   id: string;
@@ -12,6 +14,7 @@ type Member = {
 };
 
 export default function MembersAdminPage() {
+  const t = useT();
   const [members, setMembers] = useState<Member[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -20,27 +23,33 @@ export default function MembersAdminPage() {
     void (async () => {
       setLoading(true);
       try {
-        const res = await fetch("/api/v1/members");
-        if (!res.ok) throw new Error(`Load failed (${res.status})`);
+        const res = await adminApi("/api/v1/members");
+        if (res.status === 403) throw new Error(t("admin.forbidden"));
+        if (!res.ok) throw new Error(`${t("admin.loadFailed")} (${res.status})`);
         const json = await res.json();
         setMembers(json.data ?? []);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load");
+        setError(err instanceof Error ? err.message : t("admin.loadFailed"));
       } finally {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [t]);
 
-  if (loading) return <p className="text-sm text-slate-500">Loading members…</p>;
+  if (loading) return <p className="text-sm text-slate-500">{t("admin.loading")}</p>;
   if (error) return <p className="text-sm text-red-600">{error}</p>;
   if (!members.length) {
-    return <p className="text-sm text-slate-500">No members yet. Invite via POST /api/v1/members.</p>;
+    return (
+      <section className="space-y-2">
+        <h1 className="text-2xl font-semibold">{t("admin.membersTitle")}</h1>
+        <p className="text-sm text-slate-500">{t("admin.empty")}</p>
+      </section>
+    );
   }
 
   return (
     <section className="space-y-4">
-      <h1 className="text-2xl font-semibold">Members</h1>
+      <h1 className="text-2xl font-semibold">{t("admin.membersTitle")}</h1>
       <p className="text-sm text-slate-600">
         Admin invite only — password never stored in app DB. Disable takes effect on next API call.
       </p>

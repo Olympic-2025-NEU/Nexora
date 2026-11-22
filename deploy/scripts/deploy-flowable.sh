@@ -4,7 +4,7 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 instance="${1:-a}"
 case "$instance" in a|b|c) ;; *) exit 2;; esac
-project="${2:-nexora-$instance}"
+project="${2:-nexora}"
 force="${3:-}"
 source_file="${4:-deploy/flowable/processes/goods-issue-approval.bpmn20.xml}"
 if [[ -n "$force" && "$force" != --force ]]; then

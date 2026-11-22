@@ -257,8 +257,9 @@ routes:
         rejected_code: 429
 
   # -------------------------------------------------------------------------
-  # 7. ERP UI assets (/erp/*) — may be public or session; keep unauthenticated
-  #    for static asset delivery; OIDC redirect handled client-side by Next.js.
+  # 7. ERP UI via /erp/* (strip prefix) plus root /_next and /admin that Next
+  #    emits in HTML when basePath is unset. Without these, CSS/JS 404 at the
+  #    gateway while /erp/admin still returns HTML.
   # -------------------------------------------------------------------------
   - id: erp-app
     uri: /erp/*
@@ -277,6 +278,127 @@ routes:
         rejected_code: 429
       proxy-rewrite:
         regex_uri: ["^/erp/(.*)", "/$1"]
+
+  - id: erp-next-static
+    uri: /_next/*
+    methods: [GET, HEAD]
+    upstream:
+      type: roundrobin
+      nodes:
+        "erp:3000": 1
+    plugins:
+      request-id: {}
+      <<: *strip-identity-headers
+      limit-req:
+        rate: 200
+        burst: 100
+        key: remote_addr
+        rejected_code: 429
+
+  - id: erp-admin-ui
+    uri: /admin*
+    methods: [GET, HEAD]
+    upstream:
+      type: roundrobin
+      nodes:
+        "erp:3000": 1
+    plugins:
+      request-id: {}
+      <<: *strip-identity-headers
+      limit-req:
+        rate: 100
+        burst: 50
+        key: remote_addr
+        rejected_code: 429
+
+  # Public auth + home when browsers hit gateway root (not only /erp/*).
+  - id: erp-public-home
+    uri: /
+    methods: [GET, HEAD]
+    upstream:
+      type: roundrobin
+      nodes:
+        "erp:3000": 1
+    plugins:
+      request-id: {}
+      <<: *strip-identity-headers
+      limit-req:
+        rate: 100
+        burst: 50
+        key: remote_addr
+        rejected_code: 429
+
+  - id: erp-public-auth
+    uris: [/login, /login/, /logout, /logout/, /reset-password, /reset-password/]
+    methods: [GET, HEAD]
+    upstream:
+      type: roundrobin
+      nodes:
+        "erp:3000": 1
+    plugins:
+      request-id: {}
+      <<: *strip-identity-headers
+      limit-req:
+        rate: 100
+        burst: 50
+        key: remote_addr
+        rejected_code: 429
+
+  - id: erp-favicon
+    uri: /favicon.ico
+    methods: [GET, HEAD]
+    upstream:
+      type: roundrobin
+      nodes:
+        "erp:3000": 1
+    plugins:
+      request-id: {}
+      <<: *strip-identity-headers
+
+  - id: erp-icon
+    uris: [/icon, /icon.png]
+    methods: [GET, HEAD]
+    upstream:
+      type: roundrobin
+      nodes:
+        "erp:3000": 1
+    plugins:
+      request-id: {}
+      <<: *strip-identity-headers
+
+  - id: erp-assets
+    uri: /assets/*
+    methods: [GET, HEAD]
+    upstream:
+      type: roundrobin
+      nodes:
+        "erp:3000": 1
+    plugins:
+      request-id: {}
+      <<: *strip-identity-headers
+      limit-req:
+        rate: 100
+        burst: 50
+        key: remote_addr
+        rejected_code: 429
+
+  # Local Admin UI login helper (password grant). Handler returns 404 unless
+  # ALLOW_DEV_PASSWORD_LOGIN=true on ERP. Not a production auth path.
+  - id: erp-dev-token
+    uri: /auth/dev-token
+    methods: [POST]
+    upstream:
+      type: roundrobin
+      nodes:
+        "erp:3000": 1
+    plugins:
+      request-id: {}
+      <<: *strip-identity-headers
+      limit-req:
+        rate: 10
+        burst: 5
+        key: remote_addr
+        rejected_code: 429
 
   # -------------------------------------------------------------------------
   # 8. Legacy /core/* route (non-versioned) — kept for compatibility

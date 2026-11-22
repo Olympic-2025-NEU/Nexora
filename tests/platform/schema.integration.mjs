@@ -89,7 +89,10 @@ test("versioned schema contains platform tables, expected constraints and migrat
   assert.ok(indexes.some((row) => row.indexname === "outbox_message_correlation_id_idx"));
   const stock = await migrator.$queryRaw`
     SELECT to_regclass('inventory.stock_balance')::text AS relation`;
-  assert.equal(stock[0].relation, null, "P03 must not create P06 stock tables");
+  assert.equal(stock[0].relation, "inventory.stock_balance", "P06 creates inventory.stock_balance");
+  const catalog = await migrator.$queryRaw`
+    SELECT to_regclass('catalog.product')::text AS relation`;
+  assert.equal(catalog[0].relation, "catalog.product", "P06 creates catalog.product");
 });
 
 test("runtime roles are separate, least privilege and fail closed", async () => {
@@ -131,7 +134,15 @@ test("runtime roles are separate, least privilege and fail closed", async () => 
        has_table_privilege('app_runtime', 'system.partner_connection', 'SELECT') AS app_conn_select,
        has_table_privilege('app_runtime', 'system.partner_connection', 'INSERT') AS app_conn_insert,
        has_table_privilege('app_runtime', 'system.partner_connection', 'UPDATE') AS app_conn_update,
-       has_table_privilege('app_runtime', 'system.partner_connection', 'DELETE') AS app_conn_delete`;
+       has_table_privilege('app_runtime', 'system.partner_connection', 'DELETE') AS app_conn_delete,
+       has_table_privilege('app_runtime', 'catalog.product', 'SELECT') AS app_product_select,
+       has_table_privilege('app_runtime', 'catalog.product', 'INSERT') AS app_product_insert,
+       has_table_privilege('app_runtime', 'catalog.batch', 'UPDATE') AS app_batch_update,
+       has_table_privilege('app_runtime', 'inventory.warehouse', 'SELECT') AS app_wh_select,
+       has_table_privilege('app_runtime', 'inventory.stock_balance', 'UPDATE') AS app_balance_update,
+       has_table_privilege('app_runtime', 'inventory.stock_movement', 'INSERT') AS app_movement_insert,
+       has_table_privilege('app_runtime', 'inventory.stock_movement', 'UPDATE') AS app_movement_update,
+       has_table_privilege('app_runtime', 'system.membership_warehouse', 'INSERT') AS app_mw_insert`;
   assert.deepEqual(rights[0], {
     core_audit_insert: true, core_audit_select: true,
     core_audit_update: false, core_audit_delete: false,
@@ -144,6 +155,9 @@ test("runtime roles are separate, least privilege and fail closed", async () => 
     app_org_select: true, app_org_update: true, app_org_insert: false,
     app_partner_select: true, app_partner_insert: true, app_partner_update: true, app_partner_delete: false,
     app_conn_select: true, app_conn_insert: true, app_conn_update: true, app_conn_delete: false,
+    app_product_select: true, app_product_insert: true, app_batch_update: true,
+    app_wh_select: true, app_balance_update: true, app_movement_insert: true,
+    app_movement_update: false, app_mw_insert: true,
   });
 });
 

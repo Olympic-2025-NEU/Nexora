@@ -8,7 +8,7 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
-  schemas  = ["platform", "system"]
+  schemas  = ["platform", "system", "catalog", "inventory"]
 }
 
 model AuditLog {
@@ -219,9 +219,24 @@ model Membership {
   lastSyncedAt   DateTime? @map("last_synced_at") @db.Timestamptz(6)
 
   organization   Organization @relation(fields: [organizationId], references: [id])
+  warehouses     MembershipWarehouse[]
 
   @@index([role, status])
   @@map("membership")
+  @@schema("system")
+}
+
+model MembershipWarehouse {
+  membershipId String   @map("membership_id") @db.Uuid
+  warehouseId  String   @map("warehouse_id") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  membership Membership @relation(fields: [membershipId], references: [id])
+  warehouse  Warehouse  @relation(fields: [warehouseId], references: [id])
+
+  @@id([membershipId, warehouseId])
+  @@index([warehouseId, membershipId])
+  @@map("membership_warehouse")
   @@schema("system")
 }
 
@@ -276,4 +291,136 @@ model PartnerConnection {
 
   @@map("partner_connection")
   @@schema("system")
+}
+
+// ---------------------------------------------------------------------------
+// catalog schema — P06 M02
+// ---------------------------------------------------------------------------
+
+model Product {
+  id           String   @id @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+  version      Int      @default(1)
+  sku          String   @unique
+  name         String
+  description  String?
+  baseUnit     String   @map("base_unit")
+  status       String   @default("active")
+  createdBySub String   @map("created_by_sub")
+
+  identifiers ProductIdentifier[]
+  batches     Batch[]
+
+  @@index([status, name])
+  @@map("product")
+  @@schema("catalog")
+}
+
+model ProductIdentifier {
+  id        String   @id @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  productId String   @map("product_id") @db.Uuid
+  kind      String
+  value     String
+  isPrimary Boolean  @default(false) @map("is_primary")
+
+  product Product @relation(fields: [productId], references: [id])
+
+  @@unique([kind, value])
+  @@map("product_identifier")
+  @@schema("catalog")
+}
+
+model Batch {
+  id                     String    @id @db.Uuid
+  createdAt              DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+  version                Int       @default(1)
+  productId              String    @map("product_id") @db.Uuid
+  localCode              String    @map("local_code")
+  originIssuerInstanceId String    @map("origin_issuer_instance_id")
+  originLotId            String    @map("origin_lot_id")
+  manufacturedOn         DateTime? @map("manufactured_on") @db.Date
+  expiresOn              DateTime? @map("expires_on") @db.Date
+  qualityStatus          String    @default("inspect") @map("quality_status")
+  sourcePartnerId        String?   @map("source_partner_id") @db.Uuid
+  createdBySub           String?   @map("created_by_sub")
+  createdByClientId      String?   @map("created_by_client_id")
+
+  product    Product @relation(fields: [productId], references: [id])
+  balances   StockBalance[]
+  movements  StockMovement[]
+
+  @@unique([productId, localCode])
+  @@unique([originIssuerInstanceId, originLotId])
+  @@unique([id, productId])
+  @@map("batch")
+  @@schema("catalog")
+}
+
+// ---------------------------------------------------------------------------
+// inventory schema — P06 M02
+// ---------------------------------------------------------------------------
+
+model Warehouse {
+  id           String   @id @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+  version      Int      @default(1)
+  code         String   @unique
+  name         String
+  status       String
+  createdBySub String   @map("created_by_sub")
+
+  memberships MembershipWarehouse[]
+  balances    StockBalance[]
+  movements   StockMovement[]
+
+  @@map("warehouse")
+  @@schema("inventory")
+}
+
+model StockBalance {
+  warehouseId String   @map("warehouse_id") @db.Uuid
+  batchId     String   @map("batch_id") @db.Uuid
+  productId   String   @map("product_id") @db.Uuid
+  quantity    Decimal  @default(0) @db.Decimal(20, 3)
+  version     Int      @default(1)
+  updatedAt   DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id])
+  batch     Batch     @relation(fields: [batchId, productId], references: [id, productId])
+
+  @@id([warehouseId, batchId])
+  @@index([productId, batchId])
+  @@index([warehouseId, productId])
+  @@map("stock_balance")
+  @@schema("inventory")
+}
+
+model StockMovement {
+  id            String   @id @db.Uuid
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  warehouseId   String   @map("warehouse_id") @db.Uuid
+  batchId       String   @map("batch_id") @db.Uuid
+  productId     String   @map("product_id") @db.Uuid
+  sourceLineId  String   @map("source_line_id") @db.Uuid
+  kind          String
+  delta         Decimal  @db.Decimal(20, 3)
+  balanceAfter  Decimal  @map("balance_after") @db.Decimal(20, 3)
+  actorSub      String   @map("actor_sub")
+  correlationId String   @map("correlation_id")
+  reversalOf    String?  @map("reversal_of") @db.Uuid
+
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id])
+  batch     Batch     @relation(fields: [batchId, productId], references: [id, productId])
+  reversal  StockMovement?  @relation("StockMovementReversal", fields: [reversalOf], references: [id])
+  reversedBy StockMovement[] @relation("StockMovementReversal")
+
+  @@unique([sourceLineId, kind])
+  @@index([batchId, createdAt(sort: Desc)])
+  @@index([warehouseId, batchId, createdAt(sort: Desc)])
+  @@map("stock_movement")
+  @@schema("inventory")
 }

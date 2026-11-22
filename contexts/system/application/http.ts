@@ -70,7 +70,7 @@ export function projectMember(member: MembershipRecord) {
     role: member.role,
     status: member.status,
     version: member.version,
-    warehouseIds: [] as string[],
+    warehouseIds: member.warehouseIds ?? [],
   };
 }
 

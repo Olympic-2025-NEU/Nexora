@@ -86,6 +86,12 @@ const ACTION_POLICIES: Record<string, ActionPolicy> = {
   // --- Catalog/Inventory (placeholder until P06) ---
   "catalog:product:create": { roles: ["administrator", "staff"], adminAlwaysAllowed: true },
   "catalog:product:read": { roles: ["staff", "approver", "viewer"], adminAlwaysAllowed: true },
+  "catalog:product:manage": { roles: ["administrator", "staff"], adminAlwaysAllowed: true },
+  "catalog:batch:read": { roles: ["staff", "approver", "viewer"], adminAlwaysAllowed: true },
+  "catalog:batch:create": { roles: ["administrator", "staff"], adminAlwaysAllowed: true },
+  "catalog:batch:quality": { roles: ["administrator", "staff"], adminAlwaysAllowed: true },
+  "inventory:warehouse:read": { roles: ["staff", "approver", "viewer"], adminAlwaysAllowed: true },
+  "inventory:warehouse:manage": { roles: ["administrator"], adminAlwaysAllowed: true },
   "inventory:stock:read": { roles: ["staff", "approver", "viewer"], adminAlwaysAllowed: true },
 };
 

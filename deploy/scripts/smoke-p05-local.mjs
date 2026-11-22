@@ -13,7 +13,7 @@ const instance = process.argv[2] || "a";
 const root = resolve(fileURLToPath(import.meta.url), "../..");
 const envPath = resolve(root, `instances/${instance}.env`);
 const env = parseEnv(readFileSync(envPath, "utf8"));
-const project = `nexora-${instance}`;
+const project = process.env.COMPOSE_PROJECT_NAME || "nexora";
 const httpBase = `http://127.0.0.1:${env.GATEWAY_HTTP_PORT || "19080"}`;
 const repoRoot = resolve(root, "..");
 

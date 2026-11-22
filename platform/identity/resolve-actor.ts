@@ -13,13 +13,15 @@
 import type { Actor } from "./actor";
 import { realmRoles, type NexoraClaims } from "./token";
 
-/** Minimal DB membership row shape (matches system.membership). */
+/** Minimal DB membership row shape (matches system.membership + warehouse join). */
 export interface MembershipRow {
   id: string;
   organizationId: string;
   keycloakSub: string;
   role: "administrator" | "staff" | "approver" | "viewer";
   status: "invited" | "active" | "disabled";
+  /** Warehouse scope from system.membership_warehouse (empty = none for non-admin). */
+  warehouseIds: string[];
 }
 
 /** Port: implement against PrismaClient in infrastructure layer. */
@@ -82,7 +84,7 @@ export async function resolveActor(
   return {
     userId: membership.keycloakSub,
     organizationId: membership.organizationId,
-    unitIds: [],   // Warehouse scope added in P06 via system.membership_warehouse.
+    unitIds: membership.warehouseIds ?? [],
     roles: [membership.role],
   };
 }

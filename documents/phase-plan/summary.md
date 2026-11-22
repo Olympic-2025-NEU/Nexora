@@ -10,7 +10,8 @@
 - **P02 (T01–T08) DONE 2026-11-18:** Bearer auth, APISIX private/public/M2M routes, system.partner+partner_connection DB, policy matrix, HTTPS config, OpenAPI security schemes, SSRF allowlist. G02 **CLOSED** (live HTTP/HTTPS smoke). Bằng chứng: `evidence/p02-t02.md` … `evidence/G02.md`.
 - **P03/P04 DONE trên `phase-03`/`phase-04`:** G03/G04 CLOSED (data/files + workflow/events). `develop` vẫn có thể chưa merge đủ tip phase.
 - **P05 (M01 System & Partner) DONE 2026-11-21** trên `phase-05` (base `phase-04`): consume schema P02; admin-invite membership; API/UI org/members/partners/connection; M2M harden; G05 **CLOSED** (`evidence/G05.md`). Live MFA A/B/C demo still operator follow-up.
-- `contexts/sales|procurement|finance|master-data`: scaffold cũ, không tính là M01–M04. `contexts/system` là M01. `contexts/inventory` hiện chỉ có reservation guard.
+- **P06 (M02 Catalog & Inventory) DONE 2026-11-22** trên `phase-06` (base `phase-05`): schema pack Dev duyệt; Prisma `catalog`/`inventory` + `membership_warehouse`; quantity D07; Inventory port; G06 **CLOSED** (`evidence/G06.md`). **AC-03 chờ P07**.
+- `contexts/sales|procurement|finance|master-data`: scaffold cũ, không tính là M01–M04. `contexts/system` là M01. `contexts/catalog` + `contexts/inventory` là M02.
 - `LICENSE`, `NOTICE`, `CHANGELOG.md`, SPDX trên nguồn viết, repo và issue tracker công khai đã được kiểm trong T04; bản phát hành/PoF vẫn thuộc P13.
 
 ## Định nghĩa hoàn thành dự án trong phạm vi này

@@ -132,6 +132,17 @@ async function main() {
     await request('/admin/realms', token, 'POST', realm);
     changes++;
   } else {
+    // Keep local admin UI sessions usable: default Keycloak access token is ~5m.
+    const desiredLifespan = realm.accessTokenLifespan ?? 1800;
+    if (existing.accessTokenLifespan !== desiredLifespan) {
+      await request(`/admin/realms/${realm.realm}`, token, 'PUT', {
+        ...existing,
+        accessTokenLifespan: desiredLifespan,
+        ssoSessionIdleTimeout: realm.ssoSessionIdleTimeout ?? existing.ssoSessionIdleTimeout,
+        ssoSessionMaxLifespan: realm.ssoSessionMaxLifespan ?? existing.ssoSessionMaxLifespan,
+      });
+      changes++;
+    }
     for (const client of realm.clients) {
       const found = await request(
         `/admin/realms/${realm.realm}/clients?clientId=${encodeURIComponent(client.clientId)}`,

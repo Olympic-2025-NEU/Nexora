@@ -29,6 +29,21 @@ describe("audit data boundary", () => {
     assert.deepEqual(sanitizeAuditSummary({ status: "sensitive-token", version: -1 }), {});
   });
 
+  it("keeps warehouse scope ids and quality reason when bounded", () => {
+    const wid = randomUUID();
+    const summary = sanitizeAuditSummary({
+      warehouseIds: [wid, "not-a-uuid", wid],
+      changedFields: ["warehouseIds", "role", "secret"],
+      reason: "Mark available after QC",
+      role: "staff",
+    });
+    assert.deepEqual(summary.warehouseIds, [wid]);
+    assert.equal(summary.warehouseCount, 1);
+    assert.deepEqual(summary.changedFields, ["warehouseIds", "role"]);
+    assert.equal(summary.reason, "Mark available after QC");
+    assert.equal(summary.role, "staff");
+  });
+
   it("records actor, target, request and redacted summary on the caller's transaction client", async () => {
     let captured: Record<string, unknown> | undefined;
     const tx = { auditLog: { create({ data }: { data: Record<string, unknown> }) {

@@ -1,0 +1,80 @@
+{
+  "brand": {
+    "name": "Nexora",
+    "tagline": "Open-source platform for supply chain and product traceability."
+  },
+  "nav": {
+    "home": "Home",
+    "admin": "Admin",
+    "organization": "Organization",
+    "members": "Members",
+    "partners": "Partners",
+    "products": "Products",
+    "batches": "Batches",
+    "warehouses": "Warehouses",
+    "inventory": "Inventory",
+    "login": "Sign in",
+    "logout": "Sign out",
+    "resetPassword": "Reset password",
+    "menu": "Menu",
+    "close": "Close"
+  },
+  "home": {
+    "title": "Nexora",
+    "ctaLogin": "Sign in",
+    "ctaAdmin": "Open admin"
+  },
+  "auth": {
+    "loginTitle": "Sign in",
+    "loginHint": "Sign in with your organization account to manage the workspace.",
+    "username": "Username",
+    "password": "Password",
+    "submit": "Sign in",
+    "signingIn": "Signing in…",
+    "forgot": "Reset password",
+    "backHome": "Back to home",
+    "logoutTitle": "Signing out…",
+    "resetTitle": "Reset password",
+    "resetBody": "Password reset is handled in your account console. Open the link below if your administrator has published it.",
+    "resetOpen": "Open account console",
+    "resetUnavailable": "Account console is not available from this environment. Contact your administrator."
+  },
+  "shell": {
+    "adminTitle": "Nexora Admin",
+    "role": "Role",
+    "user": "User",
+    "language": "Language",
+    "loadingSession": "Loading session…",
+    "redirectLogin": "Redirecting to sign in…"
+  },
+  "theme": {
+    "label": "Theme",
+    "light": "Light",
+    "dark": "Dark",
+    "system": "System"
+  },
+  "admin": {
+    "hubTitle": "Workspace",
+    "hubBody": "Manage organization, partners, catalog, warehouses, and inventory. Secrets are never shown after save.",
+    "organizationTitle": "Organization",
+    "membersTitle": "Members",
+    "partnersTitle": "Partners",
+    "productsTitle": "Products",
+    "batchesTitle": "Batches",
+    "warehousesTitle": "Warehouses",
+    "inventoryTitle": "Inventory",
+    "loadFailed": "Load failed",
+    "forbidden": "You do not have permission for this resource.",
+    "empty": "No data yet.",
+    "refresh": "Refresh",
+    "save": "Save",
+    "create": "Create",
+    "loading": "Loading…"
+  },
+  "roles": {
+    "administrator": "Administrator",
+    "staff": "Staff",
+    "approver": "Approver",
+    "viewer": "Viewer"
+  }
+}

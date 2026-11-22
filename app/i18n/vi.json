@@ -1,0 +1,80 @@
+{
+  "brand": {
+    "name": "Nexora",
+    "tagline": "Nền tảng nguồn mở cho chuỗi cung ứng và truy xuất nguồn gốc."
+  },
+  "nav": {
+    "home": "Trang chủ",
+    "admin": "Quản trị",
+    "organization": "Tổ chức",
+    "members": "Thành viên",
+    "partners": "Đối tác",
+    "products": "Sản phẩm",
+    "batches": "Lô hàng",
+    "warehouses": "Kho",
+    "inventory": "Tồn kho",
+    "login": "Đăng nhập",
+    "logout": "Đăng xuất",
+    "resetPassword": "Đặt lại mật khẩu",
+    "menu": "Menu",
+    "close": "Đóng"
+  },
+  "home": {
+    "title": "Nexora",
+    "ctaLogin": "Đăng nhập",
+    "ctaAdmin": "Mở quản trị"
+  },
+  "auth": {
+    "loginTitle": "Đăng nhập",
+    "loginHint": "Đăng nhập bằng tài khoản tổ chức để quản lý không gian làm việc.",
+    "username": "Tên đăng nhập",
+    "password": "Mật khẩu",
+    "submit": "Đăng nhập",
+    "signingIn": "Đang đăng nhập…",
+    "forgot": "Đặt lại mật khẩu",
+    "backHome": "Về trang chủ",
+    "logoutTitle": "Đang đăng xuất…",
+    "resetTitle": "Đặt lại mật khẩu",
+    "resetBody": "Đặt lại mật khẩu qua bảng điều khiển tài khoản. Mở liên kết bên dưới nếu quản trị viên đã cấu hình.",
+    "resetOpen": "Mở bảng điều khiển tài khoản",
+    "resetUnavailable": "Bảng điều khiển tài khoản chưa khả dụng trong môi trường này. Liên hệ quản trị viên."
+  },
+  "shell": {
+    "adminTitle": "Nexora Quản trị",
+    "role": "Vai trò",
+    "user": "Người dùng",
+    "language": "Ngôn ngữ",
+    "loadingSession": "Đang tải phiên…",
+    "redirectLogin": "Đang chuyển tới đăng nhập…"
+  },
+  "theme": {
+    "label": "Giao diện",
+    "light": "Sáng",
+    "dark": "Tối",
+    "system": "Theo hệ thống"
+  },
+  "admin": {
+    "hubTitle": "Không gian làm việc",
+    "hubBody": "Quản lý tổ chức, đối tác, danh mục, kho và tồn kho. Không hiển thị secret sau khi lưu.",
+    "organizationTitle": "Tổ chức",
+    "membersTitle": "Thành viên",
+    "partnersTitle": "Đối tác",
+    "productsTitle": "Sản phẩm",
+    "batchesTitle": "Lô hàng",
+    "warehousesTitle": "Kho",
+    "inventoryTitle": "Tồn kho",
+    "loadFailed": "Tải thất bại",
+    "forbidden": "Bạn không có quyền truy cập tài nguyên này.",
+    "empty": "Chưa có dữ liệu.",
+    "refresh": "Làm mới",
+    "save": "Lưu",
+    "create": "Tạo",
+    "loading": "Đang tải…"
+  },
+  "roles": {
+    "administrator": "Quản trị viên",
+    "staff": "Nhân viên",
+    "approver": "Người duyệt",
+    "viewer": "Người xem"
+  }
+}

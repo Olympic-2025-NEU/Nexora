@@ -45,6 +45,7 @@ function mapMember(row: {
   role: string;
   status: string;
   version: number;
+  warehouses?: { warehouseId: string }[];
 }): MembershipRecord {
   return {
     id: row.id,
@@ -55,8 +56,11 @@ function mapMember(row: {
     role: row.role as MembershipRole,
     status: row.status as MembershipStatus,
     version: row.version,
+    warehouseIds: (row.warehouses ?? []).map((w) => w.warehouseId),
   };
 }
+
+const membershipInclude = { warehouses: { select: { warehouseId: true } } } as const;
 
 export function createSystemRepos(db: Db) {
   return {
@@ -98,18 +102,25 @@ export function createSystemRepos(db: Db) {
           ...(filters?.role ? { role: filters.role } : {}),
           ...(filters?.status ? { status: filters.status } : {}),
         },
+        include: membershipInclude,
         orderBy: { createdAt: "asc" },
       });
       return rows.map(mapMember);
     },
 
     async findMembershipById(id: string): Promise<MembershipRecord | null> {
-      const row = await db.membership.findUnique({ where: { id } });
+      const row = await db.membership.findUnique({
+        where: { id },
+        include: membershipInclude,
+      });
       return row ? mapMember(row) : null;
     },
 
     async findMembershipBySub(sub: string): Promise<MembershipRecord | null> {
-      const row = await db.membership.findUnique({ where: { keycloakSub: sub } });
+      const row = await db.membership.findUnique({
+        where: { keycloakSub: sub },
+        include: membershipInclude,
+      });
       return row ? mapMember(row) : null;
     },
 
@@ -128,7 +139,7 @@ export function createSystemRepos(db: Db) {
       role: MembershipRole;
       status: MembershipStatus;
     }): Promise<MembershipRecord> {
-      const row = await db.membership.create({
+      await db.membership.create({
         data: {
           id: input.id,
           organizationId: input.organizationId,
@@ -139,6 +150,10 @@ export function createSystemRepos(db: Db) {
           status: input.status,
           lastSyncedAt: new Date(),
         },
+      });
+      const row = await db.membership.findUniqueOrThrow({
+        where: { id: input.id },
+        include: membershipInclude,
       });
       return mapMember(row);
     },
@@ -161,7 +176,10 @@ export function createSystemRepos(db: Db) {
         },
       });
       if (updated.count !== 1) return null;
-      const row = await db.membership.findUniqueOrThrow({ where: { id } });
+      const row = await db.membership.findUniqueOrThrow({
+        where: { id },
+        include: membershipInclude,
+      });
       return mapMember(row);
     },
 

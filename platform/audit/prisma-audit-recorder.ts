@@ -7,6 +7,7 @@ import { safeErrorCode } from "../observability/diagnostics";
 const statuses = new Set([
   "draft", "pending", "pending_approval", "approved", "rejected", "confirmed",
   "cancelled", "active", "disabled", "rotating", "suspended", "clean", "infected", "error",
+  "archived", "available", "restricted", "inspect",
 ]);
 const kinds = new Set(["evidence_metadata", "trace_projection", "ot_reading", "archive_manifest"]);
 const visibilities = new Set(["private", "partner", "public"]);
@@ -15,7 +16,9 @@ const tools = new Set(["getLot", "getStock", "getTrace", "createReceiptDraft", "
 const changedFields = new Set([
   "status", "version", "role", "visibility", "scanState", "connectionStatus",
   "policyVersion", "scope", "ownerId", "ownerType", "payload", "endpointUrl",
+  "warehouseIds",
 ]);
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 /** Copy only fields with bounded values; unknown/nested/PII fields are discarded. */
 export function sanitizeAuditSummary(input: unknown): Prisma.InputJsonObject {
@@ -30,6 +33,23 @@ export function sanitizeAuditSummary(input: unknown): Prisma.InputJsonObject {
   if (typeof value.tool === "string" && tools.has(value.tool)) safe.tool = value.tool;
   if (Number.isSafeInteger(value.version) && (value.version as number) > 0) safe.version = value.version as number;
   if (Number.isSafeInteger(value.count) && (value.count as number) >= 0) safe.count = value.count as number;
+  if (Number.isSafeInteger(value.warehouseCount) && (value.warehouseCount as number) >= 0) {
+    safe.warehouseCount = value.warehouseCount as number;
+  }
+  if (Array.isArray(value.warehouseIds)) {
+    const ids = [...new Set(
+      value.warehouseIds.filter((id): id is string => typeof id === "string" && UUID_RE.test(id)),
+    )].slice(0, 50);
+    if (ids.length > 0) safe.warehouseIds = ids;
+    safe.warehouseCount = ids.length;
+  }
+  if (typeof value.reason === "string") {
+    const reason = value.reason.trim().slice(0, 200);
+    if (reason.length > 0 && /^[\p{L}\p{N}\s.,;:_\-/()]+$/u.test(reason)) safe.reason = reason;
+  }
+  if (typeof value.role === "string" && ["administrator", "staff", "approver", "viewer"].includes(value.role)) {
+    safe.role = value.role;
+  }
   if (Array.isArray(value.changedFields)) {
     safe.changedFields = [...new Set(value.changedFields.filter(
       (field): field is string => typeof field === "string" && changedFields.has(field),

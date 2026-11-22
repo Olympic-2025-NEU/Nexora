@@ -157,7 +157,7 @@ Stocktake dùng `document` + `document_line.counted_quantity`; variance = counte
 ## Migration order, FK muộn và truy vấn kiểm chứng
 
 1. P01 thay file rỗng `db/migrations/0001_platform.sql` bằng migration Prisma đầu (platform core: audit/attachment/core_record) trong **cùng PR**; migration tiếp theo: idempotency/outbox/approval_request. Không duy trì runner SQL thủ công song song.
-2. `0003_system.sql`, `0004_catalog.sql`, `0005_inventory.sql` (bao gồm `system.membership_warehouse` sau khi warehouse có); lúc này `stock_movement.source_line_id` chưa FK vì `trading.document_line` chưa có. Không tạo movement ngoài test harness trước P07.
+2. System (P02 Prisma migrations); catalog + inventory (P06 Prisma: `…_catalog_product_batch`, `…_inventory_warehouse_stock`, gồm `system.membership_warehouse` sau khi warehouse có). Legend cũ `0003`/`0004`/`0005` chỉ mang tính lịch sử thiết kế. Lúc P06 `stock_movement.source_line_id` chưa FK vì `trading.document_line` chưa có. Không tạo movement ngoài test harness trước P07 (trừ `openStockBalance` documented).
 3. `0006_trading.sql`: document/line/subtype; add FK `stock_movement.source_line_id→document_line.id`, `approval_request.document_id→document.id`. FK/trigger subtype và required line field phải có test migration.
 4. `0007_traceability.sql`; `0008_federation.sql` add FK `receiving_detail.inbound_message_id`, `trace_event.source_message_id` sau khi inbox tồn tại; `0009_quality_operations.sql` ở P12 tạo `traceability.quality_issue`.
 5. Mọi migration chạy từ DB trống và DB đã ở version trước; không sửa file migration đã áp dụng. Rollback bằng migration bù hoặc restore backup đã diễn tập. Query `SELECT count(*)` từng bảng, unique/FK/check violation tests, `EXPLAIN` cho balance/trace/outbox hot paths.

@@ -11,7 +11,13 @@ import {
 } from "@/contexts/system/application/http";
 import { isMembershipRole } from "@/contexts/system/domain/types";
 import { resolveUserActor, systemAuditRecorder } from "@/composition/system";
+import { createInventoryRepos } from "@/contexts/inventory/infrastructure/prisma-repos";
+import {
+  assertActiveWarehouses,
+  parseWarehouseIds,
+} from "@/contexts/inventory/application/warehouse-scope";
 import { DomainError } from "@/platform/kernel/errors";
+import { isUuid } from "@/contexts/catalog/application/http";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -19,10 +25,10 @@ export async function PATCH(request: NextRequest, context: Params): Promise<Resp
   const requestId = request.headers.get("x-request-id") ?? crypto.randomUUID();
   const { id } = await context.params;
   try {
+    if (!isUuid(id)) throw new DomainError("MEMBER_NOT_FOUND", 404);
     const body = (await request.json()) as Record<string, unknown>;
-    if (Array.isArray(body.warehouseIds) && body.warehouseIds.length > 0) {
-      throw new DomainError("WAREHOUSE_SCOPE_NOT_SUPPORTED", 422);
-    }
+    const warehouseIds =
+      body.warehouseIds !== undefined ? parseWarehouseIds(body.warehouseIds) : undefined;
     if (body.role !== undefined && (typeof body.role !== "string" || !isMembershipRole(body.role))) {
       throw new DomainError("INVALID_ROLE", 422);
     }
@@ -88,21 +94,42 @@ export async function PATCH(request: NextRequest, context: Params): Promise<Resp
           });
           if (!updated) throw new DomainError("VERSION_CONFLICT", 409);
 
+          let scope = updated.warehouseIds ?? [];
+          const changed: string[] = ["version"];
+          if (body.role !== undefined) changed.push("role");
+          if (body.status !== undefined) changed.push("status");
+          if (warehouseIds !== undefined) {
+            await assertActiveWarehouses(ctx.tx, warehouseIds);
+            scope = await createInventoryRepos(ctx.tx).replaceMembershipWarehouses(
+              id,
+              warehouseIds,
+            );
+            changed.push("warehouseIds");
+          }
+
           await systemAuditRecorder().record(ctx.tx, {
             actor: { kind: "user", sub: "organizationId" in ctx.actor ? ctx.actor.userId : "unknown" },
             action: "membership.update",
             targetType: "membership",
             targetId: updated.id,
             requestId: ctx.requestId,
-            before: { role: before.role, status: before.status, version: before.version },
+            before: {
+              role: before.role,
+              status: before.status,
+              version: before.version,
+              warehouseIds: before.warehouseIds ?? [],
+              warehouseCount: (before.warehouseIds ?? []).length,
+            },
             after: {
               role: updated.role,
               status: updated.status,
               version: updated.version,
-              changedFields: ["role", "status", "version"],
+              warehouseIds: scope,
+              warehouseCount: scope.length,
+              changedFields: changed,
             },
           });
-          return updated;
+          return { ...updated, warehouseIds: scope };
         },
       },
     );

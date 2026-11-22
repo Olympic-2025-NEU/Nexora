@@ -11,7 +11,10 @@ export function membershipRepository(): MembershipRepository {
   const db = getPrismaClient();
   return {
     async findBySub(sub) {
-      const row = await db.membership.findUnique({ where: { keycloakSub: sub } });
+      const row = await db.membership.findUnique({
+        where: { keycloakSub: sub },
+        include: { warehouses: { select: { warehouseId: true } } },
+      });
       if (!row) return null;
       return {
         id: row.id,
@@ -19,6 +22,7 @@ export function membershipRepository(): MembershipRepository {
         keycloakSub: row.keycloakSub,
         role: row.role as "administrator" | "staff" | "approver" | "viewer",
         status: row.status as "invited" | "active" | "disabled",
+        warehouseIds: row.warehouses.map((w) => w.warehouseId),
       };
     },
   };

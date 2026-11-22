@@ -52,7 +52,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   return NextResponse.json(
-    { status: "accepted", message: "Event received. Inbox processing deferred to P09." },
+    { status: "accepted", message: "Event received. Inbox processing is not enabled yet." },
     { status: 202, headers: requestId ? { "x-request-id": requestId } : {} },
   );
 }

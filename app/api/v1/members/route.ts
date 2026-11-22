@@ -13,6 +13,11 @@ import {
 } from "@/contexts/system/application/http";
 import { isMembershipRole } from "@/contexts/system/domain/types";
 import { resolveUserActor, systemAuditRecorder } from "@/composition/system";
+import { createInventoryRepos } from "@/contexts/inventory/infrastructure/prisma-repos";
+import {
+  assertActiveWarehouses,
+  parseWarehouseIds,
+} from "@/contexts/inventory/application/warehouse-scope";
 import { DomainError } from "@/platform/kernel/errors";
 
 export async function GET(request: NextRequest): Promise<Response> {
@@ -47,10 +52,7 @@ export async function POST(request: NextRequest): Promise<Response> {
     if (typeof body.role !== "string" || !isMembershipRole(body.role)) {
       throw new DomainError("INVALID_ROLE", 422);
     }
-    // Admin invite: warehouse scope deferred to P06.
-    if (Array.isArray(body.warehouseIds) && body.warehouseIds.length > 0) {
-      throw new DomainError("WAREHOUSE_SCOPE_NOT_SUPPORTED", 422);
-    }
+    const warehouseIds = parseWarehouseIds(body.warehouseIds);
 
     const data = await runCommand(
       { requestId },
@@ -83,15 +85,27 @@ export async function POST(request: NextRequest): Promise<Response> {
             role: body.role as "administrator" | "staff" | "approver" | "viewer",
             status: "invited",
           });
+          await assertActiveWarehouses(ctx.tx, warehouseIds);
+          const scope = await createInventoryRepos(ctx.tx).replaceMembershipWarehouses(
+            created.id,
+            warehouseIds,
+          );
           await systemAuditRecorder().record(ctx.tx, {
             actor: { kind: "user", sub: "organizationId" in ctx.actor ? ctx.actor.userId : "unknown" },
             action: "membership.invite",
             targetType: "membership",
             targetId: created.id,
             requestId: ctx.requestId,
-            after: { status: created.status, role: created.role, version: created.version },
+            after: {
+              status: created.status,
+              role: created.role,
+              version: created.version,
+              warehouseIds: scope,
+              warehouseCount: scope.length,
+              changedFields: ["role", "status", "version", "warehouseIds"],
+            },
           });
-          return created;
+          return { ...created, warehouseIds: scope };
         },
       },
     );

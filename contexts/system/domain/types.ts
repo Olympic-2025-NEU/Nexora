@@ -26,6 +26,7 @@ export type MembershipRecord = {
   role: MembershipRole;
   status: MembershipStatus;
   version: number;
+  warehouseIds?: string[];
 };
 
 export type PartnerRecord = {

@@ -4,6 +4,14 @@ Các thay đổi của Nexora sẽ được ghi tại đây. Chưa có bản ph�
 
 ## Unreleased
 
+### Phase 06 — M02 Catalog & Inventory (P06-T01–T08 / G06)
+
+- Schema pack Dev-approved (`evidence/p06-schema-design.md`); Prisma migrations `catalog` + `inventory` + `membership_warehouse` with `app_runtime` GRANTs.
+- Quantity D07 (`contexts/catalog/domain/quantity.ts`); Inventory port `adjustStock` / `openStockBalance`.
+- APIs/UI: products, batches, warehouses, inventory balances/movements; member `warehouseIds` scope.
+- Seed `deploy/scripts/seed-catalog.mjs`; gate `evidence/G06.md` CLOSED (AC-03 waits P07).
+- Follow-up fixes: `INSTANCE_ID` on erp Compose; audit keeps warehouseIds/reason; member warehouse UUID validation; expiry uses org timezone; seed create-if-missing; movement delta-sign CHECK; adjustStock replay/P2002/EA harden.
+
 ### Phase 05 — M01 System & Partner (P05-T01–T08 / G05)
 
 - Plan updated: no duplicate system migrations; admin-invite membership; T03 scoped to M01; T06 ≠ P09 inbox.

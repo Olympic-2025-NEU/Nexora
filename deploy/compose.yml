@@ -1,7 +1,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
-# Nexora P01 — single Compose entrypoint (instances A/B/C via -p + env file).
-# Default = infrastructure. Profiles: apps | core | dxlab | ai | local-admin
-name: nexora-${INSTANCE_ID:-a}
+# Nexora P01 — single Compose entrypoint (instances A/B/C via env file).
+# Project/containers use prefix nexora- (e.g. nexora-postgres). Profiles: apps | core | dxlab | ai | local-admin
+# Default project is nexora; fixed container_name means one such stack per Docker host.
+name: nexora
 
 networks:
   edge:
@@ -16,6 +17,7 @@ volumes:
 
 services:
   postgres:
+    container_name: nexora-postgres
     image: postgres:17.6@sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
@@ -36,6 +38,7 @@ services:
           memory: 1g
 
   db-bootstrap:
+    container_name: nexora-db-bootstrap
     image: postgres:17.6@sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929
     entrypoint: ["sh", "/bootstrap.sh"]
     environment:
@@ -63,6 +66,7 @@ services:
     restart: "no"
 
   db-migrate:
+    container_name: nexora-db-migrate
     build:
       context: ..
       dockerfile: Dockerfile
@@ -76,6 +80,7 @@ services:
     restart: "no"
 
   redis:
+    container_name: nexora-redis
     image: redis:7.4-alpine@sha256:7f7d30b7fdd09467bac58198a1f166dd69789d348d4fe859cccb20e0cf287fbe
     command: ["redis-server", "--save", "", "--appendonly", "no"]
     volumes:
@@ -92,6 +97,7 @@ services:
           memory: 256m
 
   keycloak:
+    container_name: nexora-keycloak
     image: quay.io/keycloak/keycloak:26.8.2@sha256:c68e286cacd87b942ac1939a0a1481461109d6acd3a57dc496969a319a76bbf0
     command: ["start-dev", "--http-port=8080"]
     environment:
@@ -121,6 +127,7 @@ services:
           memory: 1g
 
   keycloak-bootstrap:
+    container_name: nexora-keycloak-bootstrap
     image: node:22-bookworm-slim@sha256:e9f565d32859f0cbfb52125eafe8be39390f24dac302dc3cdf566e8ba3ab21ee
     command: ["node", "/bootstrap/bootstrap.mjs"]
     environment:
@@ -145,6 +152,7 @@ services:
     restart: "no"
 
   gateway:
+    container_name: nexora-gateway
     image: apache/apisix:3.20.0-debian@sha256:013de62a9dfba7d8e6006b3e85b524c28c9f1c3549fca3b91d5b258b0b9e759a
     volumes:
       - ./apisix/config.yaml:/usr/local/apisix/conf/config.yaml:ro,z
@@ -169,6 +177,7 @@ services:
           memory: 512m
 
   storage-bootstrap:
+    container_name: nexora-storage-bootstrap
     image: node:22-bookworm-slim@sha256:e9f565d32859f0cbfb52125eafe8be39390f24dac302dc3cdf566e8ba3ab21ee
     command: ["node", "/bootstrap/bootstrap.mjs"]
     environment:
@@ -188,6 +197,7 @@ services:
     restart: "no"
 
   seaweedfs:
+    container_name: nexora-seaweedfs
     image: chrislusf/seaweedfs:4.53@sha256:ccad23e18639c8b98cee17e7100b95830a06077b56d8e5b006d6dcf8ec5e94a0
     command: ["mini", "-dir=/data", "-ip.bind=0.0.0.0", "-s3.config=/config/s3.json", "-bucket=${S3_BUCKET_PRIVATE},${S3_BUCKET_QUARANTINE},${S3_BUCKET_PUBLIC}"]
     volumes:
@@ -208,6 +218,7 @@ services:
           memory: 512m
 
   flowable:
+    container_name: nexora-flowable
     image: flowable/flowable-rest:8.0.0@sha256:708dfa32f27b93180bb6e7a30684d881d995fe257f5b8413e14b20a55c25672d
     environment:
       SERVER_PORT: "8080"
@@ -240,6 +251,7 @@ services:
           memory: 1g
 
   clamav:
+    container_name: nexora-clamav
     image: clamav/clamav:1.4@sha256:4cc4350d3fded380caf1799e76c0d1c93f3fa40af99c0cb2862ec0c9b117718a
     volumes:
       - clamav_data:/var/lib/clamav
@@ -250,6 +262,7 @@ services:
           memory: 2g
 
   erp:
+    container_name: nexora-erp
     profiles: ["apps"]
     build:
       context: ..
@@ -257,10 +270,17 @@ services:
       target: runner
     environment:
       DATABASE_URL: ${APP_DATABASE_URL}
+      INSTANCE_ID: ${INSTANCE_ID}
       OIDC_ISSUER_URL: ${OIDC_ISSUER_URL}
+      OIDC_BASE_URL: ${OIDC_BASE_URL}
       OIDC_JWKS_URL: ${OIDC_JWKS_URL}
       OIDC_AUDIENCE: ${OIDC_AUDIENCE}
+      OIDC_CLIENT_ID_ERP: ${OIDC_CLIENT_ID_ERP}
+      ALLOW_DEV_PASSWORD_LOGIN: ${ALLOW_DEV_PASSWORD_LOGIN:-true}
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL}
+      # Browser reset-password page links to Keycloak Account (needs local-admin publish).
+      OIDC_ACCOUNT_URL: ${OIDC_ACCOUNT_URL:-}
+      KEYCLOAK_HOST_PORT: ${KEYCLOAK_HOST_PORT:-}
     depends_on:
       db-migrate:
         condition: service_completed_successfully
@@ -271,6 +291,7 @@ services:
           memory: 1g
 
   worker:
+    container_name: nexora-worker
     profiles: ["apps"]
     build:
       context: ..
@@ -295,6 +316,7 @@ services:
           memory: 512m
 
   core-data:
+    container_name: nexora-core-data
     profiles: ["apps", "core"]
     build:
       context: ..
@@ -325,6 +347,7 @@ services:
           memory: 512m
 
   file-reconciler:
+    container_name: nexora-file-reconciler
     profiles: ["apps", "core"]
     build:
       context: ..
@@ -351,6 +374,7 @@ services:
           memory: 512m
 
   file-scanner:
+    container_name: nexora-file-scanner
     profiles: ["apps", "core"]
     build:
       context: ..
@@ -381,6 +405,7 @@ services:
           memory: 512m
 
   dx-lab:
+    container_name: nexora-dx-lab
     profiles: ["dxlab"]
     build:
       context: ../apps/dx-lab
@@ -395,6 +420,7 @@ services:
           memory: 512m
 
   ai:
+    container_name: nexora-ai
     profiles: ["ai"]
     image: python:3.12-slim@sha256:78387bc3881b8273120a12ebe6c1ab22b018ccc2c9adf565ae1ac9b536e184ea
     command:
@@ -411,6 +437,7 @@ services:
 
   # local-admin: loopback-only publishes for PG + Keycloak (never 0.0.0.0).
   postgres-local:
+    container_name: nexora-postgres-local
     profiles: ["local-admin"]
     image: postgres:17.6@sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929
     network_mode: "service:postgres"
@@ -420,6 +447,7 @@ services:
       - "127.0.0.1:${POSTGRES_HOST_PORT:-15432}:5432"
 
   keycloak-local:
+    container_name: nexora-keycloak-local
     profiles: ["local-admin"]
     image: quay.io/keycloak/keycloak:26.8.2@sha256:c68e286cacd87b942ac1939a0a1481461109d6acd3a57dc496969a319a76bbf0
     network_mode: "service:keycloak"

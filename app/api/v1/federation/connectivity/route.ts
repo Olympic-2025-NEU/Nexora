@@ -48,7 +48,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       {
         status: "ok",
         partnerCode: actor.partnerCode,
-        message: "Connectivity probe succeeded; inbox path is separate (P09).",
+        message: "Connectivity probe succeeded.",
       },
       { status: 200, headers: requestId ? { "x-request-id": requestId } : {} },
     );

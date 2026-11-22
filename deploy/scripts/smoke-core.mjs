@@ -73,7 +73,7 @@ try {
   if (!/^[a-z0-9-]+$/.test(instance)) throw new Error('Invalid instance');
   const deploy = fileURLToPath(new URL('../', import.meta.url));
   env = parseEnv(readFileSync(resolve(deploy, 'instances', `${instance}.env`), 'utf8'));
-  project = `nexora-${instance}`;
+  project = process.env.COMPOSE_PROJECT_NAME || "nexora";
   // Gateway HTTP is bound to host loopback; HTTPS may use a private local CA.
   base = `http://127.0.0.1:${env.GATEWAY_HTTP_PORT || '19080'}`;
 } catch {

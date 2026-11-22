@@ -16,7 +16,7 @@ const instance = process.argv[2] || "a";
 const root = resolve(fileURLToPath(import.meta.url), "../..");
 const envPath = resolve(root, `instances/${instance}.env`);
 const env = parseEnv(readFileSync(envPath, "utf8"));
-const project = process.env.COMPOSE_PROJECT_NAME || `nexora-${instance}`;
+const project = process.env.COMPOSE_PROJECT_NAME || "nexora";
 const base = (env.PUBLIC_BASE_URL || "https://localhost:19443").replace(
   /127\.0\.0\.1/,
   "localhost",
