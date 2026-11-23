@@ -100,7 +100,8 @@ export function createDocumentService(ports: TradingPorts) {
       status: doc.status, version: doc.version, note: doc.note, purpose: doc.issuePurpose,
       correctionOfDocumentId: doc.correctionOfDocumentId, correctionReason: doc.correctionReason,
       createdAt: doc.createdAt.toISOString(), confirmedAt: doc.confirmedAt?.toISOString() ?? null,
-      approval: approval ? { id: approval.id, state: approval.state } : null, lines };
+      approval: approval ? { id: approval.id, state: approval.state,
+        processInstanceId: approval.flowableProcessId, processDefinitionVersion: approval.flowableDefinitionVersion } : null, lines };
   }
 
   async function correction(ctx: Context, id: string, kind: TradingKind, input: DocumentInput) {
@@ -171,7 +172,7 @@ export function createDocumentService(ports: TradingPorts) {
       if (doc.version !== version) throw new DomainError("VERSION_CONFLICT", 409);
       if (action === "submit" && kind !== "goods_issue") throw new DomainError("WRONG_STATE", 409);
       if (action === "confirm" && kind === "goods_issue") {
-        if (doc.status !== "pending_approval") throw new DomainError("WRONG_STATE", 409);
+        if (doc.status !== "approved") throw new DomainError("WRONG_STATE", 409);
       } else {
         try { checkTransition(kind, doc.status, action); } catch (err) { normalizeTransition(err); }
       }

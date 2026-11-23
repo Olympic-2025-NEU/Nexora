@@ -9,11 +9,12 @@ import { FlowableClient } from "../platform/workflow/flowable-client";
 import { createFlowableStarter } from "../platform/workflow/flowable-starter";
 import { createFlowableDecider } from "../platform/workflow/flowable-decider";
 import { createReconciler } from "../platform/workflow/reconciler";
+import { applyApprovalResult } from "../composition/trading";
 import { scanStuckWork } from "../platform/observability/alerts";
 
 export function main(client: PrismaClient) {
   const engine = FlowableClient.fromEnv();
-  const reconciler = createReconciler(client, engine);
+  const reconciler = createReconciler(client, engine, applyApprovalResult);
   const dispatcher = createOutboxDispatcher({ client, workerId: `worker-${randomUUID()}`,
     handlers: buildHandlerMap({ workflow: new Map([
       [WORKFLOW_EVENT_TYPES.requested, createFlowableStarter(client, engine)],

@@ -6,7 +6,8 @@ import { PrismaClient } from "@prisma/client";
 import { getPrismaClient } from "../../platform/persistence/prisma";
 import { createPrismaIdempotency } from "../../platform/http/idempotency";
 import { runCommand } from "../../platform/http/pipeline";
-import { tradingService, tradingUnitOfWork, tradingPorts, transferService, stocktakeService, saleService } from "../../composition/trading";
+import { tradingService, tradingUnitOfWork, tradingPorts, transferService, stocktakeService, saleService,
+  applyApprovalResult } from "../../composition/trading";
 import { createReceivingService, type ActualInput } from "../../contexts/trading/application/receivings";
 import { createCatalogRepos } from "../../contexts/catalog/infrastructure/prisma-repos";
 import { createDocumentService } from "../../contexts/trading/application/documents";
@@ -136,7 +137,7 @@ test("sale from approved issue leaves 6 to 4 balance unchanged, one trace event;
     "goods_issue", source.id, "submit", source.version), undefined, "goods_issue");
   await approve(source.id);
   await command("confirm", { id: source.id }, (ctx) => tradingService.action(ctx,
-    "goods_issue", source.id, "confirm", source.version + 1), randomUUID(), "goods_issue");
+    "goods_issue", source.id, "confirm", source.version + 2), randomUUID(), "goods_issue");
   const balance = async () => (await db.stockBalance.findUniqueOrThrow({ where: { warehouseId_batchId: {
     warehouseId, batchId: lot } } })).quantity.toFixed(3);
   assert.equal(await balance(), "4.000");
@@ -307,7 +308,7 @@ test("issue submit creates one bridge request; unapproved confirm fails; cancel 
   await assert.rejects(command("confirm", input, (ctx) => tradingService.action(ctx,
     "goods_issue", issue.id, "confirm", issue.version), undefined, "goods_issue"), { code: "VERSION_CONFLICT" });
   await assert.rejects(command("confirm", { ...input, version: issue.version + 1 }, (ctx) => tradingService.action(ctx,
-    "goods_issue", issue.id, "confirm", issue.version + 1), undefined, "goods_issue"), { code: "APPROVAL_NOT_YET_APPROVED" });
+    "goods_issue", issue.id, "confirm", issue.version + 1), undefined, "goods_issue"), { code: "WRONG_STATE" });
   const cancelled = await command("cancel", {}, (ctx) => tradingService.action(ctx,
     "goods_issue", issue.id, "cancel", issue.version + 1), undefined, "goods_issue");
   assert.equal(cancelled.status, "cancelled");
@@ -367,7 +368,7 @@ async function approve(id: string, decision: "approved" | "rejected" = "approved
   await createFlowableDecider(db, engine, resolver)(message as OutboxMessage);
   const deadline = Date.now() + 15_000;
   while (Date.now() < deadline) {
-    await reconcileApproval(db, engine, row.id);
+    await reconcileApproval(db, engine, row.id, applyApprovalResult);
     const state = (await db.approvalRequest.findUniqueOrThrow({ where: { id: row.id } })).state;
     if (state === decision) return;
     await new Promise((resolve) => setTimeout(resolve, 50));
@@ -381,7 +382,7 @@ async function issue(quantity: string, count = 1, purpose: "other" | "partner_tr
   await command("submit", { id: doc.id }, (ctx) => tradingService.action(ctx,
     "goods_issue", doc.id, "submit", doc.version), undefined, "goods_issue");
   await approve(doc.id);
-  return { ...doc, version: doc.version + 1 };
+  return { ...doc, version: doc.version + 2 };
 }
 
 test("approved issue 12 posts once; two issues race for remaining stock with real bridge decisions",
@@ -447,7 +448,7 @@ test("two lines of 5 on same batch fail against total balance 8, without partial
       "available" in error && error.available === "8.000");
     assert.equal((await db.stockBalance.findUniqueOrThrow({ where: {
       warehouseId_batchId: { warehouseId, batchId } } })).quantity.toFixed(3), before);
-    assert.equal((await db.document.findUniqueOrThrow({ where: { id: doc.id } })).status, "pending_approval");
+    assert.equal((await db.document.findUniqueOrThrow({ where: { id: doc.id } })).status, "approved");
     assert.equal(await db.stockMovement.count({ where: { sourceLineId: { in: doc.lines.map((row) => row.id) } } }), 0);
   });
 
@@ -469,7 +470,7 @@ test("approved request cancels atomically; stock UOM is frozen after submit desp
     }, data: { factorToStockUom: "20" } });
     await approve(packed.id);
     const confirmed = await command("confirm", { id: packed.id }, (ctx) => tradingService.action(ctx,
-      "goods_issue", packed.id, "confirm", packed.version + 1), randomUUID(), "goods_issue");
+      "goods_issue", packed.id, "confirm", packed.version + 2), randomUUID(), "goods_issue");
     assert.equal(confirmed.status, "confirmed");
     assert.equal((await db.stockMovement.findUniqueOrThrow({ where: { sourceLineId_kind: {
       sourceLineId: normalized.id, kind: "issue",
@@ -488,10 +489,10 @@ test("issue with third line on empty balance fails 422, leaves approved document
       warehouseId_batchId: { warehouseId, batchId } } })).quantity.toFixed(3);
     const retryKey = randomUUID();
     await assert.rejects(command("confirm", { id: doc.id }, (ctx) => tradingService.action(ctx,
-      "goods_issue", doc.id, "confirm", doc.version + 1), retryKey, "goods_issue"),
+      "goods_issue", doc.id, "confirm", doc.version + 2), retryKey, "goods_issue"),
     (err: unknown) => err instanceof Error && "code" in err && err.code === "INSUFFICIENT_STOCK" &&
       "batchId" in err && err.batchId === emptyBatchId);
-    assert.equal((await db.document.findUniqueOrThrow({ where: { id: doc.id } })).status, "pending_approval");
+    assert.equal((await db.document.findUniqueOrThrow({ where: { id: doc.id } })).status, "approved");
     assert.equal((await db.approvalRequest.findUniqueOrThrow({ where: { documentId: doc.id } })).state, "approved");
     assert.equal(await db.stockMovement.count({ where: { sourceLineId: { in: doc.lines.map((row) => row.id) } } }), 0);
     assert.equal((await db.stockBalance.findUniqueOrThrow({ where: {
@@ -504,7 +505,7 @@ test("issue with third line on empty balance fails 422, leaves approved document
     await command("confirm", { id: supply.id }, (ctx) => tradingService.action(ctx,
       "goods_receipt", supply.id, "confirm", supply.version), randomUUID());
     const retry = await command("confirm", { id: doc.id }, (ctx) => tradingService.action(ctx,
-      "goods_issue", doc.id, "confirm", doc.version + 1), retryKey, "goods_issue");
+      "goods_issue", doc.id, "confirm", doc.version + 2), retryKey, "goods_issue");
     assert.equal(retry.status, "confirmed");
     assert.equal(retry.movementIds?.length, 3);
   });
@@ -541,7 +542,7 @@ test("two reversed multi-batch issues lock in same order and only one can confir
     await command("submit", { id: doc.id }, (ctx) => tradingService.action(ctx,
       "goods_issue", doc.id, "submit", doc.version), undefined, "goods_issue");
     await approve(doc.id);
-    return { ...doc, version: doc.version + 1 };
+    return { ...doc, version: doc.version + 2 };
   };
   const [first, second] = await Promise.all([make(false), make(true)]);
   let ready = 0;
@@ -591,8 +592,8 @@ test("rejected bridge decision never permits issue movement", { timeout: 120_000
     "goods_issue", doc.id, "submit", doc.version), undefined, "goods_issue");
   await approve(doc.id, "rejected");
   await assert.rejects(command("confirm", { id: doc.id }, (ctx) => tradingService.action(ctx,
-    "goods_issue", doc.id, "confirm", doc.version + 1), randomUUID(), "goods_issue"),
-  { code: "APPROVAL_REJECTED", httpStatus: 409 });
+      "goods_issue", doc.id, "confirm", doc.version + 2), randomUUID(), "goods_issue"),
+  { code: "WRONG_STATE", httpStatus: 409 });
   assert.equal(await db.stockMovement.count({ where: { sourceLineId: doc.lines[0]!.id } }), 0);
 });
 
@@ -615,7 +616,7 @@ async function transferIssue() {
     "goods_issue", doc.id, "submit", doc.version), undefined, "goods_issue");
   await approve(doc.id);
   await command("confirm", { id: doc.id }, (ctx) => tradingService.action(ctx,
-    "goods_issue", doc.id, "confirm", doc.version + 1), randomUUID(), "goods_issue");
+    "goods_issue", doc.id, "confirm", doc.version + 2), randomUUID(), "goods_issue");
   return doc;
 }
 
@@ -770,7 +771,7 @@ test("G07 seeded real announcement: receipt20, approved issue12, transfer, actua
     "goods_issue", sent.id, "submit", sent.version), undefined, "goods_issue");
   await approve(sent.id);
   await command("confirm", { id: sent.id }, (ctx) => tradingService.action(ctx,
-    "goods_issue", sent.id, "confirm", sent.version + 1), randomUUID(), "goods_issue");
+    "goods_issue", sent.id, "confirm", sent.version + 2), randomUUID(), "goods_issue");
   const transfer = await transferCommand("create", { issue: sent.id }, (ctx) => transferService().create(ctx,
     { linkedIssueId: sent.id, destinationPartnerId: partnerId }));
   await transferCommand("confirm", { transfer: transfer.id }, (ctx) => transferService().confirm(ctx,
