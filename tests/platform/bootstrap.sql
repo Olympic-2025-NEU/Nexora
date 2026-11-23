@@ -7,11 +7,17 @@ CREATE ROLE core_data LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE PASSWORD 'test_c
 CREATE DATABASE nexora_upgrade OWNER migrator;
 CREATE DATABASE nexora_fresh OWNER migrator;
 CREATE DATABASE nexora_restore OWNER migrator;
+CREATE DATABASE nexora_trading_restore OWNER migrator;
 
 REVOKE ALL ON DATABASE nexora_upgrade, nexora_fresh, nexora_restore FROM PUBLIC;
 GRANT CONNECT ON DATABASE nexora_upgrade, nexora_fresh, nexora_restore TO migrator, app_runtime, core_data;
+REVOKE ALL ON DATABASE nexora_trading_restore FROM PUBLIC;
+GRANT CONNECT ON DATABASE nexora_trading_restore TO migrator, app_runtime, core_data;
 
 \connect nexora_upgrade
+REVOKE ALL ON SCHEMA public FROM PUBLIC;
+GRANT USAGE, CREATE ON SCHEMA public TO migrator;
+\connect nexora_trading_restore
 REVOKE ALL ON SCHEMA public FROM PUBLIC;
 GRANT USAGE, CREATE ON SCHEMA public TO migrator;
 \connect nexora_fresh

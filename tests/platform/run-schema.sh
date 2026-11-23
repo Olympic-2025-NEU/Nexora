@@ -54,6 +54,7 @@ docker exec "$container" psql -X -U postgres -v ON_ERROR_STOP=1 -d nexora_upgrad
 MSYS_NO_PATHCONV=1 docker exec "$container" pg_dump -U postgres -Fc -d nexora_upgrade -f /tmp/pre-p03.dump
 npx prisma migrate deploy
 npx prisma migrate deploy
+node --import tsx --test tests/platform/trading.integration.mjs
 node --test tests/platform/schema.integration.mjs
 
 printf 'P03-T01: migrating empty database\n'
@@ -61,6 +62,7 @@ export DATABASE_URL="postgresql://migrator:test_migrator@127.0.0.1:$port/nexora_
 export CORE_DATABASE_URL="postgresql://core_data:test_core@127.0.0.1:$port/nexora_fresh"
 export APP_DATABASE_URL="postgresql://app_runtime:test_app@127.0.0.1:$port/nexora_fresh"
 npx prisma migrate deploy
+npx prisma migrate status
 node --test tests/platform/schema.integration.mjs
 
 printf 'P03-T01: restoring pre-upgrade snapshot into separate database\n'
@@ -71,4 +73,12 @@ test "$restored" = "1"
 old_grant="$(docker exec "$container" psql -X -U postgres -tAc \
   "SELECT has_table_privilege('core_data','platform.audit_log','INSERT')" -d nexora_restore)"
 test "$old_grant" = "f"
+MSYS_NO_PATHCONV=1 docker exec "$container" pg_dump -U postgres -Fc -d nexora_fresh -f /tmp/p07-trading.dump
+MSYS_NO_PATHCONV=1 docker exec "$container" pg_restore -U postgres --no-owner -d nexora_trading_restore /tmp/p07-trading.dump
+trading_tables="$(docker exec "$container" psql -X -U postgres -tAc \
+  "SELECT count(*) FROM information_schema.tables WHERE table_schema='trading'" -d nexora_trading_restore)"
+test "$trading_tables" = "5"
+trading_triggers="$(docker exec "$container" psql -X -U postgres -tAc \
+  "SELECT count(*) FROM pg_trigger WHERE tgname LIKE 'trg_trading_check_%'" -d nexora_trading_restore)"
+test "$trading_triggers" = "5"
 printf 'P03-T01: schema, roles, upgrade, repeat deploy, and restore PASS\n'
