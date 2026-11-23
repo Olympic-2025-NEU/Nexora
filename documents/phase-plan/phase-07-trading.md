@@ -44,9 +44,10 @@ Document lines / Inventory confirm: tham chiếu **`product_variant_id`** + qty 
 
 ## P07-T06 — Stocktake và sale record tối thiểu
 
-- [ ] Stocktake Draft ghi count theo batch/warehouse, variance và người kiểm; confirm tạo movement điều chỉnh có lý do, không overwrite balance. Quy tắc approval cho điều chỉnh lớn nếu D06 chọn.
-- [ ] Sale record link **một** confirmed issue/lot đã trừ tồn và bên mua nếu được phép; sale không trừ tồn lần hai. Chỉ lưu dữ liệu cần cho forward trace, không làm POS/payment/finance. Confirm/cancel theo invariant bất biến.
+- [x] Stocktake Draft ghi count theo batch/warehouse, variance và người kiểm; confirm tạo movement điều chỉnh có lý do, không overwrite balance. D06 không chọn ngưỡng hay workflow stocktake cho v1; không có approval stocktake. Rủi ro chấp nhận: người đếm có thể tự confirm; xem `evidence/p07-t06.md`.
+- [x] Sale record link **một** confirmed issue/lot đã trừ tồn và bên mua nếu được phép; sale không trừ tồn lần hai. Chỉ lưu dữ liệu cần cho forward trace, không làm POS/payment/finance. Confirm/cancel theo invariant bất biến.
 - [ ] API/UI tối thiểu tạo/xem, audit và outbox trace; test variance âm/dương và không âm balance.
+- API/UI và test PostgreSQL/Flowable có tại `evidence/p07-t06.md`; chưa chạy browser journey nên giữ ô API/UI trên chưa tick.
 - **Đầu ra:** dữ liệu phục vụ trace C bán lô; **kiểm chứng:** sale link tới batch/movement/source document.
 
 ## P07-T07 — Flowable gắn với chứng từ thật
