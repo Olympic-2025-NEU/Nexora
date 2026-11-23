@@ -22,7 +22,7 @@ test("versioned schema contains platform tables, expected constraints and migrat
   const tables = await migrator.$queryRaw`
     SELECT table_name FROM information_schema.tables
     WHERE table_schema = 'platform' ORDER BY table_name`;
-  assert.deepEqual(tables.map((row) => row.table_name), ["approval_request", "attachment", "audit_log", "core_record", "idempotency_record", "outbox_message"]);
+  assert.deepEqual(tables.map((row) => row.table_name), ["approval_request", "attachment", "audit_log", "core_record", "idempotency_record", "inbound_message", "outbox_message"]);
 
   const columns = await migrator.$queryRaw`
     SELECT table_name, column_name FROM information_schema.columns
@@ -52,6 +52,8 @@ test("versioned schema contains platform tables, expected constraints and migrat
     "schema_version", "payload", "destination", "correlation_id", "status", "attempt_count",
     "next_attempt_at", "lease_owner", "lease_until", "last_error_code", "delivered_at",
   ]);
+  assert.deepEqual(byTable("inbound_message"), ["message_id", "event_type", "issuer_instance_id",
+    "recipient_instance_id", "payload", "payload_hash", "received_at"]);
 
   const constraints = await migrator.$queryRaw`
     SELECT conname FROM pg_constraint
@@ -103,6 +105,11 @@ test("versioned schema contains platform tables, expected constraints and migrat
     SELECT conname FROM pg_constraint WHERE conrelid='trading.transfer_detail'::regclass`;
   assert.ok(!transferConstraints.some((row) => row.conname === "uq_trading_transfer_issue"));
   assert.ok(transferConstraints.some((row) => row.conname === "trg_trading_active_transfer_detail"));
+  const receivingConstraints = await migrator.$queryRaw`
+    SELECT conname FROM pg_constraint WHERE conrelid='trading.receiving_detail'::regclass`;
+  assert.ok(!receivingConstraints.some((row) => row.conname === "uq_trading_receiving_source"));
+  assert.ok(receivingConstraints.some((row) => row.conname === "trg_trading_active_receiving_detail"));
+  assert.ok(migrations.some((row) => row.migration_name === "20261123030000_receiving_active_source"));
   const tradingConstraints = await migrator.$queryRaw`
     SELECT conname FROM pg_constraint WHERE conname IN
       ('batch_id_variant_key','fk_trading_movement_line','fk_trading_approval_document',

@@ -7,6 +7,8 @@ import { getPrismaClient } from "../../platform/persistence/prisma";
 import { createPrismaIdempotency } from "../../platform/http/idempotency";
 import { runCommand } from "../../platform/http/pipeline";
 import { tradingService, tradingUnitOfWork, tradingPorts, transferService } from "../../composition/trading";
+import { createReceivingService, type ActualInput } from "../../contexts/trading/application/receivings";
+import { createCatalogRepos } from "../../contexts/catalog/infrastructure/prisma-repos";
 import { createDocumentService } from "../../contexts/trading/application/documents";
 import type { Actor } from "../../platform/identity/actor";
 import type { TradingKind } from "../../contexts/trading/application/documents";
@@ -563,4 +565,228 @@ test("transfer validation and confirm recheck partner, scope and line snapshot",
   await assert.rejects(db.$transaction((tx) => service.confirm({ tx, actor: { ...actor, unitIds: [] },
     requestId: randomUUID(), emit: () => {} }, doc.id, doc.version)),
   { code: "WAREHOUSE_SCOPE_REQUIRED", httpStatus: 403 });
+});
+
+const receiving = createReceivingService(tradingPorts, "remote-instance");
+function receivingCommand<T>(action: "create" | "update" | "confirm" | "cancel", payload: unknown,
+  work: (ctx: Parameters<typeof receiving.create>[0]) => Promise<T>, key?: string, actingActor = actor) {
+  return runCommand({ requestId: randomUUID() }, {
+    authenticate: async () => actingActor, resolveTenant: async () => actingActor.organizationId,
+    action: `trading:receiving:${action}`, method: action === "update" ? "PATCH" : "POST",
+    routeKey: `receiving:${action}`, payload, idempotencyKey: key,
+    idempotencyPort: createPrismaIdempotency(db), unitOfWork: tradingUnitOfWork,
+    domain: (ctx) => work({ tx: ctx.tx, actor: actingActor, requestId: ctx.requestId, emit: ctx.emit }),
+  });
+}
+
+test("G07 seeded real announcement: receipt20, approved issue12, transfer, actual10, held reply without ACK", {
+  timeout: 120_000,
+}, async () => {
+  const supply = await command("create", {}, (ctx) => tradingService.create(ctx, "goods_receipt", { lines: [line("20")] }));
+  await command("confirm", { id: supply.id }, (ctx) => tradingService.action(ctx,
+    "goods_receipt", supply.id, "confirm", supply.version), randomUUID());
+  const sent = await command("create", {}, (ctx) => tradingService.create(ctx, "goods_issue", {
+    purpose: "partner_transfer", lines: [line("12")],
+  }), undefined, "goods_issue");
+  await command("submit", { id: sent.id }, (ctx) => tradingService.action(ctx,
+    "goods_issue", sent.id, "submit", sent.version), undefined, "goods_issue");
+  await approve(sent.id);
+  await command("confirm", { id: sent.id }, (ctx) => tradingService.action(ctx,
+    "goods_issue", sent.id, "confirm", sent.version + 1), randomUUID(), "goods_issue");
+  const transfer = await transferCommand("create", { issue: sent.id }, (ctx) => transferService().create(ctx,
+    { linkedIssueId: sent.id, destinationPartnerId: partnerId }));
+  await transferCommand("confirm", { transfer: transfer.id }, (ctx) => transferService().confirm(ctx,
+    transfer.id, transfer.version), randomUUID());
+  const announced = await db.outboxMessage.findFirstOrThrow({ where: { aggregateId: transfer.id } });
+  const envelope = announced.payload as Record<string, unknown>;
+  const sourceLot = (envelope.lots as { sourceLineId: string; senderBatch: { batchId: string } }[])[0]!;
+  await db.$transaction((tx) => receiving.source({ tx, actor, requestId: randomUUID(), emit: () => {} })
+    .seedInboundAnnouncement(envelope));
+  assert.deepEqual((await db.inboundMessage.findUniqueOrThrow({ where: { messageId: envelope.messageId as string } })).payload, envelope);
+  const localBatch = await createCatalogRepos(db).createBatch({ id: randomUUID(), productVariantId: variantId,
+    localCode: randomUUID(), originIssuerInstanceId: "local-instance", originLotId: sourceLot.senderBatch.batchId,
+    createdBySub: actor.userId });
+  const input = { inboundMessageId: envelope.messageId as string, actualLines: [{ sourceLineId: sourceLot.sourceLineId,
+    localBatchId: localBatch.id, warehouseId, actualQuantity: "10", unit: "EA" as const }],
+    discrepancyReason: "Two units missing" };
+  const before = (await db.stockBalance.findUniqueOrThrow({ where: {
+    warehouseId_batchId: { warehouseId, batchId } } })).quantity.toFixed(3);
+  const draft = await receivingCommand("create", input, (ctx) => receiving.create(ctx, input));
+  assert.equal(draft.lines[0]!.sentQuantity, "12.000");
+  assert.equal(draft.lines[0]!.actualQuantity, "10.000");
+  assert.equal(draft.lines[0]!.sourceLineId, sourceLot.sourceLineId);
+  assert.equal(await db.stockMovement.count({ where: { sourceLineId: draft.lines[0]!.id } }), 0);
+  assert.equal(await db.outboxMessage.count({ where: { aggregateId: draft.id } }), 0);
+  const key = randomUUID();
+  const confirm = () => receivingCommand("confirm", { id: draft.id, version: draft.version },
+    (ctx) => receiving.confirm(ctx, draft.id, draft.version), key);
+  const first = await confirm();
+  assert.deepEqual(await confirm(), first);
+  assert.equal(first.movementIds.length, 1);
+  await assert.rejects(receivingCommand("confirm", { id: draft.id }, (ctx) => receiving.confirm(ctx,
+    draft.id, draft.version), randomUUID()), { code: "VERSION_CONFLICT" });
+  assert.equal((await db.stockBalance.findUniqueOrThrow({ where: {
+    warehouseId_batchId: { warehouseId, batchId: localBatch.id } } })).quantity.toFixed(3), "10.000");
+  assert.equal((await db.stockBalance.findUniqueOrThrow({ where: {
+    warehouseId_batchId: { warehouseId, batchId } } })).quantity.toFixed(3), before);
+  const detail = await db.receivingDetail.findUniqueOrThrow({ where: { documentId: draft.id } });
+  assert.equal(detail.sentQuantity.toFixed(3), "12.000");
+  assert.equal(detail.actualQuantity?.toFixed(3), "10.000");
+  assert.equal(detail.discrepancyReason, "Two units missing");
+  const rows = await db.outboxMessage.findMany({ where: { aggregateId: draft.id } });
+  assert.equal(rows.length, 2);
+  assert.deepEqual(new Set(rows.map((row) => row.eventType)),
+    new Set(["trading.receipt.confirmed.v1", "receipt.confirmed.v1"]));
+  const reply = rows.find((row) => row.eventType === "receipt.confirmed.v1")!;
+  const payload = reply.payload as Record<string, unknown>;
+  const ajv = new Ajv2020({ strict: false }); addFormats(ajv);
+  assert.equal(ajv.validate(envelopeSchema, payload), true, ajv.errorsText());
+  assert.equal(payload.recipientInstanceId, "local-instance");
+  assert.equal(payload.correlationId, envelope.messageId);
+  assert.equal(payload.causationId, envelope.messageId);
+  assert.equal(payload.discrepancyQuantity, "2");
+  assert.equal((payload.actualLines as { actualQuantity: string }[])[0]!.actualQuantity, "10");
+  assert.equal((payload.lots as { sourceLineId: string }[])[0]!.sourceLineId, draft.lines[0]!.id);
+  assert.equal(reply.nextAttemptAt.getUTCFullYear(), 9999);
+  await db.outboxMessage.updateMany({ where: { id: { not: reply.id }, status: { in: ["pending", "retry_due"] } },
+    data: { nextAttemptAt: new Date("9999-12-31T00:00:00.000Z") } });
+  const dispatcher = createOutboxDispatcher({ client: db, workerId: randomUUID(), handlers: buildHandlerMap() });
+  assert.equal((await dispatcher.tick()).claimed, 0);
+  const held = await db.outboxMessage.findUniqueOrThrow({ where: { id: reply.id } });
+  assert.equal(held.status, "pending"); assert.equal(held.attemptCount, 0);
+  assert.deepEqual(held.payload, reply.payload);
+  assert.equal(await db.outboxMessage.count({ where: { aggregateId: draft.id, eventType: { contains: "ack" } } }), 0);
+  await assert.rejects(receivingCommand("create", input, (ctx) => receiving.create(ctx, input)),
+    { code: "RECEIVING_ALREADY_EXISTS", httpStatus: 409 });
+  await db.outboxMessage.update({ where: { id: announced.id }, data: { payload: { modified: true } } });
+  assert.equal((await db.$transaction((tx) => receiving.source({ tx, actor, requestId: randomUUID(), emit: () => {} })
+    .resolveVerifiedAnnouncement(input.inboundMessageId))).sentQuantity, "12");
+});
+
+test("receiving rejects missing, repeated, unknown and over-received source lines; cancel frees source", async () => {
+  const original = (await db.inboundMessage.findFirstOrThrow()).payload as Record<string, unknown>;
+  const originalLot = (original.lots as Record<string, unknown>[])[0]!;
+  const clone = { ...original, messageId: randomUUID(), eventId: randomUUID(),
+    sourceDocument: { type: "partner_transfer", id: randomUUID(), version: 2 },
+    lots: [{ ...originalLot, sourceLineId: randomUUID() }, { ...originalLot, sourceLineId: randomUUID() }],
+    sentQuantity: "24" };
+  const seed = async (payload: Record<string, unknown>) => db.$transaction((tx) => receiving.source({ tx, actor,
+    requestId: randomUUID(), emit: () => {} }).seedInboundAnnouncement(payload));
+  await seed(clone);
+  const localBatch = await db.batch.findFirstOrThrow({ where: { originIssuerInstanceId: "local-instance",
+    originLotId: batchId } });
+  const actualLines: ActualInput[] = clone.lots.map((lot) => ({ sourceLineId: lot.sourceLineId,
+    localBatchId: localBatch.id, warehouseId, actualQuantity: "0", unit: "EA" }));
+  const input = { inboundMessageId: clone.messageId, actualLines };
+  const create = (value: typeof input) => receivingCommand("create", value, (ctx) => receiving.create(ctx, value));
+  await assert.rejects(create({ ...input, actualLines: actualLines.slice(0, 1) }), { code: "SOURCE_LINE_MISSING" });
+  await assert.rejects(create({ ...input, actualLines: [actualLines[0]!, actualLines[0]!] }), { code: "SOURCE_LINE_DUPLICATE" });
+  await assert.rejects(create({ ...input, actualLines: [{ ...actualLines[0]!, sourceLineId: randomUUID() }, actualLines[1]!] }),
+    { code: "SOURCE_LINE_UNKNOWN" });
+  await assert.rejects(create({ ...input, actualLines: [{ ...actualLines[0]!, actualQuantity: "13" }, actualLines[1]!] }),
+    { code: "OVER_RECEIPT" });
+  await assert.rejects(create({ ...input, actualLines: [{ ...actualLines[0]!, localBatchId: randomUUID() }, actualLines[1]!] }),
+    { code: "BATCH_NOT_FOUND" });
+  await assert.rejects(create({ ...input, actualLines: [{ ...actualLines[0]!, localBatchId: batchId }, actualLines[1]!] }),
+    { code: "ORIGIN_MISMATCH" });
+  await assert.rejects(create({ ...input, actualLines: [{ ...actualLines[0]!, unit: "KG" }, actualLines[1]!] }),
+    { code: "QUANTITY_UNIT_MISMATCH" });
+  const races = await Promise.allSettled([create(input), create(input)]);
+  assert.equal(races.filter((outcome) => outcome.status === "fulfilled").length, 1);
+  assert.equal(races.filter((outcome) => outcome.status === "rejected" &&
+    outcome.reason.code === "RECEIVING_ALREADY_EXISTS").length, 1);
+  const draft = (races.find((outcome) => outcome.status === "fulfilled") as PromiseFulfilledResult<
+    Awaited<ReturnType<typeof receiving.create>>>).value;
+  await assert.rejects(receivingCommand("confirm", { id: draft.id }, (ctx) => receiving.confirm(ctx,
+    draft.id, draft.version), randomUUID()), { code: "DISCREPANCY_REASON_REQUIRED" });
+  await assert.rejects(receivingCommand("update", {}, (ctx) => receiving.edit(ctx, draft.id, draft.version,
+    { actualLines: [{ sourceLineId: actualLines[0]!.sourceLineId, actualQuantity: "13" }] })),
+  { code: "OVER_RECEIPT" });
+  await assert.rejects(receivingCommand("confirm", {}, (ctx) => receiving.confirm({ ...ctx, actor: {
+    ...actor, unitIds: [],
+  } }, draft.id, draft.version), randomUUID()), { code: "WAREHOUSE_SCOPE_REQUIRED" });
+  await receivingCommand("cancel", {}, (ctx) => receiving.cancel(ctx, draft.id, draft.version));
+  const replacement = await create({ ...input, actualLines: actualLines.map((item) => ({ ...item, actualQuantity: "12" })) });
+  assert.notEqual(replacement.id, draft.id);
+  await assert.rejects(receivingCommand("confirm", {}, (ctx) => receiving.confirm(ctx,
+    draft.id, draft.version + 1), randomUUID()), { code: "WRONG_STATE" });
+  const edited = await receivingCommand("update", { version: replacement.version }, (ctx) => receiving.edit(ctx,
+    replacement.id, replacement.version, { actualLines: [
+      { sourceLineId: actualLines[0]!.sourceLineId, actualQuantity: "10" },
+      { sourceLineId: actualLines[1]!.sourceLineId, actualQuantity: "0" },
+    ], discrepancyReason: "Part of shipment missing" }));
+  assert.equal(edited.actualQuantity, "10.000");
+  assert.equal(edited.lines.length, 2);
+  const result = await receivingCommand("confirm", { id: replacement.id }, (ctx) => receiving.confirm(ctx,
+    replacement.id, edited.version), randomUUID());
+  assert.equal(result.movementIds.length, 1);
+  assert.equal(await db.stockMovement.count({ where: { sourceLineId: edited.lines[1]!.id } }), 0);
+  const reply = await db.outboxMessage.findFirstOrThrow({ where: { aggregateId: replacement.id,
+    eventType: "receipt.confirmed.v1" } });
+  assert.equal((reply.payload as { actualLines: unknown[] }).actualLines.length, 2);
+  assert.equal((reply.payload as { lots: unknown[] }).lots.length, 1);
+  await assert.rejects(create(input), { code: "RECEIVING_ALREADY_EXISTS" });
+});
+
+test("seeded source rejects wrong recipient, shape and changed hash; batch product must match message", async () => {
+  const original = (await db.inboundMessage.findFirstOrThrow()).payload as Record<string, unknown>;
+  const originalLot = (original.lots as Record<string, unknown>[])[0]!;
+  const clone = { ...original, messageId: randomUUID(), eventId: randomUUID(),
+    sourceDocument: { type: "partner_transfer", id: randomUUID(), version: 2 } };
+  const seed = (payload: Record<string, unknown>) => db.$transaction((tx) => receiving.source({ tx, actor,
+    requestId: randomUUID(), emit: () => {} }).seedInboundAnnouncement(payload));
+  await seed({ ...clone, recipientInstanceId: "wrong-instance" });
+  await assert.rejects(receivingCommand("create", {}, (ctx) => receiving.create(ctx,
+    { inboundMessageId: clone.messageId, actualLines: [] })), { code: "SOURCE_MESSAGE_INVALID" });
+  const invalidType = { ...clone, messageId: randomUUID(), eventType: "receipt.confirmed.v1" };
+  await seed(invalidType);
+  await assert.rejects(db.$transaction((tx) => receiving.source({ tx, actor, requestId: randomUUID(), emit: () => {} })
+    .resolveVerifiedAnnouncement(invalidType.messageId)), { code: "SOURCE_MESSAGE_INVALID" });
+  const wrongTotal = { ...clone, messageId: randomUUID(), sentQuantity: "13" };
+  await seed(wrongTotal);
+  await assert.rejects(db.$transaction((tx) => receiving.source({ tx, actor, requestId: randomUUID(), emit: () => {} })
+    .resolveVerifiedAnnouncement(wrongTotal.messageId)), { code: "SOURCE_MESSAGE_INVALID" });
+  const badHash = { ...clone, messageId: randomUUID() };
+  await seed(badHash);
+  await owner.inboundMessage.update({ where: { messageId: badHash.messageId }, data: { payload: { ...badHash,
+    sentQuantity: "99" } } });
+  await assert.rejects(db.$transaction((tx) => receiving.source({ tx, actor, requestId: randomUUID(), emit: () => {} })
+    .resolveVerifiedAnnouncement(badHash.messageId)), { code: "SOURCE_MESSAGE_INVALID" });
+  const wrongProduct = { ...clone, messageId: randomUUID(), lots: [{ ...originalLot,
+    product: { instanceId: "local-instance", productId: randomUUID() } }] };
+  await seed(wrongProduct);
+  const localBatch = await db.batch.findFirstOrThrow({ where: { originIssuerInstanceId: "local-instance",
+    originLotId: batchId } });
+  await assert.rejects(receivingCommand("create", {}, (ctx) => receiving.create(ctx, {
+    inboundMessageId: wrongProduct.messageId, actualLines: [{ sourceLineId: originalLot.sourceLineId as string,
+      localBatchId: localBatch.id, warehouseId, actualQuantity: "10", unit: "EA" }],
+  })), { code: "BATCH_PRODUCT_MISMATCH" });
+});
+
+test("all-zero receiving emits both events, no movement, full actualLines and empty lots", async () => {
+  const original = (await db.inboundMessage.findFirstOrThrow()).payload as Record<string, unknown>;
+  const clone = { ...original, messageId: randomUUID(), eventId: randomUUID(),
+    sourceDocument: { type: "partner_transfer", id: randomUUID(), version: 2 } };
+  await db.$transaction((tx) => receiving.source({ tx, actor, requestId: randomUUID(), emit: () => {} })
+    .seedInboundAnnouncement(clone));
+  const lot = (original.lots as { sourceLineId: string }[])[0]!;
+  const localBatch = await db.batch.findFirstOrThrow({ where: { originIssuerInstanceId: "local-instance",
+    originLotId: batchId } });
+  const created = await receivingCommand("create", {}, (ctx) => receiving.create(ctx, {
+    inboundMessageId: clone.messageId, actualLines: [{ sourceLineId: lot.sourceLineId,
+      localBatchId: localBatch.id, warehouseId, actualQuantity: "0", unit: "EA" }],
+    discrepancyReason: "No delivery",
+  }));
+  const result = await receivingCommand("confirm", { id: created.id }, (ctx) => receiving.confirm(ctx,
+    created.id, created.version), randomUUID());
+  assert.deepEqual(result.movementIds, []);
+  assert.equal(await db.stockMovement.count({ where: { sourceLineId: created.lines[0]!.id } }), 0);
+  const rows = await db.outboxMessage.findMany({ where: { aggregateId: created.id } });
+  assert.equal(rows.length, 2);
+  const reply = rows.find((row) => row.eventType === "receipt.confirmed.v1")!;
+  const payload = reply.payload as Record<string, unknown>;
+  assert.deepEqual(payload.lots, []);
+  assert.equal((payload.actualLines as { actualQuantity: string }[])[0]!.actualQuantity, "0");
+  assert.equal((rows.find((row) => row.eventType === "trading.receipt.confirmed.v1")!.payload as {
+    lines: unknown[] }).lines.length, 0);
 });

@@ -21,7 +21,7 @@
     "test:contracts": "npm run check:openapi && node scripts/validate-contracts.mjs && node scripts/run-python-jcs.mjs",
     "test:identity": "node --test --require tsx/cjs platform/identity/token.test.ts platform/identity/partner-actor.test.ts",
     "test:catalog": "node --test --require tsx/cjs contexts/catalog/domain/quantity.test.ts contexts/catalog/domain/normalize-uom.test.ts contexts/inventory/application/adjust-stock.test.ts",
-    "test:trading": "node --test --require tsx/cjs contexts/trading/domain/document.test.ts",
+    "test:trading": "node --test --require tsx/cjs contexts/trading/domain/document.test.ts contexts/trading/application/inbound-announcements.test.ts",
     "test:http": "node --test --require tsx/cjs platform/http/pipeline.test.ts platform/http/idempotency.test.ts",
     "test:platform:schema": "node scripts/run-platform-test.mjs schema",
     "test:transaction:unit": "node --test --require tsx/cjs platform/persistence/transaction.test.ts",
