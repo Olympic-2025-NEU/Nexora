@@ -10,6 +10,7 @@ export type OutboxEventInput = {
   payload: Prisma.InputJsonValue;
   destination: string;
   correlationId: string;
+  nextAttemptAt?: Date;
 };
 
 export type OutboxMessage = OutboxEventInput & {

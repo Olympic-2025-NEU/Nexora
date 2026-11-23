@@ -154,7 +154,7 @@ export async function transferRoute(request: NextRequest, id?: string, action?: 
         if (!("organizationId" in ctx.actor)) throw new DomainError("TENANT_FORBIDDEN", 403);
         const args = { tx: ctx.tx, actor: ctx.actor, requestId, emit: ctx.emit };
         if (id && version !== null && action === "cancel") return service.cancel(args, id, version);
-        if (id && version !== null && action === "confirm") throw new DomainError("ACTION_NOT_FOUND", 404);
+        if (id && version !== null && action === "confirm") return service.confirm(args, id, version);
         return service.create(args, body as { linkedIssueId: string; destinationPartnerId: string; note?: string });
       },
     });

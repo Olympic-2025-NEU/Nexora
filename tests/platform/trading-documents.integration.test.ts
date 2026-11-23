@@ -447,4 +447,12 @@ test("transfer copies all issue lines; cancellation frees issue without deleting
   const next = await transferCommand("create", input, (ctx) => service.create(ctx, input));
   assert.notEqual(next.id, first.id);
   assert.equal((await db.transferDetail.findMany({ where: { linkedIssueId: issue.id } })).length, 2);
+  const confirmed = await transferCommand("confirm", { id: next.id, version: next.version },
+    (ctx) => service.confirm(ctx, next.id, next.version), randomUUID());
+  assert.equal(confirmed.status, "confirmed");
+  assert.deepEqual(confirmed.movementIds, []);
+  const announcement = await db.outboxMessage.findFirstOrThrow({ where: { aggregateId: next.id } });
+  assert.equal(announcement.eventType, "transfer.announced.v1");
+  assert.equal(announcement.status, "pending");
+  assert.equal(announcement.nextAttemptAt.getUTCFullYear(), 9999);
 });

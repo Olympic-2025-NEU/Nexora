@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { randomUUID } from "node:crypto";
+import { Decimal } from "@prisma/client/runtime/library";
 import type { Prisma } from "@prisma/client";
 import type { Actor } from "@/platform/identity/actor";
 import type { OutboxEventInput } from "@/platform/outbox/message";
@@ -109,6 +110,54 @@ export function createTransferService(ports: Ports, instanceId: string) {
       await ports.audit(ctx.tx, { actorSub: ctx.actor.userId, action: "trading.transfer.cancel", id,
         requestId: ctx.requestId, before: doc.status, after: "cancelled", version: updated.version });
       return { id, status: "cancelled", version: updated.version };
+    },
+    async confirm(ctx: Context, id: string, version: number) {
+      const repo = createTradingRepos(ctx.tx);
+      await repo.lockDocument(id);
+      const doc = await repo.getAggregate(id);
+      if (!doc || doc.documentType !== "partner_transfer" || !doc.transferDetail) throw new DomainError("DOCUMENT_NOT_FOUND", 404);
+      await repo.lockDocument(doc.transferDetail.linkedIssueId);
+      if (doc.version !== version) throw new DomainError("VERSION_CONFLICT", 409);
+      try { applyDocumentAction({ type: "partner_transfer", status: doc.status as "draft", action: "confirm" }); }
+      catch (error) { translate(error); }
+      const issue = await repo.getAggregate(doc.transferDetail.linkedIssueId);
+      if (!issue || issue.status !== "confirmed") throw new DomainError("ISSUE_NOT_CONFIRMED", 409);
+      const destination = await partner(ctx, doc.transferDetail.destinationPartnerId, true);
+      if (issue.lines.length !== doc.lines.length || issue.lines.length === 0 ||
+          doc.lines.some((line) => { const source = issue.lines.find((item) => item.id === line.sourceIssueLineId);
+            return !source || source.lineNo !== line.lineNo || source.warehouseId !== line.warehouseId ||
+              source.batchId !== line.batchId || source.productVariantId !== line.productVariantId ||
+              source.productId !== line.productId || source.uomId !== line.uomId ||
+              !line.quantity || !source.quantity || !line.quantity.eq(source.quantity); })) {
+        throw new DomainError("TRANSFER_LINE_MISMATCH", 409);
+      }
+      doc.lines.forEach((line) => scope(ctx, line.warehouseId));
+      const updated = await repo.transition(id, doc.status, version, "confirmed", ctx.actor.userId);
+      if (!updated) throw new DomainError("VERSION_CONFLICT", 409);
+      const uoms = await ctx.tx.uom.findMany({ where: { id: { in: doc.lines.map((line) => line.uomId) } } });
+      const lots = doc.lines.map((line) => {
+        const unit = ({ count: "EA", mass: "KG", volume: "L" } as const)[uoms.find((row) => row.id === line.uomId)?.kind as "count" | "mass" | "volume"];
+        if (!unit) throw new DomainError("UOM_KIND_INVALID", 422);
+        return { sourceLineId: line.id,
+          originLot: { issuerInstanceId: instanceId, lotId: line.batchId },
+          senderBatch: { instanceId, batchId: line.batchId },
+          product: { instanceId, productId: line.productId }, quantity: line.quantity!.toFixed(), unit };
+      });
+      const occurredAt = updated.confirmedAt!.toISOString();
+      const payload = { schemaVersion: "1.0", messageId: randomUUID(), eventId: randomUUID(),
+        eventType: "transfer.announced.v1", issuerInstanceId: instanceId,
+        recipientInstanceId: destination.issuerInstanceId, occurredAt, publishedAt: occurredAt,
+        correlationId: doc.correlationId, causationId: issue.id,
+        sourceDocument: { type: "partner_transfer", id, version: updated.version }, lots,
+        upstreamReferences: [], evidence: [], sharingPolicyVersion: "v1",
+        linkedIssueId: issue.id, sentQuantity: doc.lines.reduce((sum, line) => sum.add(line.quantity!), new Decimal(0)).toFixed() };
+      ctx.emit({ aggregateType: "document", aggregateId: id, aggregateVersion: updated.version,
+        eventType: "transfer.announced.v1", schemaVersion: "1", payload,
+        destination: "federation", correlationId: doc.correlationId,
+        nextAttemptAt: new Date("9999-12-31T00:00:00.000Z") });
+      await ports.audit(ctx.tx, { actorSub: ctx.actor.userId, action: "trading.transfer.confirm", id,
+        requestId: ctx.requestId, before: doc.status, after: "confirmed", version: updated.version });
+      return { id, status: "confirmed", version: updated.version, confirmedAt: occurredAt, movementIds: [] };
     },
   };
 }
