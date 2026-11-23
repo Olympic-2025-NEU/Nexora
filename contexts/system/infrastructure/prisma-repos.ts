@@ -23,6 +23,8 @@ function mapOrg(row: {
   status: string;
   version: number;
   contactEmail: string | null;
+  contactPhone: string | null;
+  address: string | null;
 }): OrganizationRecord {
   return {
     id: row.id,
@@ -33,6 +35,8 @@ function mapOrg(row: {
     status: row.status as OrganizationStatus,
     version: row.version,
     contactEmail: row.contactEmail,
+    contactPhone: row.contactPhone,
+    address: row.address,
   };
 }
 
@@ -73,6 +77,8 @@ export function createSystemRepos(db: Db) {
       expectedVersion: number;
       name?: string;
       contactEmail?: string | null;
+      contactPhone?: string | null;
+      address?: string | null;
       timezone?: string;
     }): Promise<OrganizationRecord | null> {
       const current = await db.organization.findUnique({ where: { singletonSlot: 1 } });
@@ -83,6 +89,8 @@ export function createSystemRepos(db: Db) {
         data: {
           ...(input.name !== undefined ? { name: input.name } : {}),
           ...(input.contactEmail !== undefined ? { contactEmail: input.contactEmail } : {}),
+          ...(input.contactPhone !== undefined ? { contactPhone: input.contactPhone } : {}),
+          ...(input.address !== undefined ? { address: input.address } : {}),
           ...(input.timezone !== undefined ? { timezone: input.timezone } : {}),
           version: { increment: 1 },
           updatedAt: new Date(),
@@ -161,7 +169,12 @@ export function createSystemRepos(db: Db) {
     async updateMembership(
       id: string,
       expectedVersion: number,
-      patch: { role?: MembershipRole; status?: MembershipStatus },
+      patch: {
+        role?: MembershipRole;
+        status?: MembershipStatus;
+        displayName?: string;
+        email?: string | null;
+      },
     ): Promise<MembershipRecord | null> {
       const current = await db.membership.findUnique({ where: { id } });
       if (!current || current.version !== expectedVersion) return null;
@@ -170,6 +183,8 @@ export function createSystemRepos(db: Db) {
         data: {
           ...(patch.role !== undefined ? { role: patch.role } : {}),
           ...(patch.status !== undefined ? { status: patch.status } : {}),
+          ...(patch.displayName !== undefined ? { displayName: patch.displayName } : {}),
+          ...(patch.email !== undefined ? { email: patch.email } : {}),
           version: { increment: 1 },
           updatedAt: new Date(),
           lastSyncedAt: new Date(),

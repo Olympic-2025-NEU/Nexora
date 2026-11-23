@@ -4,11 +4,13 @@
 
 ## Route và vai trò
 
-| Vùng | Route đích trong DX-Lab | UI/state bắt buộc | API |
+ERP canonical surfaces (ADR 0016): `/admin` (org/members only), `/partners`, `/catalog`, `/inventory`, `/trading` (P07+), `/trace` (P08+). Do **not** place products under `/admin`. See `../requirements/SRS-UI-surfaces.md`.
+
+| Vùng | Route đích trong DX-Lab | UI/state bắt buộc | API / ERP surface concepts |
 | --- | --- | --- | --- |
-| H | `/work`, `/profile`, `/admin/members`, `/admin/partners` | Task inbox của tôi, org/role, partner connection metadata; Admin quản user/partner, không hiện secret | `/me`, organization/members/partners, core files |
-| P | `/operations/receipts`, `/operations/issues`, `/operations/transfers`, `/operations/receivings`, `/work/approvals` | Draft forms có batch picker/quantity; sent-vs-actual; approver khác creator; pending/retry/dispute | M02/M03, Flowable bridge API |
-| D | `/data/inventory`, `/data/lots/[id]`, `/data/impact/[id]` | balance theo lot/kho, timeline A→B→C, backward/forward, provenance/gap/asOf, document/attachment link | inventory, trace, core projections |
+| H | `/work`, `/profile`, members/partners management views | Task inbox của tôi, org/role, partner connection metadata; Admin quản user/partner, không hiện secret | `/me`, organization/members; partners surface; core files |
+| P | `/operations/receipts`, `/operations/issues`, `/operations/transfers`, `/operations/receivings`, `/work/approvals` | Draft forms có batch picker/quantity; sent-vs-actual; approver khác creator; pending/retry/dispute | M02/M03; ERP `/trading/*` when present |
+| D | `/data/inventory`, `/data/lots/[id]`, `/data/impact/[id]` | balance theo lot/kho, timeline A→B→C, backward/forward, provenance/gap/asOf, document/attachment link | inventory/trace; ERP `/inventory/*`, `/catalog/*`, `/trace/*` |
 | I | `/assistant` và panel trên lot/document | Q&A nguồn, disambiguation lô, nguồn trích, AI Draft review, provider-down fallback | AI chat/drafts/tool calls |
 | Public | `/passport/[token]` | QR mobile, public field allowlist, revoke/expired/unknown state | public Passport only |
 

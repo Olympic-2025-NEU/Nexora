@@ -2,6 +2,8 @@
 
 **Mục tiêu:** một doanh nghiệp trên mỗi instance, người dùng nội bộ có vai trò, đối tác được quản lý và kết nối có kiểm soát. **Phụ thuộc:** G02–G04, D04/D05. **Unblock:** catalog, giao dịch và federation. **AC:** AC-02, một phần AC-01/05.
 
+**UI surfaces (ADR 0016, 2026-11-22):** canonical `/admin/organization`, `/admin/members`, `/partners`. Evidence may still cite legacy `/admin/partners` — that path **redirects**. Catalog/inventory must not live under `/admin`.
+
 **Quyết định vận hành (2026-11-21):**
 - Membership lifecycle = **admin invite** (không open JIT). JWT hợp lệ nhưng chưa có membership → 403.
 - Role enum bắt buộc: `administrator` | `staff` | `approver` | `viewer` (không dùng `admin`).
@@ -15,7 +17,7 @@
 
 - [x] Bootstrap organization qua seed; singleton slot khóa org thứ hai. PATCH có audit + optimistic version.
 - [x] API read/update allowlist; Staff manage 403.
-- **Đầu ra:** `contexts/system` + `/api/v1/organization` + `/admin/organization`. Evidence: `evidence/p05-t01.md`.
+- **Đầu ra:** `contexts/system` + `/api/v1/organization` + UI `/admin/organization`. Evidence: `evidence/p05-t01.md`.
 
 ## P05-T02 — Membership và vòng đời user
 

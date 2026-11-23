@@ -120,7 +120,7 @@ routes:
     upstream:
       type: roundrobin
       nodes:
-        "erp:3000": 1
+        "${ERP_UPSTREAM}": 1
     plugins:
       request-id: {}
       <<: *strip-identity-headers
@@ -139,7 +139,7 @@ routes:
     upstream:
       type: roundrobin
       nodes:
-        "erp:3000": 1
+        "${ERP_UPSTREAM}": 1
     plugins:
       request-id: {}
       <<: *strip-identity-headers
@@ -171,7 +171,7 @@ routes:
     upstream:
       type: roundrobin
       nodes:
-        "erp:3000": 1
+        "${ERP_UPSTREAM}": 1
     plugins:
       request-id: {}
       <<: *strip-identity-headers
@@ -201,7 +201,7 @@ routes:
     upstream:
       type: roundrobin
       nodes:
-        "erp:3000": 1
+        "${ERP_UPSTREAM}": 1
     plugins:
       request-id: {}
       <<: *strip-identity-headers
@@ -231,7 +231,7 @@ routes:
     upstream:
       type: roundrobin
       nodes:
-        "erp:3000": 1
+        "${ERP_UPSTREAM}": 1
     plugins:
       request-id: {}
       <<: *strip-identity-headers
@@ -267,7 +267,7 @@ routes:
     upstream:
       type: roundrobin
       nodes:
-        "erp:3000": 1
+        "${ERP_UPSTREAM}": 1
     plugins:
       request-id: {}
       <<: *strip-identity-headers
@@ -285,7 +285,7 @@ routes:
     upstream:
       type: roundrobin
       nodes:
-        "erp:3000": 1
+        "${ERP_UPSTREAM}": 1
     plugins:
       request-id: {}
       <<: *strip-identity-headers
@@ -301,7 +301,56 @@ routes:
     upstream:
       type: roundrobin
       nodes:
-        "erp:3000": 1
+        "${ERP_UPSTREAM}": 1
+    plugins:
+      request-id: {}
+      <<: *strip-identity-headers
+      limit-req:
+        rate: 100
+        burst: 50
+        key: remote_addr
+        rejected_code: 429
+
+  # Bounded-context UI surfaces (ADR 0016) — same unauthenticated HTML GET as /admin*.
+  - id: erp-partners-ui
+    uri: /partners*
+    methods: [GET, HEAD]
+    upstream:
+      type: roundrobin
+      nodes:
+        "${ERP_UPSTREAM}": 1
+    plugins:
+      request-id: {}
+      <<: *strip-identity-headers
+      limit-req:
+        rate: 100
+        burst: 50
+        key: remote_addr
+        rejected_code: 429
+
+  - id: erp-catalog-ui
+    uri: /catalog*
+    methods: [GET, HEAD]
+    upstream:
+      type: roundrobin
+      nodes:
+        "${ERP_UPSTREAM}": 1
+    plugins:
+      request-id: {}
+      <<: *strip-identity-headers
+      limit-req:
+        rate: 100
+        burst: 50
+        key: remote_addr
+        rejected_code: 429
+
+  - id: erp-inventory-ui
+    uri: /inventory*
+    methods: [GET, HEAD]
+    upstream:
+      type: roundrobin
+      nodes:
+        "${ERP_UPSTREAM}": 1
     plugins:
       request-id: {}
       <<: *strip-identity-headers
@@ -318,7 +367,7 @@ routes:
     upstream:
       type: roundrobin
       nodes:
-        "erp:3000": 1
+        "${ERP_UPSTREAM}": 1
     plugins:
       request-id: {}
       <<: *strip-identity-headers
@@ -334,7 +383,7 @@ routes:
     upstream:
       type: roundrobin
       nodes:
-        "erp:3000": 1
+        "${ERP_UPSTREAM}": 1
     plugins:
       request-id: {}
       <<: *strip-identity-headers
@@ -350,7 +399,7 @@ routes:
     upstream:
       type: roundrobin
       nodes:
-        "erp:3000": 1
+        "${ERP_UPSTREAM}": 1
     plugins:
       request-id: {}
       <<: *strip-identity-headers
@@ -361,7 +410,7 @@ routes:
     upstream:
       type: roundrobin
       nodes:
-        "erp:3000": 1
+        "${ERP_UPSTREAM}": 1
     plugins:
       request-id: {}
       <<: *strip-identity-headers
@@ -372,7 +421,7 @@ routes:
     upstream:
       type: roundrobin
       nodes:
-        "erp:3000": 1
+        "${ERP_UPSTREAM}": 1
     plugins:
       request-id: {}
       <<: *strip-identity-headers
@@ -390,7 +439,7 @@ routes:
     upstream:
       type: roundrobin
       nodes:
-        "erp:3000": 1
+        "${ERP_UPSTREAM}": 1
     plugins:
       request-id: {}
       <<: *strip-identity-headers

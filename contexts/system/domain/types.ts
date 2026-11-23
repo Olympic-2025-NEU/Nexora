@@ -15,6 +15,8 @@ export type OrganizationRecord = {
   status: OrganizationStatus;
   version: number;
   contactEmail: string | null;
+  contactPhone: string | null;
+  address: string | null;
 };
 
 export type MembershipRecord = {

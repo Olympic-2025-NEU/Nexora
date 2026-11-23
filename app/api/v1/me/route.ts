@@ -21,6 +21,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         organizationId: actor.organizationId,
         roles: actor.roles,
         unitIds: actor.unitIds,
+        displayName: actor.displayName ?? "",
       },
       { status: 200 },
     );

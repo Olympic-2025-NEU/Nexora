@@ -22,9 +22,15 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 New-Item -ItemType Directory -Force -Path deploy/certs | Out-Null
 if (-not (Test-Path deploy/certs/.gitkeep)) { Set-Content -Path deploy/certs/.gitkeep -Value '' }
 
-Write-Output "Starting infrastructure (project=$Project, no --profile apps)..."
-docker compose -f deploy/compose.yml --env-file $envFile -p $Project --profile local-admin up -d
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+Write-Output "Starting infrastructure (project=$Project, local-admin overlay, no --profile apps)..."
+# Docker Compose writes informational warnings to stderr; with $ErrorActionPreference=Stop
+# PowerShell would treat those as terminating errors even when exit code is 0.
+$prevEap = $ErrorActionPreference
+$ErrorActionPreference = 'Continue'
+docker compose -f deploy/compose.yml -f deploy/compose.local-admin.yml --env-file $envFile -p $Project up -d
+$composeExit = $LASTEXITCODE
+$ErrorActionPreference = $prevEap
+if ($composeExit -ne 0) { exit $composeExit }
 
 $port = '15432'
 foreach ($line in Get-Content $envFile) {

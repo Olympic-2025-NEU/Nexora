@@ -158,11 +158,21 @@ create("/api/v1/partners", "M01", "Create partner", "Partner", "PartnerCreate", 
 patch("/api/v1/partners/{id}", "M01", "Update partner", "Partner", "PartnerPatch", ADMIN);
 add("put", "/api/v1/partners/{id}/connection", "M01", "Upsert partner connection", "PartnerConnectionView", { body: "PartnerConnectionInput", roles: ADMIN, status: 200, description: "Admin only; URLs must be HTTPS and SSRF-safe. Response never includes outboundSecretRef." });
 
-list("/api/v1/products", "M02", "List products", "Product", EVERY_USER, ["q", "status"]);
+list("/api/v1/products", "M02", "List products", "Product", EVERY_USER, ["q", "isActive", "categoryId"]);
 create("/api/v1/products", "M02", "Create product", "Product", "ProductCreate");
 detail("/api/v1/products/{id}", "M02", "Get product", "Product");
 patch("/api/v1/products/{id}", "M02", "Update product", "Product", "ProductPatch");
-create("/api/v1/products/{id}/identifiers", "M02", "Add product identifier", "ProductIdentifier", "ProductIdentifierCreate");
+list("/api/v1/products/{id}/variants", "M02", "List product variants", "ProductVariant", EVERY_USER);
+create("/api/v1/products/{id}/variants", "M02", "Create product variant", "ProductVariant", "ProductVariantCreate");
+patch("/api/v1/variants/{id}", "M02", "Update product variant", "ProductVariant", "ProductVariantCreate");
+list("/api/v1/categories", "M02", "List categories", "Category", EVERY_USER);
+create("/api/v1/categories", "M02", "Create category", "Category", "Category");
+list("/api/v1/uoms", "M02", "List UOMs", "Uom", EVERY_USER);
+create("/api/v1/uoms", "M02", "Create UOM", "Uom", "Uom");
+list("/api/v1/price-lists", "M02", "List price lists", "PriceList", EVERY_USER);
+create("/api/v1/price-lists", "M02", "Create price list", "PriceList", "PriceList");
+list("/api/v1/price-lists/{id}/items", "M02", "List price list items", "PriceListItem", EVERY_USER);
+create("/api/v1/price-lists/{id}/items", "M02", "Create price list item", "PriceListItem", "PriceListItem");
 list("/api/v1/batches", "M02", "List batches", "Batch", EVERY_USER, ["productId", "issuer", "expiresBefore", "status"]);
 create("/api/v1/batches", "M02", "Create local batch", "Batch", "BatchCreate");
 detail("/api/v1/batches/{id}", "M02", "Get batch", "Batch");

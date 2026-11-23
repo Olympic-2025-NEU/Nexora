@@ -9,8 +9,8 @@ import {
   parseIfMatchVersion,
   projectMember,
 } from "@/contexts/system/application/http";
-import { isMembershipRole } from "@/contexts/system/domain/types";
-import { resolveUserActor, systemAuditRecorder } from "@/composition/system";
+import { isMembershipRole, type MembershipRole } from "@/contexts/system/domain/types";
+import { keycloakAdmin, resolveUserActor, systemAuditRecorder } from "@/composition/system";
 import { createInventoryRepos } from "@/contexts/inventory/infrastructure/prisma-repos";
 import {
   assertActiveWarehouses,
@@ -26,6 +26,9 @@ export async function PATCH(request: NextRequest, context: Params): Promise<Resp
   const { id } = await context.params;
   try {
     if (!isUuid(id)) throw new DomainError("MEMBER_NOT_FOUND", 404);
+    const actor = await resolveUserActor(request);
+    requirePolicy(actor, "admin:membership:manage");
+
     const body = (await request.json()) as Record<string, unknown>;
     const warehouseIds =
       body.warehouseIds !== undefined ? parseWarehouseIds(body.warehouseIds) : undefined;
@@ -39,6 +42,12 @@ export async function PATCH(request: NextRequest, context: Params): Promise<Resp
     ) {
       throw new DomainError("INVALID_STATUS", 422);
     }
+    if (body.displayName !== undefined && typeof body.displayName !== "string") {
+      throw new DomainError("INVALID_DISPLAY_NAME", 422);
+    }
+    if (body.email !== undefined && body.email !== null && typeof body.email !== "string") {
+      throw new DomainError("INVALID_EMAIL", 422);
+    }
     const expectedVersion = parseIfMatchVersion(
       request.headers.get("if-match"),
       body.version,
@@ -48,10 +57,10 @@ export async function PATCH(request: NextRequest, context: Params): Promise<Resp
     const data = await runCommand(
       { requestId },
       {
-        authenticate: () => resolveUserActor(request),
-        resolveTenant: async (actor) => {
-          if (!("organizationId" in actor)) throw new DomainError("TENANT_FORBIDDEN", 403);
-          return actor.organizationId;
+        authenticate: async () => actor,
+        resolveTenant: async (resolved) => {
+          if (!("organizationId" in resolved)) throw new DomainError("TENANT_FORBIDDEN", 403);
+          return resolved.organizationId;
         },
         action: "admin:membership:manage",
         method: "PATCH",
@@ -86,10 +95,21 @@ export async function PATCH(request: NextRequest, context: Params): Promise<Resp
 
           const updated = await repos.updateMembership(id, expectedVersion, {
             ...(body.role !== undefined
-              ? { role: body.role as "administrator" | "staff" | "approver" | "viewer" }
+              ? { role: body.role as MembershipRole }
               : {}),
             ...(body.status !== undefined
               ? { status: body.status as "active" | "disabled" }
+              : {}),
+            ...(typeof body.displayName === "string"
+              ? { displayName: body.displayName.trim() }
+              : {}),
+            ...(body.email === null || typeof body.email === "string"
+              ? {
+                  email:
+                    body.email === null || body.email === ""
+                      ? null
+                      : String(body.email).trim(),
+                }
               : {}),
           });
           if (!updated) throw new DomainError("VERSION_CONFLICT", 409);
@@ -98,6 +118,8 @@ export async function PATCH(request: NextRequest, context: Params): Promise<Resp
           const changed: string[] = ["version"];
           if (body.role !== undefined) changed.push("role");
           if (body.status !== undefined) changed.push("status");
+          if (typeof body.displayName === "string") changed.push("displayName");
+          if (body.email === null || typeof body.email === "string") changed.push("email");
           if (warehouseIds !== undefined) {
             await assertActiveWarehouses(ctx.tx, warehouseIds);
             scope = await createInventoryRepos(ctx.tx).replaceMembershipWarehouses(
@@ -108,7 +130,10 @@ export async function PATCH(request: NextRequest, context: Params): Promise<Resp
           }
 
           await systemAuditRecorder().record(ctx.tx, {
-            actor: { kind: "user", sub: "organizationId" in ctx.actor ? ctx.actor.userId : "unknown" },
+            actor: {
+              kind: "user",
+              sub: "organizationId" in ctx.actor ? ctx.actor.userId : "unknown",
+            },
             action: "membership.update",
             targetType: "membership",
             targetId: updated.id,
@@ -133,6 +158,18 @@ export async function PATCH(request: NextRequest, context: Params): Promise<Resp
         },
       },
     );
+
+    // Best-effort IdP sync after DB commit (DB remains source of truth for app authz).
+    const kc = keycloakAdmin();
+    if (body.role !== undefined) {
+      await kc.replaceRealmRoles(data.keycloakSub, data.role as MembershipRole);
+    }
+    if (body.status === "disabled") {
+      await kc.setEnabled(data.keycloakSub, false);
+    } else if (body.status === "active") {
+      await kc.setEnabled(data.keycloakSub, true);
+    }
+
     return ok(projectMember(data), requestId);
   } catch (err) {
     return mapRouteError(err, requestId);

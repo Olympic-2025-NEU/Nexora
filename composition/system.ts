@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { NextRequest } from "next/server";
 import { authenticate } from "@/platform/identity/request-auth";
+import {
+  createKeycloakAdminClient,
+  KeycloakAdminError,
+  readKeycloakAdminConfigFromEnv,
+} from "@/platform/identity/keycloak-admin";
 import { getPrismaClient } from "@/platform/persistence/prisma";
 import { createSystemRepos } from "@/contexts/system/infrastructure/prisma-repos";
 import { prismaAuditRecorder } from "@/platform/audit/prisma-audit-recorder";
@@ -20,6 +25,7 @@ export function membershipRepository(): MembershipRepository {
         id: row.id,
         organizationId: row.organizationId,
         keycloakSub: row.keycloakSub,
+        displayName: row.displayName,
         role: row.role as "administrator" | "staff" | "approver" | "viewer",
         status: row.status as "invited" | "active" | "disabled",
         warehouseIds: row.warehouses.map((w) => w.warehouseId),
@@ -30,6 +36,19 @@ export function membershipRepository(): MembershipRepository {
 
 export async function resolveUserActor(request: NextRequest) {
   return authenticate(request, { membershipRepo: membershipRepository() });
+}
+
+/** Keycloak Admin client for membership invite/provisioning. */
+export function keycloakAdmin() {
+  const config = readKeycloakAdminConfigFromEnv();
+  if (!config) {
+    throw new KeycloakAdminError(
+      "KEYCLOAK_ADMIN_UNAVAILABLE",
+      "Keycloak admin credentials are not configured",
+      503,
+    );
+  }
+  return createKeycloakAdminClient(config);
 }
 
 export function systemRepos() {

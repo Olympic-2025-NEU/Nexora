@@ -10,6 +10,7 @@ import {
   decodeIdCursor,
   encodeCursor,
   fail,
+  isUuid,
   mapRouteError,
   ok,
   okList,
@@ -18,7 +19,6 @@ import {
   readJson,
   requireText,
 } from "@/contexts/catalog/application/http";
-import { isBaseUnit } from "@/contexts/catalog/domain/quantity";
 import { catalogAuditRecorder, catalogRepos } from "@/composition/catalog";
 import { resolveUserActor } from "@/composition/system";
 
@@ -31,14 +31,29 @@ export async function GET(request: NextRequest): Promise<Response> {
 
     const params = request.nextUrl.searchParams;
     const { limit, cursor } = parsePage(params);
-    const status = params.get("status");
-    if (status !== null && status !== "active" && status !== "archived") {
-      throw new DomainError("INVALID_STATUS", 422);
-    }
     const q = params.get("q");
+    const isActiveRaw = params.get("isActive");
+    let isActive: boolean | undefined;
+    if (isActiveRaw !== null) {
+      if (isActiveRaw !== "true" && isActiveRaw !== "false") {
+        throw new DomainError("INVALID_IS_ACTIVE", 422);
+      }
+      isActive = isActiveRaw === "true";
+    }
+    const categoryId = params.get("categoryId");
+    if (categoryId !== null && !isUuid(categoryId)) {
+      throw new DomainError("CATEGORY_ID_INVALID", 422);
+    }
+    const includeDescendants = params.get("includeDescendants") === "1";
+    let categoryIds: string[] | undefined;
+    if (categoryId && includeDescendants) {
+      categoryIds = await catalogRepos().categorySubtreeIds(categoryId);
+    }
+
     const page = await catalogRepos().listProducts({
       ...(q ? { q } : {}),
-      ...(status ? { status } : {}),
+      ...(isActive !== undefined ? { isActive } : { isActive: true }),
+      ...(categoryIds ? { categoryIds } : categoryId ? { categoryId } : {}),
       ...(cursor ? { cursorId: decodeIdCursor(cursor) } : {}),
       limit,
     });
@@ -58,18 +73,24 @@ export async function GET(request: NextRequest): Promise<Response> {
 export async function POST(request: NextRequest): Promise<Response> {
   const requestId = request.headers.get("x-request-id") ?? crypto.randomUUID();
   try {
-    const body = assertBody(await readJson(request), ["sku", "name", "description", "baseUnit"]);
-    const sku = requireText(body.sku, "SKU_INVALID", 64);
+    const body = assertBody(await readJson(request), [
+      "name",
+      "categoryId",
+      "attributes",
+      "isActive",
+      "sku",
+      "barcode",
+    ]);
     const name = requireText(body.name, "NAME_INVALID", 200);
-    if (!isBaseUnit(body.baseUnit)) throw new DomainError("BASE_UNIT_INVALID", 422);
-    const baseUnit = body.baseUnit;
-    if (body.description !== undefined && typeof body.description !== "string") {
-      throw new DomainError("DESCRIPTION_INVALID", 422);
-    }
-    const description =
-      typeof body.description === "string" && body.description.trim()
-        ? body.description.trim()
-        : null;
+    if (!isUuid(body.categoryId)) throw new DomainError("CATEGORY_ID_INVALID", 422);
+    const categoryId = body.categoryId as string;
+    const attributes =
+      body.attributes && typeof body.attributes === "object" && !Array.isArray(body.attributes)
+        ? (body.attributes as Record<string, unknown>)
+        : {};
+    const sku = typeof body.sku === "string" ? body.sku.trim() : "";
+    const barcode = typeof body.barcode === "string" ? body.barcode.trim() : "";
+    const isActive = typeof body.isActive === "boolean" ? body.isActive : true;
 
     const data = await runCommand(
       { requestId },
@@ -87,21 +108,23 @@ export async function POST(request: NextRequest): Promise<Response> {
           if (!("organizationId" in ctx.actor)) throw new DomainError("TENANT_FORBIDDEN", 403);
           const sub = ctx.actor.userId;
           const repos = createCatalogRepos(ctx.tx);
-          let created;
-          try {
-            created = await repos.createProduct({
+          const productId = randomUUID();
+          const created = await repos.createProduct({
+            id: productId,
+            name,
+            categoryId,
+            attributes,
+            isActive,
+            createdBySub: sub,
+          });
+          if (sku || barcode) {
+            await repos.createVariant({
               id: randomUUID(),
-              sku,
-              name,
-              description,
-              baseUnit,
+              productId,
+              sku: sku || null,
+              barcode: barcode || null,
               createdBySub: sub,
             });
-          } catch (err) {
-            if (err instanceof Error && /Unique constraint/i.test(err.message)) {
-              throw new DomainError("PRODUCT_SKU_CONFLICT", 409);
-            }
-            throw err;
           }
           await catalogAuditRecorder().record(ctx.tx, {
             actor: { kind: "user", sub },
@@ -109,7 +132,7 @@ export async function POST(request: NextRequest): Promise<Response> {
             targetType: "product",
             targetId: created.id,
             requestId: ctx.requestId,
-            after: { status: created.status, version: created.version },
+            after: { isActive: created.isActive, version: created.version },
           });
           return created;
         },

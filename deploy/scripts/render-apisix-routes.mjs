@@ -27,11 +27,14 @@ for (const key of required) {
   }
 }
 
+const erpUpstream = (env.ERP_UPSTREAM || "erp:3000").trim();
 const template = readFileSync(resolve(root, "apisix/routes.yaml"), "utf8");
 let rendered = template
   .replaceAll("${OIDC_ISSUER_URL}", env.OIDC_ISSUER_URL)
   .replaceAll("${OIDC_GATEWAY_CLIENT_ID}", env.OIDC_GATEWAY_CLIENT_ID)
-  .replaceAll("${OIDC_GATEWAY_CLIENT_SECRET}", env.OIDC_GATEWAY_CLIENT_SECRET);
+  .replaceAll("${OIDC_GATEWAY_CLIENT_SECRET}", env.OIDC_GATEWAY_CLIENT_SECRET)
+  .replaceAll("${ERP_UPSTREAM}", erpUpstream);
+console.log(`ERP upstream nodes → ${erpUpstream}`);
 
 const certPath = resolve(root, "certs/local.pem");
 const keyPath = resolve(root, "certs/local-key.pem");

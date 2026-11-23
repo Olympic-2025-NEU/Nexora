@@ -12,7 +12,7 @@ import {
   projectMember,
 } from "@/contexts/system/application/http";
 import { isMembershipRole } from "@/contexts/system/domain/types";
-import { resolveUserActor, systemAuditRecorder } from "@/composition/system";
+import { keycloakAdmin, resolveUserActor, systemAuditRecorder } from "@/composition/system";
 import { createInventoryRepos } from "@/contexts/inventory/infrastructure/prisma-repos";
 import {
   assertActiveWarehouses,
@@ -39,12 +39,20 @@ export async function GET(request: NextRequest): Promise<Response> {
   }
 }
 
+/**
+ * Admin invite: provision (or reuse) Keycloak user by username, then insert membership.
+ * Body: { username, displayName, email?, role, warehouseIds?, temporaryPassword? }
+ * Do not send keycloakSub — IdP allocates / resolves the sub.
+ */
 export async function POST(request: NextRequest): Promise<Response> {
   const requestId = request.headers.get("x-request-id") ?? crypto.randomUUID();
   try {
+    const actor = await resolveUserActor(request);
+    requirePolicy(actor, "admin:membership:manage");
+
     const body = (await request.json()) as Record<string, unknown>;
-    if (typeof body.keycloakSub !== "string" || !body.keycloakSub.trim()) {
-      throw new DomainError("KEYCLOAK_SUB_REQUIRED", 422);
+    if (typeof body.username !== "string" || !body.username.trim()) {
+      throw new DomainError("USERNAME_REQUIRED", 422);
     }
     if (typeof body.displayName !== "string" || !body.displayName.trim()) {
       throw new DomainError("DISPLAY_NAME_REQUIRED", 422);
@@ -52,20 +60,47 @@ export async function POST(request: NextRequest): Promise<Response> {
     if (typeof body.role !== "string" || !isMembershipRole(body.role)) {
       throw new DomainError("INVALID_ROLE", 422);
     }
+    if (body.keycloakSub !== undefined) {
+      throw new DomainError("KEYCLOAK_SUB_NOT_ALLOWED", 422);
+    }
     const warehouseIds = parseWarehouseIds(body.warehouseIds);
+    const username = body.username.trim();
+    const displayName = body.displayName.trim();
+    const email = typeof body.email === "string" ? body.email.trim() : null;
+    const role = body.role as "administrator" | "staff" | "approver" | "viewer";
+    const temporaryPassword =
+      typeof body.temporaryPassword === "string" && body.temporaryPassword.trim()
+        ? body.temporaryPassword.trim()
+        : undefined;
+
+    // External IdP I/O stays outside the DB transaction.
+    const provisioned = await keycloakAdmin().provisionUser({
+      username,
+      displayName,
+      email,
+      role,
+      temporaryPassword,
+    });
 
     const data = await runCommand(
       { requestId },
       {
-        authenticate: () => resolveUserActor(request),
-        resolveTenant: async (actor) => {
-          if (!("organizationId" in actor)) throw new DomainError("TENANT_FORBIDDEN", 403);
-          return actor.organizationId;
+        authenticate: async () => actor,
+        resolveTenant: async (resolved) => {
+          if (!("organizationId" in resolved)) throw new DomainError("TENANT_FORBIDDEN", 403);
+          return resolved.organizationId;
         },
         action: "admin:membership:manage",
         method: "POST",
         routeKey: "members",
-        payload: { ...body, keycloakSub: "[redacted]" },
+        payload: {
+          username,
+          displayName,
+          role,
+          email: email ? "[redacted]" : null,
+          keycloakSub: "[redacted]",
+          keycloakCreated: provisioned.created,
+        },
         async domain(ctx) {
           requirePolicy(
             "organizationId" in ctx.actor
@@ -74,16 +109,16 @@ export async function POST(request: NextRequest): Promise<Response> {
             "admin:membership:manage",
           );
           const repos = createSystemRepos(ctx.tx);
-          const existing = await repos.findMembershipBySub(String(body.keycloakSub).trim());
+          const existing = await repos.findMembershipBySub(provisioned.keycloakSub);
           if (existing) throw new DomainError("MEMBERSHIP_EXISTS", 409);
           const created = await repos.createMembership({
             id: randomUUID(),
             organizationId: ctx.tenantId,
-            keycloakSub: String(body.keycloakSub).trim(),
-            displayName: String(body.displayName).trim(),
-            email: typeof body.email === "string" ? body.email : null,
-            role: body.role as "administrator" | "staff" | "approver" | "viewer",
-            status: "invited",
+            keycloakSub: provisioned.keycloakSub,
+            displayName,
+            email,
+            role,
+            status: "active",
           });
           await assertActiveWarehouses(ctx.tx, warehouseIds);
           const scope = await createInventoryRepos(ctx.tx).replaceMembershipWarehouses(
@@ -91,7 +126,10 @@ export async function POST(request: NextRequest): Promise<Response> {
             warehouseIds,
           );
           await systemAuditRecorder().record(ctx.tx, {
-            actor: { kind: "user", sub: "organizationId" in ctx.actor ? ctx.actor.userId : "unknown" },
+            actor: {
+              kind: "user",
+              sub: "organizationId" in ctx.actor ? ctx.actor.userId : "unknown",
+            },
             action: "membership.invite",
             targetType: "membership",
             targetId: created.id,
@@ -102,6 +140,7 @@ export async function POST(request: NextRequest): Promise<Response> {
               version: created.version,
               warehouseIds: scope,
               warehouseCount: scope.length,
+              keycloakCreated: provisioned.created,
               changedFields: ["role", "status", "version", "warehouseIds"],
             },
           });
@@ -109,7 +148,18 @@ export async function POST(request: NextRequest): Promise<Response> {
         },
       },
     );
-    return ok(projectMember(data), requestId, 201);
+
+    return ok(
+      {
+        ...projectMember(data),
+        ...(provisioned.provisionalPassword
+          ? { provisionalPassword: provisioned.provisionalPassword }
+          : {}),
+        keycloakCreated: provisioned.created,
+      },
+      requestId,
+      201,
+    );
   } catch (err) {
     return mapRouteError(err, requestId);
   }

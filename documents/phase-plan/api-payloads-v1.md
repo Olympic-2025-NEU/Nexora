@@ -16,11 +16,11 @@ Success write: `{data:{id,status,version,...},requestId}`; list: `{data:[...],pa
 | `GET /api/v1/core/records/{id}` | Không body | Record sau policy; 404 cho resource không thuộc scope |
 | `POST /api/v1/files` | multipart `{file,ownerType?,ownerId?,visibility?}`; `Idempotency-Key` bắt buộc; MIME/size allowlist. P03-T04 chỉ nhận file chưa link owner với `visibility=private`, owner fields chờ policy tài nguyên ở T07. | 202 `{id,scanState:'pending'}`; tệp nằm quarantine, không URL public; retry cùng key/payload trả ID cũ, key khác payload trả 409 |
 | `GET /api/v1/files/{id}` | `?download=1` nếu muốn bytes | metadata `{id,mimeType,sizeBytes,scanState,visibility,checksum}`; `download=1` trả stream chỉ khi clean, bucket private và actor có quyền; pending/infected/error trả 423 |
-| `GET /api/v1/organization` | Không body | `{id,instanceId,code,name,timezone,status}`; user authenticated |
-| `PATCH /api/v1/organization` | `{name?,contactEmail?,timezone?}`, `If-Match` | `{id,version,...}`; Administrator; `instanceId/code` bất biến |
+| `GET /api/v1/organization` | Không body | `{id,instanceId,code,name,timezone,status,version,contactEmail?,contactPhone?,address?}`; user authenticated |
+| `PATCH /api/v1/organization` | `{name?,contactEmail?,contactPhone?,address?,timezone?}`, `If-Match` | `{id,version,...}`; Administrator; `instanceId/code` bất biến |
 | `GET /api/v1/members` | `?cursor&limit&status&role` | `{id,keycloakSub,displayName,role,status}`; Administrator |
-| `POST /api/v1/members` | `{keycloakSub,displayName,email?,role,warehouseIds?}` | 201 member; Admin; verify sub tồn tại/được invite theo D04, không password; P05 chưa có join P06 nên nonempty `warehouseIds` bị 422 cho tới P06 |
-| `PATCH /api/v1/members/{id}` | `{role?,status?,warehouseIds?}`, `If-Match` | Member mới; Admin; không disable Admin active cuối cùng; P06 ghi `warehouseIds` vào `membership_warehouse` trong transaction |
+| `POST /api/v1/members` | `{username,displayName,email?,role,warehouseIds?,temporaryPassword?}` | 201 member (+ `provisionalPassword?` once when KC user created, `keycloakCreated`); Admin; ERP gọi Keycloak Admin tạo/tái sử dụng user theo username, gán realm role, ghi membership `active`; **không** nhận `keycloakSub` từ client; không lưu password app DB |
+| `PATCH /api/v1/members/{id}` | `{role?,status?,displayName?,email?,warehouseIds?}`, `If-Match` | Member mới; Admin; không disable Admin active cuối cùng; sync realm role + enable/disable Keycloak best-effort; P06 ghi `warehouseIds` vào `membership_warehouse` trong transaction |
 | `GET /api/v1/partners` | `?cursor&limit&status` | Danh bạ với connection status, không secret; user authenticated |
 | `POST /api/v1/partners` | `{issuerInstanceId,code,displayName,contactEmail?}` | 201 partner; Admin; issuer unique |
 | `PATCH /api/v1/partners/{id}` | `{displayName?,status?,contactEmail?}`, `If-Match` | Partner mới; Admin; suspend chặn outbound mới |
@@ -28,23 +28,38 @@ Success write: `{data:{id,status,version,...},requestId}`; list: `{data:[...],pa
 
 ## M02 catalog/inventory
 
+### M02 baseline (P06 / G06) — historical
+
+Products with `{sku,name,baseUnit}`, identifiers, batches by `productId`, balances by product+batch. **Superseded for identity by P065** (keep only until G06.5 closed).
+
+### M02 target (P065 / ADR 0017) — implement in phase 06.5
+
 | Method/path | Request fields | Response/rule |
 | --- | --- | --- |
-| `POST /api/v1/products` | `{sku,name,description?,baseUnit}` | 201 `{id,sku,name,baseUnit,status,version}`; SKU unique, Admin/Staff theo policy |
-| `PATCH /api/v1/products/{id}` | `{name?,description?,status?}`, `If-Match` | SKU/baseUnit bất biến từ create v1; archive có history, không delete |
-| `GET /api/v1/products`, `GET /api/v1/products/{id}` | `?q&status&cursor&limit` | SKU/barcode/name search, no private partner info |
-| `POST /api/v1/products/{id}/identifiers` | `{kind:'ean13'|'internal_barcode',value,isPrimary?}` | 201 identifier; unique `(kind,value)`, EAN-13 đúng 13 số/check digit; SKU ở product |
-| `POST /api/v1/batches` | `{productId,localCode,manufacturedOn?,expiresOn?}` | 201 batch `qualityStatus='inspect'`; user route chỉ tạo lot local, server gán `originIssuerInstanceId=INSTANCE_ID`, `originLotId` bất biến và duy nhất (UUID batch hoặc ID được cấp từ server). Batch đối tác chỉ được tạo từ verified inbox qua P09 service, không nhận issuer/sourcePartnerId do user khai |
-| `POST /api/v1/batches/{id}/quality-actions` | `{action:'mark_available'|'restrict'|'inspect',reason}`, `If-Match` | Actor có quyền, audit; `restricted/inspect` không xuất |
-| `GET /api/v1/batches`, `GET /api/v1/batches/{id}` | `?productId&issuer&expiresBefore&status&cursor&limit` | `{id,productId,localCode,originLot,qualityStatus,...}`; resource scope |
-| `POST /api/v1/warehouses` | `{code,name}` | 201 warehouse; Admin/Staff được cấp quyền |
-| `GET /api/v1/warehouses` | `?status&cursor&limit` | List có quyền |
-| `GET /api/v1/inventory/balances` | `?warehouseId&productId&batchId&cursor&limit` | `{warehouseId,productId,batchId,quantity,unit,updatedAt}`; không có write route cho balance |
-| `GET /api/v1/inventory/movements` | `?warehouseId&batchId&cursor&limit` | `{id,kind,delta,balanceAfter,sourceDocumentId,createdAt}`; stable pagination |
+| `POST /api/v1/products` | `{name,categoryId,attributes?,isActive?}` — **no sku** | 201 product; Staff/Admin; may auto-create empty primary later or require first variant in same UX |
+| `PATCH /api/v1/products/{id}` | `{name?,categoryId?,attributes?,isActive?}`, soft-delete action, `If-Match` | Maintains `search_text`; 409 if soft-delete blocked by stock |
+| `GET /api/v1/products`, `GET …/{id}` | `?q&categoryId&includeDescendants&isActive&cursor&limit` | Match `search_text` **or** variant sku/barcode (normalized); index fields include variantCount, primary retail |
+| `POST /api/v1/products/{id}/variants` | `{sku?,barcode?,isPrimary?,isActive?}` | ≥1 of sku/barcode; 409 `SKU_BARCODE_CONFLICT`; first → primary if none |
+| `PATCH /api/v1/variants/{id}` | `{sku?,barcode?,isPrimary?,isActive?}`, soft-delete, `If-Match` | Mutable codes; uniqueness includes soft-deleted |
+| `PUT/PATCH /api/v1/variants/{id}/uoms` | `[{uomId,isStockKeeping,factorToStockUom}]` | Exactly one stock-keeping; factor>0; default CÁI on create variant |
+| `GET/POST/PATCH /api/v1/categories` | tree `{code,name,parentId?,sortOrder?,isActive?}` | 409 `CATEGORY_HAS_CHILDREN`; no cycles |
+| `GET/POST/PATCH /api/v1/uoms` | `{name,kind?}` | Server normalize → `CÁI`; 409 `UOM_NORMALIZE_CONFLICT`; system default immutable |
+| `GET/POST/PATCH /api/v1/price-lists` | `{code?,name,isDefault?,validFrom,validTo?,currency,isActive?}` | null code + isDefault; 409 `PRICE_LIST_DEFAULT_EXISTS`; coded ⇒ not default |
+| `GET/POST/PATCH /api/v1/price-lists/{id}/items` | `{productVariantId,uomId,priceType,amount,isActive?}` | uom ∈ variant_uoms else 422; unique tuple |
+| `POST /api/v1/products/{id}/images` | `{attachmentId,sortOrder?,isPrimary?}` | attachment must exist/scanned per P03; no BLOB body |
+| `POST /api/v1/batches` | `{productVariantId,localCode,manufacturedOn?,expiresOn?}` | server sets productId from variant; quality `inspect`; local origin only on user route |
+| `POST /api/v1/batches/{id}/quality-actions` | `{action,reason}`, `If-Match` | unchanged semantics |
+| `GET /api/v1/batches`, `GET …/{id}` | `?productVariantId&productId&…` | include variant + product refs |
+| `POST /api/v1/warehouses` | `{code,name}` | unchanged |
+| `GET /api/v1/warehouses` | `?status&cursor&limit` | unchanged |
+| `GET /api/v1/inventory/balances` | `?warehouseId&productVariantId&productId&batchId&…` | `{…,productVariantId,quantity,stockUomId,updatedAt}`; qty in stock UOM; no write route |
+| `GET /api/v1/inventory/movements` | `?warehouseId&batchId&productVariantId&…` | include variant; stable pagination |
+
+Policy extensions: `catalog:category:read|manage`, `catalog:uom:read|manage`, `catalog:price_list:read|manage` (+ existing `catalog:product:*`).
 
 ## M03 chứng từ — DTO dùng chung và route cụ thể
 
-`DocumentLineInput={warehouseId,productId,batchId,quantity?:decimalString,actualQuantity?:decimalString,countedQuantity?:decimalString,unit}`. Create trả `{id,documentType,documentNumber,status:'draft',version,lines:[{id,...}]}`. Update Draft nhận `{lines?,note?}` + `If-Match`; không PATCH `status`. Use case kiểm field theo type, product↔batch, unit, warehouse, quality và quyền. `documentNumber` do server cấp từ prefix type+date+UUID rút gọn (unique constraint, retry collision), không lấy từ client. Mọi confirm trả `data:{id,status:'confirmed',version,confirmedAt,movementIds}` và `requestId` ở envelope ngoài; transfer/sale có `movementIds:[]`.
+`DocumentLineInput={warehouseId,productVariantId,batchId,quantity?:decimalString,actualQuantity?:decimalString,countedQuantity?:decimalString,uomId}` (P065+; server resolves productId, converts packing uom → stock UOM before Inventory port). Create trả `{id,documentType,documentNumber,status:'draft',version,lines:[{id,...}]}`. Update Draft nhận `{lines?,note?}` + `If-Match`; không PATCH `status`. Use case kiểm field theo type, variant↔batch, uom∈variant_uoms, warehouse, quality và quyền. `documentNumber` do server cấp từ prefix type+date+UUID rút gọn (unique constraint, retry collision), không lấy từ client. Mọi confirm trả `data:{id,status:'confirmed',version,confirmedAt,movementIds}` và `requestId` ở envelope ngoài; transfer/sale có `movementIds:[]`.
 
 | Route | Create Draft body | Action và kết quả đặc thù |
 | --- | --- | --- |

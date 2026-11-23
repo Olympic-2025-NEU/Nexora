@@ -15,8 +15,8 @@ node deploy/scripts/render-apisix-routes.mjs "$env_file"
 mkdir -p deploy/certs
 touch deploy/certs/.gitkeep
 
-printf '%s\n' "Starting infrastructure (project=$project, no --profile apps)..."
-docker compose -f deploy/compose.yml --env-file "$env_file" -p "$project" --profile local-admin up -d
+printf '%s\n' "Starting infrastructure (project=$project, local-admin overlay, no --profile apps)..."
+docker compose -f deploy/compose.yml -f deploy/compose.local-admin.yml --env-file "$env_file" -p "$project" up -d
 
 port="$(awk -F= '/^POSTGRES_HOST_PORT=/{gsub(/\r/,""); print $2; exit}' "$env_file")"
 port="${port:-15432}"

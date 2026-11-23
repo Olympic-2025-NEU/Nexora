@@ -3,7 +3,13 @@ import { randomUUID } from "node:crypto";
 import type { Prisma } from "@prisma/client";
 import { Decimal } from "@prisma/client/runtime/library";
 import { DomainError } from "@/platform/kernel/errors";
-import { addQuantity, parseQuantity, type BaseUnit } from "@/contexts/catalog/domain/quantity";
+import {
+  addQuantity,
+  parseQuantity,
+  toUomKind,
+  type QuantityUnit,
+} from "@/contexts/catalog/domain/quantity";
+import type { UomKind } from "@/contexts/catalog/domain/types";
 import type { MovementKind, StockMovementRecord } from "../domain/types";
 import { mapMovement } from "../infrastructure/prisma-repos";
 import { todayInTimezone } from "./warehouse-scope";
@@ -14,31 +20,29 @@ export type AdjustStockInput = {
   warehouseId: string;
   batchId: string;
   productId: string;
+  productVariantId: string;
   /** Idempotency anchor: one movement per (sourceLineId, kind). */
   sourceLineId: string;
   kind: MovementKind;
   /**
-   * Signed delta. String form requires `unit` (or product.baseUnit is loaded).
-   * Decimal form is re-validated against product.baseUnit under D07.
+   * Signed delta. String form requires stock UOM kind (count/mass/volume).
+   * Quantities are always in the variant stock-keeping UOM.
    */
   delta: Decimal | string;
-  unit?: BaseUnit;
+  /** Optional; must match stock UOM kind when provided. */
+  unit?: QuantityUnit;
   actorSub: string;
   correlationId: string;
-  /** Test seam for the expiry check; defaults to the current instant. */
   now?: Date;
-  /** Override org timezone for expiry; otherwise loaded from organization singleton. */
   timezone?: string;
 };
 
 export type AdjustStockResult = {
   movement: StockMovementRecord;
-  /** True when a movement for (sourceLineId, kind) already existed and nothing was written. */
   replayed: boolean;
 };
 
 export type OpenStockBalanceInput = Omit<AdjustStockInput, "kind" | "delta"> & {
-  /** Positive opening quantity. */
   quantity: Decimal | string;
 };
 
@@ -58,6 +62,7 @@ function sameMovement(
     warehouseId: string;
     batchId: string;
     productId: string;
+    productVariantId: string;
     delta: Decimal;
     actorSub: string;
   },
@@ -68,15 +73,12 @@ function sameMovement(
     existing.warehouseId === input.warehouseId &&
     existing.batchId === input.batchId &&
     existing.productId === input.productId &&
+    existing.productVariantId === input.productVariantId &&
     existing.delta.eq(delta) &&
     existing.actorSub === input.actorSub
   );
 }
 
-/**
- * Deterministic lock order for callers touching several balances in one tx:
- * always read (warehouseId ASC, batchId ASC) before any write.
- */
 export async function findBalancesOrdered(tx: Tx, keys: readonly BalanceKey[]) {
   if (keys.length === 0) return [];
   return tx.stockBalance.findMany({
@@ -85,27 +87,30 @@ export async function findBalancesOrdered(tx: Tx, keys: readonly BalanceKey[]) {
   });
 }
 
-/**
- * Apply one signed stock delta and append the movement, inside the caller's transaction.
- * Idempotent on (sourceLineId, kind) when payload matches; balance never goes negative.
- */
 export async function adjustStock(tx: Tx, input: AdjustStockInput): Promise<AdjustStockResult> {
   const product = await tx.product.findUnique({
     where: { id: input.productId },
-    select: { baseUnit: true, status: true },
+    select: { isActive: true, deletedAt: true },
   });
   if (!product) throw new DomainError("PRODUCT_NOT_FOUND", 404);
-  if (product.status !== "active" && input.kind !== "issue") {
-    // Allow issue from archived product stock; block new receipts onto archived SKUs.
+  if ((!product.isActive || product.deletedAt) && input.kind !== "issue") {
     throw new DomainError("PRODUCT_ARCHIVED", 409);
   }
-  const unit = (input.unit ?? product.baseUnit) as BaseUnit;
-  if (unit !== product.baseUnit) throw new DomainError("QUANTITY_UNIT_MISMATCH", 422);
+
+  const stockUom = await tx.productVariantUom.findFirst({
+    where: { productVariantId: input.productVariantId, isStockKeeping: true },
+    include: { uom: { select: { kind: true } } },
+  });
+  if (!stockUom) throw new DomainError("VARIANT_STOCK_UOM_MISSING", 422);
+  const stockKind = stockUom.uom.kind as UomKind;
+  if (input.unit !== undefined && toUomKind(input.unit) !== stockKind) {
+    throw new DomainError("QUANTITY_UNIT_MISMATCH", 422);
+  }
 
   const delta =
     typeof input.delta === "string"
-      ? parseQuantity(input.delta, unit)
-      : parseQuantity(input.delta.toFixed(), unit);
+      ? parseQuantity(input.delta, stockKind)
+      : parseQuantity(input.delta.toFixed(), stockKind);
   if (delta.isZero()) throw new DomainError("QUANTITY_ZERO", 422);
   if ((input.kind === "receipt" || input.kind === "receiving") && delta.lte(0)) {
     throw new DomainError("QUANTITY_NOT_POSITIVE", 422);
@@ -135,10 +140,10 @@ export async function adjustStock(tx: Tx, input: AdjustStockInput): Promise<Adju
 
   const batch = await tx.batch.findUnique({
     where: { id: input.batchId },
-    select: { productId: true, qualityStatus: true, expiresOn: true },
+    select: { productId: true, productVariantId: true, qualityStatus: true, expiresOn: true },
   });
   if (!batch) throw new DomainError("BATCH_NOT_FOUND", 404);
-  if (batch.productId !== input.productId) {
+  if (batch.productId !== input.productId || batch.productVariantId !== input.productVariantId) {
     throw new DomainError("BATCH_PRODUCT_MISMATCH", 422);
   }
 
@@ -180,10 +185,17 @@ export async function adjustStock(tx: Tx, input: AdjustStockInput): Promise<Adju
     if (updated.count !== 1) throw new DomainError("INSUFFICIENT_STOCK", 409);
   } else {
     const current = balance?.quantity ?? new Decimal(0);
-    addQuantity(current, delta); // overflow guard before write
+    addQuantity(current, delta);
     if (!balance) {
       await tx.stockBalance.createMany({
-        data: [{ ...key, productId: input.productId, quantity: new Decimal(0) }],
+        data: [
+          {
+            ...key,
+            productId: input.productId,
+            productVariantId: input.productVariantId,
+            quantity: new Decimal(0),
+          },
+        ],
         skipDuplicates: true,
       });
     }
@@ -206,6 +218,7 @@ export async function adjustStock(tx: Tx, input: AdjustStockInput): Promise<Adju
         warehouseId: input.warehouseId,
         batchId: input.batchId,
         productId: input.productId,
+        productVariantId: input.productVariantId,
         sourceLineId: input.sourceLineId,
         kind: input.kind,
         delta,
@@ -229,7 +242,6 @@ export async function adjustStock(tx: Tx, input: AdjustStockInput): Promise<Adju
   }
 }
 
-/** Opening balance = a positive `receipt` movement through the same ledger path. */
 export async function openStockBalance(
   tx: Tx,
   input: OpenStockBalanceInput,

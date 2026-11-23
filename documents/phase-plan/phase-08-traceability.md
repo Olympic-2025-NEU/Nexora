@@ -2,6 +2,8 @@
 
 **Mục tiêu:** lịch sử lô dựa trên chứng từ/event có nguồn, truy ngược/truy xuôi, công bố theo policy. **Phụ thuộc:** G07, D08. **Unblock:** federation và DX-Lab. **AC:** AC-08/09 local; AC-07/09 xuyên A/B/C kết thúc ở P09.
 
+**UI surfaces (ADR 0016):** browser trace UI under **`/trace/*`**; public passport stays a public route. Do not mount under `/admin`.
+
 ## P08-T01 — Mô hình provenance và liên kết lô
 
 - [ ] Migration `trace_event`, `trace_link`, `passport_projection`, `qr_token`; mỗi event có issuer-qualified batch ID, source document/event, occurred/recorded time, event version, evidence refs, verification status.

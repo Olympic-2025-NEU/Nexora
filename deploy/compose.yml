@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # Nexora P01 — single Compose entrypoint (instances A/B/C via env file).
-# Project/containers use prefix nexora- (e.g. nexora-postgres). Profiles: apps | core | dxlab | ai | local-admin
+# Project/containers use prefix nexora- (e.g. nexora-postgres). Profiles: apps | core | dxlab | ai
+# Host PG/Keycloak publish: -f deploy/compose.local-admin.yml (see deploy/scripts/dev-up.*)
 # Default project is nexora; fixed container_name means one such stack per Docker host.
 name: nexora
 
@@ -281,6 +282,9 @@ services:
       # Browser reset-password page links to Keycloak Account (needs local-admin publish).
       OIDC_ACCOUNT_URL: ${OIDC_ACCOUNT_URL:-}
       KEYCLOAK_HOST_PORT: ${KEYCLOAK_HOST_PORT:-}
+      # Membership invite provisions users via Keycloak Admin (same creds as bootstrap).
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD}
     depends_on:
       db-migrate:
         condition: service_completed_successfully
@@ -435,23 +439,5 @@ services:
         limits:
           memory: 256m
 
-  # local-admin: loopback-only publishes for PG + Keycloak (never 0.0.0.0).
-  postgres-local:
-    container_name: nexora-postgres-local
-    profiles: ["local-admin"]
-    image: postgres:17.6@sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929
-    network_mode: "service:postgres"
-    entrypoint: ["sleep", "infinity"]
-    depends_on: [postgres]
-    ports:
-      - "127.0.0.1:${POSTGRES_HOST_PORT:-15432}:5432"
-
-  keycloak-local:
-    container_name: nexora-keycloak-local
-    profiles: ["local-admin"]
-    image: quay.io/keycloak/keycloak:26.8.2@sha256:c68e286cacd87b942ac1939a0a1481461109d6acd3a57dc496969a319a76bbf0
-    network_mode: "service:keycloak"
-    entrypoint: ["sleep", "infinity"]
-    depends_on: [keycloak]
-    ports:
-      - "127.0.0.1:${KEYCLOAK_HOST_PORT:-18080}:8080"
+  # local-admin host publishes: use overlay deploy/compose.local-admin.yml
+  # (Compose v5 rejects ports on network_mode: service:* sidecars).

@@ -8,8 +8,14 @@ import { PolicyError } from "@/platform/access/policy";
 import { PartnerActorError } from "@/platform/identity/partner-actor";
 import type {
   BatchRecord,
-  ProductIdentifierRecord,
+  CategoryRecord,
+  PriceListItemRecord,
+  PriceListRecord,
+  ProductListItem,
   ProductRecord,
+  ProductVariantRecord,
+  ProductVariantUomRecord,
+  UomRecord,
 } from "../domain/types";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -104,25 +110,98 @@ export function decodeIdCursor(cursor: string | null): string | undefined {
   return id;
 }
 
-export function projectProduct(product: ProductRecord) {
+export function projectProduct(product: ProductRecord | ProductListItem) {
+  const list = product as ProductListItem;
   return {
     id: product.id,
-    sku: product.sku,
     name: product.name,
-    ...(product.description ? { description: product.description } : {}),
-    baseUnit: product.baseUnit,
-    status: product.status,
+    categoryId: product.categoryId,
+    attributes: product.attributes,
+    isActive: product.isActive,
+    deletedAt: product.deletedAt,
     version: product.version,
+    createdAt: product.createdAt,
+    updatedAt: product.updatedAt,
+    ...(typeof list.variantCount === "number"
+      ? {
+          variantCount: list.variantCount,
+          primarySku: list.primarySku,
+          primaryBarcode: list.primaryBarcode,
+        }
+      : {}),
   };
 }
 
-export function projectIdentifier(identifier: ProductIdentifierRecord) {
+export function projectVariant(variant: ProductVariantRecord) {
   return {
-    id: identifier.id,
-    productId: identifier.productId,
-    kind: identifier.kind,
-    value: identifier.value,
-    isPrimary: identifier.isPrimary,
+    id: variant.id,
+    productId: variant.productId,
+    sku: variant.sku,
+    barcode: variant.barcode,
+    isPrimary: variant.isPrimary,
+    isActive: variant.isActive,
+    deletedAt: variant.deletedAt,
+    version: variant.version,
+  };
+}
+
+export function projectCategory(category: CategoryRecord) {
+  return {
+    id: category.id,
+    code: category.code,
+    name: category.name,
+    parentId: category.parentId,
+    sortOrder: category.sortOrder,
+    isActive: category.isActive,
+    version: category.version,
+  };
+}
+
+export function projectUom(uom: UomRecord) {
+  return {
+    id: uom.id,
+    code: uom.code,
+    name: uom.name,
+    kind: uom.kind,
+    isSystemDefault: uom.isSystemDefault,
+    isActive: uom.isActive,
+    version: uom.version,
+  };
+}
+
+export function projectVariantUom(row: ProductVariantUomRecord) {
+  return {
+    id: row.id,
+    productVariantId: row.productVariantId,
+    uomId: row.uomId,
+    isStockKeeping: row.isStockKeeping,
+    factorToStockUom: row.factorToStockUom,
+  };
+}
+
+export function projectPriceList(list: PriceListRecord) {
+  return {
+    id: list.id,
+    code: list.code,
+    name: list.name,
+    isDefault: list.isDefault,
+    validFrom: list.validFrom,
+    validTo: list.validTo,
+    isActive: list.isActive,
+    currency: list.currency,
+    version: list.version,
+  };
+}
+
+export function projectPriceListItem(item: PriceListItemRecord) {
+  return {
+    id: item.id,
+    priceListId: item.priceListId,
+    productVariantId: item.productVariantId,
+    uomId: item.uomId,
+    priceType: item.priceType,
+    amount: item.amount,
+    isActive: item.isActive,
   };
 }
 
@@ -130,6 +209,7 @@ export function projectBatch(batch: BatchRecord) {
   return {
     id: batch.id,
     productId: batch.productId,
+    productVariantId: batch.productVariantId,
     localCode: batch.localCode,
     originLot: {
       issuerInstanceId: batch.originIssuerInstanceId,

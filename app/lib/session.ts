@@ -21,6 +21,7 @@ export type MeResponse = {
   organizationId: string;
   roles: string[];
   unitIds: string[];
+  displayName: string;
 };
 
 export function hasSession(): boolean {

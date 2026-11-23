@@ -18,6 +18,7 @@ export interface MembershipRow {
   id: string;
   organizationId: string;
   keycloakSub: string;
+  displayName: string;
   role: "administrator" | "staff" | "approver" | "viewer";
   status: "invited" | "active" | "disabled";
   /** Warehouse scope from system.membership_warehouse (empty = none for non-admin). */
@@ -86,5 +87,6 @@ export async function resolveActor(
     organizationId: membership.organizationId,
     unitIds: membership.warehouseIds ?? [],
     roles: [membership.role],
+    displayName: membership.displayName,
   };
 }

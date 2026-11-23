@@ -31,9 +31,11 @@ Seed is idempotent — safe to run twice.
 
 ## Admin invite (no open JIT)
 
-1. Create the Keycloak user (Admin Console or admin API) with required actions as needed.
-2. `POST /api/v1/members` with `{ keycloakSub, displayName, role }` as Administrator.
-3. User without membership receives **403 MEMBERSHIP_NOT_FOUND** even with a valid JWT.
+1. As Administrator, `POST /api/v1/members` with `{ username, displayName, email?, role }`.
+2. ERP authenticates to Keycloak Admin (`KC_BOOTSTRAP_ADMIN_*` + `OIDC_BASE_URL`), creates the user when missing (temporary password + `UPDATE_PASSWORD`; `CONFIGURE_TOTP` for administrator/approver), assigns the matching realm role, and inserts `system.membership` as **active**.
+3. Response may include `provisionalPassword` **once** when the Keycloak user was created — copy it out-of-band; it is never stored in the app DB.
+4. Re-inviting an existing username that already has membership → **409 MEMBERSHIP_EXISTS**. JWT without membership still → **403 MEMBERSHIP_NOT_FOUND**.
+5. `PATCH` role/status also best-effort syncs Keycloak realm role and enable/disable.
 
 ## Partner connection
 

@@ -52,7 +52,7 @@ Nguyên tắc: số lượng tồn chỉ đổi qua Inventory port (M03 confirm 
 
 ## 6. UI bề mặt
 
-- `/admin/products`, `/admin/batches`, `/admin/warehouses`, `/admin/inventory`
+- Canonical UI (ADR 0016): `/catalog/products`, `/catalog/batches`, `/inventory/warehouses`, `/inventory/balances` — **not** under `/admin` (system-only). Legacy `/admin/products|batches|warehouses|inventory` redirect to these prefixes.
 - Member warehouse scope qua membership PATCH (`membership_warehouse`)
 
 ## 7. Kiểm thử tối thiểu

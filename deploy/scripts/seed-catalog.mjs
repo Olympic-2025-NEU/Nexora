@@ -1,12 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 /**
- * Idempotent catalog/inventory seed (create-if-missing only — does not reset operator state).
- * Opening stock writes a receipt movement (same ledger shape as openStockBalance) — never
- * UPDATE balance as the source of truth without a movement.
+ * Idempotent catalog/inventory seed (create-if-missing).
+ * P065: product + primary variant (sku) + CÁI stock UOM + default price list item.
  *
  * Env: DATABASE_URL, INSTANCE_ID
- * Optional: SEED_OPENING_QTY (default "100", EA integral), SEED_PRODUCT_SKU (default DEMO-SKU-A)
- * Optional: SEED_STAFF_SUBS=comma-separated keycloak subs to grant WH-A (default: none)
+ * Optional: SEED_OPENING_QTY, SEED_PRODUCT_SKU, SEED_STAFF_SUBS
  */
 import { randomUUID, createHash } from "node:crypto";
 import { PrismaClient, Prisma } from "@prisma/client";
@@ -25,9 +23,13 @@ const instanceId = required("INSTANCE_ID");
 const sku = process.env.SEED_PRODUCT_SKU || "DEMO-SKU-A";
 const openingQty = process.env.SEED_OPENING_QTY || "100";
 if (!/^(0|[1-9]\d*)$/.test(openingQty) || openingQty === "0") {
-  throw new Error("SEED_OPENING_QTY must be a positive integer (EA)");
+  throw new Error("SEED_OPENING_QTY must be a positive integer (count UOM)");
 }
 const prisma = new PrismaClient();
+
+const UOM_CAI = "aaaaaaaa-0001-4000-8000-000000000001";
+const CAT_UNCATEGORIZED = "bbbbbbbb-0001-4000-8000-000000000001";
+const PRICE_LIST_DEFAULT = "cccccccc-0001-4000-8000-000000000001";
 
 function stableUuid(label) {
   const hex = createHash("sha256").update(`${instanceId}:${label}`).digest("hex");
@@ -42,24 +44,75 @@ async function main() {
   if (!membership) throw new Error("No active administrator membership; run seed-system first");
 
   const productId = stableUuid("product");
+  const variantId = stableUuid("variant");
   const batchId = stableUuid("batch");
   const warehouseId = stableUuid("warehouse");
   const sourceLineId = stableUuid("opening-line");
 
-  if (!(await prisma.product.findUnique({ where: { sku } }))) {
-    await prisma.product.create({
+  let product = await prisma.product.findFirst({
+    where: { variants: { some: { sku } } },
+  });
+  if (!product) {
+    product = await prisma.product.create({
       data: {
         id: productId,
-        sku,
         name: "Demo Product A",
-        description: "P06 seed product",
-        baseUnit: "EA",
-        status: "active",
+        searchText: "demo product a",
+        attributes: { description: "P065 seed product" },
+        categoryId: CAT_UNCATEGORIZED,
+        isActive: true,
         createdBySub: membership.keycloakSub,
       },
     });
   }
-  const product = await prisma.product.findUniqueOrThrow({ where: { sku } });
+
+  let variant = await prisma.productVariant.findFirst({ where: { sku } });
+  if (!variant) {
+    variant = await prisma.productVariant.create({
+      data: {
+        id: variantId,
+        productId: product.id,
+        sku,
+        barcode: sku,
+        isPrimary: true,
+        isActive: true,
+        createdBySub: membership.keycloakSub,
+      },
+    });
+    await prisma.variantCode.create({
+      data: { code: sku.toUpperCase(), variantId: variant.id, source: "both" },
+    });
+    await prisma.productVariantUom.create({
+      data: {
+        id: stableUuid("variant-uom"),
+        productVariantId: variant.id,
+        uomId: UOM_CAI,
+        isStockKeeping: true,
+        factorToStockUom: new Prisma.Decimal(1),
+      },
+    });
+  }
+
+  const priceItem = await prisma.priceListItem.findFirst({
+    where: {
+      priceListId: PRICE_LIST_DEFAULT,
+      productVariantId: variant.id,
+      uomId: UOM_CAI,
+      priceType: "retail",
+    },
+  });
+  if (!priceItem) {
+    await prisma.priceListItem.create({
+      data: {
+        id: stableUuid("price-item"),
+        priceListId: PRICE_LIST_DEFAULT,
+        productVariantId: variant.id,
+        uomId: UOM_CAI,
+        priceType: "retail",
+        amount: new Prisma.Decimal("10000"),
+      },
+    });
+  }
 
   let warehouse = await prisma.warehouse.findUnique({ where: { code: "WH-A" } });
   if (!warehouse) {
@@ -87,6 +140,7 @@ async function main() {
       data: {
         id: batchId,
         productId: product.id,
+        productVariantId: variant.id,
         localCode: "LOT-A-001",
         originIssuerInstanceId: instanceId,
         originLotId: batchId,
@@ -109,6 +163,7 @@ async function main() {
             warehouseId: warehouse.id,
             batchId: batch.id,
             productId: product.id,
+            productVariantId: variant.id,
             quantity: new Prisma.Decimal(0),
           },
         ],
@@ -128,6 +183,7 @@ async function main() {
           warehouseId: warehouse.id,
           batchId: batch.id,
           productId: product.id,
+          productVariantId: variant.id,
           sourceLineId,
           kind: "receipt",
           delta: qty,
@@ -174,6 +230,7 @@ async function main() {
     JSON.stringify({
       ok: true,
       productId: product.id,
+      variantId: variant.id,
       batchId: batch.id,
       warehouseId: warehouse.id,
       opening,

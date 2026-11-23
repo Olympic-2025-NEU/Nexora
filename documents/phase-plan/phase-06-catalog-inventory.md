@@ -1,6 +1,10 @@
 # Phase 06 — M02 Catalog & Inventory
 
-**Mục tiêu:** master data lô/kho và sổ tồn chính xác, cung cấp Inventory port cho M03. **Phụ thuộc:** G03–G05, D07. **Unblock:** nhập/xuất ở P07, trace. **AC:** AC-03 kết thúc khi phiếu nhập P07 đã tăng tồn thật.
+**Mục tiêu:** master data lô/kho và sổ tồn chính xác, cung cấp Inventory port cho M03. **Phụ thuộc:** G03–G05, D07. **Unblock:** nhập/xuất ở P07 (sau **P065** catalog upgrade), trace. **AC:** AC-03 kết thúc khi phiếu nhập P07 đã tăng tồn thật.
+
+**Sau G06:** mô hình product+SKU P06 là baseline đã đóng; nâng cấp variant/UOM/price theo D17 nằm ở [`phase-06.5-catalog-business-upgrade.md`](./phase-06.5-catalog-business-upgrade.md) — **không mở lại G06**.
+
+**UI surfaces (ADR 0016, 2026-11-22):** canonical `/catalog/products`, `/catalog/batches`, `/inventory/warehouses`, `/inventory/balances`. Legacy `/admin/products|batches|warehouses|inventory` **redirect**. Do not treat catalog as “admin”.
 
 **Cổng schema:** Dev phải check & duyệt gói [`evidence/p06-schema-design.md`](./evidence/p06-schema-design.md) trước khi apply migration catalog/inventory / API ERP. T01 quantity (không DDL) được làm song song.
 

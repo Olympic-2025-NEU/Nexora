@@ -19,9 +19,11 @@ export function projectBalance(balance: StockBalanceRecord) {
   return {
     warehouseId: balance.warehouseId,
     productId: balance.productId,
+    productVariantId: balance.productVariantId,
     batchId: balance.batchId,
     quantity: balance.quantity.toFixed(),
-    unit: balance.unit,
+    stockUomId: balance.stockUomId,
+    unitKind: balance.unitKind,
     updatedAt: balance.updatedAt.toISOString(),
   };
 }
@@ -30,6 +32,7 @@ export function projectMovement(movement: StockMovementRecord) {
   return {
     id: movement.id,
     kind: movement.kind,
+    productVariantId: movement.productVariantId,
     delta: movement.delta.toFixed(),
     balanceAfter: movement.balanceAfter.toFixed(),
     sourceDocumentId: movement.sourceLineId,

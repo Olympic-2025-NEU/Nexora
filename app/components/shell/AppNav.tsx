@@ -5,9 +5,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useT } from "@/app/i18n/LocaleProvider";
 import { cn } from "@/app/lib/cn";
-import { ADMIN_NAV, filterNavByRoles, type NavItem } from "./nav-config";
+import type { NavItem } from "./nav-config";
 
-function NavLinks({
+export function AppNav({
   items,
   onNavigate,
 }: {
@@ -41,15 +41,4 @@ function NavLinks({
       })}
     </ul>
   );
-}
-
-export function AppNav({
-  roles,
-  onNavigate,
-}: {
-  roles: string[];
-  onNavigate?: () => void;
-}) {
-  const items = filterNavByRoles(ADMIN_NAV, roles);
-  return <NavLinks items={items} onNavigate={onNavigate} />;
 }

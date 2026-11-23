@@ -4,6 +4,7 @@ import { DomainError } from "@/platform/kernel/errors";
 import { AuthError, authErrorResponse } from "@/platform/identity/request-auth";
 import { TokenError } from "@/platform/identity/token";
 import { ActorResolutionError } from "@/platform/identity/resolve-actor";
+import { KeycloakAdminError } from "@/platform/identity/keycloak-admin";
 import { PolicyError } from "@/platform/access/policy";
 import { PartnerActorError } from "@/platform/identity/partner-actor";
 import { SsrfError } from "@/platform/security/ssrf";
@@ -37,6 +38,7 @@ export function mapRouteError(err: unknown, requestId: string | null): NextRespo
     const status = (err as { httpStatus?: number }).httpStatus === 403 ? 403 : 401;
     return authErrorResponse((err as { code: string }).code, status as 401 | 403, requestId);
   }
+  if (err instanceof KeycloakAdminError) return fail(err.code, err.httpStatus, requestId);
   if (err instanceof PolicyError) return fail("POLICY_DENIED", 403, requestId);
   if (err instanceof PartnerActorError) return fail(err.code, err.httpStatus, requestId);
   if (err instanceof SsrfError) return fail(err.code, 422, requestId);
@@ -58,6 +60,8 @@ export function projectOrganization(org: OrganizationRecord) {
     status: org.status,
     version: org.version,
     ...(org.contactEmail ? { contactEmail: org.contactEmail } : {}),
+    ...(org.contactPhone ? { contactPhone: org.contactPhone } : {}),
+    ...(org.address ? { address: org.address } : {}),
   };
 }
 

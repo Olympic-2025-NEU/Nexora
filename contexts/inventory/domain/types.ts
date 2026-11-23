@@ -17,8 +17,11 @@ export type StockBalanceRecord = {
   warehouseId: string;
   batchId: string;
   productId: string;
-  /** Base unit of the product (EA | KG | L); read-only join for projection. */
-  unit: "EA" | "KG" | "L";
+  productVariantId: string;
+  /** Stock-keeping UOM id for the variant. */
+  stockUomId: string;
+  /** UOM kind for quantity rules (count | mass | volume). */
+  unitKind: "count" | "mass" | "volume";
   quantity: Decimal;
   version: number;
   updatedAt: Date;
@@ -30,6 +33,7 @@ export type StockMovementRecord = {
   warehouseId: string;
   batchId: string;
   productId: string;
+  productVariantId: string;
   sourceLineId: string;
   kind: MovementKind;
   delta: Decimal;

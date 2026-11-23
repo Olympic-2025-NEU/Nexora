@@ -1,6 +1,6 @@
 # Nexora ADRs (P00)
 
-- **Canonical SoT:** numbered `0001`…`0015`.
+- **Canonical SoT:** numbered `0001`…`0017`.
 - **Evidence detail:** phase-00 `D0x-*.md` (spike write-ups). Mapping: `decision-log.md`.
 - **D03:** Prisma **CHỐT** — [`0003-database-prisma.md`](./0003-database-prisma.md). [`D03-database-transaction-migrations.md`](./D03-database-transaction-migrations.md) is **Superseded**.
 - G00 still required before treating P01 as unblocked.
@@ -22,3 +22,5 @@
 | D13 | [0013-versions-licenses.md](./0013-versions-licenses.md) | [D13-versions-licenses-resources.md](./D13-versions-licenses-resources.md) | P01/P13 |
 | D14 | [0014-movement-ownership.md](./0014-movement-ownership.md) (**Accepted P00 design**) | [D14-stock-movement-ownership.md](./D14-stock-movement-ownership.md) | P00/P07 |
 | D15 | [0015-headless-tier2-boundary.md](./0015-headless-tier2-boundary.md) (**Accepted**) | [D15-headless-core-boundary.md](./D15-headless-core-boundary.md) | P00/P01 |
+| D16 | [0016-ui-surface-partitioning.md](./0016-ui-surface-partitioning.md) (**Accepted**) | Requirements: `documents/requirements/SRS-UI-surfaces.md` | ERP UI / P07–P11 routes |
+| D17 | [0017-catalog-variant-uom-price.md](./0017-catalog-variant-uom-price.md) (**Accepted design**; DDL chờ duyệt pack) | BRD/SRS product-catalog; pack `evidence/p065-schema-design.md` | P065 / G06.5 / trước P07 |

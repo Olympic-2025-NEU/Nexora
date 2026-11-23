@@ -7,9 +7,10 @@ Thứ tự ưu tiên khi tài liệu mâu thuẫn:
 3. **Chương 7 §7.12** — tech stack đề xuất cho Nexora, với điều kiện đáp ứng mục 1.
 4. **Plan module** trong `documents/plans/` — định hướng triển khai từng module.
 5. **Phase plan** trong `documents/phase-plan/` — task/gate thực thi chi tiết, chịu ràng buộc bởi các mục trên.
-6. **Referents** trong `documents/referents/` — luật cấu trúc, coding, glossary và đối chiếu đề thi.
-7. **ARCHITECTURE.md** — bản tóm kiến trúc cho Agent và DevOps.
-8. Các chương còn lại của đề xuất — bối cảnh, tầm nhìn dài hạn; không mở rộng phạm vi MVP.
+6. **Requirements appendix** trong `documents/requirements/` — BRD + SRS UI surfaces (ADR 0016); không mở rộng ngoài Chương 6.
+7. **Referents** trong `documents/referents/` — luật cấu trúc, coding, glossary và đối chiếu đề thi.
+8. **ARCHITECTURE.md** — bản tóm kiến trúc cho Agent và DevOps.
+9. Các chương còn lại của đề xuất — bối cảnh, tầm nhìn dài hạn; không mở rộng phạm vi MVP.
 
 Đề xuất gốc: `documents/nexora/Nexora - NEU.OPUS5.5.md`.
 
@@ -32,6 +33,7 @@ Thứ tự ưu tiên khi tài liệu mâu thuẫn:
 | Layering | MVC map trên DDD: Thin Controller / Application+Domain / Prisma Repository — `MVC_DDD_LAYERING.md` |
 | Platform caps | CRUD pattern, RBAC 4 vai, Workflow+Flowable, Outbox queue, Audit, Reporting read-model — `PLATFORM_CAPABILITIES.md` |
 | AI | Python/LLM gọi tool qua API nghiệp vụ đã phân quyền |
+| UI surfaces (D16) | `/admin` = hệ thống (org/members); `/partners`; `/catalog`; `/inventory`; `/trading` `/trace` theo phase — `requirements/SRS-UI-surfaces.md` |
 
 ## Phạm vi MVP (tóm tắt Chương 6)
 

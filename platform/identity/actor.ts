@@ -7,6 +7,8 @@ export type Actor = {
   organizationId: OrganizationId;
   unitIds: readonly OrgUnitId[];
   roles: readonly string[];
+  /** Membership display name (human-readable); not used for authorization. */
+  displayName?: string;
 };
 
 /** @deprecated Use Actor.organizationId. Keeps legacy contexts compiling during migration. */

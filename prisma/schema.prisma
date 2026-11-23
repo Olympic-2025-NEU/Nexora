@@ -195,6 +195,8 @@ model Organization {
   code          String   @unique
   name          String
   contactEmail  String?  @map("contact_email")
+  contactPhone  String?  @map("contact_phone")
+  address       String?
   timezone      String   @default("Asia/Ho_Chi_Minh")
   status        String   @default("active")
 
@@ -294,41 +296,179 @@ model PartnerConnection {
 }
 
 // ---------------------------------------------------------------------------
-// catalog schema — P06 M02
+// catalog schema — P06 + P065 (variant / UOM / price)
 // ---------------------------------------------------------------------------
 
+model Category {
+  id             String    @id @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+  version        Int       @default(1)
+  code           String    @unique
+  name           String
+  nameNormalized String    @map("name_normalized")
+  parentId       String?   @map("parent_id") @db.Uuid
+  sortOrder      Int       @default(0) @map("sort_order")
+  isActive       Boolean   @default(true) @map("is_active")
+  deletedAt      DateTime? @map("deleted_at") @db.Timestamptz(6)
+  createdBySub   String    @map("created_by_sub")
+
+  parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children Category[] @relation("CategoryTree")
+  products Product[]
+
+  @@map("category")
+  @@schema("catalog")
+}
+
+model Uom {
+  id              String    @id @db.Uuid
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+  version         Int       @default(1)
+  code            String    @unique
+  name            String
+  nameKey         String    @unique @map("name_key")
+  kind            String
+  isSystemDefault Boolean   @default(false) @map("is_system_default")
+  isActive        Boolean   @default(true) @map("is_active")
+  deletedAt       DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  variantUoms    ProductVariantUom[]
+  priceListItems PriceListItem[]
+
+  @@map("uom")
+  @@schema("catalog")
+}
+
 model Product {
-  id           String   @id @db.Uuid
-  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt    DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
-  version      Int      @default(1)
-  sku          String   @unique
+  id           String    @id @db.Uuid
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+  version      Int       @default(1)
   name         String
-  description  String?
-  baseUnit     String   @map("base_unit")
-  status       String   @default("active")
-  createdBySub String   @map("created_by_sub")
+  searchText   String    @default("") @map("search_text")
+  attributes   Json      @default("{}") @db.JsonB
+  categoryId   String    @map("category_id") @db.Uuid
+  isActive     Boolean   @default(true) @map("is_active")
+  deletedAt    DateTime? @map("deleted_at") @db.Timestamptz(6)
+  createdBySub String    @map("created_by_sub")
 
-  identifiers ProductIdentifier[]
-  batches     Batch[]
+  category Category         @relation(fields: [categoryId], references: [id])
+  variants ProductVariant[]
+  images   ProductImage[]
+  batches  Batch[]
 
-  @@index([status, name])
+  @@index([isActive, name])
   @@map("product")
   @@schema("catalog")
 }
 
-model ProductIdentifier {
-  id        String   @id @db.Uuid
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  productId String   @map("product_id") @db.Uuid
-  kind      String
-  value     String
-  isPrimary Boolean  @default(false) @map("is_primary")
+model ProductVariant {
+  id           String    @id @db.Uuid
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+  version      Int       @default(1)
+  productId    String    @map("product_id") @db.Uuid
+  sku          String?
+  barcode      String?
+  isPrimary    Boolean   @default(false) @map("is_primary")
+  isActive     Boolean   @default(true) @map("is_active")
+  deletedAt    DateTime? @map("deleted_at") @db.Timestamptz(6)
+  createdBySub String    @map("created_by_sub")
+
+  product        Product             @relation(fields: [productId], references: [id])
+  codes          VariantCode[]
+  uoms           ProductVariantUom[]
+  batches        Batch[]
+  priceListItems PriceListItem[]
+  balances       StockBalance[]
+  movements      StockMovement[]
+
+  @@map("product_variant")
+  @@schema("catalog")
+}
+
+model VariantCode {
+  code      String @id
+  variantId String @map("variant_id") @db.Uuid
+  source    String
+
+  variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@map("variant_code")
+  @@schema("catalog")
+}
+
+model ProductVariantUom {
+  id               String  @id @db.Uuid
+  productVariantId String  @map("product_variant_id") @db.Uuid
+  uomId            String  @map("uom_id") @db.Uuid
+  isStockKeeping   Boolean @default(false) @map("is_stock_keeping")
+  factorToStockUom Decimal @map("factor_to_stock_uom") @db.Decimal(20, 3)
+
+  variant ProductVariant @relation(fields: [productVariantId], references: [id])
+  uom     Uom            @relation(fields: [uomId], references: [id])
+
+  @@unique([productVariantId, uomId])
+  @@map("product_variant_uom")
+  @@schema("catalog")
+}
+
+model ProductImage {
+  id           String    @id @db.Uuid
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+  productId    String    @map("product_id") @db.Uuid
+  attachmentId String    @map("attachment_id") @db.Uuid
+  sortOrder    Int       @default(0) @map("sort_order")
+  isPrimary    Boolean   @default(false) @map("is_primary")
+  deletedAt    DateTime? @map("deleted_at") @db.Timestamptz(6)
 
   product Product @relation(fields: [productId], references: [id])
 
-  @@unique([kind, value])
-  @@map("product_identifier")
+  @@map("product_image")
+  @@schema("catalog")
+}
+
+model PriceList {
+  id           String    @id @db.Uuid
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+  version      Int       @default(1)
+  code         String?
+  name         String
+  isDefault    Boolean   @default(false) @map("is_default")
+  validFrom    DateTime  @map("valid_from") @db.Timestamptz(6)
+  validTo      DateTime? @map("valid_to") @db.Timestamptz(6)
+  isActive     Boolean   @default(true) @map("is_active")
+  currency     String    @db.Char(3)
+  deletedAt    DateTime? @map("deleted_at") @db.Timestamptz(6)
+  createdBySub String    @map("created_by_sub")
+
+  items PriceListItem[]
+
+  @@map("price_list")
+  @@schema("catalog")
+}
+
+model PriceListItem {
+  id               String   @id @db.Uuid
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+  priceListId      String   @map("price_list_id") @db.Uuid
+  productVariantId String   @map("product_variant_id") @db.Uuid
+  uomId            String   @map("uom_id") @db.Uuid
+  priceType        String   @map("price_type")
+  amount           Decimal  @db.Decimal(20, 3)
+  isActive         Boolean  @default(true) @map("is_active")
+
+  priceList PriceList      @relation(fields: [priceListId], references: [id])
+  variant   ProductVariant @relation(fields: [productVariantId], references: [id])
+  uom       Uom            @relation(fields: [uomId], references: [id])
+
+  @@unique([priceListId, productVariantId, uomId, priceType])
+  @@map("price_list_item")
   @@schema("catalog")
 }
 
@@ -338,6 +478,7 @@ model Batch {
   updatedAt              DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
   version                Int       @default(1)
   productId              String    @map("product_id") @db.Uuid
+  productVariantId       String    @map("product_variant_id") @db.Uuid
   localCode              String    @map("local_code")
   originIssuerInstanceId String    @map("origin_issuer_instance_id")
   originLotId            String    @map("origin_lot_id")
@@ -348,13 +489,16 @@ model Batch {
   createdBySub           String?   @map("created_by_sub")
   createdByClientId      String?   @map("created_by_client_id")
 
-  product    Product @relation(fields: [productId], references: [id])
-  balances   StockBalance[]
-  movements  StockMovement[]
+  product  Product        @relation(fields: [productId], references: [id])
+  variant  ProductVariant @relation(fields: [productVariantId], references: [id])
+  balances StockBalance[]
+  movements StockMovement[]
 
   @@unique([productId, localCode])
+  @@unique([productVariantId, localCode])
   @@unique([originIssuerInstanceId, originLotId])
   @@unique([id, productId])
+  @@unique([id, productVariantId])
   @@map("batch")
   @@schema("catalog")
 }
@@ -382,40 +526,44 @@ model Warehouse {
 }
 
 model StockBalance {
-  warehouseId String   @map("warehouse_id") @db.Uuid
-  batchId     String   @map("batch_id") @db.Uuid
-  productId   String   @map("product_id") @db.Uuid
-  quantity    Decimal  @default(0) @db.Decimal(20, 3)
-  version     Int      @default(1)
-  updatedAt   DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+  warehouseId      String   @map("warehouse_id") @db.Uuid
+  batchId          String   @map("batch_id") @db.Uuid
+  productId        String   @map("product_id") @db.Uuid
+  productVariantId String   @map("product_variant_id") @db.Uuid
+  quantity         Decimal  @default(0) @db.Decimal(20, 3)
+  version          Int      @default(1)
+  updatedAt        DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
 
-  warehouse Warehouse @relation(fields: [warehouseId], references: [id])
-  batch     Batch     @relation(fields: [batchId, productId], references: [id, productId])
+  warehouse Warehouse      @relation(fields: [warehouseId], references: [id])
+  batch     Batch          @relation(fields: [batchId, productVariantId], references: [id, productVariantId])
+  variant   ProductVariant @relation(fields: [productVariantId], references: [id])
 
   @@id([warehouseId, batchId])
-  @@index([productId, batchId])
-  @@index([warehouseId, productId])
+  @@index([productVariantId, batchId])
+  @@index([warehouseId, productVariantId])
   @@map("stock_balance")
   @@schema("inventory")
 }
 
 model StockMovement {
-  id            String   @id @db.Uuid
-  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  warehouseId   String   @map("warehouse_id") @db.Uuid
-  batchId       String   @map("batch_id") @db.Uuid
-  productId     String   @map("product_id") @db.Uuid
-  sourceLineId  String   @map("source_line_id") @db.Uuid
-  kind          String
-  delta         Decimal  @db.Decimal(20, 3)
-  balanceAfter  Decimal  @map("balance_after") @db.Decimal(20, 3)
-  actorSub      String   @map("actor_sub")
-  correlationId String   @map("correlation_id")
-  reversalOf    String?  @map("reversal_of") @db.Uuid
+  id               String   @id @db.Uuid
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  warehouseId      String   @map("warehouse_id") @db.Uuid
+  batchId          String   @map("batch_id") @db.Uuid
+  productId        String   @map("product_id") @db.Uuid
+  productVariantId String   @map("product_variant_id") @db.Uuid
+  sourceLineId     String   @map("source_line_id") @db.Uuid
+  kind             String
+  delta            Decimal  @db.Decimal(20, 3)
+  balanceAfter     Decimal  @map("balance_after") @db.Decimal(20, 3)
+  actorSub         String   @map("actor_sub")
+  correlationId    String   @map("correlation_id")
+  reversalOf       String?  @map("reversal_of") @db.Uuid
 
-  warehouse Warehouse @relation(fields: [warehouseId], references: [id])
-  batch     Batch     @relation(fields: [batchId, productId], references: [id, productId])
-  reversal  StockMovement?  @relation("StockMovementReversal", fields: [reversalOf], references: [id])
+  warehouse  Warehouse       @relation(fields: [warehouseId], references: [id])
+  batch      Batch           @relation(fields: [batchId, productVariantId], references: [id, productVariantId])
+  variant    ProductVariant  @relation(fields: [productVariantId], references: [id])
+  reversal   StockMovement?  @relation("StockMovementReversal", fields: [reversalOf], references: [id])
   reversedBy StockMovement[] @relation("StockMovementReversal")
 
   @@unique([sourceLineId, kind])

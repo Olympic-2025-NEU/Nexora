@@ -23,6 +23,7 @@ Chọn công nghệ qua spike **không** nghĩa app/core đã triển khai. Hai 
 | [D13](../adr/D13-versions-licenses-resources.md) → [0013](../adr/0013-versions-licenses.md) | Digest/license/RAM snapshot **đã ghi** | P00-T04 npm inventory pass; P01 peak, P13 release SBOM |
 | [D14](../adr/D14-stock-movement-ownership.md) → [0014](../adr/0014-movement-ownership.md) | Movement ownership **đã chốt thiết kế** | P07/P09 tests |
 | [D15](../adr/D15-headless-core-boundary.md) → [0015](../adr/0015-headless-tier2-boundary.md) | Ba runtime **đã chốt**; headless spike pass | Core Data/File API sản phẩm chưa có |
+| **D16** → [0016](../adr/0016-ui-surface-partitioning.md) | UI surfaces **đã chốt** (`/admin` hệ thống; `/catalog` `/inventory` `/partners`; trading/trace sau) | Migrate legacy `/admin/products…`; P07–P11 route maps |
 
 Smoke: [infra](./evidence/spikes/infra/README.md), [pg semantics spike](./evidence/spikes/d03/README.md), [Prisma SoT spike](./evidence/spike-d03.md). T04–T06 static gates đã có evidence. **G00 CLOSED** trên `phase-01` theo owner waiver. T02 còn chờ BTC.
 
@@ -45,6 +46,8 @@ Smoke: [infra](./evidence/spikes/infra/README.md), [pg semantics spike](./eviden
 | D13 Versions | P01/P13 | Snapshot recorded | [0013](../adr/0013-versions-licenses.md) | Evidence: `D13-versions-licenses-resources.md` |
 | D14 Movement | P00/P07 | **Accepted P00 design** | [0014](../adr/0014-movement-ownership.md) | D03 primitive/static contract pass; P07 real confirms |
 | D15 Headless | P00/P01 | **Accepted** (spike) | [0015](../adr/0015-headless-tier2-boundary.md) | Evidence: `D15-headless-core-boundary.md` |
+| D16 UI surfaces | ERP UI / P07–P11 | **Accepted** 2026-11-22 | [0016](../adr/0016-ui-surface-partitioning.md) | BRD/SRS: `documents/requirements/` |
+| D17 Catalog upgrade | **P065** (trước P07) | **ADR Accepted design** 2026-11-22; **DDL chờ Dev duyệt pack** | [0017](../adr/0017-catalog-variant-uom-price.md) | Pack [`evidence/p065-schema-design.md`](./evidence/p065-schema-design.md); BRD/SRS product-catalog; plan [`phase-06.5`](./phase-06.5-catalog-business-upgrade.md); G06.5 |
 
 ### Ghi chú công nghệ
 

@@ -42,7 +42,7 @@ P03-T04 bổ sung `upload_key_hash char(64)? UNIQUE` và `upload_payload_hash ch
 
 ### `system.organization`
 
-`id`, `created_at`, `updated_at`, `version`; `singleton_slot smallint! DEFAULT 1 CHECK(singleton_slot=1) UNIQUE`, `instance_id text! UNIQUE`, `code text! UNIQUE (<=40)`, `name text! (<=200)`, `contact_email text?`, `timezone text! DEFAULT 'Asia/Ho_Chi_Minh'`, `status text! CHECK IN ('active','suspended') DEFAULT 'active'`. Không có row thứ hai cùng DB; `instance_id` bất biến sau bootstrap.
+`id`, `created_at`, `updated_at`, `version`; `singleton_slot smallint! DEFAULT 1 CHECK(singleton_slot=1) UNIQUE`, `instance_id text! UNIQUE`, `code text! UNIQUE (<=40)`, `name text! (<=200)`, `contact_email text?`, `contact_phone text? (<=40)`, `address text? (<=500)`, `timezone text! DEFAULT 'Asia/Ho_Chi_Minh'`, `status text! CHECK IN ('active','suspended') DEFAULT 'active'`. Không có row thứ hai cùng DB; `instance_id` bất biến sau bootstrap.
 
 ### `system.membership`
 
@@ -56,19 +56,65 @@ P03-T04 bổ sung `upload_key_hash char(64)? UNIQUE` và `upload_payload_hash ch
 
 `id`, `created_at`, `updated_at`, `version`; `partner_id uuid!→system.partner.id UNIQUE`, `endpoint_url text!` (URL API remote cho outbound), `outbound_token_url text!` (token endpoint của realm remote), `outbound_client_id text!` (remote cấp cho local), `outbound_secret_ref text!`, `outbound_audience text!`, `inbound_client_id text!` (local Keycloak cấp cho remote), `allowed_inbound_scope text! DEFAULT 'federation:write'`, `status text! CHECK IN ('active','rotating','disabled')`, `last_verified_at timestamptz?`, `rotated_at timestamptz?`. Unique `(inbound_client_id)` trong local realm; outbound client ID có thể lặp giữa các remote realm nên unique phải theo `(partner_id,outbound_client_id)` nếu thêm. Receiver map verified token `client_id=inbound_client_id`→partner; sender dùng `outbound_token_url/client_id/secret_ref` lấy token từ remote. Secret inbound nằm trong Keycloak/secret store, không ở app DB. HTTPS/host allowlist/SSRF validation áp dụng cho **cả hai URL** ở app + test, không CHECK regex DB thay kiểm DNS.
 
-## P06 — `catalog` và `inventory`
+## P06 — `catalog` và `inventory` (baseline G06 — **superseded for product identity by P065**)
 
-### `catalog.product`
+P06 shipped `product.sku` + `base_unit`∈{EA,KG,L} + `product_identifier`. **Target SoT after P065 / ADR 0017** is § P065 below. Keep P06 rows historically as what G06 closed; do not implement new features on P06 product.sku.
+
+### `catalog.product` (P06 historical)
 
 `id`, `created_at`, `updated_at`, `version`; `sku text! UNIQUE (<=64)`, `name text! (<=200)`, `description text?`, `base_unit text! CHECK IN ('EA','KG','L')`, `status text! CHECK IN ('active','archived') DEFAULT 'active'`, `created_by_sub text!`. SKU và unit bất biến từ create ở v1; index `(status,name)`.
 
-### `catalog.product_identifier`
+### `catalog.product_identifier` (P06 historical — dropped in P065)
 
-`id`, `created_at`; `product_id uuid!→catalog.product.id`, `kind text! CHECK IN ('ean13','internal_barcode')`, `value text! (<=128)`, `is_primary boolean! DEFAULT false`. Unique `(kind,value)`; partial unique `(product_id,kind) WHERE is_primary`; SKU duy nhất ở `product.sku`, không tạo identifier kind=sku thành nguồn chân lý kép. EAN-13 đúng 13 chữ số/check digit ở application + test.
+`id`, `created_at`; `product_id uuid!→catalog.product.id`, `kind text! CHECK IN ('ean13','internal_barcode')`, `value text! (<=128)`, `is_primary boolean! DEFAULT false`. Unique `(kind,value)`; partial unique `(product_id,kind) WHERE is_primary`.
 
-### `catalog.batch`
+### `catalog.batch` (P06; P065 adds `product_variant_id`)
 
-`id`, `created_at`, `updated_at`, `version`; `product_id uuid!→catalog.product.id`, `local_code text! (<=80)`, `origin_issuer_instance_id text!`, `origin_lot_id text!`, `manufactured_on date?`, `expires_on date?`, `quality_status text! CHECK IN ('available','restricted','inspect') DEFAULT 'inspect'`, `source_partner_id uuid?→system.partner.id`, `created_by_sub text?`, `created_by_client_id text?`; CHECK `((created_by_sub IS NOT NULL) <> (created_by_client_id IS NOT NULL))`. Local batch do user tạo lưu sub; P09 inbound batch chỉ service verified inbox tạo lưu client ID, không dùng sub giả. Unique `(product_id,local_code)`, `(origin_issuer_instance_id,origin_lot_id)`; unique `(id,product_id)` để composite FK từ movement/line; CHECK `(manufactured_on IS NULL OR expires_on IS NULL OR manufactured_on<=expires_on)`. Quality transition qua action/audit; không tự biến partner-asserted thành verified.
+`id`, `created_at`, `updated_at`, `version`; `product_id uuid!→catalog.product.id`, `local_code text! (<=80)`, `origin_issuer_instance_id text!`, `origin_lot_id text!`, `manufactured_on date?`, `expires_on date?`, `quality_status text! CHECK IN ('available','restricted','inspect') DEFAULT 'inspect'`, `source_partner_id uuid?→system.partner.id`, `created_by_sub text?`, `created_by_client_id text?`; CHECK `((created_by_sub IS NOT NULL) <> (created_by_client_id IS NOT NULL))`. Unique `(product_id,local_code)`, `(origin_issuer_instance_id,origin_lot_id)`; unique `(id,product_id)`. CHECK `(manufactured_on IS NULL OR expires_on IS NULL OR manufactured_on<=expires_on)`.
+
+## P065 — Catalog upgrade (ADR 0017 / D17) — **target SoT before P07**
+
+Pack: [`evidence/p065-schema-design.md`](./evidence/p065-schema-design.md). Soft-delete = `deleted_at`; commercial flags = `is_active`.
+
+### `catalog.category`
+
+`id`, timestamps, `version`; `code text! UNIQUE (<=64)`, `name text! (<=200)`, `name_normalized text!`, `parent_id uuid?→category.id` CHECK ≠ self, `sort_order int! DEFAULT 0`, `is_active boolean! DEFAULT true`, `deleted_at timestamptz?`, `created_by_sub text!`. Depth ≤8 / no cycles (app + trigger). Filter products: recursive CTE over descendants.
+
+### `catalog.uom`
+
+`id`, timestamps, `version`; `code text! UNIQUE (<=32)`, `name text! (<=64)`, `name_key text! UNIQUE (<=32)`, `kind text! CHECK IN ('count','mass','volume')`, `is_system_default boolean! DEFAULT false`, `is_active boolean! DEFAULT true`, `deleted_at timestamptz?`. Partial unique exactly one `is_system_default`. Seed `CÁI`/`CAI`; also `KG`,`L` for backfill.
+
+### `catalog.product` (target)
+
+`id`, timestamps, `version`; `name text! (<=200)`, `search_text text! DEFAULT ''`, `attributes jsonb! DEFAULT '{}'`, `category_id uuid!→category.id`, `is_active boolean! DEFAULT true`, `deleted_at timestamptz?`, `created_by_sub text!`. **Forbidden:** `sku`, `barcode`, `base_unit`.
+
+### `catalog.product_variant`
+
+`id`, timestamps, `version`; `product_id uuid!→product.id`, `sku text? (<=64)`, `barcode text? (<=128)`, `is_primary boolean! DEFAULT false`, `is_active boolean! DEFAULT true`, `deleted_at timestamptz?`, `created_by_sub text!`. CHECK `(sku IS NOT NULL OR barcode IS NOT NULL)`. Partial unique non-null `sku`; non-null `barcode`; one primary per product where `is_primary AND deleted_at IS NULL AND is_active`.
+
+### `catalog.variant_code`
+
+`code text PK`, `variant_id uuid!→product_variant.id`, `source text! CHECK IN ('sku','barcode','both')`. Maintains cross-field uniqueness (sku of A ≠ barcode of B); same variant may use `sku=barcode` with `source=both`. Soft-delete keeps rows.
+
+### `catalog.product_variant_uom`
+
+`id` (or composite); `product_variant_id`, `uom_id`; UNIQUE `(product_variant_id,uom_id)`; `is_stock_keeping boolean!`; `factor_to_stock_uom numeric(20,3)! CHECK >0`; partial unique one stock-keeping per variant; stock row requires factor=1.
+
+### `catalog.product_image`
+
+`id`, `product_id`, `attachment_id→platform.attachment.id`, `sort_order`, `is_primary`, `deleted_at`, timestamps. No BLOB; `variant_id` deferred NULL.
+
+### `catalog.price_list`
+
+`id`, timestamps, `version`; `code text? UNIQUE where NOT NULL`, `name text!`, `is_default boolean! DEFAULT false`, `valid_from timestamptz!`, `valid_to timestamptz?`, `is_active boolean! DEFAULT true`, `currency char(3)!`, `deleted_at`, `created_by_sub`. CHECK `(code IS NULL) OR (NOT is_default)`; `valid_to IS NULL OR valid_to > valid_from`. Partial unique one active default among `code IS NULL`.
+
+### `catalog.price_list_item`
+
+`id`, `price_list_id`, `product_variant_id`, `uom_id`, `price_type text! CHECK IN ('purchase','retail','wholesale')`, `amount numeric(20,3)! CHECK >=0`, `is_active boolean! DEFAULT true`. UNIQUE `(price_list_id, product_variant_id, uom_id, price_type)`. uom ∈ that variant’s `product_variant_uom`.
+
+### `catalog.batch` (P065)
+
+Add `product_variant_id uuid!→product_variant.id`; keep `product_id` denormalized (= variant.product_id). UNIQUE `(product_variant_id, local_code)`; UNIQUE `(id, product_variant_id)` for stock FK; keep origin pair unique.
 
 ### `inventory.warehouse`
 
@@ -80,11 +126,11 @@ P03-T04 bổ sung `upload_key_hash char(64)? UNIQUE` và `upload_payload_hash ch
 
 ### `inventory.stock_balance`
 
-**Không có `id`; PK `(warehouse_id,batch_id)`**. `warehouse_id uuid!→inventory.warehouse.id`, `batch_id uuid!`, `product_id uuid!`, `quantity numeric(20,3)! DEFAULT 0 CHECK(quantity>=0)`, `version integer! DEFAULT 1 CHECK(version>0)`, `updated_at timestamptz! DEFAULT now()`; FK `(batch_id,product_id)→catalog.batch(id,product_id)`. Index `(product_id,batch_id)` và `(warehouse_id,product_id)`. Chỉ Inventory port ghi; `INSERT ... ON CONFLICT`/row lock theo thứ tự `(warehouse_id,batch_id)`.
+**Không có `id`; PK `(warehouse_id,batch_id)`**. `warehouse_id uuid!→inventory.warehouse.id`, `batch_id uuid!`, `product_id uuid!` (denorm), **`product_variant_id uuid!` (P065)**, `quantity numeric(20,3)! DEFAULT 0 CHECK(quantity>=0)`, `version integer! DEFAULT 1 CHECK(version>0)`, `updated_at timestamptz! DEFAULT now()`; FK `(batch_id,product_variant_id)→catalog.batch(id,product_variant_id)` sau P065 (P06: `(batch_id,product_id)`). Index `(product_variant_id,batch_id)`, `(warehouse_id,product_variant_id)`. Chỉ Inventory port ghi; qty luôn ĐVT gốc variant. `INSERT ... ON CONFLICT`/row lock `(warehouse_id,batch_id)`.
 
 ### `inventory.stock_movement`
 
-`id`, `created_at`; `warehouse_id uuid!→inventory.warehouse.id`, `batch_id uuid!`, `product_id uuid!`, `source_line_id uuid!` (FK `trading.document_line.id` thêm P07), `kind text! CHECK IN ('receipt','issue','receiving','stocktake')`, `delta numeric(20,3)! CHECK(delta<>0)`, `balance_after numeric(20,3)! CHECK(balance_after>=0)`, `actor_sub text!`, `correlation_id text!`, `reversal_of uuid?→inventory.stock_movement.id`; FK `(batch_id,product_id)→catalog.batch(id,product_id)`. Unique `(source_line_id,kind)`; index `(batch_id,created_at DESC)`, `(warehouse_id,batch_id,created_at DESC)`. `issue` delta <0, `receipt/receiving` >0, `stocktake` ± qua CHECK. Không UPDATE/DELETE movement ở runtime.
+`id`, `created_at`; `warehouse_id`, `batch_id`, `product_id` (denorm), **`product_variant_id` (P065)**, `source_line_id uuid!` (FK `trading.document_line.id` thêm P07), `kind text! CHECK IN ('receipt','issue','receiving','stocktake')`, `delta numeric(20,3)! CHECK(delta<>0)`, `balance_after numeric(20,3)! CHECK(balance_after>=0)`, `actor_sub text!`, `correlation_id text!`, `reversal_of uuid?→inventory.stock_movement.id`; FK `(batch_id,product_variant_id)→batch` sau P065. Unique `(source_line_id,kind)`; index `(batch_id,created_at DESC)`, `(warehouse_id,batch_id,created_at DESC)`. Append-only runtime.
 
 ## P07 — `trading` (một header/line chung, subtype rõ)
 
@@ -96,7 +142,7 @@ P03-T04 bổ sung `upload_key_hash char(64)? UNIQUE` và `upload_payload_hash ch
 
 ### `trading.document_line`
 
-`id`, `created_at`; `document_id uuid!→trading.document.id`, `line_no integer! CHECK(line_no>0)`, `warehouse_id uuid!→inventory.warehouse.id`, `batch_id uuid!`, `product_id uuid!`, `quantity numeric(20,3)? CHECK(quantity>=0)`, `actual_quantity numeric(20,3)? CHECK(actual_quantity>=0)`, `counted_quantity numeric(20,3)? CHECK(counted_quantity>=0)`, `unit text! CHECK IN ('EA','KG','L')`, `source_issue_line_id uuid?→trading.document_line.id` (transfer/sale copy từ issue local), `source_line_ref uuid?` (receiving giữ `sourceLineId` của transfer remote; **không** FK xuyên instance). FK `(batch_id,product_id)→catalog.batch(id,product_id)`; unique `(document_id,line_no)`, `(id,document_id)`, partial unique `(document_id,source_issue_line_id) WHERE source_issue_line_id IS NOT NULL` và `(document_id,source_line_ref) WHERE source_line_ref IS NOT NULL`; index `(batch_id,document_id)`. `quantity` là lượng gửi với receiving, `actual_quantity` là lượng nhận thực, `counted_quantity` chỉ stocktake. DB deferred constraint trigger P07 chặn confirmed document không có line, thiếu field theo type, unit khác `product.base_unit`, transfer/sale line không khớp issue; receiving bắt từng `source_line_ref`, `0<=actual_quantity<=quantity`. Trigger chạy ở commit để không chặn việc tạo Draft chưa hoàn chỉnh; confirm use case cũng validate sớm.
+`id`, `created_at`; `document_id uuid!→trading.document.id`, `line_no integer! CHECK(line_no>0)`, `warehouse_id uuid!→inventory.warehouse.id`, `batch_id uuid!`, **`product_variant_id uuid!→catalog.product_variant.id` (sau P065; không còn giả định SKU trên product)**, `product_id uuid!` (denorm = variant.product_id), `quantity numeric(20,3)? CHECK(quantity>=0)`, `actual_quantity numeric(20,3)? CHECK(actual_quantity>=0)`, `counted_quantity numeric(20,3)? CHECK(counted_quantity>=0)`, `uom_id uuid!→catalog.uom.id` (qty nhập có thể packing; **server convert → stock UOM trước Inventory port**), `source_issue_line_id uuid?→trading.document_line.id` (transfer/sale copy từ issue local), `source_line_ref uuid?` (receiving giữ `sourceLineId` của transfer remote; **không** FK xuyên instance). FK `(batch_id,product_variant_id)→catalog.batch(id,product_variant_id)`; unique `(document_id,line_no)`, `(id,document_id)`, partial unique `(document_id,source_issue_line_id) WHERE source_issue_line_id IS NOT NULL` và `(document_id,source_line_ref) WHERE source_line_ref IS NOT NULL`; index `(batch_id,document_id)`. `quantity` là lượng gửi với receiving, `actual_quantity` là lượng nhận thực, `counted_quantity` chỉ stocktake. DB deferred constraint trigger P07 chặn confirmed document không có line, thiếu field theo type, uom ∉ variant_uoms, transfer/sale line không khớp issue; receiving bắt từng `source_line_ref`, `0<=actual_quantity<=quantity`. Trigger chạy ở commit để không chặn Draft; confirm use case validate sớm.
 
 ### `trading.transfer_detail`
 

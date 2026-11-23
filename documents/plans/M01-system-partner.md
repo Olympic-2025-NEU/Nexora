@@ -46,9 +46,13 @@ Folder: `contexts/system/`.
 
 ## 6. UI bề mặt
 
-- Hồ sơ doanh nghiệp
-- Danh sách member / gán `administrator|staff|approver|viewer`
-- Danh sách federated partner + form kết nối (URL, client id, secret **reference**)
+Canonical routes (ADR 0016 / `documents/requirements/SRS-UI-surfaces.md`):
+
+- `/admin/organization` — hồ sơ doanh nghiệp
+- `/admin/members` — danh sách member / gán `administrator|staff|approver|viewer`
+- `/partners` — danh sách federated partner + form kết nối (URL, client id, secret **reference**)
+
+`/admin` is **system-only** (org/members). Do not place catalog/inventory under `/admin`. Legacy `/admin/partners` redirects to `/partners`.
 
 ## 7. Kiểm thử tối thiểu
 

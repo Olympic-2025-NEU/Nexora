@@ -11,9 +11,56 @@ export type AppRole =
 export type NavItem = {
   href: string;
   labelKey: string;
-  /** Roles that may see this link. Empty = all authenticated. */
+  /** Roles that may see this link. "*" = all authenticated. */
   roles: AppRole[] | "*";
 };
+
+/**
+ * Single ERP app nav (catalog / inventory / partners).
+ * System admin routes are opened from the user menu (administrator only).
+ */
+export const APP_NAV: NavItem[] = [
+  {
+    href: "/catalog/products",
+    labelKey: "nav.products",
+    roles: ["administrator", "staff", "approver", "viewer"],
+  },
+  {
+    href: "/catalog/categories",
+    labelKey: "nav.categories",
+    roles: ["administrator", "staff", "approver", "viewer"],
+  },
+  {
+    href: "/catalog/uom",
+    labelKey: "nav.uom",
+    roles: ["administrator", "staff", "approver", "viewer"],
+  },
+  {
+    href: "/catalog/pricing",
+    labelKey: "nav.pricing",
+    roles: ["administrator", "staff", "approver", "viewer"],
+  },
+  {
+    href: "/catalog/batches",
+    labelKey: "nav.batches",
+    roles: ["administrator", "staff", "approver", "viewer"],
+  },
+  {
+    href: "/inventory/warehouses",
+    labelKey: "nav.warehouses",
+    roles: ["administrator", "staff", "approver", "viewer"],
+  },
+  {
+    href: "/inventory/balances",
+    labelKey: "nav.inventory",
+    roles: ["administrator", "staff", "approver", "viewer"],
+  },
+  {
+    href: "/partners",
+    labelKey: "nav.partners",
+    roles: "*",
+  },
+];
 
 export const ADMIN_NAV: NavItem[] = [
   {
@@ -26,31 +73,6 @@ export const ADMIN_NAV: NavItem[] = [
     labelKey: "nav.members",
     roles: ["administrator"],
   },
-  {
-    href: "/admin/partners",
-    labelKey: "nav.partners",
-    roles: "*",
-  },
-  {
-    href: "/admin/products",
-    labelKey: "nav.products",
-    roles: ["administrator", "staff", "approver", "viewer"],
-  },
-  {
-    href: "/admin/batches",
-    labelKey: "nav.batches",
-    roles: ["administrator", "staff", "approver", "viewer"],
-  },
-  {
-    href: "/admin/warehouses",
-    labelKey: "nav.warehouses",
-    roles: ["administrator", "staff", "approver", "viewer"],
-  },
-  {
-    href: "/admin/inventory",
-    labelKey: "nav.inventory",
-    roles: ["administrator", "staff", "approver", "viewer"],
-  },
 ];
 
 export function filterNavByRoles(
@@ -62,6 +84,10 @@ export function filterNavByRoles(
     if (item.roles === "*") return true;
     return item.roles.some((r) => set.has(String(r).toLowerCase()));
   });
+}
+
+export function isAdministrator(roles: string[]): boolean {
+  return roles.some((r) => r.toLowerCase() === "administrator");
 }
 
 export function primaryRole(roles: string[]): string {

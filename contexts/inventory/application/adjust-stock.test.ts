@@ -8,24 +8,43 @@ import { todayInTimezone } from "./warehouse-scope";
 
 function mockTx(state: {
   warehouseStatus?: string;
-  batch?: { productId: string; qualityStatus: string; expiresOn: Date | null };
+  batch?: {
+    productId: string;
+    productVariantId: string;
+    qualityStatus: string;
+    expiresOn: Date | null;
+  };
   balanceQty?: Decimal | null;
   existingMovement?: {
     warehouseId: string;
     batchId: string;
     productId: string;
+    productVariantId: string;
     delta: Decimal;
     actorSub: string;
   } | null;
-  productStatus?: string;
-  baseUnit?: string;
+  productActive?: boolean;
+  uomKind?: string;
   timezone?: string;
 }) {
   let qty = state.balanceQty === undefined ? null : state.balanceQty;
+  const variantId = state.batch?.productVariantId ?? "v";
   return {
     product: {
       async findUnique() {
-        return { baseUnit: state.baseUnit ?? "EA", status: state.productStatus ?? "active" };
+        return {
+          isActive: state.productActive ?? true,
+          deletedAt: null,
+        };
+      },
+    },
+    productVariantUom: {
+      async findFirst() {
+        return {
+          uomId: "uom-cai",
+          isStockKeeping: true,
+          uom: { kind: state.uomKind ?? "count" },
+        };
       },
     },
     organization: {
@@ -42,6 +61,7 @@ function mockTx(state: {
           warehouseId: state.existingMovement.warehouseId,
           batchId: state.existingMovement.batchId,
           productId: state.existingMovement.productId,
+          productVariantId: state.existingMovement.productVariantId,
           sourceLineId: "s",
           kind: "receipt",
           delta: state.existingMovement.delta,
@@ -90,13 +110,19 @@ function mockTx(state: {
       },
     },
     getQty: () => qty,
+    variantId,
   };
 }
 
+const baseBatch = {
+  productId: "p",
+  productVariantId: "v",
+  qualityStatus: "available" as const,
+  expiresOn: null,
+};
+
 test("todayInTimezone uses org zone not raw UTC for early local morning", () => {
-  // 2026-11-22 01:00 UTC = 08:00 Asia/Ho_Chi_Minh same calendar day
-  const utcMorning = new Date("2026-11-21T20:00:00.000Z"); // 03:00 ICT next calendar day? 
-  // 20:00 UTC Nov 21 = 03:00 ICT Nov 22
+  const utcMorning = new Date("2026-11-21T20:00:00.000Z");
   assert.equal(todayInTimezone("Asia/Ho_Chi_Minh", utcMorning), "2026-11-22");
   assert.equal(todayInTimezone("UTC", utcMorning), "2026-11-21");
 });
@@ -104,13 +130,14 @@ test("todayInTimezone uses org zone not raw UTC for early local morning", () => 
 test("openStockBalance writes receipt and replays idempotently", async () => {
   const tx = mockTx({
     warehouseStatus: "active",
-    batch: { productId: "p", qualityStatus: "available", expiresOn: null },
+    batch: baseBatch,
     balanceQty: null,
   });
   const first = await openStockBalance(tx as never, {
     warehouseId: "w",
     batchId: "b",
     productId: "p",
+    productVariantId: "v",
     sourceLineId: "s",
     quantity: "10",
     unit: "EA",
@@ -122,11 +149,12 @@ test("openStockBalance writes receipt and replays idempotently", async () => {
 
   const tx2 = mockTx({
     warehouseStatus: "active",
-    batch: { productId: "p", qualityStatus: "available", expiresOn: null },
+    batch: baseBatch,
     existingMovement: {
       warehouseId: "w",
       batchId: "b",
       productId: "p",
+      productVariantId: "v",
       delta: new Decimal(10),
       actorSub: "actor",
     },
@@ -135,6 +163,7 @@ test("openStockBalance writes receipt and replays idempotently", async () => {
     warehouseId: "w",
     batchId: "b",
     productId: "p",
+    productVariantId: "v",
     sourceLineId: "s",
     quantity: "10",
     unit: "EA",
@@ -147,11 +176,12 @@ test("openStockBalance writes receipt and replays idempotently", async () => {
 test("replay with different delta is conflict", async () => {
   const tx = mockTx({
     warehouseStatus: "active",
-    batch: { productId: "p", qualityStatus: "available", expiresOn: null },
+    batch: baseBatch,
     existingMovement: {
       warehouseId: "w",
       batchId: "b",
       productId: "p",
+      productVariantId: "v",
       delta: new Decimal(10),
       actorSub: "actor",
     },
@@ -162,6 +192,7 @@ test("replay with different delta is conflict", async () => {
         warehouseId: "w",
         batchId: "b",
         productId: "p",
+        productVariantId: "v",
         sourceLineId: "s",
         quantity: "5",
         unit: "EA",
@@ -172,10 +203,10 @@ test("replay with different delta is conflict", async () => {
   );
 });
 
-test("issue blocked for inspect and insufficient stock; EA fraction rejected", async () => {
+test("issue blocked for inspect and insufficient stock; count fraction rejected", async () => {
   const blocked = mockTx({
     warehouseStatus: "active",
-    batch: { productId: "p", qualityStatus: "inspect", expiresOn: null },
+    batch: { ...baseBatch, qualityStatus: "inspect" },
     balanceQty: new Decimal(5),
   });
   await assert.rejects(
@@ -184,6 +215,7 @@ test("issue blocked for inspect and insufficient stock; EA fraction rejected", a
         warehouseId: "w",
         batchId: "b",
         productId: "p",
+        productVariantId: "v",
         sourceLineId: "s1",
         kind: "issue",
         delta: "-1",
@@ -196,7 +228,7 @@ test("issue blocked for inspect and insufficient stock; EA fraction rejected", a
 
   const short = mockTx({
     warehouseStatus: "active",
-    batch: { productId: "p", qualityStatus: "available", expiresOn: null },
+    batch: baseBatch,
     balanceQty: new Decimal(1),
   });
   await assert.rejects(
@@ -205,6 +237,7 @@ test("issue blocked for inspect and insufficient stock; EA fraction rejected", a
         warehouseId: "w",
         batchId: "b",
         productId: "p",
+        productVariantId: "v",
         sourceLineId: "s2",
         kind: "issue",
         delta: "-5",
@@ -217,9 +250,8 @@ test("issue blocked for inspect and insufficient stock; EA fraction rejected", a
 
   const frac = mockTx({
     warehouseStatus: "active",
-    batch: { productId: "p", qualityStatus: "available", expiresOn: null },
+    batch: baseBatch,
     balanceQty: new Decimal(5),
-    baseUnit: "EA",
   });
   await assert.rejects(
     () =>
@@ -227,6 +259,7 @@ test("issue blocked for inspect and insufficient stock; EA fraction rejected", a
         warehouseId: "w",
         batchId: "b",
         productId: "p",
+        productVariantId: "v",
         sourceLineId: "s3",
         kind: "issue",
         delta: new Decimal("1.5"),

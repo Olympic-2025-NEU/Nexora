@@ -41,9 +41,14 @@ export default function Home() {
       <p className="max-w-xl text-lg text-muted-foreground">{t("brand.tagline")}</p>
       <div className="flex flex-wrap items-center justify-center gap-3">
         {signedIn ? (
-          <Button asChild size="lg">
-            <Link href="/admin">{t("home.ctaAdmin")}</Link>
-          </Button>
+          <>
+            <Button asChild size="lg">
+              <Link href="/admin">{t("home.ctaAdmin")}</Link>
+            </Button>
+            <Button asChild size="lg" variant="outline">
+              <Link href="/catalog/products">{t("home.ctaCatalog")}</Link>
+            </Button>
+          </>
         ) : (
           <Button asChild size="lg">
             <Link href="/login">{t("home.ctaLogin")}</Link>

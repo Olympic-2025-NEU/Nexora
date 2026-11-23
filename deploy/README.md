@@ -8,9 +8,9 @@ Legacy `docker-compose.yml` (Postgres-only) is removed; do not reintroduce a sec
 | Service | Network | Host publish (default) |
 | --- | --- | --- |
 | `gateway` (APISIX) | `edge` + `internal` | `127.0.0.1:${GATEWAY_HTTP_PORT}` → 9080 |
-| `postgres` | `internal` | none (use `--profile local-admin`) |
+| `postgres` | `internal` | none (use `compose.local-admin.yml`) |
 | `redis` | `internal` | none |
-| `keycloak` | `internal` | none (use `--profile local-admin`) |
+| `keycloak` | `internal` | none (use `compose.local-admin.yml`) |
 | `seaweedfs` | `internal` | none |
 | `flowable` | `internal` | `127.0.0.1:${FLOWABLE_HOST_PORT}` → 8080 (authenticated REST) |
 | `clamav` | `internal` | none |
@@ -61,10 +61,10 @@ For the three-database and object-storage backup, verification, isolated restore
 ## Profiles
 
 - default: infrastructure (PG, Redis, Keycloak, gateway, SeaweedFS, Flowable, ClamAV)
-- `local-admin`: loopback publish for Postgres + Keycloak only
 - `apps`: ERP + worker + core-data + file-reconciler
 - `dxlab`: DX-Lab frontend (P11)
 - `ai`: optional AI stub
+- Host loopback publish for Postgres + Keycloak: overlay `compose.local-admin.yml` (used by `dev-up`)
 
 ## ERP UI shell (≤P06)
 
@@ -72,7 +72,7 @@ Public pages: `/` (home), `/login`, `/logout`, `/reset-password`. Admin surfaces
 
 **Local login (Compose demo):** when `ALLOW_DEV_PASSWORD_LOGIN=true` on ERP, the browser posts to `/auth/dev-token` (password or refresh grant). This is not production PKCE; browser authorization-code + PKCE remains a follow-up once the issuer is browser-reachable.
 
-**Reset password:** `/reset-password` links to Keycloak Account Console. Set optional `OIDC_ACCOUNT_URL`, or rely on `KEYCLOAK_HOST_PORT` (default link `http://127.0.0.1:${KEYCLOAK_HOST_PORT}/realms/nexora/account/`). Publish Keycloak with `--profile local-admin` so the browser can open that URL.
+**Reset password:** `/reset-password` links to Keycloak Account Console. Set optional `OIDC_ACCOUNT_URL`, or rely on `KEYCLOAK_HOST_PORT` (default link `http://127.0.0.1:${KEYCLOAK_HOST_PORT}/realms/nexora/account/`). Publish Keycloak via `compose.local-admin.yml` (or `dev-up`) so the browser can open that URL.
 
 ## Faster local iteration
 
@@ -85,14 +85,14 @@ Building `--profile apps` is slow because it runs `npm ci` and `next build` insi
    npm run db:migrate
    npm run dev
    ```
-   Bash: `bash deploy/scripts/dev-up.sh a`. Script starts Compose with `--profile local-admin` (Postgres on loopback) and prints the host URL hint.
+   Bash: `bash deploy/scripts/dev-up.sh a`. Script starts Compose with `compose.local-admin.yml` (Postgres + Keycloak on loopback) and prints the host URL hint.
 2. **After the first successful image build:** omit `--build` unless `package-lock.json` / Dockerfile / Prisma schema changed:
    ```sh
    docker compose -f deploy/compose.yml --env-file deploy/instances/a.env -p nexora --profile apps up -d
    ```
 3. Rebuild images only when needed: `docker compose ... --profile apps build`. Dockerfiles use BuildKit npm/apt caches to speed repeat builds (Docker Desktop BuildKit on by default).
 4. First boot of ClamAV is slow (signature download); later starts reuse `nexora_clamav_data`.
-5. Optional overlay `compose.dev-db-publish.yml` also publishes Postgres without `local-admin` sidecar if you need that layout.
+5. Optional overlay `compose.dev-db-publish.yml` publishes Postgres only; prefer `compose.local-admin.yml` for day-to-day host Next.js.
 
 ## P01-T04 runtime bootstrap
 

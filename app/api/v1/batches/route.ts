@@ -37,6 +37,10 @@ export async function GET(request: NextRequest): Promise<Response> {
     const { limit, cursor } = parsePage(params);
     const productId = params.get("productId");
     if (productId !== null && !isUuid(productId)) throw new DomainError("PRODUCT_ID_INVALID", 422);
+    const productVariantId = params.get("productVariantId");
+    if (productVariantId !== null && !isUuid(productVariantId)) {
+      throw new DomainError("VARIANT_ID_INVALID", 422);
+    }
     const status = params.get("status");
     if (status !== null && !QUALITY_STATUSES.has(status)) {
       throw new DomainError("INVALID_STATUS", 422);
@@ -49,6 +53,7 @@ export async function GET(request: NextRequest): Promise<Response> {
 
     const page = await catalogRepos().listBatches({
       ...(productId ? { productId } : {}),
+      ...(productVariantId ? { productVariantId } : {}),
       ...(issuer ? { issuer } : {}),
       ...(status ? { status: status as QualityStatus } : {}),
       ...(expiresBefore ? { expiresBefore } : {}),
@@ -73,13 +78,17 @@ export async function POST(request: NextRequest): Promise<Response> {
   try {
     // issuer / sourcePartnerId / quality are server-assigned; user JSON cannot supply them.
     const body = assertBody(await readJson(request), [
+      "productVariantId",
       "productId",
       "localCode",
       "manufacturedOn",
       "expiresOn",
     ]);
-    if (!isUuid(body.productId)) throw new DomainError("PRODUCT_ID_INVALID", 422);
-    const productId = body.productId;
+    const productVariantId =
+      typeof body.productVariantId === "string" ? body.productVariantId : null;
+    if (!productVariantId || !isUuid(productVariantId)) {
+      throw new DomainError("VARIANT_ID_INVALID", 422);
+    }
     const localCode = requireText(body.localCode, "LOCAL_CODE_INVALID", 80);
     if (body.manufacturedOn !== undefined && !isDateOnly(body.manufacturedOn)) {
       throw new DomainError("DATE_INVALID", 422);
@@ -110,15 +119,20 @@ export async function POST(request: NextRequest): Promise<Response> {
           if (!instanceId) throw new DomainError("INSTANCE_ID_NOT_CONFIGURED", 500);
           const sub = ctx.actor.userId;
           const repos = createCatalogRepos(ctx.tx);
-          const product = await repos.findProductById(productId);
-          if (!product) throw new DomainError("PRODUCT_NOT_FOUND", 404);
-          if (product.status !== "active") throw new DomainError("PRODUCT_ARCHIVED", 409);
+          const variant = await repos.findVariantById(productVariantId);
+          if (!variant || variant.deletedAt || !variant.isActive) {
+            throw new DomainError("VARIANT_NOT_FOUND", 404);
+          }
+          const product = await repos.findProductById(variant.productId);
+          if (!product || !product.isActive || product.deletedAt) {
+            throw new DomainError("PRODUCT_ARCHIVED", 409);
+          }
           const batchId = randomUUID();
           let created;
           try {
             created = await repos.createBatch({
               id: batchId,
-              productId,
+              productVariantId,
               localCode,
               originIssuerInstanceId: instanceId,
               originLotId: batchId,

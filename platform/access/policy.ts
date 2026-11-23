@@ -83,10 +83,16 @@ const ACTION_POLICIES: Record<string, ActionPolicy> = {
   "trading:goods-issue:approve": { roles: ["approver"], adminAlwaysAllowed: true },
   "trading:goods-issue:read": { roles: ["staff", "approver", "viewer"], adminAlwaysAllowed: true },
 
-  // --- Catalog/Inventory (placeholder until P06) ---
+  // --- Catalog/Inventory (P06 + P065) ---
   "catalog:product:create": { roles: ["administrator", "staff"], adminAlwaysAllowed: true },
   "catalog:product:read": { roles: ["staff", "approver", "viewer"], adminAlwaysAllowed: true },
   "catalog:product:manage": { roles: ["administrator", "staff"], adminAlwaysAllowed: true },
+  "catalog:category:read": { roles: ["staff", "approver", "viewer"], adminAlwaysAllowed: true },
+  "catalog:category:manage": { roles: ["administrator", "staff"], adminAlwaysAllowed: true },
+  "catalog:uom:read": { roles: ["staff", "approver", "viewer"], adminAlwaysAllowed: true },
+  "catalog:uom:manage": { roles: ["administrator", "staff"], adminAlwaysAllowed: true },
+  "catalog:price_list:read": { roles: ["staff", "approver", "viewer"], adminAlwaysAllowed: true },
+  "catalog:price_list:manage": { roles: ["administrator", "staff"], adminAlwaysAllowed: true },
   "catalog:batch:read": { roles: ["staff", "approver", "viewer"], adminAlwaysAllowed: true },
   "catalog:batch:create": { roles: ["administrator", "staff"], adminAlwaysAllowed: true },
   "catalog:batch:quality": { roles: ["administrator", "staff"], adminAlwaysAllowed: true },

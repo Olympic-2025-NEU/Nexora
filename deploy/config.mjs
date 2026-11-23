@@ -138,7 +138,12 @@ export function validateConfig(env, service) {
   }
   if (config.PUBLIC_BASE_URL.hostname !== "127.0.0.1" && config.PUBLIC_BASE_URL.protocol !== "https:")
     fail("PUBLIC_BASE_URL");
-  if (config.PUBLIC_BASE_URL.port !== String(config.GATEWAY_HTTP_PORT)) fail("GATEWAY_HTTP_PORT");
+  // HTTP demos bind PUBLIC_BASE_URL to GATEWAY_HTTP_PORT; local HTTPS (mkcert) uses GATEWAY_HTTPS_PORT.
+  if (config.PUBLIC_BASE_URL.protocol === "https:") {
+    if (config.PUBLIC_BASE_URL.port !== String(config.GATEWAY_HTTPS_PORT)) fail("GATEWAY_HTTPS_PORT");
+  } else if (config.PUBLIC_BASE_URL.port !== String(config.GATEWAY_HTTP_PORT)) {
+    fail("GATEWAY_HTTP_PORT");
+  }
   if (new Set([config.GATEWAY_HTTP_PORT, config.POSTGRES_HOST_PORT, config.KEYCLOAK_HOST_PORT, config.FLOWABLE_HOST_PORT]).size !== 4 ||
       [config.POSTGRES_HOST_PORT, config.KEYCLOAK_HOST_PORT, config.FLOWABLE_HOST_PORT].includes(config.GATEWAY_HTTPS_PORT)) fail("FLOWABLE_HOST_PORT");
   if (config.FLOWABLE_BASE_URL.href !== "http://flowable:8080/flowable-rest/service" ||

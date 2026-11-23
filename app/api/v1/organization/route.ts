@@ -32,11 +32,24 @@ export async function PATCH(request: NextRequest): Promise<Response> {
   const requestId = request.headers.get("x-request-id") ?? crypto.randomUUID();
   try {
     const body = (await request.json()) as Record<string, unknown>;
-    const allowedKeys = new Set(["name", "contactEmail", "timezone", "version"]);
+    const allowedKeys = new Set([
+      "name",
+      "contactEmail",
+      "contactPhone",
+      "address",
+      "timezone",
+      "version",
+    ]);
     for (const key of Object.keys(body)) {
       if (!allowedKeys.has(key)) throw new DomainError("FIELD_NOT_ALLOWED", 422);
     }
-    if (!body.name && body.contactEmail === undefined && !body.timezone) {
+    if (
+      !body.name &&
+      body.contactEmail === undefined &&
+      body.contactPhone === undefined &&
+      body.address === undefined &&
+      !body.timezone
+    ) {
       throw new DomainError("EMPTY_PATCH", 422);
     }
     const expectedVersion = parseIfMatchVersion(
@@ -67,14 +80,48 @@ export async function PATCH(request: NextRequest): Promise<Response> {
           const repos = createSystemRepos(ctx.tx);
           const before = await repos.getOrganization();
           if (!before) throw new DomainError("ORGANIZATION_NOT_FOUND", 404);
-          const updated = await repos.updateOrganization({
-            expectedVersion,
-            ...(typeof body.name === "string" ? { name: body.name.trim() } : {}),
-            ...(body.contactEmail === null || typeof body.contactEmail === "string"
-              ? { contactEmail: body.contactEmail as string | null }
-              : {}),
-            ...(typeof body.timezone === "string" ? { timezone: body.timezone } : {}),
-          });
+
+          const patch: {
+            expectedVersion: number;
+            name?: string;
+            contactEmail?: string | null;
+            contactPhone?: string | null;
+            address?: string | null;
+            timezone?: string;
+          } = { expectedVersion };
+          const changedFields: string[] = ["version"];
+
+          if (typeof body.name === "string") {
+            patch.name = body.name.trim();
+            changedFields.push("name");
+          }
+          if (body.contactEmail === null || typeof body.contactEmail === "string") {
+            patch.contactEmail =
+              body.contactEmail === null || body.contactEmail === ""
+                ? null
+                : String(body.contactEmail).trim();
+            changedFields.push("contactEmail");
+          }
+          if (body.contactPhone === null || typeof body.contactPhone === "string") {
+            patch.contactPhone =
+              body.contactPhone === null || body.contactPhone === ""
+                ? null
+                : String(body.contactPhone).trim();
+            changedFields.push("contactPhone");
+          }
+          if (body.address === null || typeof body.address === "string") {
+            patch.address =
+              body.address === null || body.address === ""
+                ? null
+                : String(body.address).trim();
+            changedFields.push("address");
+          }
+          if (typeof body.timezone === "string") {
+            patch.timezone = body.timezone;
+            changedFields.push("timezone");
+          }
+
+          const updated = await repos.updateOrganization(patch);
           if (!updated) throw new DomainError("VERSION_CONFLICT", 409);
           await systemAuditRecorder().record(ctx.tx, {
             actor: { kind: "user", sub: "organizationId" in ctx.actor ? ctx.actor.userId : "unknown" },
@@ -83,7 +130,7 @@ export async function PATCH(request: NextRequest): Promise<Response> {
             targetId: updated.id,
             requestId: ctx.requestId,
             before: { version: before.version, status: before.status },
-            after: { version: updated.version, status: updated.status, changedFields: ["version"] },
+            after: { version: updated.version, status: updated.status, changedFields },
           });
           return updated;
         },

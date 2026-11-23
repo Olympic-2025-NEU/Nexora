@@ -1,18 +1,23 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 "use client";
 
+import Link from "next/link";
+import { Settings } from "lucide-react";
 import { useEffect } from "react";
 import { useT } from "@/app/i18n/LocaleProvider";
 import { Button } from "@/app/components/ui/button";
 import { AppNav } from "./AppNav";
+import { isAdministrator, type NavItem } from "./nav-config";
 
 export function MobileDrawer({
   open,
   onClose,
+  items,
   roles,
 }: {
   open: boolean;
   onClose: () => void;
+  items: NavItem[];
   roles: string[];
 }) {
   const t = useT();
@@ -43,7 +48,15 @@ export function MobileDrawer({
             {t("nav.close")}
           </Button>
         </div>
-        <AppNav roles={roles} onNavigate={onClose} />
+        <AppNav items={items} onNavigate={onClose} />
+        {isAdministrator(roles) ? (
+          <Button asChild variant="secondary" className="justify-start">
+            <Link href="/admin" onClick={onClose}>
+              <Settings className="mr-2 h-4 w-4" />
+              {t("nav.openAdmin")}
+            </Link>
+          </Button>
+        ) : null}
       </div>
     </div>
   );

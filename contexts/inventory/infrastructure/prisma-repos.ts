@@ -32,16 +32,22 @@ function mapBalance(row: {
   warehouseId: string;
   batchId: string;
   productId: string;
+  productVariantId: string;
   quantity: Prisma.Decimal;
   version: number;
   updatedAt: Date;
-  batch: { product: { baseUnit: string } };
+  variant: {
+    uoms: { uomId: string; isStockKeeping: boolean; uom: { kind: string } }[];
+  };
 }): StockBalanceRecord {
+  const stock = row.variant.uoms.find((u) => u.isStockKeeping);
   return {
     warehouseId: row.warehouseId,
     batchId: row.batchId,
     productId: row.productId,
-    unit: row.batch.product.baseUnit as StockBalanceRecord["unit"],
+    productVariantId: row.productVariantId,
+    stockUomId: stock?.uomId ?? "",
+    unitKind: (stock?.uom.kind ?? "count") as StockBalanceRecord["unitKind"],
     quantity: row.quantity,
     version: row.version,
     updatedAt: row.updatedAt,
@@ -54,6 +60,7 @@ export function mapMovement(row: {
   warehouseId: string;
   batchId: string;
   productId: string;
+  productVariantId: string;
   sourceLineId: string;
   kind: string;
   delta: Prisma.Decimal;
@@ -68,6 +75,7 @@ export function mapMovement(row: {
     warehouseId: row.warehouseId,
     batchId: row.batchId,
     productId: row.productId,
+    productVariantId: row.productVariantId,
     sourceLineId: row.sourceLineId,
     kind: row.kind as MovementKind,
     delta: row.delta,
@@ -169,6 +177,7 @@ export function createInventoryRepos(db: Db) {
     async listBalances(filters: {
       warehouseId?: string;
       productId?: string;
+      productVariantId?: string;
       batchId?: string;
       scopeIds?: readonly string[];
       cursor?: { warehouseId: string; batchId: string };
@@ -179,9 +188,19 @@ export function createInventoryRepos(db: Db) {
         where: {
           ...(warehouse !== undefined ? { warehouseId: warehouse } : {}),
           ...(filters.productId ? { productId: filters.productId } : {}),
+          ...(filters.productVariantId ? { productVariantId: filters.productVariantId } : {}),
           ...(filters.batchId ? { batchId: filters.batchId } : {}),
         },
-        include: { batch: { select: { product: { select: { baseUnit: true } } } } },
+        include: {
+          variant: {
+            select: {
+              uoms: {
+                where: { isStockKeeping: true },
+                select: { uomId: true, isStockKeeping: true, uom: { select: { kind: true } } },
+              },
+            },
+          },
+        },
         orderBy: [{ warehouseId: "asc" }, { batchId: "asc" }],
         take: filters.limit + 1,
         ...(filters.cursor

@@ -20,6 +20,25 @@ test("all instance contracts parse and isolate ports, buckets and credentials", 
   }
 });
 
+test("HTTPS PUBLIC_BASE_URL must match GATEWAY_HTTPS_PORT", () => {
+  const httpsPort = examples[0].GATEWAY_HTTPS_PORT;
+  const httpPort = examples[0].GATEWAY_HTTP_PORT;
+  const env = {
+    ...examples[0],
+    PUBLIC_BASE_URL: `https://localhost:${httpsPort}`,
+    OIDC_REDIRECT_URI_ERP: `https://localhost:${httpsPort}/erp/callback`,
+    OIDC_REDIRECT_URI_DXLAB: `https://localhost:${httpsPort}/dxlab/callback`,
+  };
+  validateConfig(env);
+  const mismatched = {
+    ...env,
+    PUBLIC_BASE_URL: `https://localhost:${httpPort}`,
+    OIDC_REDIRECT_URI_ERP: `https://localhost:${httpPort}/erp/callback`,
+    OIDC_REDIRECT_URI_DXLAB: `https://localhost:${httpPort}/dxlab/callback`,
+  };
+  assert.throws(() => validateConfig(mismatched), { message: "Invalid or missing GATEWAY_HTTPS_PORT" });
+});
+
 for (const field of [
   "INSTANCE_ID", "APP_DATABASE_URL", "OIDC_ISSUER_URL", "PARTNER_OUTBOUND_TOKEN_URL",
   "S3_BUCKET_PRIVATE", "FLOWABLE_BASE_URL", "FLOWABLE_HOST_PORT", "REDIS_URL", "AI_BASE_URL",

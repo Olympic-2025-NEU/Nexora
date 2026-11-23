@@ -63,7 +63,7 @@
 | --- | --- | --- |
 | P11-T01 | `apps/dx-lab/` Next frontend riêng + `ui-ai-spec-v1.md` route map H/P/D/I; diagram gateway→core/ERP services. | Tắt DX-Lab/ERP UI vẫn smoke core SSO/gateway/data/file/Flowable; app tầng 2 không DB credential. |
 | P11-T02 | `apps/dx-lab/app/(workspace)/layout.tsx`, auth callback/session/nav, typed `lib/api-client` từ OpenAPI. | Login/logout/expiry/deep link, 401/403 và role nav; cookie/token không log/URL/localStorage trái ADR. |
-| P11-T03 | `/work`, `/profile`, `/admin/members`, `/admin/partners`; `ApprovalInbox` preview, org/user/partner forms theo API spec. | Admin edit, Staff 403; secretRef write-only; A/B/C org context đúng, empty/error/409 states. |
+| P11-T03 | `/work`, `/profile`; org/members (ERP `/admin/*` concepts); partners (ERP `/partners`); `ApprovalInbox` preview. | Admin edit, Staff 403; secretRef write-only; A/B/C org context đúng, empty/error/409 states. Do not mount catalog under admin. |
 | P11-T04 | `/operations/{receipts,issues,transfers,receivings}`, `/work/approvals`; `BatchPicker`, `DocumentEditor`, `ReceivingCompare`, `ApprovalInbox`. | UI làm AC-03/04/06/12, sent vs actual tách ACK, reject/self-approve/server 403, double submit không nhân movement. |
 | P11-T05 | `/data/inventory`, `/data/lots/[id]`, `/data/impact/[id]`, `/passport/[token]`; `TraceTimeline/ImpactGraph/PassportView`. | AC-07/08/09 qua UI, mobile QR, gap/source/asOf/verification rõ; DOM/network public không private fields. |
 | P11-T06 | `/assistant` + `AiPanel/DraftReview`, tool source list và editable Draft link. | AC-10/11 UI; provider down fallback, user thiếu quyền tool 403, AI không tự confirm. |

@@ -17,6 +17,7 @@ import { Button } from "@/app/components/ui/button";
 import { AppNav } from "./AppNav";
 import { MobileDrawer } from "./MobileDrawer";
 import { UserMenu } from "./UserMenu";
+import { APP_NAV, filterNavByRoles } from "./nav-config";
 
 function redirectToLogin(pathname: string, search: string): void {
   const next = `${pathname}${search}`;
@@ -24,6 +25,7 @@ function redirectToLogin(pathname: string, search: string): void {
   window.location.replace(`/login${qs}`);
 }
 
+/** One shared ERP shell; system admin is reached via user menu. */
 export function AppShell({ children }: { children: ReactNode }) {
   const t = useT();
   const pathname = usePathname();
@@ -63,20 +65,28 @@ export function AppShell({ children }: { children: ReactNode }) {
     return <>{children}</>;
   }
 
+  // Always keep `{children}` in the tree so Instant Navigation can validate
+  // page segments (Next.js drops validation when a Client shell omits children).
   if (loading || !me) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background text-sm text-muted-foreground">
-        {t("shell.redirectLogin")}
+      <div className="flex min-h-full flex-col bg-background text-foreground">
+        <div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">
+          {t("shell.redirectLogin")}
+        </div>
+        <div className="hidden" aria-hidden>
+          {children}
+        </div>
       </div>
     );
   }
 
   const roles = me.roles;
+  const navItems = filterNavByRoles(APP_NAV, roles);
 
   return (
     <div className="flex min-h-full flex-col bg-background text-foreground">
       <header className="sticky top-0 z-30 border-b border-border bg-card/95 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
+        <div className="mx-auto flex w-full items-center justify-between gap-3 px-4 py-3 lg:px-6">
           <div className="flex items-center gap-3">
             <Button
               type="button"
@@ -88,7 +98,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             >
               <Menu className="h-4 w-4" />
             </Button>
-            <Link href="/admin" className="flex items-center gap-2">
+            <Link href="/catalog/products" className="flex items-center gap-2">
               <Image
                 src="/assets/Nexora.png"
                 alt={t("brand.name")}
@@ -97,25 +107,28 @@ export function AppShell({ children }: { children: ReactNode }) {
                 className="h-8 w-8"
                 priority
               />
-              <span className="font-semibold tracking-tight">
-                {t("shell.adminTitle")}
-              </span>
+              <span className="font-semibold tracking-tight">{t("shell.appTitle")}</span>
             </Link>
           </div>
-          <UserMenu userId={me.userId} roles={roles} />
+          <UserMenu
+            userId={me.userId}
+            displayName={me.displayName}
+            roles={roles}
+          />
         </div>
-        <nav className="mx-auto hidden max-w-6xl px-4 pb-3 md:block" aria-label="Admin">
-          <AppNav roles={roles} />
+        <nav className="mx-auto hidden w-full px-4 pb-3 md:block lg:px-6" aria-label={t("shell.appTitle")}>
+          <AppNav items={navItems} />
         </nav>
       </header>
 
       <MobileDrawer
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
+        items={navItems}
         roles={roles}
       />
 
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6">{children}</main>
+      <main className="mx-auto w-full flex-1 px-4 py-6 lg:px-6">{children}</main>
     </div>
   );
 }

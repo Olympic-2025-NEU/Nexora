@@ -18,51 +18,38 @@ import {
 import { catalogAuditRecorder, catalogRepos } from "@/composition/catalog";
 import { resolveUserActor } from "@/composition/system";
 
-type Params = { params: Promise<{ id: string }> };
+type Ctx = { params: Promise<{ id: string }> };
 
-export async function GET(request: NextRequest, context: Params): Promise<Response> {
+export async function GET(request: NextRequest, context: Ctx): Promise<Response> {
   const requestId = request.headers.get("x-request-id");
   try {
-    const { id } = await context.params;
     const actor = await resolveUserActor(request);
     const { allowed } = checkPolicy(actor, "catalog:product:read");
     if (!allowed) return fail("POLICY_DENIED", 403, requestId);
-    if (!isUuid(id)) return fail("PRODUCT_NOT_FOUND", 404, requestId);
+    const { id } = await context.params;
+    if (!isUuid(id)) throw new DomainError("PRODUCT_ID_INVALID", 422);
     const product = await catalogRepos().findProductById(id);
-    if (!product) return fail("PRODUCT_NOT_FOUND", 404, requestId);
+    if (!product || product.deletedAt) return fail("PRODUCT_NOT_FOUND", 404, requestId);
     return ok(projectProduct(product), requestId);
   } catch (err) {
     return mapRouteError(err, requestId);
   }
 }
 
-export async function PATCH(request: NextRequest, context: Params): Promise<Response> {
+export async function PATCH(request: NextRequest, context: Ctx): Promise<Response> {
   const requestId = request.headers.get("x-request-id") ?? crypto.randomUUID();
   try {
     const { id } = await context.params;
-    if (!isUuid(id)) throw new DomainError("PRODUCT_NOT_FOUND", 404);
-    // sku and baseUnit are immutable in v1: they are not in the allow-list.
-    const body = assertBody(await readJson(request), ["name", "description", "status", "version"]);
-    if (body.name === undefined && body.description === undefined && body.status === undefined) {
-      throw new DomainError("EMPTY_PATCH", 422);
-    }
-    const name = body.name !== undefined ? requireText(body.name, "NAME_INVALID", 200) : undefined;
-    let description: string | null | undefined;
-    if (body.description !== undefined) {
-      if (body.description !== null && typeof body.description !== "string") {
-        throw new DomainError("DESCRIPTION_INVALID", 422);
-      }
-      description =
-        typeof body.description === "string" && body.description.trim()
-          ? body.description.trim()
-          : null;
-    }
-    if (body.status !== undefined && body.status !== "active" && body.status !== "archived") {
-      throw new DomainError("INVALID_STATUS", 422);
-    }
-    const status = body.status as "active" | "archived" | undefined;
-    const expectedVersion = parseIfMatchVersion(request.headers.get("if-match"), body.version);
-    if (!expectedVersion) throw new DomainError("VERSION_REQUIRED", 422);
+    if (!isUuid(id)) throw new DomainError("PRODUCT_ID_INVALID", 422);
+    const body = assertBody(await readJson(request), [
+      "name",
+      "categoryId",
+      "attributes",
+      "isActive",
+      "version",
+    ]);
+    const version = parseIfMatchVersion(request.headers.get("if-match"), body.version);
+    if (version === null) throw new DomainError("VERSION_REQUIRED", 428);
 
     const data = await runCommand(
       { requestId },
@@ -78,24 +65,37 @@ export async function PATCH(request: NextRequest, context: Params): Promise<Resp
         payload: body,
         async domain(ctx) {
           if (!("organizationId" in ctx.actor)) throw new DomainError("TENANT_FORBIDDEN", 403);
-          const sub = ctx.actor.userId;
           const repos = createCatalogRepos(ctx.tx);
-          const before = await repos.findProductById(id);
-          if (!before) throw new DomainError("PRODUCT_NOT_FOUND", 404);
-          const updated = await repos.updateProduct(id, expectedVersion, {
-            ...(name !== undefined ? { name } : {}),
-            ...(description !== undefined ? { description } : {}),
-            ...(status !== undefined ? { status } : {}),
-          });
-          if (!updated) throw new DomainError("VERSION_CONFLICT", 409);
+          const patch: {
+            name?: string;
+            categoryId?: string;
+            attributes?: Record<string, unknown>;
+            isActive?: boolean;
+          } = {};
+          if (body.name !== undefined) patch.name = requireText(body.name, "NAME_INVALID", 200);
+          if (body.categoryId !== undefined) {
+            if (!isUuid(body.categoryId)) throw new DomainError("CATEGORY_ID_INVALID", 422);
+            patch.categoryId = body.categoryId as string;
+          }
+          if (body.attributes !== undefined) {
+            if (!body.attributes || typeof body.attributes !== "object" || Array.isArray(body.attributes)) {
+              throw new DomainError("ATTRIBUTES_INVALID", 422);
+            }
+            patch.attributes = body.attributes as Record<string, unknown>;
+          }
+          if (body.isActive !== undefined) {
+            if (typeof body.isActive !== "boolean") throw new DomainError("IS_ACTIVE_INVALID", 422);
+            patch.isActive = body.isActive;
+          }
+          const updated = await repos.updateProduct(id, version, patch);
+          if (!updated) throw new DomainError("PRODUCT_VERSION_CONFLICT", 409);
           await catalogAuditRecorder().record(ctx.tx, {
-            actor: { kind: "user", sub },
-            action: status === "archived" ? "product.archive" : "product.update",
+            actor: { kind: "user", sub: ctx.actor.userId },
+            action: "product.update",
             targetType: "product",
-            targetId: updated.id,
+            targetId: id,
             requestId: ctx.requestId,
-            before: { status: before.status, version: before.version },
-            after: { status: updated.status, version: updated.version },
+            after: { version: updated.version, isActive: updated.isActive },
           });
           return updated;
         },
