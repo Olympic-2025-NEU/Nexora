@@ -9,6 +9,7 @@ import { createPrismaIdempotency } from "@/platform/http/idempotency";
 import { createRequest, confirmApproval, cancelRequest, cancelApprovedRequest } from "@/platform/workflow/approval-service";
 import { computeLineSnapshotSha256 } from "@/contracts/workflow/line-snapshot";
 import { serializeDomainEvent, TRADING_EVENT_TYPES } from "@/contracts/events/registry";
+import { createTransferService } from "@/contexts/trading/application/transfers";
 
 export const tradingPorts: TradingPorts = {
   adjust: adjustStock,
@@ -48,6 +49,7 @@ export const tradingPorts: TradingPorts = {
   },
 };
 export const tradingService = createDocumentService(tradingPorts);
+export const transferService = () => createTransferService(tradingPorts, process.env.NEXORA_ISSUER_INSTANCE_ID ?? "");
 
 export const tradingIdempotency = () => createPrismaIdempotency(getPrismaClient());
 export const tradingRead = async <T>(work: (tx: Prisma.TransactionClient) => Promise<T>) =>

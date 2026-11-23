@@ -605,7 +605,7 @@ model Document {
   transferDetail TransferDetail? @relation("TransferDocument")
   receivingDetail ReceivingDetail?
   saleDetail SaleDetail? @relation("SaleDocument")
-  transferIssue TransferDetail? @relation("TransferIssue")
+  transferIssues TransferDetail[] @relation("TransferIssue")
   saleIssue SaleDetail? @relation("SaleIssue")
   approvals ApprovalRequest[]
 
@@ -652,7 +652,7 @@ model DocumentLine {
 
 model TransferDetail {
   documentId          String    @id @map("document_id") @db.Uuid
-  linkedIssueId       String    @unique(map: "uq_trading_transfer_issue") @map("linked_issue_id") @db.Uuid
+  linkedIssueId       String    @map("linked_issue_id") @db.Uuid
   destinationPartnerId String   @map("destination_partner_id") @db.Uuid
   deliveryState       String    @default("pending") @map("delivery_state")
   technicalAckAt      DateTime? @map("technical_ack_at") @db.Timestamptz(6)
@@ -663,6 +663,7 @@ model TransferDetail {
   destinationPartner Partner @relation(fields: [destinationPartnerId], references: [id])
 
   @@index([destinationPartnerId], map: "idx_trading_transfer_partner")
+  @@index([linkedIssueId], map: "idx_trading_transfer_issue")
   @@map("transfer_detail")
   @@schema("trading")
 }

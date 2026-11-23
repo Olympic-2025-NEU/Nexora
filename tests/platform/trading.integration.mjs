@@ -175,6 +175,32 @@ test("transfer, sale and receiving raw SQL validate links and totals", async () 
     await insertLine(tx, line(valid.id, { sourceIssueLineId: issueLine.id }));
     await confirm(tx, valid.id);
   });
+  const duplicateTransfer = header("partner_transfer");
+  await assert.rejects(app.$transaction(async (tx) => {
+    await insertHeader(tx, duplicateTransfer);
+    await tx.$executeRaw`INSERT INTO trading.transfer_detail(document_id, linked_issue_id, destination_partner_id)
+      VALUES (${duplicateTransfer.id}::uuid, ${issue.id}::uuid, ${ids.partner}::uuid)`;
+  }), { code: "P2002" });
+  const cancelledIssue = header("goods_issue");
+  await app.$transaction(async (tx) => {
+    await insertHeader(tx, cancelledIssue);
+    await insertLine(tx, line(cancelledIssue.id));
+    await confirm(tx, cancelledIssue.id);
+  });
+  const cancelledTransfer = header("partner_transfer");
+  await app.$transaction(async (tx) => {
+    await insertHeader(tx, cancelledTransfer);
+    await tx.$executeRaw`INSERT INTO trading.transfer_detail(document_id, linked_issue_id, destination_partner_id)
+      VALUES (${cancelledTransfer.id}::uuid, ${cancelledIssue.id}::uuid, ${ids.partner}::uuid)`;
+  });
+  await app.$executeRaw`UPDATE trading.document SET status='cancelled', cancelled_at=now() WHERE id=${cancelledTransfer.id}::uuid`;
+  const replacement = header("partner_transfer");
+  await app.$transaction(async (tx) => {
+    await insertHeader(tx, replacement);
+    await tx.$executeRaw`INSERT INTO trading.transfer_detail(document_id, linked_issue_id, destination_partner_id)
+      VALUES (${replacement.id}::uuid, ${cancelledIssue.id}::uuid, ${ids.partner}::uuid)`;
+  });
+  assert.equal((await app.transferDetail.findMany({ where: { linkedIssueId: cancelledIssue.id } })).length, 2);
   await app.$executeRaw`UPDATE trading.transfer_detail SET delivery_state='technical_ack' WHERE document_id=${valid.id}::uuid`;
   assert.equal((await app.transferDetail.findUniqueOrThrow({ where: { documentId: valid.id } })).deliveryState, "technical_ack");
   await attack("immutable_detail", (tx) => tx.$executeRaw`UPDATE trading.transfer_detail

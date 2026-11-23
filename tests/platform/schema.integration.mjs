@@ -98,6 +98,11 @@ test("versioned schema contains platform tables, expected constraints and migrat
   assert.deepEqual(trading.map((row) => row.table_name),
     ["document", "document_line", "receiving_detail", "sale_detail", "transfer_detail"]);
   assert.ok(migrations.some((row) => row.migration_name === "20261123010000_trading_documents"));
+  assert.ok(migrations.some((row) => row.migration_name === "20261123020000_transfer_active_link"));
+  const transferConstraints = await migrator.$queryRaw`
+    SELECT conname FROM pg_constraint WHERE conrelid='trading.transfer_detail'::regclass`;
+  assert.ok(!transferConstraints.some((row) => row.conname === "uq_trading_transfer_issue"));
+  assert.ok(transferConstraints.some((row) => row.conname === "trg_trading_active_transfer_detail"));
   const tradingConstraints = await migrator.$queryRaw`
     SELECT conname FROM pg_constraint WHERE conname IN
       ('batch_id_variant_key','fk_trading_movement_line','fk_trading_approval_document',

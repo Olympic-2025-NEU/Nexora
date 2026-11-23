@@ -146,7 +146,7 @@ Add `product_variant_id uuid!→product_variant.id`; keep `product_id` denormali
 
 ### `trading.transfer_detail`
 
-`document_id uuid PK→trading.document.id`, `linked_issue_id uuid!→trading.document.id UNIQUE`, `destination_partner_id uuid!→system.partner.id`, `delivery_state text! CHECK IN ('pending','technical_ack','awaiting_receipt','received','partial','disputed') DEFAULT 'pending'`, `technical_ack_at timestamptz?`, `business_receipt_at timestamptz?`. Trigger/use case bảo đảm `document_type='partner_transfer'`, linked issue type `goods_issue` với `issue_purpose='partner_transfer'`, cả hai confirmed trước gửi, line/lot/quantity khớp 1:1. Unique issue chặn double transfer.
+`document_id uuid PK→trading.document.id`, `linked_issue_id uuid!→trading.document.id` (index, không UNIQUE thuần), `destination_partner_id uuid!→system.partner.id`, `delivery_state text! CHECK IN ('pending','technical_ack','awaiting_receipt','received','partial','disputed') DEFAULT 'pending'`, `technical_ack_at timestamptz?`, `business_receipt_at timestamptz?`. Deferred constraint trigger trên detail/status bảo đảm tối đa một transfer chưa huỷ mỗi issue; create khoá row issue trước khi kiểm tra/insert. Cancel draft giữ lịch sử nhưng giải phóng issue, confirmed chiếm issue vĩnh viễn. Trigger/use case bảo đảm `document_type='partner_transfer'`, linked issue type `goods_issue` với `issue_purpose='partner_transfer'`, cả hai confirmed trước gửi, line/lot/quantity khớp 1:1.
 
 ### `trading.receiving_detail`
 
