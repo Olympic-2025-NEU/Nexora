@@ -64,6 +64,7 @@ CREATE TABLE trading.transfer_detail (
   business_receipt_at timestamptz(6),
   CONSTRAINT uq_trading_transfer_issue UNIQUE (linked_issue_id)
 );
+CREATE INDEX idx_trading_transfer_partner ON trading.transfer_detail(destination_partner_id);
 CREATE TABLE trading.receiving_detail (
   document_id uuid PRIMARY KEY REFERENCES trading.document(id) ON DELETE RESTRICT,
   source_issuer_instance_id text NOT NULL,

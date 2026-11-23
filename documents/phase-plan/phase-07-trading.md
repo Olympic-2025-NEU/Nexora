@@ -16,9 +16,9 @@ Document lines / Inventory confirm: tham chiếu **`product_variant_id`** + qty 
 
 ## P07-T02 — Migration và repository chứng từ
 
-- [ ] Versioned `trading.document` + `document_line` chung và `transfer_detail`/`receiving_detail`/`sale_detail` theo `database-schema-v1.md`; sáu loại chứng từ là `document_type`, line bắt buộc batch/product/qty/unit/warehouse đúng loại.
-- [ ] FK/version/unique document number trong instance, snapshot giá trị cần bất biến, link source/partner/approver và timestamp. Index query theo status, batch, partner, time.
-- [ ] Repository dùng transaction client P03, không ẩn transaction riêng; migration chạy từ DB trống và backup restore.
+- [x] Versioned `trading.document` + `document_line` chung và `transfer_detail`/`receiving_detail`/`sale_detail` theo `database-schema-v1.md`; sáu loại chứng từ là `document_type`, line bắt buộc batch/product/qty/unit/warehouse đúng loại.
+- [x] FK/version/unique document number trong instance, snapshot giá trị cần bất biến, link source/partner/approver và timestamp. Index query theo status, batch, partner, time.
+- [x] Repository dùng transaction client P03, không ẩn transaction riêng; migration chạy từ DB trống và backup restore.
 - **Đầu ra:** schema/repository; **kiểm chứng:** DB chặn line sai hoặc confirmed thiếu required fields.
 
 ## P07-T03 — Goods receipt và issue

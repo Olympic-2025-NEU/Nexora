@@ -98,6 +98,18 @@ test("versioned schema contains platform tables, expected constraints and migrat
   assert.deepEqual(trading.map((row) => row.table_name),
     ["document", "document_line", "receiving_detail", "sale_detail", "transfer_detail"]);
   assert.ok(migrations.some((row) => row.migration_name === "20261123010000_trading_documents"));
+  const tradingConstraints = await migrator.$queryRaw`
+    SELECT conname FROM pg_constraint WHERE conname IN
+      ('batch_id_variant_key','fk_trading_movement_line','fk_trading_approval_document',
+       'fk_trading_line_batch_variant','uq_trading_document_number')`;
+  assert.deepEqual(tradingConstraints.map((row) => row.conname).sort(),
+    ["batch_id_variant_key", "fk_trading_approval_document", "fk_trading_line_batch_variant",
+      "fk_trading_movement_line", "uq_trading_document_number"].sort());
+  const tradingIndexes = await migrator.$queryRaw`
+    SELECT indexname FROM pg_indexes WHERE schemaname='trading' AND indexname IN
+      ('idx_trading_document_status_time','idx_trading_document_type_time',
+       'idx_trading_line_batch_document','idx_trading_transfer_partner','uq_trading_one_active_correction')`;
+  assert.equal(tradingIndexes.length, 5);
 });
 
 test("runtime roles are separate, least privilege and fail closed", async () => {

@@ -662,6 +662,7 @@ model TransferDetail {
   linkedIssue Document @relation("TransferIssue", fields: [linkedIssueId], references: [id])
   destinationPartner Partner @relation(fields: [destinationPartnerId], references: [id])
 
+  @@index([destinationPartnerId], map: "idx_trading_transfer_partner")
   @@map("transfer_detail")
   @@schema("trading")
 }

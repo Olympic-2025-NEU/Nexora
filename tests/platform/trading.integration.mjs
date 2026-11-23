@@ -13,7 +13,8 @@ const app = connect(process.env.APP_DATABASE_URL);
 after(async () => Promise.all([owner.$disconnect(), app.$disconnect()]));
 
 const ids = { partner: randomUUID(), warehouse: randomUUID(), product: randomUUID(),
-  variant: randomUUID(), batch: randomUUID(), uom: "aaaaaaaa-0001-4000-8000-000000000001",
+  altProduct: randomUUID(), variant: randomUUID(), batch: randomUUID(), altBatch: randomUUID(),
+  uom: "aaaaaaaa-0001-4000-8000-000000000001",
   invalidUom: "aaaaaaaa-0001-4000-8000-000000000002" };
 
 function header(type = "goods_receipt", overrides = {}) {
@@ -59,12 +60,16 @@ test("seed catalog and partner as migrator", async () => {
     VALUES (${ids.warehouse}::uuid, ${randomUUID()}, 'Warehouse', 'active', 'test')`;
   await owner.$executeRaw`INSERT INTO catalog.product(id, name, category_id, created_by_sub)
     VALUES (${ids.product}::uuid, 'Product', 'bbbbbbbb-0001-4000-8000-000000000001', 'test')`;
+  await owner.$executeRaw`INSERT INTO catalog.product(id, name, category_id, created_by_sub)
+    VALUES (${ids.altProduct}::uuid, 'Other product', 'bbbbbbbb-0001-4000-8000-000000000001', 'test')`;
   await owner.$executeRaw`INSERT INTO catalog.product_variant(id, product_id, sku, created_by_sub)
     VALUES (${ids.variant}::uuid, ${ids.product}::uuid, ${randomUUID()}, 'test')`;
   await owner.$executeRaw`INSERT INTO catalog.product_variant_uom(id, product_variant_id, uom_id, is_stock_keeping, factor_to_stock_uom)
     VALUES (${randomUUID()}::uuid, ${ids.variant}::uuid, ${ids.uom}::uuid, true, 1)`;
   await owner.$executeRaw`INSERT INTO catalog.batch(id, product_id, product_variant_id, local_code, origin_issuer_instance_id, origin_lot_id, created_by_sub)
     VALUES (${ids.batch}::uuid, ${ids.product}::uuid, ${ids.variant}::uuid, ${randomUUID()}, 'source', ${randomUUID()}, 'test')`;
+  await owner.$executeRaw`INSERT INTO catalog.batch(id, product_id, product_variant_id, local_code, origin_issuer_instance_id, origin_lot_id, created_by_sub)
+    VALUES (${ids.altBatch}::uuid, ${ids.product}::uuid, ${ids.variant}::uuid, ${randomUUID()}, 'source', ${randomUUID()}, 'test')`;
   const constraints = await owner.$queryRaw`SELECT conname FROM pg_constraint WHERE conrelid='catalog.batch'::regclass AND conname='batch_id_variant_key'`;
   assert.equal(constraints.length, 1);
 });
@@ -107,6 +112,21 @@ test("raw app SQL rejects invalid confirmed documents, preserves drafts and conf
     ${ids.variant}::uuid, ${ids.product}::uuid, ${ids.uom}::uuid, 1)`);
   await attack("immutable_line", (tx) => tx.$executeRaw`DELETE FROM trading.document_line WHERE id=${goodLine.id}::uuid`);
   await attack("immutable_line", (tx) => tx.$executeRaw`UPDATE trading.document_line SET quantity=11 WHERE id=${goodLine.id}::uuid`);
+  const wrongProduct = header();
+  await attack("product_mismatch", async (tx) => {
+    await insertHeader(tx, wrongProduct);
+    await insertLine(tx, line(wrongProduct.id, { productId: ids.altProduct }));
+    await confirm(tx, wrongProduct.id);
+  });
+  await assert.rejects(app.$executeRaw`INSERT INTO platform.approval_request
+    (id, document_id, submitted_document_version, creator_sub, warehouse_ids, line_snapshot_sha256, state)
+    VALUES (${randomUUID()}::uuid, ${randomUUID()}::uuid, 1, 'test', '[]'::jsonb, ${"a".repeat(64)}, 'requested')`, /23503/);
+  await assert.rejects(app.$executeRaw`INSERT INTO inventory.stock_movement
+    (id, warehouse_id, batch_id, product_id, product_variant_id, source_line_id,
+     kind, delta, balance_after, actor_sub, correlation_id)
+    VALUES (${randomUUID()}::uuid, ${ids.warehouse}::uuid, ${ids.batch}::uuid,
+      ${ids.product}::uuid, ${ids.variant}::uuid, ${randomUUID()}::uuid,
+      'receipt', 1, 1, 'test', 'test')`, /23503/);
   const duplicate = header("goods_receipt", { documentNumber: good.documentNumber });
   await assert.rejects(insertHeader(app, duplicate), /23505/);
 });
@@ -126,6 +146,14 @@ test("transfer, sale and receiving raw SQL validate links and totals", async () 
       VALUES (${transfer.id}::uuid, ${issue.id}::uuid, ${ids.partner}::uuid)`;
     await insertLine(tx, line(transfer.id, { sourceIssueLineId: issueLine.id, quantity: "11" }));
     await confirm(tx, transfer.id);
+  });
+  const wrongLot = header("partner_transfer");
+  await attack("line_mismatch", async (tx) => {
+    await insertHeader(tx, wrongLot);
+    await tx.$executeRaw`INSERT INTO trading.transfer_detail(document_id, linked_issue_id, destination_partner_id)
+      VALUES (${wrongLot.id}::uuid, ${issue.id}::uuid, ${ids.partner}::uuid)`;
+    await insertLine(tx, line(wrongLot.id, { sourceIssueLineId: issueLine.id, batchId: ids.altBatch }));
+    await confirm(tx, wrongLot.id);
   });
   const sale = header("sale_record");
   await attack("issue_purpose", async (tx) => {
