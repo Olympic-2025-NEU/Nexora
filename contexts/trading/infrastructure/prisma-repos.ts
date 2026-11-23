@@ -80,7 +80,7 @@ export function createTradingRepos(tx: Prisma.TransactionClient) {
       await tx.$queryRaw`SELECT id FROM trading.document WHERE id = ${id}::uuid FOR UPDATE`;
     },
     async lockReceivingSource(issuer: string, transferId: string) {
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${issuer} || ':' || ${transferId}, 0))`;
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${issuer} || ':' || ${transferId}, 0))::text`;
     },
 
     findVariant(id: string) {

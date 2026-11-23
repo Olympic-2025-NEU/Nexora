@@ -18,7 +18,7 @@ export type DocumentInput = { lines: LineInput[]; note?: string; purpose?: "part
 type Context = { tx: Prisma.TransactionClient; actor: Actor; requestId: string; emit(event: OutboxEventInput): void };
 export type TradingPorts = {
   adjust(tx: Prisma.TransactionClient, input: { warehouseId: string; batchId: string; productId: string;
-    productVariantId: string; sourceLineId: string; kind: "receipt" | "issue"; delta: Decimal;
+    productVariantId: string; sourceLineId: string; kind: "receipt" | "issue" | "receiving"; delta: Decimal;
     actorSub: string; correlationId: string }): Promise<{ movement: { id: string } }>;
   audit(tx: Prisma.TransactionClient, input: { actorSub: string; action: string; id: string; requestId: string;
     before?: string; after: string; version: number }): Promise<void>;

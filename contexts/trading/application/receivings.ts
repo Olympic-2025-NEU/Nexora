@@ -12,7 +12,14 @@ import { createPrismaAnnouncementSource } from "../infrastructure/inbound-announ
 
 type Context = { tx: Prisma.TransactionClient; actor: Actor; requestId: string; emit(event: OutboxEventInput): void };
 type Ports = { audit(tx: Prisma.TransactionClient, input: { actorSub: string; action: string; id: string;
-  requestId: string; before?: string; after: string; version: number }): Promise<void> };
+  requestId: string; before?: string; after: string; version: number }): Promise<void>;
+  adjust(tx: Prisma.TransactionClient, input: { warehouseId: string; batchId: string; productId: string;
+    productVariantId: string; sourceLineId: string; kind: "receiving"; delta: Decimal;
+    actorSub: string; correlationId: string }): Promise<{ movement: { id: string } }>;
+  event(type: "receipt", input: { id: string; version: number; actorSub: string; correlationId: string;
+    lines: { id: string; warehouseId: string; batchId: string; quantity: string;
+      originIssuerInstanceId: string; originLotId: string; unit: "EA" | "KG" | "L" }[];
+    movementIds: string[] }): OutboxEventInput[] };
 export type ActualInput = { sourceLineId: string; localBatchId: string; warehouseId: string;
   actualQuantity: string; unit: "EA" | "KG" | "L" };
 export type ReceivingEdit = { actualLines?: { sourceLineId: string; actualQuantity?: string;
@@ -205,6 +212,78 @@ export function createReceivingService(ports: Ports, instanceId: string) {
       await ports.audit(ctx.tx, { actorSub: ctx.actor.userId, action: "trading.receiving.cancel", id,
         requestId: ctx.requestId, before: "draft", after: "cancelled", version: updated.version });
       return { id, status: "cancelled", version: updated.version };
+    },
+    async confirm(ctx: Context, id: string, version: number) {
+      const doc = await draft(ctx, id, version, "edit");
+      const message = await source(ctx).resolveVerifiedAnnouncement(doc.receivingDetail!.inboundMessageId!);
+      if (message.issuerInstanceId !== doc.receivingDetail!.sourceIssuerInstanceId ||
+        message.sourceDocument.id !== doc.receivingDetail!.sourceTransferId) throw new DomainError("SOURCE_MESSAGE_INVALID", 422);
+      coverage(message, doc.lines.map((line) => ({ sourceLineId: line.sourceLineRef! })));
+      const prepared = await Promise.all(doc.lines.map(async (line) => {
+        const lot = message.lots.find((item) => item.sourceLineId === line.sourceLineRef)!;
+        if (!line.quantity || !line.quantity.eq(lot.quantity) || !line.actualQuantity ||
+          line.actualQuantity.lt(0) || line.actualQuantity.gt(line.quantity)) throw new DomainError("OVER_RECEIPT", 422);
+        const valid = await mapping(ctx, lot, line.batchId, line.warehouseId, lot.unit);
+        if (line.productId !== valid.batch.productId || line.productVariantId !== valid.batch.productVariantId ||
+          line.uomId !== valid.uomId) throw new DomainError("BATCH_PRODUCT_MISMATCH", 422);
+        return { line, lot, batch: valid.batch };
+      }));
+      const actual = prepared.reduce((sum, { line }) => sum.add(line.actualQuantity!), new Decimal(0));
+      if (!doc.receivingDetail!.sentQuantity.eq(message.sentQuantity) ||
+        actual.gt(doc.receivingDetail!.sentQuantity)) throw new DomainError("OVER_RECEIPT", 422);
+      const reason = doc.receivingDetail!.discrepancyReason?.trim();
+      if (!actual.eq(message.sentQuantity) && !reason) throw new DomainError("DISCREPANCY_REASON_REQUIRED", 422);
+      await ctx.tx.receivingDetail.update({ where: { documentId: id }, data: { actualQuantity: actual,
+        sentQuantity: message.sentQuantity, discrepancyReason: reason || null } });
+      const updated = await repo(ctx).transition(id, "draft", version, "confirmed", ctx.actor.userId);
+      if (!updated) throw new DomainError("VERSION_CONFLICT", 409);
+      const keys = [...new Map(prepared.filter(({ line }) => line.actualQuantity!.gt(0))
+        .map(({ line }) => [`${line.warehouseId}:${line.batchId}`, { warehouseId: line.warehouseId, batchId: line.batchId }])).values()]
+        .sort((a, b) => a.warehouseId.localeCompare(b.warehouseId) || a.batchId.localeCompare(b.batchId));
+      await repo(ctx).lockBalances(keys);
+      const movementIds: string[] = [];
+      for (const { line } of prepared) {
+        if (line.actualQuantity!.isZero()) continue;
+        const result = await ports.adjust(ctx.tx, { warehouseId: line.warehouseId, batchId: line.batchId,
+          productId: line.productId, productVariantId: line.productVariantId,
+          sourceLineId: line.id, kind: "receiving", delta: line.actualQuantity!,
+          actorSub: ctx.actor.userId, correlationId: doc.correlationId });
+        movementIds.push(result.movement.id);
+      }
+      const occurredAt = updated.confirmedAt!.toISOString();
+      const eventLines = prepared.filter(({ line }) => line.actualQuantity!.gt(0)).map(({ line, batch, lot }) => ({
+        id: line.id, warehouseId: line.warehouseId, batchId: line.batchId,
+        quantity: line.actualQuantity!.toFixed(3), originIssuerInstanceId: batch.originIssuerInstanceId,
+        originLotId: batch.originLotId, unit: lot.unit,
+      }));
+      for (const event of ports.event("receipt", { id, version: updated.version, actorSub: ctx.actor.userId,
+        correlationId: doc.correlationId, lines: eventLines, movementIds })) ctx.emit(event);
+      const envelope = { schemaVersion: "1.0", messageId: randomUUID(), eventId: randomUUID(),
+        eventType: "receipt.confirmed.v1", issuerInstanceId: instanceId,
+        recipientInstanceId: message.issuerInstanceId, occurredAt, publishedAt: occurredAt,
+        correlationId: message.messageId, causationId: message.messageId,
+        sourceDocument: { type: "receiving_confirmation", id, version: updated.version },
+        lots: prepared.filter(({ line }) => line.actualQuantity!.gt(0)).map(({ line, lot, batch }) => ({
+          sourceLineId: line.id, originLot: { issuerInstanceId: batch.originIssuerInstanceId,
+            lotId: batch.originLotId }, senderBatch: { instanceId, batchId: line.batchId },
+          product: { instanceId, productId: line.productId }, quantity: line.actualQuantity!.toFixed(), unit: lot.unit,
+        })),
+        upstreamReferences: [{ issuerInstanceId: message.issuerInstanceId,
+          messageId: message.messageId, eventId: message.eventId }], evidence: [], sharingPolicyVersion: "v1",
+        sourceTransfer: { issuerInstanceId: message.issuerInstanceId, id: message.sourceDocument.id },
+        actualLines: prepared.map(({ line, lot }) => ({ sourceLineId: lot.sourceLineId, receiverBatchId: line.batchId,
+          sentQuantity: line.quantity!.toFixed(), actualQuantity: line.actualQuantity!.toFixed(), unit: lot.unit })),
+        sentQuantity: message.sentQuantity, actualQuantity: actual.toFixed(),
+        discrepancyQuantity: new Decimal(message.sentQuantity).sub(actual).toFixed(),
+        ...(reason ? { discrepancyReason: reason } : {}),
+      };
+      ctx.emit({ aggregateType: "document", aggregateId: id, aggregateVersion: updated.version,
+        eventType: "receipt.confirmed.v1", schemaVersion: "1", payload: envelope,
+        destination: "federation", correlationId: message.messageId,
+        nextAttemptAt: new Date("9999-12-31T00:00:00.000Z") });
+      await ports.audit(ctx.tx, { actorSub: ctx.actor.userId, action: "trading.receiving.confirm", id,
+        requestId: ctx.requestId, before: "draft", after: "confirmed", version: updated.version });
+      return { id, status: "confirmed", version: updated.version, confirmedAt: occurredAt, movementIds };
     },
   };
 }
