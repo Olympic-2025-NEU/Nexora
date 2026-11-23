@@ -84,6 +84,19 @@ export async function cancelRequest(tx: Prisma.TransactionClient, input: {
   return changed;
 }
 
+export async function cancelApprovedRequest(tx: Prisma.TransactionClient, input: {
+  approvalRequestId: string; actorSub: string; reason: string;
+}) {
+  if (!input.reason.trim()) throw new Error("Cancellation reason required");
+  const row = await getApproval(tx, input.approvalRequestId);
+  if (!row || row.state !== "approved") throw new ApprovalNotReadyError("Approval not approved");
+  const changed = await transition(tx, row.id, ["approved"], "cancelled",
+    { cancelReason: input.reason.trim(), engineCleanupAt: new Date() }, row.version);
+  if (!changed) throw new VersionConflictError("Approval version changed");
+  await auditApproval(tx, changed, "workflow.approval.cancelled", input.actorSub, row.state);
+  return changed;
+}
+
 export async function confirmApproval(tx: Prisma.TransactionClient, resolver: ActorResolver,
   reconcile: (id: string) => Promise<void>, input: {
     approvalRequestId: string; actorSub: string; currentLineSnapshotSha256: string;

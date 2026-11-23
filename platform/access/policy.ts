@@ -82,6 +82,17 @@ const ACTION_POLICIES: Record<string, ActionPolicy> = {
   "trading:goods-issue:create": { roles: ["staff"], adminAlwaysAllowed: true },
   "trading:goods-issue:approve": { roles: ["approver"], adminAlwaysAllowed: true },
   "trading:goods-issue:read": { roles: ["staff", "approver", "viewer"], adminAlwaysAllowed: true },
+  "trading:receipt:read": { roles: ["staff", "approver", "viewer"], adminAlwaysAllowed: true },
+  "trading:issue:read": { roles: ["staff", "approver", "viewer"], adminAlwaysAllowed: true },
+  "trading:receipt:create": { roles: ["staff"], adminAlwaysAllowed: true },
+  "trading:receipt:edit": { roles: ["staff"], adminAlwaysAllowed: true },
+  "trading:receipt:confirm": { roles: ["staff"], adminAlwaysAllowed: true },
+  "trading:receipt:cancel": { roles: ["staff"], adminAlwaysAllowed: true },
+  "trading:issue:create": { roles: ["staff"], adminAlwaysAllowed: true },
+  "trading:issue:edit": { roles: ["staff"], adminAlwaysAllowed: true },
+  "trading:issue:submit": { roles: ["staff"], adminAlwaysAllowed: true },
+  "trading:issue:confirm": { roles: ["staff"], adminAlwaysAllowed: true },
+  "trading:issue:cancel": { roles: ["staff"], adminAlwaysAllowed: true },
 
   // --- Catalog/Inventory (P06 + P065) ---
   "catalog:product:create": { roles: ["administrator", "staff"], adminAlwaysAllowed: true },

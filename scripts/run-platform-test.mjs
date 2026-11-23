@@ -17,6 +17,7 @@ const scripts = {
   workflow: "tests/platform/run-workflow.sh",
   "workflow-bridge": "tests/platform/run-workflow-bridge.sh",
   ops: "tests/platform/run-ops.sh",
+  trading: "tests/platform/run-trading.sh",
 };
 const script = scripts[process.argv[2]];
 if (!script) {
