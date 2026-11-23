@@ -7,8 +7,8 @@ import { EVENT_DESTINATIONS, TRADING_EVENT_TYPES, serializeDomainEvent, validate
   type TradingEventType } from "./registry";
 
 const cases = Object.entries(fixtures.cases).filter(([name]) => name.startsWith("trading-"));
-test("five trading schemas serialize valid fixtures, reject invalid fixtures and pin versions", () => {
-  assert.equal(cases.length, 5);
+test("six trading schemas serialize valid fixtures, reject invalid fixtures and pin versions", () => {
+  assert.equal(cases.length, 6);
   assert.deepEqual(Object.values(TRADING_EVENT_TYPES), cases.map(([name]) =>
     name.replace(".schema.json", "").replaceAll("-", ".")));
   for (const [name, pair] of cases) {
@@ -17,7 +17,7 @@ test("five trading schemas serialize valid fixtures, reject invalid fixtures and
       aggregateVersion: 2, correlationId: randomUUID() };
     const rows = serializeDomainEvent(input);
     assert.deepEqual(rows.map((row) => row.destination),
-      [TRADING_EVENT_TYPES.receipt, TRADING_EVENT_TYPES.issue].includes(type as typeof TRADING_EVENT_TYPES.receipt)
+      [TRADING_EVENT_TYPES.receipt, TRADING_EVENT_TYPES.issue, TRADING_EVENT_TYPES.stocktake].includes(type as typeof TRADING_EVENT_TYPES.receipt)
         ? [EVENT_DESTINATIONS.traceability] : [EVENT_DESTINATIONS.traceability, EVENT_DESTINATIONS.federation]);
     assert.ok(rows.every((row) => row.eventType === type && row.schemaVersion === "1" && row.payload === pair.valid));
     assert.deepEqual(validateDomainEvent(type, "1", pair.invalid), { ok: false, reason: "INVALID_EVENT_PAYLOAD" });

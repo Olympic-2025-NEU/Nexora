@@ -16,7 +16,8 @@ Validation: UUID/length/date format, supported version/type, recipient đúng re
 | `trading.issue.confirmed.v1` | Như receipt + `movementIds` | Trace projector; stock đã trừ trước event |
 | `trading.transfer.confirmed.v1` | `{eventId,transferId,linkedIssueId,destinationPartnerId,lines,occurredAt}` | Federation outbound + trace; **không** movement mới |
 | `trading.receiving.confirmed.v1` | `{eventId,receivingId,sourceIssuerInstanceId,sourceTransferId,sentLines,actualLines,discrepancyReason?,occurredAt}` | Trace + gửi business receipt về sender; actual đã cộng stock |
-| `trading.sale.recorded.v1` | `{eventId,saleId,linkedIssueId,lines,occurredAt}` | Trace + downstream impact theo policy; **không** movement mới |
+| `trading.stocktake.confirmed.v1` | `{eventId,documentId,documentVersion,lines:[{lineId,batchId,warehouseId,systemQuantity,countedQuantity,delta,unit}],actorSub,reason,occurredAt}`; mọi line gồm delta 0, decimal là string; snapshot từ balance khóa lúc confirm | Trace projector; không gửi federation tại T06 |
+| `trading.sale.recorded.v1` | `{eventId,saleId,linkedIssueId,lines,occurredAt}` | Trace; downstream impact theo policy hoãn tới P09; **không** movement mới |
 | `workflow.approval.requested.v1` | `{eventId,approvalRequestId,documentId,creatorSub,processKey,correlationKey,submittedDocumentVersion,lineSnapshotSha256}` | Flowable bridge; không gửi partner |
 | `workflow.approval.decision_requested.v1` | `{eventId,approvalRequestId,documentId,taskId,decision,decisionReason?,requestedBySub,requestedAt,lineSnapshotSha256}` | Flowable decision worker; không gửi partner, không tự confirm |
 

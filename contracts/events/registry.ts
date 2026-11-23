@@ -8,6 +8,7 @@ import issueV1 from "./trading-issue-confirmed-v1.schema.json";
 import transferV1 from "./trading-transfer-confirmed-v1.schema.json";
 import receivingV1 from "./trading-receiving-confirmed-v1.schema.json";
 import saleV1 from "./trading-sale-recorded-v1.schema.json";
+import stocktakeV1 from "./trading-stocktake-confirmed-v1.schema.json";
 import requestedV1 from "./workflow-approval-requested-v1.schema.json";
 import decisionRequestedV1 from "./workflow-approval-decision-requested-v1.schema.json";
 import startedV1 from "./workflow-approval-started-v1.schema.json";
@@ -28,6 +29,7 @@ export const TRADING_EVENT_TYPES = {
   transfer: "trading.transfer.confirmed.v1",
   receiving: "trading.receiving.confirmed.v1",
   sale: "trading.sale.recorded.v1",
+  stocktake: "trading.stocktake.confirmed.v1",
 } as const;
 
 export type TradingEventType = (typeof TRADING_EVENT_TYPES)[keyof typeof TRADING_EVENT_TYPES];
@@ -43,6 +45,7 @@ const entries = [
   [TRADING_EVENT_TYPES.transfer, transferV1, [EVENT_DESTINATIONS.traceability, EVENT_DESTINATIONS.federation]],
   [TRADING_EVENT_TYPES.receiving, receivingV1, [EVENT_DESTINATIONS.traceability, EVENT_DESTINATIONS.federation]],
   [TRADING_EVENT_TYPES.sale, saleV1, [EVENT_DESTINATIONS.traceability, EVENT_DESTINATIONS.federation]],
+  [TRADING_EVENT_TYPES.stocktake, stocktakeV1, [EVENT_DESTINATIONS.traceability]],
   [WORKFLOW_EVENT_TYPES.requested, requestedV1, [EVENT_DESTINATIONS.workflow]],
   [WORKFLOW_EVENT_TYPES.decisionRequested, decisionRequestedV1, [EVENT_DESTINATIONS.workflow]],
   [WORKFLOW_EVENT_TYPES.started, startedV1, [EVENT_DESTINATIONS.workflow]],

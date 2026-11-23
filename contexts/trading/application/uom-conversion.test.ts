@@ -14,6 +14,12 @@ test("conversion rounds once and stock form is idempotent", () => {
   assert.throws(() => convertToStock("0.001", "pack", [{ ...uoms[0] }, { ...uoms[1], factorToStockUom: "0.001" }]),
     { code: "CONVERSION_ROUNDS_TO_ZERO" });
 });
+test("stocktake accepts zero only when requested, still validates UOM and rounding", () => {
+  assert.equal(convertToStock("0", "pack", uoms, true).stockQuantity, "0.000");
+  assert.throws(() => convertToStock("0", "pack", uoms), { code: "QUANTITY_NOT_POSITIVE" });
+  assert.throws(() => convertToStock("0", "unknown", uoms, true), { code: "UOM_NOT_ON_VARIANT" });
+  assert.throws(() => convertToStock("0.001", "pack", uoms, true), { code: "CONVERSION_ROUNDS_TO_ZERO" });
+});
 test("confirm checklist rejects missing or duplicate lines", () => {
   assert.throws(() => checkLines([]), { code: "NO_LINES" });
   const line = { lineNo: 1, warehouseId: "w", batchId: "b", productVariantId: "v", productId: "p", uomId: "u", quantity: "1" };

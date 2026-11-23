@@ -11,6 +11,9 @@ import { computeLineSnapshotSha256 } from "@/contracts/workflow/line-snapshot";
 import { serializeDomainEvent, TRADING_EVENT_TYPES } from "@/contracts/events/registry";
 import { createTransferService } from "@/contexts/trading/application/transfers";
 import { createReceivingService } from "@/contexts/trading/application/receivings";
+import { createStocktakeService } from "@/contexts/trading/application/stocktakes";
+import { createSaleService } from "@/contexts/trading/application/sales";
+import { EVENT_DESTINATIONS } from "@/contracts/events/registry";
 
 export const tradingPorts: TradingPorts = {
   adjust: adjustStock,
@@ -52,6 +55,21 @@ export const tradingPorts: TradingPorts = {
 export const tradingService = createDocumentService(tradingPorts);
 export const transferService = () => createTransferService(tradingPorts, process.env.NEXORA_ISSUER_INSTANCE_ID ?? "");
 export const receivingService = () => createReceivingService(tradingPorts, process.env.NEXORA_ISSUER_INSTANCE_ID ?? "");
+export const stocktakeService = () => createStocktakeService({ audit: tradingPorts.audit, adjust: adjustStock,
+  event(input) {
+    return serializeDomainEvent({ type: TRADING_EVENT_TYPES.stocktake, aggregateType: "document",
+      aggregateId: input.id, aggregateVersion: input.version, correlationId: input.correlationId,
+      payload: { eventId: randomUUID(), documentId: input.id, documentVersion: input.version,
+        lines: input.lines, actorSub: input.actorSub, reason: input.reason, occurredAt: input.occurredAt } });
+  } });
+export const saleService = () => createSaleService({ audit: tradingPorts.audit,
+  event(input) {
+    return serializeDomainEvent({ type: TRADING_EVENT_TYPES.sale, aggregateType: "document",
+      aggregateId: input.id, aggregateVersion: input.version, correlationId: input.correlationId,
+      destinations: [EVENT_DESTINATIONS.traceability],
+      payload: { eventId: randomUUID(), saleId: input.id, linkedIssueId: input.linkedIssueId,
+        lines: input.lines, occurredAt: input.occurredAt } });
+  } });
 
 export const tradingIdempotency = () => createPrismaIdempotency(getPrismaClient());
 export const tradingRead = async <T>(work: (tx: Prisma.TransactionClient) => Promise<T>) =>

@@ -6,7 +6,7 @@ import { PrismaClient } from "@prisma/client";
 import { getPrismaClient } from "../../platform/persistence/prisma";
 import { createPrismaIdempotency } from "../../platform/http/idempotency";
 import { runCommand } from "../../platform/http/pipeline";
-import { tradingService, tradingUnitOfWork, tradingPorts, transferService } from "../../composition/trading";
+import { tradingService, tradingUnitOfWork, tradingPorts, transferService, stocktakeService, saleService } from "../../composition/trading";
 import { createReceivingService, type ActualInput } from "../../contexts/trading/application/receivings";
 import { createCatalogRepos } from "../../contexts/catalog/infrastructure/prisma-repos";
 import { createDocumentService } from "../../contexts/trading/application/documents";
@@ -38,6 +38,9 @@ const actor: Actor = { userId: "receipt-creator", organizationId: "fixture-org",
 process.env.NEXORA_ISSUER_INSTANCE_ID = "local-instance";
 const partnerId = randomUUID();
 const line = (quantity: string, uomId = stockUomId) => ({ warehouseId, productVariantId: variantId, batchId, quantity, uomId });
+const countLine = (batch: string, countedQuantity: string, uomId = stockUomId) => ({
+  warehouseId, productVariantId: variantId, batchId: batch, countedQuantity, uomId,
+});
 
 before(async () => {
   await owner.organization.create({ data: { id: orgId, instanceId: randomUUID(), code: "TEST", name: "Trading fixture" } });
@@ -79,6 +82,181 @@ async function command<T>(action: string, body: unknown,
     domain: (ctx) => work({ tx: ctx.tx, actor: actingActor, requestId: ctx.requestId, emit: ctx.emit }),
   });
 }
+
+async function stockCommand<T>(action: string, body: unknown,
+  work: (ctx: Parameters<ReturnType<typeof stocktakeService>["create"]>[0]) => Promise<T>,
+  key?: string, actingActor: Actor = actor): Promise<T> {
+  return runCommand({ requestId: randomUUID() }, {
+    authenticate: async () => actingActor, resolveTenant: async () => actingActor.organizationId,
+    action: `trading:stocktake:${action}`, unitOfWork: tradingUnitOfWork,
+    method: "POST", routeKey: `stocktake:${action}`, payload: body,
+    idempotencyKey: key, idempotencyPort: createPrismaIdempotency(db),
+    domain: (ctx) => work({ tx: ctx.tx, actor: actingActor, requestId: ctx.requestId, emit: ctx.emit }),
+  });
+}
+
+async function saleCommand<T>(action: "create" | "confirm" | "cancel" | "read", body: unknown,
+  work: (ctx: Parameters<ReturnType<typeof saleService>["create"]>[0]) => Promise<T>, key?: string,
+  actingActor: Actor = actor): Promise<T> {
+  return runCommand({ requestId: randomUUID() }, {
+    authenticate: async () => actingActor, resolveTenant: async () => actingActor.organizationId,
+    action: `trading:sale:${action}`, unitOfWork: tradingUnitOfWork,
+    method: "POST", routeKey: `sale:${action}`, payload: body,
+    idempotencyKey: key, idempotencyPort: createPrismaIdempotency(db),
+    domain: (ctx) => work({ tx: ctx.tx, actor: actingActor, requestId: ctx.requestId, emit: ctx.emit }),
+  });
+}
+
+test("sale from approved issue leaves 6 to 4 balance unchanged, one trace event; rejects invalid source", {
+  timeout: 120_000,
+}, async () => {
+  const lot = randomUUID();
+  await owner.batch.create({ data: { id: lot, productId, productVariantId: variantId, localCode: randomUUID(),
+    originIssuerInstanceId: "issuer", originLotId: randomUUID(), qualityStatus: "available", createdBySub: "fixture" } });
+  const receipt = await command("create", {}, (ctx) => tradingService.create(ctx, "goods_receipt",
+    { lines: [{ ...line("6"), batchId: lot }] }));
+  await command("confirm", { id: receipt.id }, (ctx) => tradingService.action(ctx,
+    "goods_receipt", receipt.id, "confirm", receipt.version), randomUUID());
+  assert.equal((await db.stockBalance.findUniqueOrThrow({ where: { warehouseId_batchId: {
+    warehouseId, batchId: lot } } })).quantity.toFixed(3), "6.000");
+  const source = await command("create", {}, (ctx) => tradingService.create(ctx, "goods_issue",
+    { purpose: "sale", lines: [{ ...line("2"), batchId: lot }] }), undefined, "goods_issue");
+  await assert.rejects(saleCommand("create", {}, (ctx) => saleService().create(ctx, {
+    linkedIssueId: source.id,
+  })), { code: "ISSUE_NOT_CONFIRMED", httpStatus: 409 });
+  const wrong = await command("create", {}, (ctx) => tradingService.create(ctx, "goods_issue",
+    { purpose: "other", lines: [{ ...line("1"), batchId: lot }] }), undefined, "goods_issue");
+  await assert.rejects(saleCommand("create", {}, (ctx) => saleService().create(ctx, {
+    linkedIssueId: wrong.id,
+  })), { code: "ISSUE_WRONG_PURPOSE", httpStatus: 422 });
+  await assert.rejects(saleCommand("create", {}, (ctx) => saleService().create(ctx, {
+    linkedIssueId: randomUUID(),
+  })), { code: "ISSUE_NOT_FOUND", httpStatus: 422 });
+  await command("submit", { id: source.id }, (ctx) => tradingService.action(ctx,
+    "goods_issue", source.id, "submit", source.version), undefined, "goods_issue");
+  await approve(source.id);
+  await command("confirm", { id: source.id }, (ctx) => tradingService.action(ctx,
+    "goods_issue", source.id, "confirm", source.version + 1), randomUUID(), "goods_issue");
+  const balance = async () => (await db.stockBalance.findUniqueOrThrow({ where: { warehouseId_batchId: {
+    warehouseId, batchId: lot } } })).quantity.toFixed(3);
+  assert.equal(await balance(), "4.000");
+  const movementCount = await db.stockMovement.count();
+  await assert.rejects(saleCommand("create", {}, (ctx) => saleService().create(ctx, {
+    linkedIssueId: source.id, soldAt: new Date(Date.now() + 86_400_000).toISOString(),
+  })), { code: "INVALID_SOLD_AT", httpStatus: 422 });
+  await assert.rejects(saleCommand("create", {}, (ctx) => saleService().create(ctx, {
+    linkedIssueId: source.id, buyerRef: "x".repeat(65),
+  })), { code: "BUYER_REF_TOO_LONG", httpStatus: 422 });
+  const cancelled = await saleCommand("create", {}, (ctx) => saleService().create(ctx, {
+    linkedIssueId: source.id, buyerRef: "  ref-1  ",
+  }));
+  assert.equal(cancelled.buyerRef, "ref-1");
+  assert.equal(cancelled.lines[0]!.sourceIssueLineId, source.lines[0]!.id);
+  await assert.rejects(saleCommand("create", {}, (ctx) => saleService().create(ctx, {
+    linkedIssueId: source.id,
+  })), { code: "SALE_ALREADY_EXISTS", httpStatus: 409 });
+  await saleCommand("cancel", { id: cancelled.id }, (ctx) => saleService().cancel(ctx, cancelled.id, cancelled.version));
+  const sale = await saleCommand("create", {}, (ctx) => saleService().create(ctx, { linkedIssueId: source.id }));
+  await assert.rejects(saleCommand("confirm", { id: sale.id }, (ctx) =>
+    saleService().confirm(ctx, sale.id, sale.version), randomUUID(), { ...actor, unitIds: [] }),
+  { code: "WAREHOUSE_SCOPE_REQUIRED", httpStatus: 403 });
+  const key = randomUUID();
+  const confirm = () => saleCommand("confirm", { id: sale.id }, (ctx) => saleService().confirm(ctx, sale.id, sale.version), key);
+  const posted = await confirm();
+  assert.deepEqual(await confirm(), posted);
+  assert.equal(posted.movementIds.length, 0);
+  assert.equal(await balance(), "4.000");
+  assert.equal(await db.stockMovement.count(), movementCount);
+  assert.deepEqual((await saleCommand("read", {}, (ctx) => saleService().view(ctx, sale.id))).lines[0]!.stockEffect,
+    { issueBefore: "6.000", issueAfter: "4.000" });
+  assert.equal(await db.outboxMessage.count({ where: { aggregateId: sale.id, eventType: "trading.sale.recorded.v1" } }), 1);
+  assert.equal((await db.outboxMessage.findFirstOrThrow({ where: { aggregateId: sale.id,
+    eventType: "trading.sale.recorded.v1" } })).destination, "traceability");
+  await assert.rejects(saleCommand("create", {}, (ctx) => saleService().create(ctx, {
+    linkedIssueId: source.id,
+  })), { code: "SALE_ALREADY_EXISTS", httpStatus: 409 });
+});
+
+test("stocktake signed variance, zero lines, found stock, packing, reason and replay", async () => {
+  const lot = randomUUID(), found = randomUUID();
+  for (const id of [lot, found]) await owner.batch.create({ data: { id, productId, productVariantId: variantId,
+    localCode: randomUUID(), originIssuerInstanceId: "issuer", originLotId: randomUUID(),
+    qualityStatus: "available", createdBySub: "fixture" } });
+  const receipt = await command("create", {}, (ctx) => tradingService.create(ctx, "goods_receipt",
+    { lines: [{ ...line("10"), batchId: lot }] }));
+  await command("confirm", { id: receipt.id }, (ctx) => tradingService.action(ctx,
+    "goods_receipt", receipt.id, "confirm", receipt.version), randomUUID());
+  const first = await stockCommand("create", {}, (ctx) => stocktakeService().create(ctx, {
+    lines: [countLine(lot, "7"), countLine(found, "5")], note: "Counted variance",
+  }));
+  assert.equal((await db.documentLine.findFirstOrThrow({ where: { documentId: first.id } })).quantity, null);
+  const key = randomUUID();
+  const confirm = () => stockCommand("confirm", { id: first.id }, (ctx) =>
+    stocktakeService().confirm(ctx, first.id, first.version), key);
+  const posted = await confirm();
+  assert.deepEqual(await confirm(), posted);
+  assert.equal(posted.movementIds.length, 2);
+  assert.deepEqual((await db.stockMovement.findMany({ where: { sourceLineId: { in: first.lines.map((l) => l.id) } },
+    orderBy: { delta: "asc" } })).map((row) => row.delta.toFixed(3)), ["-3.000", "5.000"]);
+  assert.equal((await db.stockBalance.findUniqueOrThrow({ where: { warehouseId_batchId: {
+    warehouseId, batchId: lot } } })).quantity.toFixed(3), "7.000");
+  assert.equal((await db.stockBalance.findUniqueOrThrow({ where: { warehouseId_batchId: {
+    warehouseId, batchId: found } } })).quantity.toFixed(3), "5.000");
+  const second = await stockCommand("create", {}, (ctx) => stocktakeService().create(ctx, {
+    lines: [countLine(lot, "0.9", packUomId), countLine(found, "5")], note: "Two found",
+  }));
+  await stockCommand("confirm", { id: second.id }, (ctx) => stocktakeService().confirm(ctx, second.id, second.version), randomUUID());
+  const event = await db.outboxMessage.findFirstOrThrow({ where: { aggregateId: second.id,
+    eventType: "trading.stocktake.confirmed.v1" } });
+  const payload = event.payload as { lines: { delta: string; systemQuantity: string; countedQuantity: string }[] };
+  assert.deepEqual(payload.lines.map((item) => item.delta), ["2.000", "0.000"]);
+  assert.equal(payload.lines[0]!.systemQuantity, "7.000");
+  assert.equal(payload.lines[0]!.countedQuantity, "9.000");
+  assert.equal((await db.documentLine.findFirstOrThrow({ where: { documentId: second.id } })).quantity, null);
+  assert.equal((await db.documentLine.findFirstOrThrow({ where: { documentId: second.id } })).uomId, stockUomId);
+  assert.equal((await stockCommand("read", {}, (ctx) => stocktakeService().view(ctx, second.id))).lines[1]!.movementId, null);
+  const zero = await stockCommand("create", {}, (ctx) => stocktakeService().create(ctx, {
+    lines: [countLine(lot, "9"), countLine(found, "5")],
+  }));
+  assert.equal((await stockCommand("confirm", { id: zero.id }, (ctx) => stocktakeService().confirm(ctx, zero.id, zero.version), randomUUID())).movementIds.length, 0);
+  assert.equal((await db.outboxMessage.findFirstOrThrow({ where: { aggregateId: zero.id,
+    eventType: "trading.stocktake.confirmed.v1" } })).destination, "traceability");
+  assert.equal((await db.stockMovement.count({ where: { sourceLineId: { in: zero.lines.map((row) => row.id) } } })), 0);
+  const noReason = await stockCommand("create", {}, (ctx) => stocktakeService().create(ctx, { lines: [countLine(lot, "8")] }));
+  await assert.rejects(stockCommand("confirm", { id: noReason.id }, (ctx) =>
+    stocktakeService().confirm(ctx, noReason.id, noReason.version), randomUUID()),
+  { code: "STOCKTAKE_REASON_REQUIRED", httpStatus: 422 });
+  await assert.rejects(stockCommand("create", {}, (ctx) => stocktakeService().create(ctx, {
+    lines: [countLine(lot, "1"), countLine(lot, "2")],
+  })), { code: "DUPLICATE_LINE", httpStatus: 422 });
+  await assert.rejects(stockCommand("create", {}, (ctx) => stocktakeService().create(ctx, {
+    lines: [countLine(randomUUID(), "1")],
+  })), { code: "BATCH_NOT_FOUND", httpStatus: 422 });
+  const duplicatePatch = await stockCommand("create", {}, (ctx) => stocktakeService().create(ctx, {
+    lines: [countLine(lot, "9")],
+  }));
+  await assert.rejects(stockCommand("update", { id: duplicatePatch.id }, (ctx) =>
+    stocktakeService().edit(ctx, duplicatePatch.id, duplicatePatch.version,
+      { lines: [countLine(lot, "8"), countLine(lot, "9")] })),
+  { code: "DUPLICATE_LINE", httpStatus: 422 });
+  const race = await Promise.allSettled([randomUUID(), randomUUID()].map((raceKey) =>
+    stockCommand("confirm", { id: duplicatePatch.id }, (ctx) =>
+      stocktakeService().confirm(ctx, duplicatePatch.id, duplicatePatch.version), raceKey)));
+  assert.equal(race.filter((result) => result.status === "fulfilled").length, 1);
+  assert.equal(race.filter((result) => result.status === "rejected").length, 1);
+  assert.equal((await db.outboxMessage.count({ where: { aggregateId: duplicatePatch.id,
+    eventType: "trading.stocktake.confirmed.v1" } })), 1);
+  await owner.batch.update({ where: { id: lot }, data: { expiresOn: new Date(Date.now() - 86400000), qualityStatus: "inspect" } });
+  try {
+    const expired = await stockCommand("create", {}, (ctx) => stocktakeService().create(ctx, {
+      lines: [countLine(lot, "9")],
+    }));
+    await stockCommand("confirm", { id: expired.id }, (ctx) => stocktakeService().confirm(ctx, expired.id, expired.version), randomUUID());
+  } finally { await owner.batch.update({ where: { id: lot }, data: { expiresOn: null, qualityStatus: "available" } }); }
+  await assert.rejects(stockCommand("confirm", { id: noReason.id }, (ctx) =>
+    stocktakeService().confirm(ctx, noReason.id, noReason.version), randomUUID(), { ...actor, unitIds: [] }),
+  { code: "WAREHOUSE_SCOPE_REQUIRED", httpStatus: 403 });
+});
 
 test("receipt 20 from pack, atomic movement, audit, outbox, replay and stale guard", async () => {
   const receipt = await command("create", { lines: [line("2", packUomId)] }, (ctx) =>

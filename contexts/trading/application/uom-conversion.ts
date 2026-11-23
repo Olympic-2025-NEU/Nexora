@@ -4,7 +4,7 @@ import { DomainError } from "@/platform/kernel/errors";
 
 export type VariantUom = { uomId: string; isStockKeeping: boolean; factorToStockUom: string };
 
-export function convertToStock(quantity: string, uomId: string, uoms: readonly VariantUom[]) {
+export function convertToStock(quantity: string, uomId: string, uoms: readonly VariantUom[], allowZero = false) {
   if (!/^(?:0|[1-9]\d{0,16})(?:\.\d{1,3})?$/.test(quantity)) {
     throw new DomainError("QUANTITY_INVALID", 422);
   }
@@ -14,8 +14,8 @@ export function convertToStock(quantity: string, uomId: string, uoms: readonly V
     throw new DomainError("UOM_NOT_ON_VARIANT", 422);
   }
   const result = new Decimal(quantity).mul(source.factorToStockUom).toDecimalPlaces(3, Decimal.ROUND_HALF_UP);
-  if (new Decimal(quantity).lte(0)) throw new DomainError("QUANTITY_NOT_POSITIVE", 422);
-  if (result.isZero()) throw new DomainError("CONVERSION_ROUNDS_TO_ZERO", 422);
+  if (new Decimal(quantity).lte(0) && !(allowZero && new Decimal(quantity).isZero())) throw new DomainError("QUANTITY_NOT_POSITIVE", 422);
+  if (result.isZero() && !new Decimal(quantity).isZero()) throw new DomainError("CONVERSION_ROUNDS_TO_ZERO", 422);
   if (result.gte("100000000000000000")) throw new DomainError("QUANTITY_OVERFLOW", 422);
   return { stockQuantity: result.toFixed(3), stockUomId: stock.uomId };
 }
