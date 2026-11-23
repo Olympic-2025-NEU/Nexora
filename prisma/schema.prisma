@@ -606,7 +606,7 @@ model Document {
   receivingDetail ReceivingDetail?
   saleDetail SaleDetail? @relation("SaleDocument")
   transferIssues TransferDetail[] @relation("TransferIssue")
-  saleIssue SaleDetail? @relation("SaleIssue")
+  saleIssues SaleDetail[] @relation("SaleIssue")
   approvals ApprovalRequest[]
 
   @@unique([documentType, documentNumber], map: "uq_trading_document_number")
@@ -700,13 +700,14 @@ model InboundMessage {
 
 model SaleDetail {
   documentId    String   @id @map("document_id") @db.Uuid
-  linkedIssueId String   @unique(map: "uq_trading_sale_issue") @map("linked_issue_id") @db.Uuid
+  linkedIssueId String   @map("linked_issue_id") @db.Uuid
   buyerRef      String?  @map("buyer_ref")
   soldAt        DateTime @map("sold_at") @db.Timestamptz(6)
 
   document Document @relation("SaleDocument", fields: [documentId], references: [id])
   linkedIssue Document @relation("SaleIssue", fields: [linkedIssueId], references: [id])
 
+  @@index([linkedIssueId], map: "idx_trading_sale_issue")
   @@map("sale_detail")
   @@schema("trading")
 }
