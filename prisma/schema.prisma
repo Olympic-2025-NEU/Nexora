@@ -679,7 +679,7 @@ model ReceivingDetail {
 
   document Document @relation(fields: [documentId], references: [id])
 
-  @@unique([sourceIssuerInstanceId, sourceTransferId], map: "uq_trading_receiving_source")
+  @@index([sourceIssuerInstanceId, sourceTransferId], map: "idx_trading_receiving_source")
   @@map("receiving_detail")
   @@schema("trading")
 }

@@ -103,6 +103,11 @@ test("versioned schema contains platform tables, expected constraints and migrat
     SELECT conname FROM pg_constraint WHERE conrelid='trading.transfer_detail'::regclass`;
   assert.ok(!transferConstraints.some((row) => row.conname === "uq_trading_transfer_issue"));
   assert.ok(transferConstraints.some((row) => row.conname === "trg_trading_active_transfer_detail"));
+  const receivingConstraints = await migrator.$queryRaw`
+    SELECT conname FROM pg_constraint WHERE conrelid='trading.receiving_detail'::regclass`;
+  assert.ok(!receivingConstraints.some((row) => row.conname === "uq_trading_receiving_source"));
+  assert.ok(receivingConstraints.some((row) => row.conname === "trg_trading_active_receiving_detail"));
+  assert.ok(migrations.some((row) => row.migration_name === "20261123030000_receiving_active_source"));
   const tradingConstraints = await migrator.$queryRaw`
     SELECT conname FROM pg_constraint WHERE conname IN
       ('batch_id_variant_key','fk_trading_movement_line','fk_trading_approval_document',

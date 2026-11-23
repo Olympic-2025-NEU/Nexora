@@ -231,14 +231,39 @@ test("transfer, sale and receiving raw SQL validate links and totals", async () 
     await confirm(tx, noReference.id);
   });
   const partial = header("receiving_confirmation");
+  const reusableSource = randomUUID();
   await app.$transaction(async (tx) => {
     await insertHeader(tx, partial);
     await tx.$executeRaw`INSERT INTO trading.receiving_detail
       (document_id, source_issuer_instance_id, source_transfer_id, sent_quantity, actual_quantity, discrepancy_reason)
-      VALUES (${partial.id}::uuid, 'remote', ${randomUUID()}, 12, 0, 'Nothing arrived')`;
+      VALUES (${partial.id}::uuid, 'remote', ${reusableSource}, 12, 0, 'Nothing arrived')`;
     await insertLine(tx, line(partial.id, { actualQuantity: "0", sourceLineRef: randomUUID() }));
     await confirm(tx, partial.id);
   });
+  const duplicateReceiving = header("receiving_confirmation");
+  await assert.rejects(app.$transaction(async (tx) => {
+    await insertHeader(tx, duplicateReceiving);
+    await tx.$executeRaw`INSERT INTO trading.receiving_detail
+      (document_id, source_issuer_instance_id, source_transfer_id, sent_quantity)
+      VALUES (${duplicateReceiving.id}::uuid, 'remote', ${reusableSource}, 12)`;
+  }), { code: "P2002" });
+  const cancelledReceiving = header("receiving_confirmation");
+  const cancelledSource = randomUUID();
+  await app.$transaction(async (tx) => {
+    await insertHeader(tx, cancelledReceiving);
+    await tx.$executeRaw`INSERT INTO trading.receiving_detail
+      (document_id, source_issuer_instance_id, source_transfer_id, sent_quantity)
+      VALUES (${cancelledReceiving.id}::uuid, 'remote', ${cancelledSource}, 12)`;
+  });
+  await app.document.update({ where: { id: cancelledReceiving.id }, data: { status: "cancelled", cancelledAt: new Date() } });
+  const replacementReceiving = header("receiving_confirmation");
+  await app.$transaction(async (tx) => {
+    await insertHeader(tx, replacementReceiving);
+    await tx.$executeRaw`INSERT INTO trading.receiving_detail
+      (document_id, source_issuer_instance_id, source_transfer_id, sent_quantity)
+      VALUES (${replacementReceiving.id}::uuid, 'remote', ${cancelledSource}, 12)`;
+  });
+  assert.equal((await app.receivingDetail.findMany({ where: { sourceTransferId: cancelledSource } })).length, 2);
 });
 
 test("partial correction uniqueness and caller-owned repository transaction", async () => {
