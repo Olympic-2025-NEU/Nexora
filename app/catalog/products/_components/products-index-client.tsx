@@ -60,7 +60,13 @@ export function ProductsIndexClient() {
   }, [q, t]);
 
   useEffect(() => {
-    void load();
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) void load();
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [load]);
 
   const catName = (id: string) => categories.find((c) => c.id === id)?.name ?? "—";

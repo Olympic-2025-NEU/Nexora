@@ -76,7 +76,13 @@ export default function CatalogBatchesPage() {
   }, [t]);
 
   useEffect(() => {
-    void load();
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) void load();
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [load]);
 
   async function createBatch(e: React.FormEvent) {

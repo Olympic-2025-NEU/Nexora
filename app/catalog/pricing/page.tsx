@@ -112,11 +112,24 @@ export default function PricingPage() {
   }, []);
 
   useEffect(() => {
-    void loadLists();
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) void loadLists();
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [loadLists]);
 
   useEffect(() => {
-    if (selectedId) void loadItems(selectedId);
+    if (!selectedId) return;
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) void loadItems(selectedId);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [selectedId, loadItems]);
 
   async function addItem(e: React.FormEvent) {
