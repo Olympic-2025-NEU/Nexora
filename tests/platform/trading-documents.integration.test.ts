@@ -6,7 +6,7 @@ import { PrismaClient } from "@prisma/client";
 import { getPrismaClient } from "../../platform/persistence/prisma";
 import { createPrismaIdempotency } from "../../platform/http/idempotency";
 import { runCommand } from "../../platform/http/pipeline";
-import { tradingService, tradingUnitOfWork, tradingPorts } from "../../composition/trading";
+import { tradingService, tradingUnitOfWork, tradingPorts, transferService } from "../../composition/trading";
 import { createDocumentService } from "../../contexts/trading/application/documents";
 import type { Actor } from "../../platform/identity/actor";
 import type { TradingKind } from "../../contexts/trading/application/documents";
@@ -26,6 +26,8 @@ const stockUomId = "aaaaaaaa-0001-4000-8000-000000000001";
 const packUomId = randomUUID();
 const orgId = randomUUID();
 const actor: Actor = { userId: "receipt-creator", organizationId: "fixture-org", roles: ["staff"], unitIds: [warehouseId] };
+process.env.NEXORA_ISSUER_INSTANCE_ID = "local-instance";
+const partnerId = randomUUID();
 const line = (quantity: string, uomId = stockUomId) => ({ warehouseId, productVariantId: variantId, batchId, quantity, uomId });
 
 before(async () => {
@@ -51,6 +53,8 @@ before(async () => {
     } });
     await owner.membershipWarehouse.create({ data: { membershipId: member.id, warehouseId } });
   }
+  await owner.partner.create({ data: { id: partnerId, issuerInstanceId: "remote-instance", code: randomUUID(),
+    displayName: "Remote", createdBySub: "fixture" } });
 });
 after(async () => { await db.$disconnect(); await owner.$disconnect(); });
 
@@ -405,4 +409,42 @@ test("concurrent receipt confirms on same document return one 409, not a raw imm
   assert.equal(results.filter((outcome) => outcome.status === "rejected" &&
     outcome.reason.code === "VERSION_CONFLICT").length, 1);
   assert.equal(await db.stockMovement.count({ where: { sourceLineId: doc.lines[0]!.id } }), 1);
+});
+
+async function transferIssue() {
+  const doc = await command("create", {}, (ctx) => tradingService.create(ctx, "goods_issue",
+    { purpose: "partner_transfer", lines: [line("1")] }), undefined, "goods_issue");
+  await command("submit", { id: doc.id }, (ctx) => tradingService.action(ctx,
+    "goods_issue", doc.id, "submit", doc.version), undefined, "goods_issue");
+  await approve(doc.id);
+  await command("confirm", { id: doc.id }, (ctx) => tradingService.action(ctx,
+    "goods_issue", doc.id, "confirm", doc.version + 1), randomUUID(), "goods_issue");
+  return doc;
+}
+
+function transferCommand<T>(action: "create" | "cancel" | "confirm", payload: unknown,
+  work: (ctx: Parameters<ReturnType<typeof transferService>["create"]>[0]) => Promise<T>, key?: string) {
+  return runCommand({ requestId: randomUUID() }, {
+    authenticate: async () => actor, resolveTenant: async () => actor.organizationId,
+    action: `trading:transfer:${action}`, method: "POST", routeKey: `transfer:${action}`,
+    payload, idempotencyKey: key, idempotencyPort: createPrismaIdempotency(db), unitOfWork: tradingUnitOfWork,
+    domain: (ctx) => work({ tx: ctx.tx, actor, requestId: ctx.requestId, emit: ctx.emit }),
+  });
+}
+
+test("transfer copies all issue lines; cancellation frees issue without deleting history", { timeout: 120_000 }, async () => {
+  const issue = await transferIssue();
+  const service = transferService();
+  const input = { linkedIssueId: issue.id, destinationPartnerId: partnerId };
+  const first = await transferCommand("create", input, (ctx) => service.create(ctx, input));
+  assert.equal(first.lines.length, issue.lines.length);
+  assert.equal(first.lines[0]!.sourceIssueLineId, issue.lines[0]!.id);
+  assert.equal(first.lines[0]!.quantity, "1.000");
+  assert.equal(await db.outboxMessage.count({ where: { aggregateId: first.id } }), 0);
+  await assert.rejects(transferCommand("create", input, (ctx) => service.create(ctx, input)),
+    { code: "TRANSFER_ALREADY_EXISTS", httpStatus: 409 });
+  await transferCommand("cancel", { id: first.id }, (ctx) => service.cancel(ctx, first.id, first.version));
+  const next = await transferCommand("create", input, (ctx) => service.create(ctx, input));
+  assert.notEqual(next.id, first.id);
+  assert.equal((await db.transferDetail.findMany({ where: { linkedIssueId: issue.id } })).length, 2);
 });

@@ -93,6 +93,10 @@ const ACTION_POLICIES: Record<string, ActionPolicy> = {
   "trading:issue:submit": { roles: ["staff"], adminAlwaysAllowed: true },
   "trading:issue:confirm": { roles: ["staff"], adminAlwaysAllowed: true },
   "trading:issue:cancel": { roles: ["staff"], adminAlwaysAllowed: true },
+  "trading:transfer:read": { roles: ["staff", "approver", "viewer"], adminAlwaysAllowed: true },
+  "trading:transfer:create": { roles: ["staff"], adminAlwaysAllowed: true },
+  "trading:transfer:confirm": { roles: ["staff"], adminAlwaysAllowed: true },
+  "trading:transfer:cancel": { roles: ["staff"], adminAlwaysAllowed: true },
 
   // --- Catalog/Inventory (P06 + P065) ---
   "catalog:product:create": { roles: ["administrator", "staff"], adminAlwaysAllowed: true },

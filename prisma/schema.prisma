@@ -605,7 +605,7 @@ model Document {
   transferDetail TransferDetail? @relation("TransferDocument")
   receivingDetail ReceivingDetail?
   saleDetail SaleDetail? @relation("SaleDocument")
-  transferIssue TransferDetail? @relation("TransferIssue")
+  transferIssues TransferDetail[] @relation("TransferIssue")
   saleIssue SaleDetail? @relation("SaleIssue")
   approvals ApprovalRequest[]
 
