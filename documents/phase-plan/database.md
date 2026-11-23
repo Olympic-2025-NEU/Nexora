@@ -39,6 +39,13 @@ Flowable và Keycloak lưu vào database/role riêng của **cùng instance stac
 4. Nhận federation: authenticate trước parse/ghi; unique inbox + payload hash; duplicate cùng hash trả ACK tương đương, duplicate khác hash báo conflict và audit. Nhận message không được update balance.
 5. Test cạnh tranh: hai issue vượt số dư, chỉ một được confirm; double-click confirm tạo một movement/outbox; message replay tạo một inbox/trace summary.
 
+### P03-T02: Unit of Work policy
+
+- `platform/persistence/transaction.ts` dùng Prisma interactive transaction mức `Serializable`, `maxWait=2s`, `timeout=10s`; caller inject cùng `TransactionClient` vào mọi repository của một command. Không gọi HTTP, storage hoặc dispatcher bên trong callback vì callback có thể chạy lại.
+- Retry nhiều nhất **2 lần sau lần đầu** chỉ với Prisma `P2034` hoặc PostgreSQL SQLSTATE `40001`/`40P01`. Hết lượt trả `TRANSACTION_CONFLICT`; transaction quá hạn trả `TRANSACTION_TIMEOUT` và không retry. Lỗi domain/unique giữ nguyên để use case map đúng HTTP.
+- Aggregate mutable dùng `WHERE id AND version=expected`, tăng version cùng update; count 0 là conflict. Với tồn kho P06, dùng update có điều kiện `quantity >= delta` để ngăn âm. Nếu command khóa nhiều dòng, sắp thứ tự cố định theo `(warehouse_id,batch_id)` bằng `orderForLocking` trước khi ghi; cùng quy tắc cho mọi caller.
+- P03-T02 kiểm policy trên các bảng spike chỉ sống trong DB test cách ly, dùng audit thật; `outbox_message`, `stock_balance` và document sản phẩm thuộc P04/P06/P07 phải có integration test riêng theo đúng port này khi được tạo.
+
 ## 4. Migration và dữ liệu mẫu (Prisma)
 
 - **Một nguồn migration:** Prisma Migrate (`prisma/migrations/`). P01 thay/loại file rỗng `db/migrations/0001_platform.sql`; không duy trì hai hệ migration song song. Chi tiết quy ước: [`prisma-migration-spec.md`](./prisma-migration-spec.md).

@@ -1,17 +1,458 @@
 # SPDX-License-Identifier: AGPL-3.0-only
-# P01 bootstrap routes. Access policy for private APIs belongs to P02.
-# Default topology does not require erp/core containers.
+# P02 — API Gateway routes.
+# Private routes enforce OIDC bearer; public route is anonymous but rate-limited.
+# Strip client-supplied identity headers before OIDC plugin sets verified ones.
+
+# ---------------------------------------------------------------------------
+# Shared header-stripping function (injected via serverless-pre-function).
+# Removes X-Userinfo, X-Access-Token, X-Authenticated-User and similar
+# headers that a client could forge to escalate privileges if the gateway
+# were bypassed or if header injection were possible upstream.
+# ---------------------------------------------------------------------------
+x-strip-identity-headers: &strip-identity-headers
+  serverless-pre-function:
+    phase: access
+    functions:
+      - |
+        return function(conf, ctx)
+          local core = require("apisix.core")
+          local headers_to_strip = {
+            "x-userinfo", "x-access-token", "x-authenticated-user",
+            "x-remote-user", "x-forwarded-user", "x-consumer-username",
+            "x-consumer-id", "x-consumer-custom-id",
+          }
+          for _, h in ipairs(headers_to_strip) do
+            core.request.set_header(ctx, h, nil)
+          end
+        end
+
 routes:
+  # -------------------------------------------------------------------------
+  # 0. Gateway liveness ping (public, no upstream)
+  # -------------------------------------------------------------------------
   - id: public-gateway-ping
     uri: /gateway/ping
     methods: [GET, HEAD]
     plugins:
       request-id: {}
+      limit-req:
+        rate: 20
+        burst: 10
+        key: remote_addr
+        rejected_code: 429
       serverless-pre-function:
         phase: access
         functions:
           - return function(conf, ctx) local core = require("apisix.core"); core.response.exit(200, "{\"status\":\"up\",\"service\":\"gateway\"}") end
-  - id: core-api
+
+  # -------------------------------------------------------------------------
+  # 1. Core data API — specific prefix BEFORE catch-all /api/v1/*
+  # -------------------------------------------------------------------------
+  - id: core-api-v1
+    uri: /api/v1/core/*
+    methods: [GET, HEAD, POST, PUT, PATCH, DELETE]
+    upstream:
+      type: roundrobin
+      nodes:
+        "core-data:8080": 1
+    plugins:
+      request-id: {}
+      <<: *strip-identity-headers
+      openid-connect:
+        # Bearer-only: gateway verifies token; core verifies Authorization again.
+        # OIDC_ISSUER_URL placeholder — substitute actual value from instance env.
+        # Internal Keycloak URL for Docker Compose: http://keycloak:8080/realms/nexora
+        discovery: "${OIDC_ISSUER_URL}/.well-known/openid-configuration"
+        client_id: "${OIDC_GATEWAY_CLIENT_ID}"
+        client_secret: "${OIDC_GATEWAY_CLIENT_SECRET}"
+        bearer_only: true
+        use_jwks: true
+        realm: nexora
+        introspection_endpoint_auth_method: client_secret_post
+        set_access_token_header: false
+        set_userinfo_header: false
+        access_token_in_authorization_header: true
+      limit-req:
+        rate: 100
+        burst: 50
+        key: remote_addr
+        rejected_code: 429
+      proxy-rewrite:
+        regex_uri: ["^/api/v1/core/(.*)", "/$1"]
+
+  # -------------------------------------------------------------------------
+  # 2. Files API — specific prefix BEFORE catch-all /api/v1/*
+  # -------------------------------------------------------------------------
+  - id: files-api-v1
+    uris: [/api/v1/files, /api/v1/files/*]
+    methods: [GET, HEAD, POST, PUT, PATCH, DELETE]
+    upstream:
+      type: roundrobin
+      nodes:
+        "core-data:8080": 1
+    plugins:
+      request-id: {}
+      <<: *strip-identity-headers
+      openid-connect:
+        discovery: "${OIDC_ISSUER_URL}/.well-known/openid-configuration"
+        client_id: "${OIDC_GATEWAY_CLIENT_ID}"
+        client_secret: "${OIDC_GATEWAY_CLIENT_SECRET}"
+        bearer_only: true
+        use_jwks: true
+        realm: nexora
+        set_access_token_header: false
+        set_userinfo_header: false
+        access_token_in_authorization_header: true
+      limit-req:
+        rate: 50
+        burst: 20
+        key: remote_addr
+        rejected_code: 429
+      proxy-rewrite:
+        regex_uri: ["^/api/v1/files/?(.*)$", "/files/$1"]
+
+  # -------------------------------------------------------------------------
+  # 3. Public passport route — anonymous, GET/HEAD only, rate-limited
+  # -------------------------------------------------------------------------
+  - id: public-passport-v1
+    uri: /api/v1/public/passport/*
+    methods: [GET, HEAD]
+    upstream:
+      type: roundrobin
+      nodes:
+        "${ERP_UPSTREAM}": 1
+    plugins:
+      request-id: {}
+      <<: *strip-identity-headers
+      limit-req:
+        rate: 30
+        burst: 15
+        key: remote_addr
+        rejected_code: 429
+
+  # -------------------------------------------------------------------------
+  # 4. Federation M2M events — POST only, bearer + required scope
+  # -------------------------------------------------------------------------
+  - id: federation-events-v1
+    uri: /api/v1/federation/events
+    methods: [POST]
+    upstream:
+      type: roundrobin
+      nodes:
+        "${ERP_UPSTREAM}": 1
+    plugins:
+      request-id: {}
+      <<: *strip-identity-headers
+      openid-connect:
+        discovery: "${OIDC_ISSUER_URL}/.well-known/openid-configuration"
+        client_id: "${OIDC_GATEWAY_CLIENT_ID}"
+        client_secret: "${OIDC_GATEWAY_CLIENT_SECRET}"
+        bearer_only: true
+        use_jwks: true
+        realm: nexora
+        set_access_token_header: false
+        set_userinfo_header: false
+        access_token_in_authorization_header: true
+        # Required scope for M2M federation partners.
+        # APISIX openid-connect >= 3.x supports scope_claim_name + required_scopes.
+        scope_claim_name: scope
+      limit-req:
+        rate: 20
+        burst: 10
+        key: remote_addr
+        rejected_code: 429
+
+  # -------------------------------------------------------------------------
+  # 5. Federation M2M acks — POST only, bearer + required scope
+  # -------------------------------------------------------------------------
+  - id: federation-acks-v1
+    uri: /api/v1/federation/acks
+    methods: [POST]
+    upstream:
+      type: roundrobin
+      nodes:
+        "${ERP_UPSTREAM}": 1
+    plugins:
+      request-id: {}
+      <<: *strip-identity-headers
+      openid-connect:
+        discovery: "${OIDC_ISSUER_URL}/.well-known/openid-configuration"
+        client_id: "${OIDC_GATEWAY_CLIENT_ID}"
+        client_secret: "${OIDC_GATEWAY_CLIENT_SECRET}"
+        bearer_only: true
+        use_jwks: true
+        realm: nexora
+        set_access_token_header: false
+        set_userinfo_header: false
+        access_token_in_authorization_header: true
+        scope_claim_name: scope
+      limit-req:
+        rate: 20
+        burst: 10
+        key: remote_addr
+        rejected_code: 429
+
+  # -------------------------------------------------------------------------
+  # 5b. Federation M2M connectivity probe — not inbox (P09)
+  # -------------------------------------------------------------------------
+  - id: federation-connectivity-v1
+    uri: /api/v1/federation/connectivity
+    methods: [POST]
+    upstream:
+      type: roundrobin
+      nodes:
+        "${ERP_UPSTREAM}": 1
+    plugins:
+      request-id: {}
+      <<: *strip-identity-headers
+      openid-connect:
+        discovery: "${OIDC_ISSUER_URL}/.well-known/openid-configuration"
+        client_id: "${OIDC_GATEWAY_CLIENT_ID}"
+        client_secret: "${OIDC_GATEWAY_CLIENT_SECRET}"
+        bearer_only: true
+        use_jwks: true
+        realm: nexora
+        set_access_token_header: false
+        set_userinfo_header: false
+        access_token_in_authorization_header: true
+        scope_claim_name: scope
+      limit-req:
+        rate: 20
+        burst: 10
+        key: remote_addr
+        rejected_code: 429
+
+  # -------------------------------------------------------------------------
+  # 6. ERP app API catch-all /api/v1/* — MUST be AFTER specific prefixes above
+  # -------------------------------------------------------------------------
+  - id: erp-api-v1
+    uri: /api/v1/*
+    methods: [GET, HEAD, POST, PUT, PATCH, DELETE]
+    upstream:
+      type: roundrobin
+      nodes:
+        "${ERP_UPSTREAM}": 1
+    plugins:
+      request-id: {}
+      <<: *strip-identity-headers
+      openid-connect:
+        # NOTE: If APISIX standalone does not support env-var substitution in
+        # routes.yaml, replace ${OIDC_ISSUER_URL} with the literal internal URL:
+        #   http://keycloak:8080/realms/nexora
+        # Match the value of OIDC_ISSUER_URL in deploy/instances/*.env.example.
+        discovery: "${OIDC_ISSUER_URL}/.well-known/openid-configuration"
+        client_id: "${OIDC_GATEWAY_CLIENT_ID}"
+        client_secret: "${OIDC_GATEWAY_CLIENT_SECRET}"
+        bearer_only: true
+        use_jwks: true
+        realm: nexora
+        introspection_endpoint_auth_method: client_secret_post
+        set_access_token_header: false
+        set_userinfo_header: false
+        access_token_in_authorization_header: true
+      limit-req:
+        rate: 200
+        burst: 100
+        key: remote_addr
+        rejected_code: 429
+
+  # -------------------------------------------------------------------------
+  # 7. ERP UI via /erp/* (strip prefix) plus root /_next and /admin that Next
+  #    emits in HTML when basePath is unset. Without these, CSS/JS 404 at the
+  #    gateway while /erp/admin still returns HTML.
+  # -------------------------------------------------------------------------
+  - id: erp-app
+    uri: /erp/*
+    methods: [GET, HEAD]
+    upstream:
+      type: roundrobin
+      nodes:
+        "${ERP_UPSTREAM}": 1
+    plugins:
+      request-id: {}
+      <<: *strip-identity-headers
+      limit-req:
+        rate: 100
+        burst: 50
+        key: remote_addr
+        rejected_code: 429
+      proxy-rewrite:
+        regex_uri: ["^/erp/(.*)", "/$1"]
+
+  - id: erp-next-static
+    uri: /_next/*
+    methods: [GET, HEAD]
+    upstream:
+      type: roundrobin
+      nodes:
+        "${ERP_UPSTREAM}": 1
+    plugins:
+      request-id: {}
+      <<: *strip-identity-headers
+      limit-req:
+        rate: 200
+        burst: 100
+        key: remote_addr
+        rejected_code: 429
+
+  - id: erp-admin-ui
+    uri: /admin*
+    methods: [GET, HEAD]
+    upstream:
+      type: roundrobin
+      nodes:
+        "${ERP_UPSTREAM}": 1
+    plugins:
+      request-id: {}
+      <<: *strip-identity-headers
+      limit-req:
+        rate: 100
+        burst: 50
+        key: remote_addr
+        rejected_code: 429
+
+  # Bounded-context UI surfaces (ADR 0016) — same unauthenticated HTML GET as /admin*.
+  - id: erp-partners-ui
+    uri: /partners*
+    methods: [GET, HEAD]
+    upstream:
+      type: roundrobin
+      nodes:
+        "${ERP_UPSTREAM}": 1
+    plugins:
+      request-id: {}
+      <<: *strip-identity-headers
+      limit-req:
+        rate: 100
+        burst: 50
+        key: remote_addr
+        rejected_code: 429
+
+  - id: erp-catalog-ui
+    uri: /catalog*
+    methods: [GET, HEAD]
+    upstream:
+      type: roundrobin
+      nodes:
+        "${ERP_UPSTREAM}": 1
+    plugins:
+      request-id: {}
+      <<: *strip-identity-headers
+      limit-req:
+        rate: 100
+        burst: 50
+        key: remote_addr
+        rejected_code: 429
+
+  - id: erp-inventory-ui
+    uri: /inventory*
+    methods: [GET, HEAD]
+    upstream:
+      type: roundrobin
+      nodes:
+        "${ERP_UPSTREAM}": 1
+    plugins:
+      request-id: {}
+      <<: *strip-identity-headers
+      limit-req:
+        rate: 100
+        burst: 50
+        key: remote_addr
+        rejected_code: 429
+
+  # Public auth + home when browsers hit gateway root (not only /erp/*).
+  - id: erp-public-home
+    uri: /
+    methods: [GET, HEAD]
+    upstream:
+      type: roundrobin
+      nodes:
+        "${ERP_UPSTREAM}": 1
+    plugins:
+      request-id: {}
+      <<: *strip-identity-headers
+      limit-req:
+        rate: 100
+        burst: 50
+        key: remote_addr
+        rejected_code: 429
+
+  - id: erp-public-auth
+    uris: [/login, /login/, /logout, /logout/, /reset-password, /reset-password/]
+    methods: [GET, HEAD]
+    upstream:
+      type: roundrobin
+      nodes:
+        "${ERP_UPSTREAM}": 1
+    plugins:
+      request-id: {}
+      <<: *strip-identity-headers
+      limit-req:
+        rate: 100
+        burst: 50
+        key: remote_addr
+        rejected_code: 429
+
+  - id: erp-favicon
+    uri: /favicon.ico
+    methods: [GET, HEAD]
+    upstream:
+      type: roundrobin
+      nodes:
+        "${ERP_UPSTREAM}": 1
+    plugins:
+      request-id: {}
+      <<: *strip-identity-headers
+
+  - id: erp-icon
+    uris: [/icon, /icon.png]
+    methods: [GET, HEAD]
+    upstream:
+      type: roundrobin
+      nodes:
+        "${ERP_UPSTREAM}": 1
+    plugins:
+      request-id: {}
+      <<: *strip-identity-headers
+
+  - id: erp-assets
+    uri: /assets/*
+    methods: [GET, HEAD]
+    upstream:
+      type: roundrobin
+      nodes:
+        "${ERP_UPSTREAM}": 1
+    plugins:
+      request-id: {}
+      <<: *strip-identity-headers
+      limit-req:
+        rate: 100
+        burst: 50
+        key: remote_addr
+        rejected_code: 429
+
+  # Local Admin UI login helper (password grant). Handler returns 404 unless
+  # ALLOW_DEV_PASSWORD_LOGIN=true on ERP. Not a production auth path.
+  - id: erp-dev-token
+    uri: /auth/dev-token
+    methods: [POST]
+    upstream:
+      type: roundrobin
+      nodes:
+        "${ERP_UPSTREAM}": 1
+    plugins:
+      request-id: {}
+      <<: *strip-identity-headers
+      limit-req:
+        rate: 10
+        burst: 5
+        key: remote_addr
+        rejected_code: 429
+
+  # -------------------------------------------------------------------------
+  # 8. Legacy /core/* route (non-versioned) — kept for compatibility
+  # -------------------------------------------------------------------------
+  - id: core-api-legacy
     uri: /core/*
     methods: [GET, HEAD]
     upstream:
@@ -22,15 +463,4 @@ routes:
       request-id: {}
       proxy-rewrite:
         regex_uri: ["^/core/(.*)", "/$1"]
-  - id: erp-app
-    uri: /erp/*
-    methods: [GET, HEAD]
-    upstream:
-      type: roundrobin
-      nodes:
-        "erp:3000": 1
-    plugins:
-      request-id: {}
-      proxy-rewrite:
-        regex_uri: ["^/erp/(.*)", "/$1"]
 #END

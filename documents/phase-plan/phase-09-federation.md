@@ -2,6 +2,8 @@
 
 **Mục tiêu:** trao đổi dữ liệu lô qua API giữa ba instance và DB độc lập, chống mất/trùng/sai nguồn, phân biệt giao hàng với nhận thực tế. **Phụ thuộc:** G05–G08, D05/D08. **AC:** AC-01/05/06/07/09.
 
+**UI surfaces (ADR 0016):** partner connection UI is `/partners` (not `/admin`). Federation queue/ops stay separate from catalog admin.
+
 ## P09-T01 — Topology ba instance độc lập
 
 - [ ] Compose/profile hoặc script dựng A/B/C với app DB, credentials, volumes, Keycloak realm/client, gateway routes và object namespace riêng; cấu hình secrets ngoài Git.

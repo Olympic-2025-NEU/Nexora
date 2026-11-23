@@ -52,10 +52,12 @@ Confirm phiếu **sở hữu movement** (GoodsReceipt+, GoodsIssue−, Receiving
 
 ## 6. UI bề mặt
 
-- Form draft phiếu nhập/xuất/chuyển/kiểm kê/bán
-- Nút Confirm / Cancel
-- Lịch sử chứng từ
+Canonical prefix **`/trading/*`** (ADR 0016) — not under `/admin`:
+
+- `/trading/...` — form draft phiếu nhập/xuất/chuyển/kiểm kê/bán
+- Nút Confirm / Cancel; lịch sử chứng từ
 - Màn nhận hàng từ đối tác (so sánh số lượng)
+- Approval inbox for Approver (separate from system admin)
 
 ## 7. Kiểm thử tối thiểu
 

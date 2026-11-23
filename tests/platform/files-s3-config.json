@@ -1,0 +1,18 @@
+{
+  "identities": [
+    {
+      "name": "core-t04-test",
+      "credentials": [{ "accessKey": "core-t04-test-access", "secretKey": "core-t04-test-secret" }],
+      "actions": [
+        "Read:nexora-t04-quarantine", "Write:nexora-t04-quarantine", "List:nexora-t04-quarantine",
+        "Read:nexora-t04-private", "Write:nexora-t04-private", "List:nexora-t04-private",
+        "Read:nexora-t04-public", "Write:nexora-t04-public"
+      ]
+    },
+    {
+      "name": "scanner-t05-test",
+      "credentials": [{ "accessKey": "scanner-t05-test-access", "secretKey": "scanner-t05-test-secret" }],
+      "actions": ["Read:nexora-t04-quarantine", "Write:nexora-t04-quarantine", "Write:nexora-t04-private"]
+    }
+  ]
+}

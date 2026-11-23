@@ -29,7 +29,7 @@
     },
     "BatchCreate": {
       "valid": {
-        "productId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        "productVariantId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
         "localCode": "A-L1"
       },
       "invalid": {
@@ -50,13 +50,11 @@
         "kind": "evidence_metadata",
         "payload": {
           "schemaVersion": 1,
-          "ownerType": "batch",
+          "ownerType": "membership",
           "ownerId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
           "attachmentId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
           "title": "Quality document"
-        },
-        "visibility": "private",
-        "policyVersion": "v1"
+        }
       },
       "invalid": {
         "payload": {
@@ -66,8 +64,7 @@
           "attachmentId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
           "title": "Quality document"
         },
-        "visibility": "private",
-        "policyVersion": "v1"
+        "sourceType": "evidence"
       }
     },
     "FederationEnvelope": {
@@ -165,10 +162,10 @@
         "lines": [
           {
             "warehouseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-            "productId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            "productVariantId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
             "batchId": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
             "quantity": "12",
-            "unit": "EA"
+            "uomId": "dddddddd-dddd-4ddd-8ddd-dddddddddddd"
           }
         ]
       },
@@ -176,10 +173,10 @@
         "lines": [
           {
             "warehouseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-            "productId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            "productVariantId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
             "batchId": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
             "quantity": "12",
-            "unit": "EA"
+            "uomId": "dddddddd-dddd-4ddd-8ddd-dddddddddddd"
           }
         ]
       }
@@ -251,22 +248,65 @@
     },
     "ProductCreate": {
       "valid": {
-        "sku": "SKU-001",
         "name": "Sample product",
-        "baseUnit": "EA"
+        "categoryId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
       },
       "invalid": {
-        "name": "Sample product",
-        "baseUnit": "EA"
+        "name": "Sample product"
       }
     },
-    "ProductIdentifierCreate": {
+    "ProductVariantCreate": {
       "valid": {
-        "kind": "ean13",
-        "value": "5901234123457"
+        "sku": "SKU-001"
       },
       "invalid": {
-        "value": "5901234123457"
+        "unknown": true
+      }
+    },
+    "ProductVariantPatch": {
+      "valid": {
+        "isActive": false
+      },
+      "invalid": {}
+    },
+    "CategoryCreate": {
+      "valid": {
+        "code": "CAT-01",
+        "name": "Beverages"
+      },
+      "invalid": {
+        "name": "Beverages"
+      }
+    },
+    "UomCreate": {
+      "valid": {
+        "name": "Each",
+        "kind": "count"
+      },
+      "invalid": {
+        "name": "Each"
+      }
+    },
+    "PriceListCreate": {
+      "valid": {
+        "name": "Retail",
+        "currency": "VND"
+      },
+      "invalid": {
+        "name": "Retail"
+      }
+    },
+    "PriceListItemCreate": {
+      "valid": {
+        "productVariantId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        "uomId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        "priceType": "retail",
+        "amount": "12000"
+      },
+      "invalid": {
+        "productVariantId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        "uomId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        "priceType": "retail"
       }
     },
     "ProductPatch": {
@@ -292,10 +332,10 @@
         "lines": [
           {
             "warehouseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-            "productId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            "productVariantId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
             "batchId": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
             "quantity": "12",
-            "unit": "EA"
+            "uomId": "dddddddd-dddd-4ddd-8ddd-dddddddddddd"
           }
         ]
       },
@@ -316,7 +356,7 @@
             "localBatchId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
             "warehouseId": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
             "actualQuantity": "10",
-            "unit": "EA"
+            "uomId": "dddddddd-dddd-4ddd-8ddd-dddddddddddd"
           }
         ],
         "discrepancyReason": "Two units damaged in transit"
@@ -328,7 +368,7 @@
             "localBatchId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
             "warehouseId": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
             "actualQuantity": "10",
-            "unit": "EA"
+            "uomId": "dddddddd-dddd-4ddd-8ddd-dddddddddddd"
           }
         ],
         "discrepancyReason": "Two units damaged in transit"
@@ -351,10 +391,10 @@
         "lines": [
           {
             "warehouseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-            "productId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            "productVariantId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
             "batchId": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
             "countedQuantity": "10",
-            "unit": "EA"
+            "uomId": "dddddddd-dddd-4ddd-8ddd-dddddddddddd"
           }
         ],
         "note": "Cycle count"

@@ -248,6 +248,7 @@
         "documentId": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
         "taskId": "task-a",
         "decision": "approved",
+        "intentVersion": 2,
         "requestedBySub": "approver-b",
         "requestedAt": "2026-11-14T12:00:00Z",
         "lineSnapshotSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"

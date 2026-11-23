@@ -19,6 +19,7 @@
 
 # production
 /build
+/worker/dist/
 
 # misc
 .DS_Store
@@ -37,6 +38,12 @@ yarn-error.log*
 !deploy/.env.example
 !deploy/instances/*.env.example
 deploy/instances/*.env
+deploy/apisix/apisix.generated.yaml
+deploy/certs/*.pem
+deploy/certs/*-key.pem
+deploy/certs/*.key
+!deploy/certs/.gitkeep
+!deploy/certs/README.md
 
 # vercel
 .vercel

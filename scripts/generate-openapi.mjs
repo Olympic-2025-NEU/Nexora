@@ -12,7 +12,9 @@ const filterTypes = {
   cursor: str(), limit: { type: "integer", minimum: 1, maximum: 100, default: 20 },
   depth: { type: "integer", minimum: 1, maximum: 10 },
   id: uuid, warehouseId: uuid, productId: uuid, batchId: uuid, partnerId: uuid,
-  targetId: uuid, from: str({ format: "date-time" }), to: str({ format: "date-time" }),
+  targetId: str({ maxLength: 128 }), requestId: str({ maxLength: 128 }),
+  download: str({ enum: ["1"] }),
+  from: str({ format: "date-time" }), to: str({ format: "date-time" }),
 };
 
 const doc = {
@@ -20,7 +22,7 @@ const doc = {
   info: {
     title: "Nexora API",
     version: "1.0.0",
-    description: "Phase 00 contract v1. The operations describe target behavior; only the scaffold health route is implemented today. Runtime conformance is tested in later phases.",
+    description: "Nexora ERP API v1. P02-T07: Bearer security schemes (bearerUser, bearerM2M, oidc). Operations describe target behavior; runtime conformance tested per phase. See deploy/README.md for provisioning runbook.",
     license: { name: "AGPL-3.0-only", url: "https://www.gnu.org/licenses/agpl-3.0.html" },
   },
   servers: [{ url: "https://{host}", variables: { host: { default: "nexora.example" } } }],
@@ -29,8 +31,24 @@ const doc = {
   paths: {},
   components: {
     securitySchemes: {
-      oidc: { type: "openIdConnect", openIdConnectUrl: "https://keycloak.example/.well-known/openid-configuration" },
-      bearerM2M: { type: "http", scheme: "bearer", bearerFormat: "JWT" },
+      // P02-T07: Bearer security schemes.
+      oidc: {
+        type: "openIdConnect",
+        openIdConnectUrl: "https://keycloak.example/.well-known/openid-configuration",
+        description: "Authorization Code + PKCE. MFA required for administrator and approver roles.",
+      },
+      bearerUser: {
+        type: "http",
+        scheme: "bearer",
+        bearerFormat: "JWT",
+        description: "User Bearer JWT. Audience: OIDC_AUDIENCE (erp-browser). Issued via auth-code+PKCE.",
+      },
+      bearerM2M: {
+        type: "http",
+        scheme: "bearer",
+        bearerFormat: "JWT",
+        description: "Service-account Bearer JWT for M2M partner federation. Required scope: federation:write.",
+      },
     },
     parameters: {
       IfMatch: { name: "If-Match", in: "header", required: true, schema: str({ pattern: '^"[1-9][0-9]*"$' }), description: "Current aggregate version ETag." },
@@ -108,9 +126,9 @@ function add(method, path, tag, summary, response, options = {}) {
     responses: { [String(responseCode)]: success, ...errors(errorCodes) },
   };
   if (path === "/api/v1/files/{id}") {
-    op.responses["302"] = { description: "Authorized clean-file redirect", headers: {
-      Location: { schema: str({ format: "uri" }) },
-    } };
+    for (const mediaType of ["application/pdf", "image/png", "image/jpeg", "text/plain"]) {
+      op.responses["200"].content[mediaType] = { schema: str({ format: "binary" }) };
+    }
   }
   (doc.paths[path] ??= {})[verb] = op;
 }
@@ -140,11 +158,21 @@ create("/api/v1/partners", "M01", "Create partner", "Partner", "PartnerCreate", 
 patch("/api/v1/partners/{id}", "M01", "Update partner", "Partner", "PartnerPatch", ADMIN);
 add("put", "/api/v1/partners/{id}/connection", "M01", "Upsert partner connection", "PartnerConnectionView", { body: "PartnerConnectionInput", roles: ADMIN, status: 200, description: "Admin only; URLs must be HTTPS and SSRF-safe. Response never includes outboundSecretRef." });
 
-list("/api/v1/products", "M02", "List products", "Product", EVERY_USER, ["q", "status"]);
+list("/api/v1/products", "M02", "List products", "Product", EVERY_USER, ["q", "isActive", "categoryId"]);
 create("/api/v1/products", "M02", "Create product", "Product", "ProductCreate");
 detail("/api/v1/products/{id}", "M02", "Get product", "Product");
 patch("/api/v1/products/{id}", "M02", "Update product", "Product", "ProductPatch");
-create("/api/v1/products/{id}/identifiers", "M02", "Add product identifier", "ProductIdentifier", "ProductIdentifierCreate");
+list("/api/v1/products/{id}/variants", "M02", "List product variants", "ProductVariant", EVERY_USER);
+create("/api/v1/products/{id}/variants", "M02", "Create product variant", "ProductVariant", "ProductVariantCreate");
+patch("/api/v1/variants/{id}", "M02", "Update product variant", "ProductVariant", "ProductVariantPatch");
+list("/api/v1/categories", "M02", "List categories", "Category", EVERY_USER);
+create("/api/v1/categories", "M02", "Create category", "Category", "CategoryCreate");
+list("/api/v1/uoms", "M02", "List UOMs", "Uom", EVERY_USER);
+create("/api/v1/uoms", "M02", "Create UOM", "Uom", "UomCreate");
+list("/api/v1/price-lists", "M02", "List price lists", "PriceList", EVERY_USER);
+create("/api/v1/price-lists", "M02", "Create price list", "PriceList", "PriceListCreate");
+list("/api/v1/price-lists/{id}/items", "M02", "List price list items", "PriceListItem", EVERY_USER);
+create("/api/v1/price-lists/{id}/items", "M02", "Create price list item", "PriceListItem", "PriceListItemCreate");
 list("/api/v1/batches", "M02", "List batches", "Batch", EVERY_USER, ["productId", "issuer", "expiresBefore", "status"]);
 create("/api/v1/batches", "M02", "Create local batch", "Batch", "BatchCreate");
 detail("/api/v1/batches/{id}", "M02", "Get batch", "Batch");
@@ -189,12 +217,31 @@ action("/api/v1/federation/deliveries/{id}/retry", "M04", "Retry outbound delive
 add("post", "/api/v1/ai/chat", "AI01", "AI chat with delegated tools", "AiChatResult", { body: "AiChatInput", status: 200, roles: EVERY_USER });
 create("/api/v1/ai/drafts", "AI01", "Create AI-assisted draft", "AiDraftResult", "AiDraftInput", WRITER, { idempotent: true, status: 201 });
 detail("/api/v1/ai/tool-calls/{id}", "AI01", "Get redacted AI tool call", "AiToolCall");
-create("/api/v1/core/records", "Core", "Create structured core record", "CoreRecordCreated", "CoreRecordCreate", ["administrator", "staff", "service"], { idempotent: true, description: "Kind-specific JSON Schema and writer policy apply. User-created evidence metadata gets its source key from the server." });
+create("/api/v1/core/records", "Core", "Create private evidence record", "CoreRecord", "CoreRecordCreate", WRITER, { idempotent: true, errors: [401, 403, 404, 409, 422, 503], description: "Only evidence_metadata with an authorized active membership or organization owner and clean private attachment. Server assigns source key, visibility and policy version. Same Idempotency-Key and payload returns 200; different payload returns 409 unless If-Match names the current version and owner remains unchanged." });
+doc.paths["/api/v1/core/records"].post.responses["200"] = doc.paths["/api/v1/core/records"].post.responses["201"];
+doc.paths["/api/v1/core/records"].post.parameters.push({ name: "If-Match", in: "header", required: false,
+  schema: str({ pattern: '^"[1-9][0-9]*"$' }), description: "Optional current version for a change to existing evidence." });
 detail("/api/v1/core/records/{id}", "Core", "Get structured core record", "CoreRecord");
 add("post", "/api/v1/files", "Core", "Upload quarantined file", "FileAccepted", { body: "FileUpload", multipart: true, status: 202, idempotent: true, roles: WRITER, description: "Only scanned clean files may be downloaded or shared." });
-detail("/api/v1/files/{id}", "Core", "Get file metadata or content", "FileMetadata");
+add("get", "/api/v1/files/{id}", "Core", "Get file metadata or content", "FileMetadata", {
+  roles: EVERY_USER, query: ["download"], errors: [400, 401, 403, 404, 423, 429, 503],
+  description: "Returns metadata by default. download=1 streams bytes only after a clean scan and resource authorization.",
+});
+add("post", "/api/v1/files/{id}/retry-scan", "Core", "Retry failed file scan", "FileScanRetry", {
+  status: 202, roles: ADMIN, errors: [400, 401, 403, 404, 409, 429, 503],
+  description: "Administrator only. Resets an error state to pending; infected files cannot be retried or released. Empty request body.",
+});
+add("post", "/api/v1/files/{id}/discard", "Core", "Discard infected quarantine bytes", "FileDiscarded", {
+  status: 202, roles: ADMIN, errors: [400, 401, 403, 404, 409, 429, 503],
+  description: "Administrator only. Deletes infected quarantine bytes, retains metadata and audit, and never releases the file. Repeated requests are safe. Empty request body.",
+});
 
-list("/api/v1/audit-logs", "Operations", "Query audit logs", "AuditEntry", ADMIN, ["action", "targetType", "targetId", "from", "to", "outcome"]);
+add("get", "/api/v1/audit-logs", "Operations", "Query audit logs", "AuditEntry", {
+  list: true, roles: ADMIN,
+  query: ["action", "targetType", "targetId", "requestId", "from", "to", "outcome"],
+  errors: [400, 401, 403, 429, 503],
+  description: "Administrator-only audit query. Filters are allowlisted and summaries are never returned.",
+});
 list("/api/v1/reports/inventory-summary", "Operations", "Inventory summary", "InventorySummary", WRITER, ["warehouseId", "productId"]);
 add("get", "/api/v1/reports/document-counts", "Operations", "Document counts", arr(ref("DocumentCount")), { query: ["from", "to", "type", "status"] });
 list("/api/v1/reports/open-quality-signals", "Operations", "Open quality signals", "QualitySignal", ADMIN, ["severity"]);

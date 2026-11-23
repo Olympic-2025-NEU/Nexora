@@ -1,5 +1,5 @@
-# SPDX-License-Identifier: AGPL-3.0-only
 #!/bin/sh
+# SPDX-License-Identifier: AGPL-3.0-only
 set -eu
 
 for name in POSTGRES_USER POSTGRES_PASSWORD APP_DB_NAME APP_DB_USER APP_DB_PASSWORD CORE_DB_USER CORE_DB_PASSWORD MIGRATOR_DB_USER MIGRATOR_DB_PASSWORD KEYCLOAK_DB_USER KEYCLOAK_DB_PASSWORD KEYCLOAK_DB_NAME FLOWABLE_DB_USER FLOWABLE_DB_PASSWORD FLOWABLE_DB_NAME; do
@@ -43,6 +43,8 @@ SELECT format('ALTER ROLE %I WITH LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NORE
 SELECT format('CREATE DATABASE %I OWNER %I', name, owner) FROM (VALUES (:'app_db', :'migrator_user'), (:'kc_db', :'kc_user'), (:'flow_db', :'flow_user')) AS dbs(name, owner) WHERE NOT EXISTS (SELECT 1 FROM pg_database WHERE datname = name) \gexec
 SELECT format('ALTER DATABASE %I OWNER TO %I', name, owner) FROM (VALUES (:'app_db', :'migrator_user'), (:'kc_db', :'kc_user'), (:'flow_db', :'flow_user')) AS dbs(name, owner) \gexec
 SELECT format('REVOKE ALL ON DATABASE %I FROM PUBLIC', name) FROM (VALUES (:'app_db'), (:'kc_db'), (:'flow_db')) AS dbs(name) \gexec
+REVOKE CONNECT ON DATABASE postgres FROM PUBLIC;
+REVOKE CONNECT ON DATABASE template1 FROM PUBLIC;
 SELECT format('GRANT CONNECT ON DATABASE %I TO %I, %I, %I', :'app_db', :'app_user', :'core_user', :'migrator_user') \gexec
 SELECT format('GRANT CONNECT ON DATABASE %I TO %I', :'kc_db', :'kc_user') \gexec
 SELECT format('GRANT CONNECT ON DATABASE %I TO %I', :'flow_db', :'flow_user') \gexec

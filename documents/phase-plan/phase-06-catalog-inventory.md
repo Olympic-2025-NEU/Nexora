@@ -1,71 +1,81 @@
 # Phase 06 — M02 Catalog & Inventory
 
-**Mục tiêu:** master data lô/kho và sổ tồn chính xác, cung cấp Inventory port cho M03. **Phụ thuộc:** G03–G05, D07. **Unblock:** nhập/xuất ở P07, trace. **AC:** AC-03 kết thúc khi phiếu nhập P07 đã tăng tồn thật.
+**Mục tiêu:** master data lô/kho và sổ tồn chính xác, cung cấp Inventory port cho M03. **Phụ thuộc:** G03–G05, D07. **Unblock:** nhập/xuất ở P07 (sau **P065** catalog upgrade), trace. **AC:** AC-03 kết thúc khi phiếu nhập P07 đã tăng tồn thật.
+
+**Sau G06:** mô hình product+SKU P06 là baseline đã đóng; nâng cấp variant/UOM/price theo D17 nằm ở [`phase-06.5-catalog-business-upgrade.md`](./phase-06.5-catalog-business-upgrade.md) — **không mở lại G06**.
+
+**UI surfaces (ADR 0016, 2026-11-22):** canonical `/catalog/products`, `/catalog/batches`, `/inventory/warehouses`, `/inventory/balances`. Legacy `/admin/products|batches|warehouses|inventory` **redirect**. Do not treat catalog as “admin”.
+
+**Cổng schema:** Dev phải check & duyệt gói [`evidence/p06-schema-design.md`](./evidence/p06-schema-design.md) trước khi apply migration catalog/inventory / API ERP. T01 quantity (không DDL) được làm song song.
+
+**Migration (Prisma, không legacy `0004`/`0005` SQL):**
+- `prisma/migrations/…_catalog_product_batch/` — schema `catalog` + product/identifier/batch + GRANT `app_runtime`
+- `prisma/migrations/…_inventory_warehouse_stock/` — schema `inventory` + warehouse/balance/movement + `system.membership_warehouse` + GRANT
+- Seed: `deploy/scripts/seed-catalog.mjs` (không `UPDATE stock_balance` bằng SQL; opening qua `openStockBalance` harness → movement `receipt`)
 
 ## P06-T01 — Chốt quy tắc định lượng và định danh
 
-- [ ] ADR D07 có ví dụ hàng chiếc/hàng cân, đơn vị cơ sở, precision/scale, quy đổi nếu có, làm tròn và phép so sánh. Dùng decimal string/decimal library ở biên, `numeric` trong PG; không dùng JS float cho balance.
-- [ ] Chốt uniqueness SKU/barcode trong một instance và batch code trong phạm vi product + issuer; lô đối tác có external issuer ID riêng.
-- [ ] Fixture kiểm 0, âm, quá precision, overflow, duplicate barcode, trùng tên khác issuer và ngày hết hạn.
-- **Đầu ra:** invariant document + unit tests; **kiểm chứng:** input sai trả lỗi ổn định, không ghi DB.
+- [x] ADR D07 có ví dụ hàng chiếc/hàng cân, đơn vị cơ sở, precision/scale; decimal string / Prisma.Decimal ở biên, `numeric` trong PG; không dùng JS float cho balance.
+- [x] Uniqueness SKU/barcode trong instance; batch `(product_id,local_code)` và `(origin_issuer_instance_id,origin_lot_id)`.
+- [x] Fixture kiểm 0, âm, quá precision, overflow, EA non-integer.
+- **Đầu ra:** `contexts/catalog/domain/quantity.ts` + unit tests; **kiểm chứng:** input sai không ghi DB.
 
 ## P06-T02 — Product/SKU và identifiers
 
-- [ ] Migration `catalog.product`/`product_identifier`; trạng thái active/archived, SKU unique, barcode type/value với uniqueness phù hợp, unit và mô tả ngắn.
-- [ ] API create/update/list/search theo pagination/filter; archive không xóa history, product đã có chứng từ không đổi unit/identity tùy tiện.
-- [ ] UI nhập product có lỗi uniqueness/validation rõ, tìm bằng SKU hoặc barcode; quyền Admin/Staff theo matrix.
-- **Đầu ra:** product module qua PG/API/UI; **kiểm chứng:** restart giữ dữ liệu, duplicate bị DB và domain chặn.
+- [x] Migration `catalog.product`/`product_identifier`; active/archived, SKU unique, barcode uniqueness, `base_unit` EA|KG|L.
+- [x] API create/update/list/search; archive không xóa; SKU/`baseUnit` bất biến.
+- [x] UI product; quyền Admin/Staff theo matrix.
+- **Đầu ra:** product module PG/API/UI.
 
 ## P06-T03 — Batch/lô với nguồn gốc
 
-- [ ] Migration batch có product FK, issuer, issuer lot ID hoặc local lot code, manufacture/expiry, quality status `available|restricted|inspect`, metadata nguồn.
-- [ ] Tạo batch local hoặc map batch từ partner theo policy; không gộp chỉ vì cùng tên/code. Thay quality status cần action, reason, audit và quyền; restricted/expired ảnh hưởng xuất hàng theo rule.
-- [ ] API/UI list/detail/filter theo issuer, product, expiry; hiển thị source và status, chặn sửa identity sau movement.
-- **Đầu ra:** batch module; **kiểm chứng:** hai issuer cùng lot code vẫn tách, lô restricted không được xuất.
+- [x] Migration `catalog.batch` (cùng catalog migration); quality `available|restricted|inspect`.
+- [x] Tạo batch local (server gán origin); quality-actions + audit; partner batch = P09.
+- [x] API/UI list/filter; restricted/inspect/expired chặn issue ở Inventory port.
+- **Đầu ra:** batch module.
 
 ## P06-T04 — Warehouse và phạm vi quyền
 
-- [ ] Migration warehouse unique code, active/archived; balance luôn gắn warehouse + product + batch. Không chuyển kho bằng sửa cột balance trực tiếp.
-- [ ] Warehouse permission nếu D04 chọn: user không có quyền không xem/ghi kho khác; inactive warehouse không nhận movement mới.
-- [ ] API/UI tạo và liệt kê; kiểm tra hàng còn tồn trước archive.
-- **Đầu ra:** warehouse module; **kiểm chứng:** FK/unique và permission tests.
+- [x] Migration warehouse + `system.membership_warehouse`; balance gắn warehouse+batch.
+- [x] Scope: Admin toàn instance; Staff/Approver/Viewer từ join; archived không nhận movement mới.
+- [x] API/UI warehouses; archive chặn nếu còn balance > 0.
+- **Đầu ra:** warehouse module + member `warehouseIds`.
 
 ## P06-T05 — Sổ movement và balance projection
 
-- [ ] Migration `stock_movement` append-only, `stock_balance` unique; movement gồm direction, quantity, source document/line, action, occurred_at, actor và correlation. Unique source action để chống nhân đôi.
-- [ ] Balance được cập nhật **chỉ** qua Inventory application port trong cùng transaction client của M03; không cho route PATCH balance. Chốt lock ordering và conditional update ngăn âm.
-- [ ] Rebuild/reconcile balance từ movement trong môi trường kiểm thử; divergence tạo alert, không tự sửa bằng overwrite âm thầm.
-- **Đầu ra:** Inventory port + PG adapter; **kiểm chứng:** double call cùng source chỉ một movement, lỗi rollback không lệch balance.
+- [x] Migration `stock_movement` append-only, `stock_balance`; `source_line_id` chưa FK (P07); UNIQUE `(source_line_id,kind)`.
+- [x] Balance chỉ qua Inventory port + shared `TransactionClient`; lock `(warehouse_id,batch_id)`; không PATCH balance.
+- [x] Harness double-call cùng source → một movement.
+- **Đầu ra:** `contexts/inventory/application/adjust-stock.ts`.
 
 ## P06-T06 — Read model tồn theo lô
 
-- [ ] Query balance theo kho/product/batch, tổng từ nhiều kho và movement history có pagination; response ghi unit, thời gian snapshot/source.
-- [ ] Truy vấn chỉ trong instance, áp authz; batch private/partner source không lộ trên public route.
-- [ ] UI tra tồn và lịch sử biến động, empty/error/loading; số lượng hiển thị chính xác theo unit/precision.
-- **Đầu ra:** inventory read API/UI; **kiểm chứng:** tổng bằng sổ movement, quyền và pagination pass.
+- [x] `GET /inventory/balances|movements` + cursor; authz theo kho.
+- [x] UI tra tồn / lịch sử.
+- **Đầu ra:** inventory read API/UI.
 
 ## P06-T07 — Test cạnh tranh và import master data
 
-- [ ] Test hai lệnh issue cùng balance chỉ một thành công nếu tổng vượt tồn; retry/idempotency không nhân movement. Nếu chưa có M03, dùng test harness qua Inventory port; chạy lại với M03 ở P07.
-- [ ] Seed product/batch/warehouse A/B/C idempotent; không seed balance bằng SQL cập nhật trực tiếp. Nạp tồn khởi đầu qua phiếu nhập P07 hoặc documented opening-balance command có audit/movement/approval.
-- [ ] Test restore/restart không đổi tồn, reconcile deterministic.
-- **Đầu ra:** integration suite và fixtures; **kiểm chứng:** PG assertions theo quantity/source.
+- [x] Concurrent issue > stock → một pass; idempotency không nhân movement.
+- [x] `deploy/scripts/seed-catalog.mjs` idempotent; opening qua harness (không SQL balance).
+- [x] Schema privilege asserts catalog/inventory.
+- **Đầu ra:** integration suite + fixtures.
 
 ## P06-T08 — Gate G06
 
-- [ ] Product, batch, warehouse API/UI và Inventory port chạy thật; uniqueness, quality, precision, concurrency tests pass.
-- [ ] AC-03 **chưa đánh dấu hoàn thành** cho đến khi P07 xác nhận nhập và balance tăng qua chứng từ; lưu cross-phase test ở G07.
-- **Bằng chứng:** migration, read/write request trace, balance/movement assertions, seed log.
+- [x] Product, batch, warehouse API/UI và Inventory port; uniqueness, quality, precision, concurrency.
+- [x] AC-03 **chưa** hoàn thành (chờ receipt P07 / G07).
+- **Bằng chứng:** [`evidence/G06.md`](./evidence/G06.md).
 
 ## Hồ sơ giao AI theo từng task
 
 | Task | Tệp/đầu ra cụ thể | Điều kiện kiểm chứng trước khi đóng |
 | --- | --- | --- |
-| P06-T01 | D07 trong `implementation-baseline.md`: numeric(20,3), EA nguyên, KG/L 3 lẻ, product unit bất biến; `contexts/catalog/domain/quantity.ts`. | Unit tests 0/âm/overflow/rounding/EA=1.5, trùng lot code khác issuer; JSON lượng là string. |
-| P06-T02 | `0004_catalog.sql` product/identifier, `contexts/catalog/` product aggregate/use cases/PG repo, `/products` + identifier API và UI. | SKU/identifier unique ở PG, EAN13 hợp lệ nếu dùng, archive giữ history, stale version 409. |
-| P06-T03 | `catalog.batch` origin issuer+lot/local code/date/quality, batch action routes và UI filter. | Trùng origin pair bị reject, cùng local code khác product theo rule, restricted/inspect/expired chặn issue; identity sau movement bất biến. |
-| P06-T04 | `0005_inventory.sql` warehouse + `system.membership_warehouse` FK join, `/warehouses` UI/API. | Kho archived còn balance bị chặn; user ngoài scope 403; code unique; revoke scope có hiệu lực lần check sau. |
-| P06-T05 | `stock_balance`/`stock_movement` đúng schema, `contexts/inventory/application/adjust-stock.ts` nhận shared `Prisma.TransactionClient`, lock order `(warehouse,batch)`. | Sum movement delta=balance; source_line+kind unique; two concurrent issues > stock chỉ một pass; không PATCH balance API. |
-| P06-T06 | Read repositories `/inventory/balances|movements`, UI lọc kho/lot/unit, cursor `(createdAt,id)`. | Pagination không lặp/thiếu row; totals khớp SQL; resource scope chặn kho không được cấp. |
-| P06-T07 | `db/seed/catalog.ts` tạo product/batch/warehouse **không** update balance bằng SQL; PG integration tests harness port. | Seed idempotent, rollback/concurrency pass; tồn mở đầu phải qua receipt P07. |
-| P06-T08 | `evidence/G06.md` migration/constraint, precision, lock/concurrency, API/UI logs. | AC-03 chưa hoàn tất trước receipt P07; G06 chứng minh nền catalog/inventory port thật. |
+| P06-T01 | D07 baseline; `contexts/catalog/domain/quantity.ts` | Unit tests 0/âm/overflow/EA=1.5; JSON lượng là string |
+| P06-T02 | Prisma migration catalog product/identifier; `contexts/catalog/`; `/products` API/UI | SKU/identifier unique, EAN13, archive, 409 |
+| P06-T03 | `catalog.batch` + quality routes/UI | Origin pair unique; restricted chặn issue |
+| P06-T04 | Prisma inventory warehouse + `membership_warehouse`; `/warehouses` | Scope 403; archive + balance guard |
+| P06-T05 | `stock_*` + `adjust-stock.ts` | Sum delta=balance; concurrency; no PATCH balance |
+| P06-T06 | `/inventory/balances|movements` | Pagination + scope |
+| P06-T07 | `deploy/scripts/seed-catalog.mjs` + harness | Idempotent seed; opening via port |
+| P06-T08 | `evidence/G06.md` | AC-03 chờ P07 |

@@ -69,11 +69,11 @@ Federation:
 
 ## 6. UI bề mặt
 
-- Timeline lịch sử lô
-- Truy ngược / truy xuôi
-- Tạo QR + xem passport (public)
-- Hàng đợi federation (lỗi, retry)
-- Mapping định danh đối tác
+Canonical prefixes (ADR 0016):
+
+- `/trace/...` — timeline lịch sử lô; truy ngược / truy xuôi; impact
+- Public passport/QR — public route (e.g. `/passport/[token]`), not under `/admin`
+- Federation ops UI (queue/retry/mapping) — partner/ops surfaces; not catalog admin
 
 ## 7. Kiểm thử tối thiểu
 

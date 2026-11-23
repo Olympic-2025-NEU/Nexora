@@ -1,5 +1,5 @@
 {
-  "core": ["Read:private", "Write:private", "Read:quarantine", "Write:quarantine", "Read:public", "Write:public"],
-  "scanner": ["Read:quarantine", "Write:quarantine"],
+  "core": ["Read:private", "Write:private", "List:private", "Read:quarantine", "Write:quarantine", "List:quarantine", "Read:public", "Write:public"],
+  "scanner": ["Read:quarantine", "Write:quarantine", "Write:private"],
   "admin": ["Admin"]
 }

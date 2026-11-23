@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { DomainError } from "@/platform/kernel/errors";
-import type { TenantId } from "@/platform/kernel/id";
+import type { OrganizationId } from "@/platform/kernel/id";
 
 export type PartnerRole = "customer" | "supplier" | "both";
 
 export type Partner = {
   id: string;
-  tenantId: TenantId;
+  organizationId: OrganizationId;
   code: string;
   name: string;
   role: PartnerRole;

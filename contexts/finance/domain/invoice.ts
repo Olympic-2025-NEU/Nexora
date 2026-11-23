@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { DomainError } from "@/platform/kernel/errors";
-import type { TenantId } from "@/platform/kernel/id";
+import type { OrganizationId } from "@/platform/kernel/id";
 
 export type InvoiceSide = "receivable" | "payable";
 
 export type InvoiceDraft = {
   id: string;
-  tenantId: TenantId;
+  organizationId: OrganizationId;
   side: InvoiceSide;
   sourceType: string;
   sourceId: string;

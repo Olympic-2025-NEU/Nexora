@@ -2,11 +2,86 @@ name: ci
 
 on:
   push:
-    branches: [develop, main, "chore/**", "spike/**", "phase-*/**", "phase01/**"]
+    branches: [develop, main, "chore/**", "spike/**", "phase-*/**", "phase01/**", "phase-03", "phase03/**", "phase-04", "phase04/**"]
   pull_request:
     branches: [develop, main]
 
 jobs:
+  platform-schema:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Install and generate Prisma client
+        run: npm ci && npm run db:generate
+      - name: PostgreSQL schema, privilege, upgrade and restore tests
+        run: npm run test:platform:schema
+
+  platform-transaction:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Install and generate Prisma client
+        run: npm ci && npm run db:generate
+      - name: PostgreSQL Unit of Work failure and concurrency tests
+        run: npm run test:platform:transaction
+
+  platform-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Install and generate Prisma client
+        run: npm ci && npm run db:generate
+      - name: PostgreSQL audit atomicity, privacy and query tests
+        run: npm run test:platform:audit
+
+  platform-files:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Install and generate Prisma client
+        run: npm ci && npm run db:generate
+      - name: PostgreSQL and SeaweedFS file API, privacy, compensation and restart tests
+        run: npm run test:platform:files
+
+  platform-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Install and generate Prisma client
+        run: npm ci && npm run db:generate
+      - name: Real ClamAV, PostgreSQL and SeaweedFS scan pipeline tests
+        run: npm run test:platform:scan
+
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 20

@@ -10,6 +10,24 @@ const knownExpressions = new Set([
   "BSD-3-Clause", "BlueOak-1.0.0", "CC-BY-4.0", "CC0-1.0",
   "ISC", "LGPL-3.0-or-later", "MIT", "MPL-2.0", "Python-2.0",
 ]);
+// These two upstream packages use the legacy `licenses` manifest field, which
+// npm omits from lockfile entries. Pin the reviewed MIT LICENSE bytes instead.
+const reviewedLegacyLicenses = {
+  "node_modules/busboy": { version: "1.6.0", license: "MIT", sha256: "d06b5d27bbbbe22c36b1fd88406b1208876e2d37d795f5b8eaed951a459a3111" },
+  "node_modules/streamsearch": { version: "1.1.0", license: "MIT", sha256: "7c28463b739e2e73a49bf127d0bda427f8c55f0b37365a044c3c3f254716118b" },
+};
+
+function licenseFor(path, entry) {
+  if (entry.license) return { license: entry.license };
+  const review = reviewedLegacyLicenses[path];
+  if (!review || review.version !== entry.version) return { license: undefined };
+  const manifest = JSON.parse(readFileSync(`${path}/package.json`, "utf8"));
+  const actual = createHash("sha256").update(readFileSync(`${path}/LICENSE`)).digest("hex");
+  if (manifest.licenses?.[0]?.type !== review.license || actual !== review.sha256) {
+    throw new Error(`Reviewed license bytes changed: ${path}`);
+  }
+  return { license: review.license, reviewedLicenseSha256: actual };
+}
 
 const lockBytes = readFileSync(LOCKFILE);
 // Git may check out CRLF on Windows and LF on Linux. Inventory the normalized
@@ -25,7 +43,7 @@ const packages = Object.entries(lock.packages)
   .map(([path, entry]) => ({
     path,
     version: entry.version,
-    license: entry.license,
+    ...licenseFor(path, entry),
     resolved: entry.resolved,
     integrity: entry.integrity,
     dev: Boolean(entry.dev),

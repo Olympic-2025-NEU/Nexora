@@ -5,3 +5,15 @@
 3a5a540acfcad1ca6254a3baa1a87111301b52a8:documents/phase-plan/evidence/p01-t04.md:curl-auth-user:59
 3a5a540acfcad1ca6254a3baa1a87111301b52a8:documents/phase-plan/evidence/p01-t04.md:curl-auth-user:64
 3a5a540acfcad1ca6254a3baa1a87111301b52a8:documents/phase-plan/evidence/p01-t04.md:curl-auth-user:84
+# P02 G02 command deliberately passes a 13-character invalid-token fixture (not a credential).
+cfea7759d617bf19711c699d60f87649eefefa70:documents/phase-plan/evidence/G02.md:curl-auth-header:83
+# P03-T04 S3 client reads the runtime environment; the source line contains no credential literal.
+652c93a0267d6c8970e4223f07569ad0414e2b42:services/core-data/files/s3-store.mjs:generic-api-key:17
+# P04-T02 test fixtures (fake key "valid-key-12345678") — added 2026-11-20
+71f1b48664d010d117d40cbd90fe52f23ed4c803:platform/http/idempotency.test.ts:generic-api-key:25
+71f1b48664d010d117d40cbd90fe52f23ed4c803:platform/http/pipeline.test.ts:generic-api-key:137
+71f1b48664d010d117d40cbd90fe52f23ed4c803:platform/http/pipeline.test.ts:generic-api-key:163
+71f1b48664d010d117d40cbd90fe52f23ed4c803:platform/http/pipeline.test.ts:generic-api-key:182
+71f1b48664d010d117d40cbd90fe52f23ed4c803:platform/http/pipeline.test.ts:generic-api-key:198
+71f1b48664d010d117d40cbd90fe52f23ed4c803:platform/http/pipeline.test.ts:generic-api-key:212
+71f1b48664d010d117d40cbd90fe52f23ed4c803:platform/http/pipeline.test.ts:generic-api-key:231

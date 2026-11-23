@@ -1,0 +1,22 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Overlay: loopback-only publishes for host-side Prisma / Keycloak Account Console.
+# Used by deploy/scripts/dev-up.ps1 and dev-up.sh (Compose v2+/v5 cannot publish ports
+# on network_mode: service:* sidecars).
+# Do not use on shared hosts exposed beyond the developer machine.
+#
+#   docker compose -f deploy/compose.yml -f deploy/compose.local-admin.yml \
+#     --env-file deploy/instances/a.env -p nexora up -d
+
+services:
+  postgres:
+    ports:
+      - "127.0.0.1:${POSTGRES_HOST_PORT:-15432}:5432"
+
+  keycloak:
+    ports:
+      - "127.0.0.1:${KEYCLOAK_HOST_PORT:-18080}:8080"
+
+  # Reach host Next.js when ERP_UPSTREAM=host.docker.internal:3000 (UI hot-reload).
+  gateway:
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

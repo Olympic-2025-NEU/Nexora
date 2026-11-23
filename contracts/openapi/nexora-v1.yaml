@@ -2,7 +2,7 @@ openapi: 3.0.3
 info:
   title: Nexora API
   version: 1.0.0
-  description: Phase 00 contract v1. The operations describe target behavior; only the scaffold health route is implemented today. Runtime conformance is tested in later phases.
+  description: "Nexora ERP API v1. P02-T07: Bearer security schemes (bearerUser, bearerM2M, oidc). Operations describe target behavior; runtime conformance tested per phase. See deploy/README.md for provisioning runbook."
   license:
     name: AGPL-3.0-only
     url: https://www.gnu.org/licenses/agpl-3.0.html
@@ -588,7 +588,11 @@ paths:
           in: query
           schema:
             type: string
-        - name: status
+        - name: isActive
+          in: query
+          schema:
+            type: string
+        - name: categoryId
           in: query
           schema:
             type: string
@@ -775,12 +779,66 @@ paths:
           $ref: "#/components/responses/Error"
         "503":
           $ref: "#/components/responses/Error"
-  /api/v1/products/{id}/identifiers:
+  /api/v1/products/{id}/variants:
+    get:
+      tags:
+        - M02
+      operationId: getProductsByIdVariants
+      summary: List product variants
+      description: Target contract; runtime implementation is tracked by the owning phase.
+      security:
+        - oidc: []
+      x-nexora-roles:
+        - administrator
+        - staff
+        - approver
+        - viewer
+      x-nexora-scope: resource
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - data
+                  - requestId
+                  - page
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ProductVariant"
+                  requestId:
+                    type: string
+                  page:
+                    $ref: "#/components/schemas/Page"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
     post:
       tags:
         - M02
-      operationId: postProductsByIdIdentifiers
-      summary: Add product identifier
+      operationId: postProductsByIdVariants
+      summary: Create product variant
       description: Target contract; runtime implementation is tracked by the owning phase.
       security:
         - oidc: []
@@ -800,7 +858,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/ProductIdentifierCreate"
+              $ref: "#/components/schemas/ProductVariantCreate"
       responses:
         "201":
           description: Success
@@ -814,7 +872,463 @@ paths:
                   - requestId
                 properties:
                   data:
-                    $ref: "#/components/schemas/ProductIdentifier"
+                    $ref: "#/components/schemas/ProductVariant"
+                  requestId:
+                    type: string
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "422":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
+  /api/v1/variants/{id}:
+    patch:
+      tags:
+        - M02
+      operationId: patchVariantsById
+      summary: Update product variant
+      description: Target contract; runtime implementation is tracked by the owning phase.
+      security:
+        - oidc: []
+      x-nexora-roles:
+        - administrator
+        - staff
+      x-nexora-scope: resource
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProductVariantPatch"
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - data
+                  - requestId
+                properties:
+                  data:
+                    $ref: "#/components/schemas/ProductVariant"
+                  requestId:
+                    type: string
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "422":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
+  /api/v1/categories:
+    get:
+      tags:
+        - M02
+      operationId: getCategories
+      summary: List categories
+      description: Target contract; runtime implementation is tracked by the owning phase.
+      security:
+        - oidc: []
+      x-nexora-roles:
+        - administrator
+        - staff
+        - approver
+        - viewer
+      x-nexora-scope: resource
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - data
+                  - requestId
+                  - page
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Category"
+                  requestId:
+                    type: string
+                  page:
+                    $ref: "#/components/schemas/Page"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
+    post:
+      tags:
+        - M02
+      operationId: postCategories
+      summary: Create category
+      description: Target contract; runtime implementation is tracked by the owning phase.
+      security:
+        - oidc: []
+      x-nexora-roles:
+        - administrator
+        - staff
+      x-nexora-scope: resource
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CategoryCreate"
+      responses:
+        "201":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - data
+                  - requestId
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Category"
+                  requestId:
+                    type: string
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "422":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
+  /api/v1/uoms:
+    get:
+      tags:
+        - M02
+      operationId: getUoms
+      summary: List UOMs
+      description: Target contract; runtime implementation is tracked by the owning phase.
+      security:
+        - oidc: []
+      x-nexora-roles:
+        - administrator
+        - staff
+        - approver
+        - viewer
+      x-nexora-scope: resource
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - data
+                  - requestId
+                  - page
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Uom"
+                  requestId:
+                    type: string
+                  page:
+                    $ref: "#/components/schemas/Page"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
+    post:
+      tags:
+        - M02
+      operationId: postUoms
+      summary: Create UOM
+      description: Target contract; runtime implementation is tracked by the owning phase.
+      security:
+        - oidc: []
+      x-nexora-roles:
+        - administrator
+        - staff
+      x-nexora-scope: resource
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UomCreate"
+      responses:
+        "201":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - data
+                  - requestId
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Uom"
+                  requestId:
+                    type: string
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "422":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
+  /api/v1/price-lists:
+    get:
+      tags:
+        - M02
+      operationId: getPriceLists
+      summary: List price lists
+      description: Target contract; runtime implementation is tracked by the owning phase.
+      security:
+        - oidc: []
+      x-nexora-roles:
+        - administrator
+        - staff
+        - approver
+        - viewer
+      x-nexora-scope: resource
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - data
+                  - requestId
+                  - page
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PriceList"
+                  requestId:
+                    type: string
+                  page:
+                    $ref: "#/components/schemas/Page"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
+    post:
+      tags:
+        - M02
+      operationId: postPriceLists
+      summary: Create price list
+      description: Target contract; runtime implementation is tracked by the owning phase.
+      security:
+        - oidc: []
+      x-nexora-roles:
+        - administrator
+        - staff
+      x-nexora-scope: resource
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PriceListCreate"
+      responses:
+        "201":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - data
+                  - requestId
+                properties:
+                  data:
+                    $ref: "#/components/schemas/PriceList"
+                  requestId:
+                    type: string
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "422":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
+  /api/v1/price-lists/{id}/items:
+    get:
+      tags:
+        - M02
+      operationId: getPriceListsByIdItems
+      summary: List price list items
+      description: Target contract; runtime implementation is tracked by the owning phase.
+      security:
+        - oidc: []
+      x-nexora-roles:
+        - administrator
+        - staff
+        - approver
+        - viewer
+      x-nexora-scope: resource
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - data
+                  - requestId
+                  - page
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PriceListItem"
+                  requestId:
+                    type: string
+                  page:
+                    $ref: "#/components/schemas/Page"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
+    post:
+      tags:
+        - M02
+      operationId: postPriceListsByIdItems
+      summary: Create price list item
+      description: Target contract; runtime implementation is tracked by the owning phase.
+      security:
+        - oidc: []
+      x-nexora-roles:
+        - administrator
+        - staff
+      x-nexora-scope: resource
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PriceListItemCreate"
+      responses:
+        "201":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - data
+                  - requestId
+                properties:
+                  data:
+                    $ref: "#/components/schemas/PriceListItem"
                   requestId:
                     type: string
         "400":
@@ -3987,17 +4501,23 @@ paths:
       tags:
         - Core
       operationId: postCoreRecords
-      summary: Create structured core record
-      description: Kind-specific JSON Schema and writer policy apply. User-created evidence metadata gets its source key from the server.
+      summary: Create private evidence record
+      description: Only evidence_metadata with an authorized active membership or organization owner and clean private attachment. Server assigns source key, visibility and policy version. Same Idempotency-Key and payload returns 200; different payload returns 409 unless If-Match names the current version and owner remains unchanged.
       security:
         - oidc: []
       x-nexora-roles:
         - administrator
         - staff
-        - service
       x-nexora-scope: resource
       parameters:
         - $ref: "#/components/parameters/IdempotencyKey"
+        - name: If-Match
+          in: header
+          required: false
+          schema:
+            type: string
+            pattern: ^"[1-9][0-9]*"$
+          description: Optional current version for a change to existing evidence.
       requestBody:
         required: true
         content:
@@ -4005,6 +4525,21 @@ paths:
             schema:
               $ref: "#/components/schemas/CoreRecordCreate"
       responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - data
+                  - requestId
+                properties:
+                  data:
+                    $ref: "#/components/schemas/CoreRecord"
+                  requestId:
+                    type: string
         "201":
           description: Success
           content:
@@ -4017,20 +4552,18 @@ paths:
                   - requestId
                 properties:
                   data:
-                    $ref: "#/components/schemas/CoreRecordCreated"
+                    $ref: "#/components/schemas/CoreRecord"
                   requestId:
                     type: string
-        "400":
-          $ref: "#/components/responses/Error"
         "401":
           $ref: "#/components/responses/Error"
         "403":
           $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
         "409":
           $ref: "#/components/responses/Error"
         "422":
-          $ref: "#/components/responses/Error"
-        "429":
           $ref: "#/components/responses/Error"
         "503":
           $ref: "#/components/responses/Error"
@@ -4139,7 +4672,7 @@ paths:
         - Core
       operationId: getFilesById
       summary: Get file metadata or content
-      description: Target contract; runtime implementation is tracked by the owning phase.
+      description: Returns metadata by default. download=1 streams bytes only after a clean scan and resource authorization.
       security:
         - oidc: []
       x-nexora-roles:
@@ -4155,6 +4688,12 @@ paths:
           schema:
             type: string
             format: uuid
+        - name: download
+          in: query
+          schema:
+            type: string
+            enum:
+              - "1"
       responses:
         "200":
           description: Success
@@ -4171,18 +4710,129 @@ paths:
                     $ref: "#/components/schemas/FileMetadata"
                   requestId:
                     type: string
-        "302":
-          description: Authorized clean-file redirect
-          headers:
-            Location:
+            application/pdf:
               schema:
                 type: string
-                format: uri
+                format: binary
+            image/png:
+              schema:
+                type: string
+                format: binary
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            text/plain:
+              schema:
+                type: string
+                format: binary
+        "400":
+          $ref: "#/components/responses/Error"
         "401":
           $ref: "#/components/responses/Error"
         "403":
           $ref: "#/components/responses/Error"
         "404":
+          $ref: "#/components/responses/Error"
+        "423":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
+  /api/v1/files/{id}/retry-scan:
+    post:
+      tags:
+        - Core
+      operationId: postFilesByIdRetryScan
+      summary: Retry failed file scan
+      description: Administrator only. Resets an error state to pending; infected files cannot be retried or released. Empty request body.
+      security:
+        - oidc: []
+      x-nexora-roles:
+        - administrator
+      x-nexora-scope: resource
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "202":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - data
+                  - requestId
+                properties:
+                  data:
+                    $ref: "#/components/schemas/FileScanRetry"
+                  requestId:
+                    type: string
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
+  /api/v1/files/{id}/discard:
+    post:
+      tags:
+        - Core
+      operationId: postFilesByIdDiscard
+      summary: Discard infected quarantine bytes
+      description: Administrator only. Deletes infected quarantine bytes, retains metadata and audit, and never releases the file. Repeated requests are safe. Empty request body.
+      security:
+        - oidc: []
+      x-nexora-roles:
+        - administrator
+      x-nexora-scope: resource
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "202":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - data
+                  - requestId
+                properties:
+                  data:
+                    $ref: "#/components/schemas/FileDiscarded"
+                  requestId:
+                    type: string
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
           $ref: "#/components/responses/Error"
         "429":
           $ref: "#/components/responses/Error"
@@ -4194,7 +4844,7 @@ paths:
         - Operations
       operationId: getAuditLogs
       summary: Query audit logs
-      description: Target contract; runtime implementation is tracked by the owning phase.
+      description: Administrator-only audit query. Filters are allowlisted and summaries are never returned.
       security:
         - oidc: []
       x-nexora-roles:
@@ -4215,7 +4865,12 @@ paths:
           in: query
           schema:
             type: string
-            format: uuid
+            maxLength: 128
+        - name: requestId
+          in: query
+          schema:
+            type: string
+            maxLength: 128
         - name: from
           in: query
           schema:
@@ -4251,6 +4906,8 @@ paths:
                     type: string
                   page:
                     $ref: "#/components/schemas/Page"
+        "400":
+          $ref: "#/components/responses/Error"
         "401":
           $ref: "#/components/responses/Error"
         "403":
@@ -4646,10 +5303,17 @@ components:
     oidc:
       type: openIdConnect
       openIdConnectUrl: https://keycloak.example/.well-known/openid-configuration
+      description: Authorization Code + PKCE. MFA required for administrator and approver roles.
+    bearerUser:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: "User Bearer JWT. Audience: OIDC_AUDIENCE (erp-browser). Issued via auth-code+PKCE."
     bearerM2M:
       type: http
       scheme: bearer
       bearerFormat: JWT
+      description: "Service-account Bearer JWT for M2M partner federation. Required scope: federation:write."
   parameters:
     IfMatch:
       name: If-Match
@@ -5025,29 +5689,26 @@ components:
       additionalProperties: false
       required:
         - id
-        - sku
         - name
-        - baseUnit
-        - status
+        - categoryId
+        - isActive
         - version
       properties:
         id:
           type: string
           format: uuid
-        sku:
-          type: string
         name:
           type: string
-        description:
+        categoryId:
           type: string
-        baseUnit:
+          format: uuid
+        attributes:
+          type: object
+        isActive:
+          type: boolean
+        deletedAt:
           type: string
-          enum:
-            - EA
-            - KG
-            - L
-        status:
-          type: string
+          format: date-time
         version:
           type: integer
           minimum: 1
@@ -5055,24 +5716,21 @@ components:
       type: object
       additionalProperties: false
       required:
-        - sku
         - name
-        - baseUnit
+        - categoryId
       properties:
-        sku:
-          type: string
-          minLength: 1
         name:
           type: string
           minLength: 1
-        description:
+        categoryId:
           type: string
-        baseUnit:
+          format: uuid
+        attributes:
+          type: object
+        sku:
           type: string
-          enum:
-            - EA
-            - KG
-            - L
+        barcode:
+          type: string
     ProductPatch:
       type: object
       additionalProperties: false
@@ -5080,22 +5738,23 @@ components:
         name:
           type: string
           minLength: 1
-        description:
+        categoryId:
           type: string
-        status:
-          type: string
-          enum:
-            - active
-            - archived
+          format: uuid
+        attributes:
+          type: object
+        isActive:
+          type: boolean
       minProperties: 1
-    ProductIdentifier:
+    ProductVariant:
       type: object
       additionalProperties: false
       required:
         - id
         - productId
-        - kind
-        - value
+        - isPrimary
+        - isActive
+        - version
       properties:
         id:
           type: string
@@ -5103,32 +5762,251 @@ components:
         productId:
           type: string
           format: uuid
-        kind:
+        sku:
           type: string
-          enum:
-            - ean13
-            - internal_barcode
-        value:
+        barcode:
           type: string
         isPrimary:
           type: boolean
-    ProductIdentifierCreate:
+        isActive:
+          type: boolean
+        version:
+          type: integer
+          minimum: 1
+    ProductVariantCreate:
+      type: object
+      additionalProperties: false
+      properties:
+        sku:
+          type: string
+        barcode:
+          type: string
+        isPrimary:
+          type: boolean
+        stockUomId:
+          type: string
+          format: uuid
+    ProductVariantPatch:
+      type: object
+      additionalProperties: false
+      properties:
+        sku:
+          type: string
+        barcode:
+          type: string
+        isPrimary:
+          type: boolean
+        isActive:
+          type: boolean
+      minProperties: 1
+    Category:
       type: object
       additionalProperties: false
       required:
-        - kind
-        - value
+        - id
+        - code
+        - name
+        - isActive
+        - version
       properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        name:
+          type: string
+        parentId:
+          type: string
+          format: uuid
+        sortOrder:
+          type: integer
+          minimum: 1
+        isActive:
+          type: boolean
+        version:
+          type: integer
+          minimum: 1
+    CategoryCreate:
+      type: object
+      additionalProperties: false
+      required:
+        - code
+        - name
+      properties:
+        code:
+          type: string
+          minLength: 1
+        name:
+          type: string
+          minLength: 1
+        parentId:
+          type: string
+          format: uuid
+        sortOrder:
+          type: integer
+          minimum: 0
+    Uom:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - code
+        - name
+        - kind
+        - version
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        name:
+          type: string
         kind:
           type: string
           enum:
-            - ean13
-            - internal_barcode
-        value:
+            - count
+            - mass
+            - volume
+        isSystemDefault:
+          type: boolean
+        isActive:
+          type: boolean
+        version:
+          type: integer
+          minimum: 1
+    UomCreate:
+      type: object
+      additionalProperties: false
+      required:
+        - name
+        - kind
+      properties:
+        name:
           type: string
           minLength: 1
-        isPrimary:
+        kind:
+          type: string
+          enum:
+            - count
+            - mass
+            - volume
+    PriceList:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - name
+        - isDefault
+        - validFrom
+        - currency
+        - version
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        name:
+          type: string
+        isDefault:
           type: boolean
+        validFrom:
+          type: string
+          format: date-time
+        validTo:
+          type: string
+          format: date-time
+        isActive:
+          type: boolean
+        currency:
+          type: string
+        version:
+          type: integer
+          minimum: 1
+    PriceListCreate:
+      type: object
+      additionalProperties: false
+      required:
+        - name
+        - currency
+      properties:
+        code:
+          type: string
+        name:
+          type: string
+          minLength: 1
+        isDefault:
+          type: boolean
+        validFrom:
+          type: string
+          format: date-time
+        validTo:
+          type: string
+          format: date-time
+        currency:
+          type: string
+          minLength: 1
+          maxLength: 3
+    PriceListItem:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - priceListId
+        - productVariantId
+        - uomId
+        - priceType
+        - amount
+      properties:
+        id:
+          type: string
+          format: uuid
+        priceListId:
+          type: string
+          format: uuid
+        productVariantId:
+          type: string
+          format: uuid
+        uomId:
+          type: string
+          format: uuid
+        priceType:
+          type: string
+          enum:
+            - purchase
+            - retail
+            - wholesale
+        amount:
+          type: string
+          pattern: ^(0|[1-9][0-9]*)(\.[0-9]{1,3})?$
+        isActive:
+          type: boolean
+    PriceListItemCreate:
+      type: object
+      additionalProperties: false
+      required:
+        - productVariantId
+        - uomId
+        - priceType
+        - amount
+      properties:
+        productVariantId:
+          type: string
+          format: uuid
+        uomId:
+          type: string
+          format: uuid
+        priceType:
+          type: string
+          enum:
+            - purchase
+            - retail
+            - wholesale
+        amount:
+          type: string
+          pattern: ^(0|[1-9][0-9]*)(\.[0-9]{1,3})?$
     OriginLot:
       type: object
       additionalProperties: false
@@ -5147,6 +6025,7 @@ components:
       required:
         - id
         - productId
+        - productVariantId
         - localCode
         - originLot
         - qualityStatus
@@ -5156,6 +6035,9 @@ components:
           type: string
           format: uuid
         productId:
+          type: string
+          format: uuid
+        productVariantId:
           type: string
           format: uuid
         localCode:
@@ -5181,10 +6063,10 @@ components:
       type: object
       additionalProperties: false
       required:
-        - productId
+        - productVariantId
         - localCode
       properties:
-        productId:
+        productVariantId:
           type: string
           format: uuid
         localCode:
@@ -5253,9 +6135,9 @@ components:
       required:
         - warehouseId
         - productId
+        - productVariantId
         - batchId
         - quantity
-        - unit
         - updatedAt
       properties:
         warehouseId:
@@ -5264,18 +6146,24 @@ components:
         productId:
           type: string
           format: uuid
+        productVariantId:
+          type: string
+          format: uuid
         batchId:
           type: string
           format: uuid
         quantity:
           type: string
           pattern: ^(0|[1-9][0-9]*)(\.[0-9]{1,3})?$
-        unit:
+        stockUomId:
+          type: string
+          format: uuid
+        unitKind:
           type: string
           enum:
-            - EA
-            - KG
-            - L
+            - count
+            - mass
+            - volume
         updatedAt:
           type: string
           format: date-time
@@ -5295,6 +6183,9 @@ components:
           format: uuid
         kind:
           type: string
+        productVariantId:
+          type: string
+          format: uuid
         delta:
           type: string
           pattern: ^-?(0|[1-9][0-9]*)(\.[0-9]{1,3})?$
@@ -5312,15 +6203,15 @@ components:
       additionalProperties: false
       required:
         - warehouseId
-        - productId
+        - productVariantId
         - batchId
         - quantity
-        - unit
+        - uomId
       properties:
         warehouseId:
           type: string
           format: uuid
-        productId:
+        productVariantId:
           type: string
           format: uuid
         batchId:
@@ -5329,26 +6220,23 @@ components:
         quantity:
           type: string
           pattern: ^(?!0(?:\.0{1,3})?$)(0|[1-9][0-9]*)(\.[0-9]{1,3})?$
-        unit:
+        uomId:
           type: string
-          enum:
-            - EA
-            - KG
-            - L
+          format: uuid
     CountLine:
       type: object
       additionalProperties: false
       required:
         - warehouseId
-        - productId
+        - productVariantId
         - batchId
         - countedQuantity
-        - unit
+        - uomId
       properties:
         warehouseId:
           type: string
           format: uuid
-        productId:
+        productVariantId:
           type: string
           format: uuid
         batchId:
@@ -5357,12 +6245,9 @@ components:
         countedQuantity:
           type: string
           pattern: ^(0|[1-9][0-9]*)(\.[0-9]{1,3})?$
-        unit:
+        uomId:
           type: string
-          enum:
-            - EA
-            - KG
-            - L
+          format: uuid
     ActualLine:
       type: object
       additionalProperties: false
@@ -5371,7 +6256,7 @@ components:
         - localBatchId
         - warehouseId
         - actualQuantity
-        - unit
+        - uomId
       properties:
         sourceLineId:
           type: string
@@ -5385,26 +6270,26 @@ components:
         actualQuantity:
           type: string
           pattern: ^(0|[1-9][0-9]*)(\.[0-9]{1,3})?$
-        unit:
+        uomId:
           type: string
-          enum:
-            - EA
-            - KG
-            - L
+          format: uuid
     DocumentLine:
       type: object
       additionalProperties: false
       required:
         - id
         - warehouseId
-        - productId
+        - productVariantId
         - batchId
-        - unit
+        - uomId
       properties:
         id:
           type: string
           format: uuid
         warehouseId:
+          type: string
+          format: uuid
+        productVariantId:
           type: string
           format: uuid
         productId:
@@ -5422,12 +6307,9 @@ components:
         countedQuantity:
           type: string
           pattern: ^(0|[1-9][0-9]*)(\.[0-9]{1,3})?$
-        unit:
+        uomId:
           type: string
-          enum:
-            - EA
-            - KG
-            - L
+          format: uuid
         sourceLineRef:
           type: string
           format: uuid
@@ -6107,34 +6989,13 @@ components:
       required:
         - kind
         - payload
-        - visibility
-        - policyVersion
       properties:
         kind:
           type: string
           enum:
             - evidence_metadata
-            - trace_projection
-            - ot_reading
-            - archive_manifest
-        sourceType:
-          type: string
-        sourceId:
-          type: string
         payload:
-          oneOf:
-            - $ref: "#/components/schemas/EvidenceMetadataPayload"
-            - $ref: "#/components/schemas/TraceProjectionPayload"
-            - $ref: "#/components/schemas/OtReadingPayload"
-            - $ref: "#/components/schemas/ArchiveManifestPayload"
-        visibility:
-          type: string
-          enum:
-            - private
-            - partner
-            - public
-        policyVersion:
-          type: string
+          $ref: "#/components/schemas/EvidenceMetadataPayload"
     CoreRecord:
       type: object
       additionalProperties: false
@@ -6144,6 +7005,7 @@ components:
         - version
         - checksum
         - builtAt
+        - visibility
         - payload
       properties:
         id:
@@ -6162,12 +7024,10 @@ components:
           format: date-time
         visibility:
           type: string
+          enum:
+            - private
         payload:
-          oneOf:
-            - $ref: "#/components/schemas/EvidenceMetadataPayload"
-            - $ref: "#/components/schemas/TraceProjectionPayload"
-            - $ref: "#/components/schemas/OtReadingPayload"
-            - $ref: "#/components/schemas/ArchiveManifestPayload"
+          $ref: "#/components/schemas/EvidenceMetadataPayload"
     CoreRecordCreated:
       type: object
       additionalProperties: false
@@ -6245,6 +7105,21 @@ components:
         checksum:
           type: string
           pattern: ^[0-9a-f]{64}$
+        scanAttempts:
+          type: integer
+          minimum: 0
+          maximum: 5
+        scanErrorCode:
+          type: string
+          nullable: true
+        nextScanAt:
+          type: string
+          format: date-time
+          nullable: true
+        quarantinePurgedAt:
+          type: string
+          format: date-time
+          nullable: true
     FileAccepted:
       type: object
       additionalProperties: false
@@ -6259,6 +7134,42 @@ components:
           type: string
           enum:
             - pending
+            - clean
+            - infected
+            - error
+    FileScanRetry:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - scanState
+      properties:
+        id:
+          type: string
+          format: uuid
+        scanState:
+          type: string
+          enum:
+            - pending
+    FileDiscarded:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - scanState
+        - discarded
+      properties:
+        id:
+          type: string
+          format: uuid
+        scanState:
+          type: string
+          enum:
+            - infected
+        discarded:
+          type: boolean
+          enum:
+            - true
     AuditEntry:
       type: object
       additionalProperties: false
@@ -6290,6 +7201,8 @@ components:
         outcome:
           type: string
         requestId:
+          type: string
+        correlationId:
           type: string
     InventorySummary:
       type: object
@@ -6432,6 +7345,8 @@ components:
             - document
             - batch
             - trace_event
+            - membership
+            - organization
         ownerId:
           type: string
           format: uuid

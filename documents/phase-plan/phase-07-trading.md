@@ -1,6 +1,10 @@
 # Phase 07 — M03 Trading & Distribution
 
-**Mục tiêu:** chứng từ Draft → confirm với tồn/audit/outbox atomic; giao nhận thực tế và một phê duyệt Flowable. **Phụ thuộc:** G04–G06, D06/D07. **Unblock:** trace/federation. **AC:** AC-03/04/06/12.
+**Mục tiêu:** chứng từ Draft → confirm với tồn/audit/outbox atomic; giao nhận thực tế và một phê duyệt Flowable. **Phụ thuộc:** G04–G06, **G06.5** (catalog variant/UOM/price — D17), D06/D07. **Unblock:** trace/federation. **AC:** AC-03/04/06/12.
+
+Document lines / Inventory confirm: tham chiếu **`product_variant_id`** + qty ở ĐVT gốc (sau P065); không còn giả định SKU trên `product` kiểu P06.
+
+**UI surfaces (ADR 0016):** ERP trading UI lives under **`/trading/*`** (not `/admin`). Inventory confirmations still call Inventory port; balances UI remains `/inventory/*` read-until-then write via documents.
 
 ## P07-T01 — Loại chứng từ và transition contract
 

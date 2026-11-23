@@ -1,6 +1,6 @@
 # Plan: M02 — Product & Inventory Management
 
-> Plan tổng quan. DevOps bổ sung chi tiết hệ thống, giao diện, kiểm thử, kết nối trước khi code sâu.
+> Chi tiết thi công theo `documents/phase-plan/phase-06-catalog-inventory.md` (P06). Schema ERP phải Dev duyệt (`evidence/p06-schema-design.md`) trước migration/API.
 
 ## 1. Mục tiêu / phạm vi MVP
 
@@ -22,52 +22,51 @@ Folders: `contexts/catalog/`, `contexts/inventory/`.
 - Module QC chuyên sâu nhiều bước
 - BOM / lệnh sản xuất
 - Định giá, công nợ
+- Bảng UOM master / quy đổi đơn vị (v1: `product.base_unit` EA|KG|L bất biến)
+- Trading receipt HTTP (P07); partner batch từ inbox (P09)
 
 ## 3. Phụ thuộc / cung cấp
 
 | Hướng | Nội dung |
 | --- | --- |
-| Phụ thuộc | Platform, M01 |
-| Cung cấp M03 | ProductId, BatchId, WarehouseId; port điều chỉnh tồn |
-| Cung cấp M04 | Định danh lô / mapping nguồn đối tác |
+| Phụ thuộc | Platform, M01 (G03–G05), D07 |
+| Cung cấp M03 | ProductId, BatchId, WarehouseId; port `adjustStock` |
+| Cung cấp M04 | Định danh lô / origin issuer+lot |
 | Cung cấp AI01 | Tra cứu product/lot/tồn |
 
-Nguyên tắc: số lượng tồn chỉ đổi từ giao dịch hợp lệ (do M03 gọi port Inventory khi confirm).
+Nguyên tắc: số lượng tồn chỉ đổi qua Inventory port (M03 confirm hoặc harness `openStockBalance`); không SQL UPDATE balance; không PATCH balance API.
 
 ## 4. Aggregate / sự kiện chính
 
 - `Product`, `ProductIdentifier`, `Batch`
 - `Warehouse`, `StockBalance`, `StockMovement`
-- Sự kiện nội bộ: `inventory.balance.changed` (cho history / audit)
+- Sự kiện nội bộ / audit: thay đổi product/batch/warehouse/quality; movement append-only
 
-## 5. API bề mặt (dự kiến)
+## 5. API bề mặt
 
-- `GET/POST/PATCH /api/v1/products`, `POST /api/v1/products/{id}/identifiers`; không DELETE có history
-- `GET/POST /api/v1/batches`, `POST /api/v1/batches/{id}/quality-actions`; batch partner chỉ service verified inbox tạo
-- `GET/POST /api/v1/warehouses`; archive theo policy, không DELETE có balance/history
-- `GET /api/v1/inventory/balances`
-- `GET /api/v1/inventory/movements`
-- Port nội bộ: `adjustStock`, `assertAvailable`
+- `GET/POST/PATCH /api/v1/products`, `POST /api/v1/products/{id}/identifiers`
+- `GET/POST /api/v1/batches`, `POST /api/v1/batches/{id}/quality-actions`
+- `GET/POST /api/v1/warehouses`
+- `GET /api/v1/inventory/balances`, `GET /api/v1/inventory/movements`
+- Port nội bộ: `adjustStock`, `openStockBalance` (harness/seed)
 
 ## 6. UI bề mặt
 
-- Danh mục sản phẩm / lô
-- Kho và tồn theo sản phẩm+lô
-- Lịch sử biến động
-- Trạng thái lô
+- Canonical UI (ADR 0016): `/catalog/products`, `/catalog/batches`, `/inventory/warehouses`, `/inventory/balances` — **not** under `/admin` (system-only). Legacy `/admin/products|batches|warehouses|inventory` redirect to these prefixes.
+- Member warehouse scope qua membership PATCH (`membership_warehouse`)
 
 ## 7. Kiểm thử tối thiểu
 
-- Unit: v1 luôn cấm tồn âm; batch status `restricted/inspect` và hết hạn chặn xuất
-- Integration: movement ghi history
-- API: validation SKU/lot uniqueness trong instance
+- Unit: quantity D07; cấm tồn âm; restricted/inspect/expired chặn xuất
+- Integration: concurrency issue; idempotent movement; GRANT privileges
+- API: SKU/lot uniqueness; warehouse scope 403
 
 ## 8. Tiêu chí Done
 
-- [ ] AC-03
 - [ ] Port Inventory sẵn cho M03
-- [ ] Lô lưu được tham chiếu nguồn đối tác (phục vụ M04)
+- [ ] Lô lưu origin issuer+lot (phục vụ M04)
+- [ ] G06 evidence; **AC-03 chờ P07**
 
 ## 9. Ghi chú DevOps
 
-Chi tiết hóa: chiến lược khóa dòng khi adjust stock, đơn vị tính, import lô từ federation mapping, UI lọc HSD.
+Prisma Migrate multi-schema `catalog`/`inventory`; GRANT trong cùng migration; rebuild `db-migrate` trước deploy; lock order `(warehouse_id,batch_id)`.

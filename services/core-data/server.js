@@ -2,13 +2,26 @@
 import http from "node:http";
 import { PrismaClient } from "@prisma/client";
 import { validateConfig } from "./config.mjs";
-import { requestId, response, timed, bucketProbe, scannerPing, log } from "./health.mjs";
+import { requestId, response, timed, bucketProbe, log } from "./health.mjs";
+import { createAuthenticator } from "./auth.mjs";
+import { createFileService } from "./files/upload-service.mjs";
+import { createS3FileStore } from "./files/s3-store.mjs";
+import { handleFileRequest } from "./files/http.mjs";
+import { createClamAvScanner } from "./files/clamav.mjs";
+import { createRecordService } from "./records/service.mjs";
+import { handleRecordRequest } from "./records/http.mjs";
 
 validateConfig(process.env, "core-data");
 const prisma = new PrismaClient({ datasources: { db: { url: process.env.CORE_DATABASE_URL } } });
+const store = createS3FileStore(process.env);
+const scanner = createClamAvScanner();
+const authenticate = createAuthenticator(prisma, process.env);
+const fileHandler = { authenticate,
+  files: createFileService(prisma, store) };
+const recordHandler = { authenticate, records: createRecordService(prisma) };
 async function ready() {
   try {
-    await Promise.all([timed(prisma.$queryRaw`SELECT 1`), bucketProbe(process.env), scannerPing()]);
+    await Promise.all([timed(prisma.$queryRaw`SELECT 1`), bucketProbe(process.env), timed(scanner.version())]);
     return true;
   } catch { return false; }
 }
@@ -26,6 +39,8 @@ const server = http.createServer(async (req, res) => {
     res.end(`# TYPE service_up gauge\nservice_up{service="core-data"} ${Number(up)}\n`);
     return;
   }
+  if (await handleFileRequest(req, res, fileHandler)) return;
+  if (await handleRecordRequest(req, res, recordHandler)) return;
   res.writeHead(404, { "content-type": "application/json", "x-request-id": id });
   res.end(JSON.stringify({ error: "not_found", requestId: id }));
 });

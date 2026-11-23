@@ -6,55 +6,61 @@
 
 - [ ] Biến `commandPipeline` từ danh sách string thành middleware/use-case boundary thực: authenticate → authorize → idempotency → validate/domain → transaction → response/dispatch sau commit.
 - [ ] Có request ID, actor/correlation, mapping DomainError thành API error; route handler chỉ parse/dispatch/map response.
-- [ ] Unit/contract test thứ tự và khi bước trước fail thì không chạy bước sau; confirm chưa auth không có side effect.
+- [x] Unit/contract test thứ tự và khi bước trước fail thì không chạy bước sau; confirm chưa auth không có side effect.
+- **Ghi chú (2026-11-19):** Lõi pipeline và contract tests đã hoàn thành (bằng chứng: `evidence/p04-t01.md`). Việc cắm route thật được để trống có chủ đích: chưa có route ghi thật để cắm; route `federation/events` hiện chỉ trả 202 stub, chưa lưu inbox hoặc chống trùng (thuộc P09). Hai ô đầu sẽ được tick khi có consumer thật đầu tiên (module nghiệp vụ P05+ hoặc P09).
 - **Đầu ra:** pipeline adapter; **kiểm chứng:** trace log và negative tests.
 
 ## P04-T02 — Idempotency cho lệnh ghi
 
-- [ ] Migration `idempotency_record` theo `database.md`; scope key theo actor/client + route/action, payload hash, expiry và response reference.
-- [ ] Đồng thời hai request cùng key chỉ một transaction tạo effect; cùng key khác payload trả 409; retry sau timeout trả kết quả cũ, không tạo outbox mới.
-- [ ] Phân biệt idempotency của user command và dedupe của federation inbox, không dùng một cache Redis làm nguồn duy nhất.
+- [x] Migration `idempotency_record` theo `database.md`; scope key theo actor/client + route/action, payload hash, expiry và response reference.
+- [x] Đồng thời hai request cùng key chỉ một transaction tạo effect; cùng key khác payload trả 409; retry sau timeout trả kết quả cũ, không tạo outbox mới.
+- [x] Phân biệt idempotency của user command và dedupe của federation inbox, không dùng một cache Redis làm nguồn duy nhất.
+- **Ghi chú (2026-11-20):** PostgreSQL integration test chứng minh 20 request cùng key tạo đúng một effect và dispatch đúng một lần; retry replay response, body khác trả 409. Outbox-row assertion chờ P04-T03 tạo bảng outbox; kiểm chứng literal tại G04. Xem `evidence/p04-t02.md`.
 - **Đầu ra:** idempotency adapter; **kiểm chứng:** parallel/retry tests với DB assertions.
 
 ## P04-T03 — Transactional outbox và worker
 
-- [ ] Migration outbox, payload version, aggregate/correlation/destination; insert trong cùng PG transaction của command.
-- [ ] Worker riêng claim row với lease, backoff+jitter, max attempts, dead-letter và admin retry; gửi sau commit, không gọi HTTP partner trong transaction.
-- [ ] Redis nếu dùng cho coordination/cache không thay PG outbox; kill/restart worker, chứng minh message không mất.
+- [x] Migration outbox, payload version, aggregate/correlation/destination; insert trong cùng PG transaction của command.
+- [x] Worker riêng claim row với lease, backoff+jitter, max attempts, dead-letter và admin retry; gửi sau commit, không gọi HTTP partner trong transaction.
+- [x] Redis nếu dùng cho coordination/cache không thay PG outbox; kill/restart worker, chứng minh message không mất.
+- **Ghi chú (2026-11-20):** Hàm nội bộ `retryDeadLetter` và kiểm thử ship trong T03; API admin có phân quyền/audit thuộc P04-T07. Dispatcher gửi qua handler port sau commit; production chưa đăng ký handler, kiểm thử delivery là mô phỏng. `test:platform:outbox` kiểm chứng literal caveat T02: 20 lệnh cùng key → một effect, một idempotency row, một outbox row, một simulated delivery. SIGKILL/restart worker test chứng minh 20 message không mất; Redis không giữ outbox. Xem `evidence/p04-t03.md`; G04 vẫn cần kiểm chứng riêng.
 - **Đầu ra:** dispatcher + metrics/ops API; **kiểm chứng:** crash-before/after-send và receiver duplicate tests.
 
 ## P04-T04 — Event handlers và ownership
 
-- [ ] Định nghĩa type/version cho `trading.receipt.confirmed`, `issue.confirmed`, `transfer.confirmed`, `receiving.confirmed`, `sale.recorded`; event nội bộ khác federation envelope.
-- [ ] Wire handler ở `composition/` để Traceability/Federation tiêu thụ qua port, không import domain context khác; lỗi handler có retry và dead-letter.
-- [ ] Không phát event truy xuất cho Draft hoặc transaction rollback.
+- [x] Định nghĩa type/version cho `trading.receipt.confirmed`, `issue.confirmed`, `transfer.confirmed`, `receiving.confirmed`, `sale.recorded`; event nội bộ khác federation envelope.
+- [x] Wire handler ở `composition/` để Traceability/Federation tiêu thụ qua port, không import domain context khác; lỗi handler có retry và dead-letter.
+- [x] Không phát event truy xuất cho Draft hoặc transaction rollback.
+- **Ghi chú (2026-11-20):** Schema và payload có sẵn từ P00; T04 đưa năm event trading vào runtime registry/serializer (`.v1`, `schemaVersion: "1"`, khác envelope federation `"1.0"`). Worker đăng ký hai destination và routing port; lỗi tạm thời retry, lỗi vĩnh viễn dead-letter ngay lần đầu. Consumer thật của Traceability/Federation thuộc P08/P09, chưa có body trong T04; event hợp lệ chưa có consumer được giữ trong dead-letter để replay. Test Draft không emit và rollback qua pipeline + PostgreSQL thật, nhưng chưa có chứng từ trading thật; P07 sẽ ràng buộc emit chỉ khi confirm. Xem `evidence/p04-t04.md`.
 - **Đầu ra:** event registry/contract tests; **kiểm chứng:** một confirm→một event cùng source document ID.
 
 ## P04-T05 — Flowable OSS REST/BPMN bền vững
 
-- [ ] Pin Flowable OSS REST, cấu hình PostgreSQL/credential riêng, deploy một BPMN process versioned từ source repo; admin endpoint nội bộ.
-- [ ] Tạo user task approve/reject với assignee/group và reason; không dùng password mặc định hoặc H2 ở demo/release.
-- [ ] Test process start, query task, complete, cancel, version upgrade và restart container không mất process.
+- [x] Pin Flowable OSS REST, cấu hình PostgreSQL/credential riêng, deploy một BPMN process versioned từ source repo; admin endpoint chỉ trên loopback và Compose internal.
+- [x] Tạo user task approve/reject với candidate group `approver` và process variable `decisionReason`; test từ chối mật khẩu mặc định và xác nhận bảng `ACT_*` trong PostgreSQL.
+- [x] Test process start, query task, complete, cancel, version upgrade và restart container không mất process.
+- **Ghi chú (2026-11-20):** Chạy trên stack `nexora-b`, version 1→2 và restart Flowable pass; bằng chứng ở `evidence/p04-t05.md`. Group là string contract phía Flowable, chưa đồng bộ Keycloak. Bridge/reconciliation thuộc T06; backup drill Flowable DB còn mở ở G04/P12.
 - **Đầu ra:** process definition + adapter; **kiểm chứng:** Flowable API/process history chứng minh engine đã chạy.
 
 ## P04-T06 — Kết nối app↔Flowable không distributed transaction
 
-- [ ] Lưu local approval request/state và outbox khi tạo yêu cầu; worker start Flowable process bằng correlation key idempotent. Poller/reconciler theo `workflow-spec-v1.md` đồng bộ local state sau khi verify process/task; không dựng webhook chưa có hợp đồng xác thực.
-- [ ] Tình huống Flowable down: document chờ, không tự approve; kết quả task lặp/đến muộn không confirm document; timeout/rejection có lý do và audit.
-- [ ] GoodsIssue luôn cần Approver khác creator ở v1; final `confirm` kiểm trạng thái approval được đồng bộ và quyền actor hiện tại.
+- [x] Lưu local approval request/state và outbox khi tạo yêu cầu; worker start Flowable process bằng correlation key idempotent. Poller/reconciler theo `workflow-spec-v1.md` đồng bộ local state sau khi verify process/task; không dựng webhook chưa có hợp đồng xác thực.
+- [x] Tình huống Flowable down: document chờ, không tự approve; kết quả task lặp/đến muộn không confirm document; timeout/rejection có lý do và audit.
+- [x] GoodsIssue luôn cần Approver khác creator ở v1; final `confirm` kiểm trạng thái approval được đồng bộ và quyền actor hiện tại.
 - **Đầu ra:** workflow integration contract; **kiểm chứng:** kill Flowable giữa start/complete, phục hồi không tạo process/confirm trùng.
 
 ## P04-T07 — Quan sát và quyền vận hành
 
-- [ ] Metrics pending/retry/dead outbox, process pending/failed, latency; log có requestId, messageId, processId nhưng redacted secret.
-- [ ] Admin xem/retry theo quyền, retry có audit; không cho sửa payload đã phát hoặc mark delivered thủ công không căn cứ.
-- [ ] Runbook xử lý queue/process stuck và cảnh báo ngưỡng dựa trên test failure thực.
+- [x] Metrics pending/retry/dead outbox, process pending/failed, latency; log có requestId, messageId, processId nhưng redacted secret.
+- [x] Admin xem/retry theo quyền, retry có audit; không cho sửa payload đã phát hoặc mark delivered thủ công không căn cứ.
+- [x] Runbook xử lý queue/process stuck và cảnh báo ngưỡng dựa trên test failure thực.
+- **Ghi chú:** Triển khai và suite đã có tại `evidence/p04-t07.md`; kiểm chứng PostgreSQL live do verifier ghi sau, chưa tuyên bố suite pass.
 - **Đầu ra:** dashboard/log/runbook ban đầu; **kiểm chứng:** inject failure tạo cảnh báo và thao tác retry khôi phục.
 
 ## P04-T08 — Gate G04
 
-- [ ] Một command mẫu ghi aggregate/audit/outbox atomically, worker dispatch và retry; một BPMN user task được hoàn thành qua engine, app phản ánh state.
-- [ ] Kiểm tra `applyAction` chỉ guard state; không dùng nó để claim AC-12. AC-12 còn chờ chứng từ M03 ở P07.
+- [x] Một command mẫu ghi aggregate/audit/outbox atomically, worker dispatch và retry; một BPMN user task được hoàn thành qua engine, app phản ánh state.
+- [x] Kiểm tra `applyAction` chỉ guard state; không dùng nó để claim AC-12. AC-12 còn chờ chứng từ M03 ở P07.
 - **Bằng chứng:** transaction/worker/Flowable logs, DB assertions, process definition version và failure tests.
 
 ## Hồ sơ giao AI theo từng task

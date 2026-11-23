@@ -25,6 +25,8 @@
 | [api-contracts.md](./api-contracts.md), [api-payloads-v1.md](./api-payloads-v1.md) | Route theo cụm chức năng, DTO, audit/reports, auth, lỗi |
 | [event-contracts.md](./event-contracts.md), [event-payloads-v1.md](./event-payloads-v1.md), [workflow-spec-v1.md](./workflow-spec-v1.md) | Envelope/event v1, ACK, BPMN GoodsIssue và bridge Flowable |
 | [deployment-spec-v1.md](./deployment-spec-v1.md), [ui-ai-spec-v1.md](./ui-ai-spec-v1.md), [security.md](./security.md) | Runtime/env/CI, H-P-D-I, XSS/CSRF/SQLi, RBAC |
+| [../requirements/BRD.md](../requirements/BRD.md), [../requirements/SRS-UI-surfaces.md](../requirements/SRS-UI-surfaces.md), [../adr/0016-ui-surface-partitioning.md](../adr/0016-ui-surface-partitioning.md) | BRD/SRS UI surfaces; `/admin` ≠ catalog |
+| [../requirements/BRD-product-catalog.md](../requirements/BRD-product-catalog.md), [../requirements/SRS-product-catalog.md](../requirements/SRS-product-catalog.md), [phase-06.5-catalog-business-upgrade.md](./phase-06.5-catalog-business-upgrade.md) | D17 catalog upgrade (variant/UOM/price); P065 trước P07 |
 | [../referents/MVC_DDD_LAYERING.md](../referents/MVC_DDD_LAYERING.md), [../referents/PLATFORM_CAPABILITIES.md](../referents/PLATFORM_CAPABILITIES.md) | Thin Controller/Service/Model; CRUD/RBAC/Workflow/Queue/Audit/Reporting |
 | [test-matrix.md](./test-matrix.md) | AC-01…AC-13, điều kiện đề thi và minh chứng phải lưu |
 | [contest-scorecard.md](./contest-scorecard.md) | 50 điểm PoF và 50 điểm sản phẩm theo thể lệ, bằng chứng cho từng mục |
@@ -70,8 +72,9 @@ Nếu bị chặn bởi phase trước, ghi blocker cụ thể và dừng phần
 | [03](./phase-03-data-files.md) | PostgreSQL, transaction, tệp, audit | Giao dịch và file được bảo vệ, restore được |
 | [04](./phase-04-workflow-events.md) | Flowable, idempotency, outbox, worker | BPMN thực thi; outbox không mất/trùng |
 | [05](./phase-05-system-partner.md) | M01 System & Partner | AC-02 và kết nối đối tác có quyền |
-| [06](./phase-06-catalog-inventory.md) | M02 Catalog & Inventory | Nền AC-03, tồn theo lô nhất quán; hoàn tất AC-03 tại G07 |
-| [07](./phase-07-trading.md) | M03 Trading & Distribution | AC-04/06/12, confirm một transaction |
+| [06](./phase-06-catalog-inventory.md) | M02 Catalog & Inventory | Nền AC-03, tồn theo lô nhất quán; G06 CLOSED; hoàn tất AC-03 tại G07 |
+| [06.5](./phase-06.5-catalog-business-upgrade.md) | M02 catalog business upgrade (D17 / SRS) | Variant/SKU/UOM/price/category; G06.5; **trước P07** |
+| [07](./phase-07-trading.md) | M03 Trading & Distribution | AC-04/06/12, confirm một transaction; phụ thuộc G06.5 |
 | [08](./phase-08-traceability.md) | M04 Traceability & Passport | Trace/QR/chính sách công bố chạy trên dữ liệu thật |
 | [09](./phase-09-federation.md) | M04 Federation A/B/C | AC-05/07/09, retry/dedupe/discrepancy |
 | [10](./phase-10-ai.md) | AI01 | AC-10/11, tool có quyền và draft-only |

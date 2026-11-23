@@ -142,11 +142,11 @@
       "auth": "protected",
       "roles": [
         "administrator",
-        "staff",
-        "service"
+        "staff"
       ],
       "scope": "resource",
       "success": [
+        "200",
         "201"
       ]
     },
@@ -243,6 +243,22 @@
       "success": [
         "200"
       ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/files/{id}/retry-scan",
+      "auth": "protected",
+      "roles": ["administrator"],
+      "scope": "resource",
+      "success": ["202"]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/files/{id}/discard",
+      "auth": "protected",
+      "roles": ["administrator"],
+      "scope": "resource",
+      "success": ["202"]
     },
     {
       "method": "GET",
@@ -646,8 +662,148 @@
       ]
     },
     {
+      "method": "GET",
+      "path": "/api/v1/products/{id}/variants",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff",
+        "approver",
+        "viewer"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
       "method": "POST",
-      "path": "/api/v1/products/{id}/identifiers",
+      "path": "/api/v1/products/{id}/variants",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff"
+      ],
+      "scope": "resource",
+      "success": [
+        "201"
+      ]
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/variants/{id}",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/categories",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff",
+        "approver",
+        "viewer"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/categories",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff"
+      ],
+      "scope": "resource",
+      "success": [
+        "201"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/uoms",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff",
+        "approver",
+        "viewer"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/uoms",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff"
+      ],
+      "scope": "resource",
+      "success": [
+        "201"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/price-lists",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff",
+        "approver",
+        "viewer"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/price-lists",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff"
+      ],
+      "scope": "resource",
+      "success": [
+        "201"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/price-lists/{id}/items",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff",
+        "approver",
+        "viewer"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/price-lists/{id}/items",
       "auth": "protected",
       "roles": [
         "administrator",

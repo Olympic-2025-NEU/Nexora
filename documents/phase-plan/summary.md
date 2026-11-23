@@ -7,7 +7,12 @@
 - `app/page.tsx`: placeholder Nexora; health `live`/`ready` nằm ở `app/api/v1/health/`.
 - `deploy/compose.yml`: topology P01 (gateway publish loopback; PG/Keycloak/Flowable/SeaweedFS/Redis/ClamAV internal). Prisma Migrate platform baseline đã có (`prisma-migration-spec.md`, D03).
 - G00 **CLOSED** trên `phase-01` theo owner waiver 2026-11-17. G01 **CLOSED** 2026-11-18 theo owner waiver (agent reinstall A/B làm bằng chứng kỹ thuật). Bằng chứng runtime P01: `evidence/p01-t01.md` … `evidence/G01.md`.
-- `contexts/sales|procurement|finance|master-data`: scaffold cũ, không tính là M01–M04. `contexts/inventory` hiện chỉ có reservation guard.
+- **P02 (T01–T08) DONE 2026-11-18:** Bearer auth, APISIX private/public/M2M routes, system.partner+partner_connection DB, policy matrix, HTTPS config, OpenAPI security schemes, SSRF allowlist. G02 **CLOSED** (live HTTP/HTTPS smoke). Bằng chứng: `evidence/p02-t02.md` … `evidence/G02.md`.
+- **P03/P04 DONE trên `phase-03`/`phase-04`:** G03/G04 CLOSED (data/files + workflow/events). `develop` vẫn có thể chưa merge đủ tip phase.
+- **P05 (M01 System & Partner) DONE 2026-11-21** trên `phase-05` (base `phase-04`): consume schema P02; admin-invite membership; API/UI org/members/partners/connection; M2M harden; G05 **CLOSED** (`evidence/G05.md`). Live MFA A/B/C demo still operator follow-up.
+- **P06 (M02 Catalog & Inventory) DONE 2026-11-22** trên `phase-06` (base `phase-05`): schema pack Dev duyệt; Prisma `catalog`/`inventory` + `membership_warehouse`; quantity D07; Inventory port; G06 **CLOSED** (`evidence/G06.md`). **AC-03 chờ P07**. G06 **giữ CLOSED** — không mở lại khi làm P065.
+- **P065 (M02 catalog business upgrade) DONE 2026-11-22:** ADR 0017; migrations applied; API/UI/seed; live smoke 12/12 (`smoke-p065-local.mjs`). Gate **G06.5 CLOSED** technical ([`evidence/G06.5.md`](./evidence/G06.5.md)). AC-03 vẫn P07.
+- `contexts/sales|procurement|finance|master-data`: scaffold cũ, không tính là M01–M04. `contexts/system` là M01. `contexts/catalog` + `contexts/inventory` là M02 (P06 baseline + P065 upgrade).
 - `LICENSE`, `NOTICE`, `CHANGELOG.md`, SPDX trên nguồn viết, repo và issue tracker công khai đã được kiểm trong T04; bản phát hành/PoF vẫn thuộc P13.
 
 ## Định nghĩa hoàn thành dự án trong phạm vi này
@@ -23,11 +28,11 @@ flowchart LR
   P01 --> P03["03 Data/Files"]
   P02 --> P04["04 Workflow/Events"]
   P03 --> P04
-  P04 --> P05["05 M01"] --> P06["06 M02"] --> P07["07 M03"] --> P08["08 Trace"] --> P09["09 Federation"]
+  P04 --> P05["05 M01"] --> P06["06 M02"] --> P065["06.5 Catalog upgrade"] --> P07["07 M03"] --> P08["08 Trace"] --> P09["09 Federation"]
   P09 --> P10["10 AI"] --> P11["11 DX-Lab UI"] --> P12["12 Operability"] --> P13["13 Release"]
 ```
 
-P02/P03 có thể triển khai độc lập sau P01. UI cơ bản được làm theo từng module P05–P10; P11 hợp nhất luồng và chứng minh ứng dụng tầng 2. P12 có thể bắt đầu nghiên cứu sớm nhưng cần dữ liệu sự kiện thật để nghiệm thu. AI không được đi trước API M02/M03/M04.
+P02/P03 có thể triển khai độc lập sau P01. **P065** nằm trên đường găng giữa G06 và P07 (D17). UI cơ bản được làm theo từng module P05–P10; P11 hợp nhất luồng và chứng minh ứng dụng tầng 2. P12 có thể bắt đầu nghiên cứu sớm nhưng cần dữ liệu sự kiện thật để nghiệm thu. AI không được đi trước API M02/M03/M04.
 
 ## Cổng liên pha
 
@@ -39,13 +44,14 @@ P02/P03 có thể triển khai độc lập sau P01. UI cơ bản được làm 
 | G03 | Ghi aggregate + audit + outbox không atomic; file chưa cách ly | Integration rollback, upload/download/scan, restore drill |
 | G04 | Workflow chỉ là enum TS; retry tạo bản ghi trùng | BPMN deployment, task complete, crash/retry tests |
 | G05–G07 | Org/lot/stock/document không có API + DB + auth + UI tối thiểu | Test module, API contract, state và transaction evidence |
+| G06.5 | Catalog chưa variant/UOM/price theo SRS; tồn vẫn neo product.sku P06 | Schema pack Approved, migrate+backfill, API/UI, `evidence/G06.5.md` |
 | G08–G09 | Trace không liên kết chứng từ hoặc federation phụ thuộc DB chung | A/B/C e2e, offline/retry/dedupe/partial receiving |
 | G10–G11 | AI có thể confirm hoặc H-P-D-I chỉ là slide | Adversarial AI tests, UI thật qua gateway |
 | G12–G13 | Thiếu 4 nguyên lý DX-OS, tài liệu nguồn mở, release hoặc demo | Ma trận nghiệm thu ký bởi người thực hiện; build/restore/showcase |
 
 ## Nguyên tắc cắt việc
 
-Mỗi phần nghiệp vụ đi từ schema → domain invariant → use case/port → adapter → API → UI tối thiểu → test. Với các hành động thay đổi tồn, không cho phép tách “API xong” khỏi transaction, outbox và audit. Với federation, technical ACK không được cập nhật tồn; xác nhận thực nhận là hành động riêng của B/C.
+Mỗi phần nghiệp vụ đi từ schema → domain invariant → use case/port → adapter → API → **UI tối thiểu theo surface bounded context** (ADR 0016: `/admin` hệ thống; `/catalog`; `/inventory`; `/partners`; `/trading`; `/trace`) → test. Không gom sản phẩm vào `/admin`. Với các hành động thay đổi tồn, không cho phép tách “API xong” khỏi transaction, outbox và audit. Với federation, technical ACK không được cập nhật tồn; xác nhận thực nhận là hành động riêng của B/C.
 
 ## Rủi ro cấp dự án
 
