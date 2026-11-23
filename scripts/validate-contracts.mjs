@@ -135,7 +135,7 @@ function checkOpenApi() {
       if (method === "patch" || /\/(?:confirm|cancel|submit|decision|acknowledge|resolve|quality-actions)$/.test(path)) {
         assert(headers.includes("IfMatch"), `Missing If-Match: ${name}`);
       }
-      if (/\/(?:confirm|submit|decision|retry|acknowledge|resolve|quality-actions|qr)$/.test(path) ||
+      if (/\/(?:confirm|submit|decision|decisions|retry|acknowledge|resolve|quality-actions|qr)$/.test(path) ||
         path === "/api/v1/ai/drafts" || path === "/api/v1/core/records") {
         assert(headers.includes("IdempotencyKey"), `Missing Idempotency-Key: ${name}`);
       }

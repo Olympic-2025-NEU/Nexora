@@ -46,7 +46,7 @@
     },
     {
       "method": "POST",
-      "path": "/api/v1/approvals/{approvalRequestId}/decision",
+      "path": "/api/v1/approvals/{id}/decisions",
       "auth": "protected",
       "roles": [
         "approver"
@@ -58,7 +58,7 @@
     },
     {
       "method": "GET",
-      "path": "/api/v1/approvals/tasks",
+      "path": "/api/v1/approvals/inbox",
       "auth": "protected",
       "roles": [
         "approver"

@@ -3790,21 +3790,18 @@ paths:
           $ref: "#/components/responses/Error"
         "503":
           $ref: "#/components/responses/Error"
-  /api/v1/approvals/tasks:
+  /api/v1/approvals/inbox:
     get:
       tags:
         - M03
-      operationId: getApprovalsTasks
-      summary: List approval tasks
-      description: Target contract; runtime implementation is tracked by the owning phase.
+      operationId: getApprovalsInbox
+      summary: List actionable approval tasks
+      description: Candidate-group tasks in current warehouse scope, excluding creator. Age reflects submission time.
       security:
         - oidc: []
       x-nexora-roles:
         - approver
       x-nexora-scope: resource
-      parameters:
-        - $ref: "#/components/parameters/Cursor"
-        - $ref: "#/components/parameters/Limit"
       responses:
         "200":
           description: Success
@@ -3816,7 +3813,6 @@ paths:
                 required:
                   - data
                   - requestId
-                  - page
                 properties:
                   data:
                     type: array
@@ -3824,8 +3820,6 @@ paths:
                       $ref: "#/components/schemas/ApprovalTask"
                   requestId:
                     type: string
-                  page:
-                    $ref: "#/components/schemas/Page"
         "401":
           $ref: "#/components/responses/Error"
         "403":
@@ -3834,26 +3828,25 @@ paths:
           $ref: "#/components/responses/Error"
         "503":
           $ref: "#/components/responses/Error"
-  /api/v1/approvals/{approvalRequestId}/decision:
+  /api/v1/approvals/{id}/decisions:
     post:
       tags:
         - M03
-      operationId: postApprovalsByApprovalRequestIdDecision
+      operationId: postApprovalsByIdDecisions
       summary: Record approval decision intent
-      description: If-Match refers to approvalVersion. Creator cannot approve their own issue. Flowable completion occurs asynchronously.
+      description: Creator cannot decide own issue. Decision intent commits before Flowable completion; result is asynchronous.
       security:
         - oidc: []
       x-nexora-roles:
         - approver
       x-nexora-scope: resource
       parameters:
-        - name: approvalRequestId
+        - name: id
           in: path
           required: true
           schema:
             type: string
             format: uuid
-        - $ref: "#/components/parameters/IfMatch"
         - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
         required: true
@@ -6577,31 +6570,47 @@ components:
       additionalProperties: false
       required:
         - approvalRequestId
-        - approvalVersion
         - documentId
-        - taskId
+        - documentNumber
+        - documentType
         - creatorSub
         - submittedAt
-        - state
+        - ageSeconds
+        - warehouseIds
+        - lineHash
+        - approvalState
+        - processDefinitionVersion
       properties:
         approvalRequestId:
           type: string
           format: uuid
-        approvalVersion:
-          type: integer
-          minimum: 1
         documentId:
           type: string
           format: uuid
-        taskId:
+        documentNumber:
+          type: string
+        documentType:
           type: string
         creatorSub:
           type: string
         submittedAt:
           type: string
           format: date-time
-        state:
+        ageSeconds:
+          type: integer
+          minimum: 0
+        warehouseIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        lineHash:
           type: string
+        approvalState:
+          type: string
+        processDefinitionVersion:
+          type: integer
+          minimum: 1
     ApprovalDecisionInput:
       type: object
       additionalProperties: false
@@ -6611,9 +6620,9 @@ components:
         decision:
           type: string
           enum:
-            - approved
-            - rejected
-        reason:
+            - approve
+            - reject
+        note:
           type: string
     ApprovalDecisionResult:
       type: object
@@ -6621,6 +6630,7 @@ components:
       required:
         - approvalRequestId
         - state
+        - decision
       properties:
         approvalRequestId:
           type: string
@@ -6629,6 +6639,11 @@ components:
           type: string
           enum:
             - decision_pending
+        decision:
+          type: string
+          enum:
+            - approve
+            - reject
     TraceHistory:
       type: object
       additionalProperties: false

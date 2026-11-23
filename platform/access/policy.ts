@@ -81,6 +81,8 @@ const ACTION_POLICIES: Record<string, ActionPolicy> = {
   // --- Trading (placeholder until P07) ---
   "trading:goods-issue:create": { roles: ["staff"], adminAlwaysAllowed: true },
   "trading:goods-issue:approve": { roles: ["approver"], adminAlwaysAllowed: true },
+  "workflow:approval:read": { roles: ["approver"], adminAlwaysAllowed: false },
+  "workflow:approval:decide": { roles: ["approver"], adminAlwaysAllowed: false },
   "trading:goods-issue:read": { roles: ["staff", "approver", "viewer"], adminAlwaysAllowed: true },
   "trading:receipt:read": { roles: ["staff", "approver", "viewer"], adminAlwaysAllowed: true },
   "trading:issue:read": { roles: ["staff", "approver", "viewer"], adminAlwaysAllowed: true },
