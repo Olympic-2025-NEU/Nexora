@@ -16,6 +16,13 @@ import { createFlowableDecider } from "../../platform/workflow/flowable-decider"
 import { reconcileApproval } from "../../platform/workflow/reconciler";
 import { recordDecisionIntent } from "../../platform/workflow/approval-service";
 import type { OutboxMessage } from "../../platform/outbox/message";
+import Ajv2020 from "ajv/dist/2020.js";
+import addFormats from "ajv-formats";
+import canonicalize from "canonicalize";
+import { createHash } from "node:crypto";
+import envelopeSchema from "../../contracts/events/envelope-v1.schema.json";
+import { createOutboxDispatcher } from "../../platform/outbox/dispatcher";
+import { buildHandlerMap } from "../../composition/event-handlers";
 
 if (process.env.NEXORA_TEST_DB !== "1") throw new Error("Disposable PostgreSQL required");
 const owner = new PrismaClient({ datasources: { db: { url: process.env.OWNER_DATABASE_URL! } } });
@@ -188,9 +195,9 @@ async function approve(id: string, decision: "approved" | "rejected" = "approved
   throw new Error("Decision was not reconciled before timeout");
 }
 
-async function issue(quantity: string, count = 1) {
+async function issue(quantity: string, count = 1, purpose: "other" | "partner_transfer" = "other") {
   const doc = await command("create", {}, (ctx) => tradingService.create(ctx, "goods_issue",
-    { purpose: "other", lines: Array.from({ length: count }, () => line(quantity)) }), undefined, "goods_issue");
+    { purpose, lines: Array.from({ length: count }, () => line(quantity)) }), undefined, "goods_issue");
   await command("submit", { id: doc.id }, (ctx) => tradingService.action(ctx,
     "goods_issue", doc.id, "submit", doc.version), undefined, "goods_issue");
   await approve(doc.id);
@@ -199,7 +206,7 @@ async function issue(quantity: string, count = 1) {
 
 test("approved issue 12 posts once; two issues race for remaining stock with real bridge decisions",
   { timeout: 120_000 }, async () => {
-    const first = await issue("12");
+    const first = await issue("12", 1, "partner_transfer");
     const confirmed = await command("confirm", { id: first.id }, (ctx) => tradingService.action(ctx,
       "goods_issue", first.id, "confirm", first.version), randomUUID(), "goods_issue");
     assert.equal(confirmed.status, "confirmed");
@@ -209,6 +216,16 @@ test("approved issue 12 posts once; two issues race for remaining stock with rea
     assert.equal((await db.stockBalance.findUniqueOrThrow({ where: {
       warehouseId_batchId: { warehouseId, batchId } } })).quantity.toFixed(3), "8.000");
     assert.equal(await db.stockMovement.count({ where: { sourceLineId: first.lines[0]!.id } }), 1);
+    const transfer = await transferCommand("create", { linkedIssueId: first.id, destinationPartnerId: partnerId },
+      (ctx) => transferService().create(ctx, { linkedIssueId: first.id, destinationPartnerId: partnerId }));
+    const movementCount = await db.stockMovement.count();
+    await transferCommand("confirm", { id: transfer.id },
+      (ctx) => transferService().confirm(ctx, transfer.id, transfer.version), randomUUID());
+    assert.equal(await db.stockMovement.count(), movementCount);
+    assert.equal((await db.stockBalance.findUniqueOrThrow({ where: {
+      warehouseId_batchId: { warehouseId, batchId } } })).quantity.toFixed(3), "8.000");
+    assert.equal(await db.outboxMessage.count({ where: { aggregateId: transfer.id,
+      eventType: "transfer.announced.v1" } }), 1);
     const replenishment = await command("create", {}, (ctx) => tradingService.create(ctx, "goods_receipt",
       { lines: [line("12")] }));
     await command("confirm", { id: replenishment.id }, (ctx) => tradingService.action(ctx,
@@ -455,4 +472,95 @@ test("transfer copies all issue lines; cancellation frees issue without deleting
   assert.equal(announcement.eventType, "transfer.announced.v1");
   assert.equal(announcement.status, "pending");
   assert.equal(announcement.nextAttemptAt.getUTCFullYear(), 9999);
+});
+
+test("offline dispatcher retains frozen envelope; replay and concurrency never duplicate", { timeout: 120_000 }, async () => {
+  const issue = await transferIssue();
+  const service = transferService();
+  const input = { linkedIssueId: issue.id, destinationPartnerId: partnerId };
+  const outcomes = await Promise.allSettled([0, 1].map(() =>
+    transferCommand("create", input, (ctx) => service.create(ctx, input), randomUUID())));
+  assert.equal(outcomes.filter((outcome) => outcome.status === "fulfilled").length, 1);
+  assert.equal(outcomes.filter((outcome) => outcome.status === "rejected" &&
+    outcome.reason.code === "TRANSFER_ALREADY_EXISTS").length, 1);
+  const doc = (outcomes.find((outcome) => outcome.status === "fulfilled") as PromiseFulfilledResult<
+    Awaited<ReturnType<typeof service.create>>>).value;
+  assert.equal(await db.outboxMessage.count({ where: { aggregateId: doc.id } }), 0);
+  const before = await db.stockBalance.findUniqueOrThrow({ where: { warehouseId_batchId: { warehouseId, batchId } } });
+  const movements = await db.stockMovement.count();
+  const payload = { id: doc.id, version: doc.version };
+  const key = randomUUID();
+  const confirm = () => transferCommand("confirm", payload, (ctx) => service.confirm(ctx, doc.id, doc.version), key);
+  const first = await confirm();
+  assert.deepEqual(await confirm(), first);
+  await assert.rejects(transferCommand("confirm", payload,
+    (ctx) => service.confirm(ctx, doc.id, doc.version), randomUUID()), { code: "VERSION_CONFLICT", httpStatus: 409 });
+  await assert.rejects(transferCommand("create", input, (ctx) => service.create(ctx, input)),
+    { code: "TRANSFER_ALREADY_EXISTS", httpStatus: 409 });
+  assert.equal((await db.stockBalance.findUniqueOrThrow({ where: { warehouseId_batchId: { warehouseId, batchId } } })).quantity.toFixed(), before.quantity.toFixed());
+  assert.equal(await db.stockMovement.count(), movements);
+  const rows = await db.outboxMessage.findMany({ where: { aggregateId: doc.id } });
+  assert.equal(rows.length, 1);
+  const row = rows[0]!;
+  const envelope = row.payload as Record<string, unknown>;
+  const ajv = new Ajv2020({ strict: false });
+  addFormats(ajv);
+  assert.equal(ajv.validate(envelopeSchema, envelope), true, ajv.errorsText());
+  assert.equal(envelope.recipientInstanceId, "remote-instance");
+  assert.equal(envelope.linkedIssueId, issue.id);
+  assert.equal(envelope.sentQuantity, "1");
+  assert.equal((envelope.lots as { sourceLineId: string; quantity: string }[])[0]!.sourceLineId, doc.lines[0]!.id);
+  assert.equal((envelope.lots as { sourceLineId: string; quantity: string }[])[0]!.quantity, "1");
+  assert.match(createHash("sha256").update(canonicalize(envelope)!).digest("hex"), /^[0-9a-f]{64}$/);
+  const shown = await db.$transaction((tx) => service.view({ tx, actor, requestId: randomUUID(), emit: () => {} }, doc.id));
+  assert.equal(shown.announcement?.messageId, envelope.messageId);
+  assert.equal(shown.announcement?.attempts, 0);
+  assert.equal(shown.deliveryState, "pending");
+  await db.outboxMessage.updateMany({ where: { id: { not: row.id }, status: { in: ["pending", "retry_due"] } },
+    data: { nextAttemptAt: new Date("9999-12-31T00:00:00.000Z") } });
+  const dispatcher = createOutboxDispatcher({ client: db, workerId: randomUUID(), handlers: buildHandlerMap(), batchSize: 100 });
+  assert.equal((await dispatcher.tick()).claimed, 0);
+  const held = await db.outboxMessage.findUniqueOrThrow({ where: { id: row.id } });
+  assert.equal(held.status, "pending");
+  assert.equal(held.attemptCount, 0);
+  assert.deepEqual(held.payload, row.payload);
+  assert.equal(await db.outboxMessage.count({ where: { aggregateId: doc.id } }), 1);
+});
+
+test("transfer validation and confirm recheck partner, scope and line snapshot", { timeout: 120_000 }, async () => {
+  const service = transferService();
+  const issue = await transferIssue();
+  const input: { linkedIssueId: string; destinationPartnerId: string } = { linkedIssueId: issue.id, destinationPartnerId: partnerId };
+  const create = (value = input) => transferCommand("create", value, (ctx) => service.create(ctx, value));
+  await assert.rejects(create({ ...input, linkedIssueId: randomUUID() }), { code: "ISSUE_NOT_FOUND", httpStatus: 422 });
+  await assert.rejects(create({ ...input, destinationPartnerId: randomUUID() }), { code: "PARTNER_NOT_FOUND", httpStatus: 422 });
+  const wrongPurpose = await command("create", {}, (ctx) => tradingService.create(ctx, "goods_issue",
+    { purpose: "other", lines: [line("1")] }), undefined, "goods_issue");
+  await assert.rejects(create({ ...input, linkedIssueId: wrongPurpose.id }), { code: "ISSUE_WRONG_PURPOSE", httpStatus: 422 });
+  const draft = await command("create", {}, (ctx) => tradingService.create(ctx, "goods_issue",
+    { purpose: "partner_transfer", lines: [line("1")] }), undefined, "goods_issue");
+  await assert.rejects(create({ ...input, linkedIssueId: draft.id }), { code: "ISSUE_NOT_CONFIRMED", httpStatus: 409 });
+  await owner.partner.update({ where: { id: partnerId }, data: { status: "suspended" } });
+  await assert.rejects(create(), { code: "PARTNER_INACTIVE", httpStatus: 422 });
+  await owner.partner.update({ where: { id: partnerId }, data: { status: "active" } });
+  const localPartner = await owner.partner.create({ data: { id: randomUUID(), issuerInstanceId: "local-instance",
+    code: randomUUID(), displayName: "Local", createdBySub: "fixture" } });
+  await assert.rejects(create({ ...input, destinationPartnerId: localPartner.id }),
+    { code: "PARTNER_SELF_TRANSFER", httpStatus: 422 });
+  const emptyPartner = await owner.partner.create({ data: { id: randomUUID(), issuerInstanceId: " ",
+    code: randomUUID(), displayName: "Unfederated", createdBySub: "fixture" } });
+  await assert.rejects(create({ ...input, destinationPartnerId: emptyPartner.id }),
+    { code: "PARTNER_NOT_FEDERATED", httpStatus: 422 });
+  const doc = await create();
+  await owner.partner.update({ where: { id: partnerId }, data: { status: "suspended" } });
+  await assert.rejects(transferCommand("confirm", { id: doc.id }, (ctx) => service.confirm(ctx, doc.id, doc.version), randomUUID()),
+    { code: "PARTNER_INACTIVE", httpStatus: 409 });
+  await owner.partner.update({ where: { id: partnerId }, data: { status: "active" } });
+  await owner.documentLine.update({ where: { id: doc.lines[0]!.id }, data: { quantity: "2" } });
+  await assert.rejects(transferCommand("confirm", { id: doc.id }, (ctx) => service.confirm(ctx, doc.id, doc.version), randomUUID()),
+    { code: "TRANSFER_LINE_MISMATCH", httpStatus: 409 });
+  await owner.documentLine.update({ where: { id: doc.lines[0]!.id }, data: { quantity: "1" } });
+  await assert.rejects(db.$transaction((tx) => service.confirm({ tx, actor: { ...actor, unitIds: [] },
+    requestId: randomUUID(), emit: () => {} }, doc.id, doc.version)),
+  { code: "WAREHOUSE_SCOPE_REQUIRED", httpStatus: 403 });
 });
