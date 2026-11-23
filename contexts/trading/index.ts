@@ -6,3 +6,4 @@ export { convertToStock } from "./application/uom-conversion";
 export { tradingRoute } from "./application/http";
 export { transferRoute } from "./application/http";
 export { receivingRoute } from "./application/receiving-http";
+export { stocktakeRoute } from "./application/stocktake-http";

@@ -102,6 +102,11 @@ const ACTION_POLICIES: Record<string, ActionPolicy> = {
   "trading:receiving:update": { roles: ["staff"], adminAlwaysAllowed: true },
   "trading:receiving:confirm": { roles: ["staff"], adminAlwaysAllowed: true },
   "trading:receiving:cancel": { roles: ["staff"], adminAlwaysAllowed: true },
+  "trading:stocktake:create": { roles: ["staff"], adminAlwaysAllowed: true },
+  "trading:stocktake:read": { roles: ["staff", "approver", "viewer"], adminAlwaysAllowed: true },
+  "trading:stocktake:update": { roles: ["staff"], adminAlwaysAllowed: true },
+  "trading:stocktake:confirm": { roles: ["staff"], adminAlwaysAllowed: true },
+  "trading:stocktake:cancel": { roles: ["staff"], adminAlwaysAllowed: true },
 
   // --- Catalog/Inventory (P06 + P065) ---
   "catalog:product:create": { roles: ["administrator", "staff"], adminAlwaysAllowed: true },
