@@ -64,6 +64,10 @@ export function createFlowableDecider(db: PrismaClient, engine: FlowableClient, 
         }, row.version, "workflow.decision.revoked", row.state);
         return true;
       }
+      const beforeComplete = await getApproval(db, row.id);
+      if (beforeComplete?.state !== "decision_pending" || beforeComplete.version !== payload.intentVersion ||
+          beforeComplete.decisionIntent !== payload.decision ||
+          beforeComplete.decisionRequestedAt?.toISOString() !== payload.requestedAt) return true;
       await engine.completeTask(row.flowableTaskId, { decision: row.decisionIntent as Decision,
         ...(row.decisionIntentReason && { decisionReason: row.decisionIntentReason }),
         approverSub: row.decisionRequestedBySub, decidedAt: row.decisionRequestedAt.toISOString() });
