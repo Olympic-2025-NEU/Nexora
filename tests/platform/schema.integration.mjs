@@ -93,6 +93,11 @@ test("versioned schema contains platform tables, expected constraints and migrat
   const catalog = await migrator.$queryRaw`
     SELECT to_regclass('catalog.product')::text AS relation`;
   assert.equal(catalog[0].relation, "catalog.product", "P06 creates catalog.product");
+  const trading = await migrator.$queryRaw`
+    SELECT table_name FROM information_schema.tables WHERE table_schema = 'trading' ORDER BY table_name`;
+  assert.deepEqual(trading.map((row) => row.table_name),
+    ["document", "document_line", "receiving_detail", "sale_detail", "transfer_detail"]);
+  assert.ok(migrations.some((row) => row.migration_name === "20261123010000_trading_documents"));
 });
 
 test("runtime roles are separate, least privilege and fail closed", async () => {

@@ -267,6 +267,7 @@
     "tests/platform/outbox.integration.test.ts",
     "tests/platform/scan.integration.test.mjs",
     "tests/platform/schema.integration.mjs",
+    "tests/platform/trading.integration.mjs",
     "tests/platform/transaction.integration.test.ts",
     "tests/platform/workflow-bridge.integration.test.ts",
     "tests/platform/workflow.integration.test.ts",

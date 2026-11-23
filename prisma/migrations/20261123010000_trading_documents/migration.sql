@@ -106,7 +106,8 @@ BEGIN
     END IF;
   END IF;
   IF TG_OP <> 'DELETE' THEN
-    IF EXISTS (SELECT 1 FROM trading.document WHERE id = NEW.document_id AND status = 'confirmed') THEN
+    IF EXISTS (SELECT 1 FROM trading.document WHERE id = NEW.document_id AND status = 'confirmed'
+      AND (TG_OP <> 'INSERT' OR xmin <> pg_current_xact_id()::text::xid)) THEN
       RAISE EXCEPTION 'trading_confirm:immutable_line';
     END IF;
   END IF;
@@ -119,7 +120,8 @@ CREATE TRIGGER trg_trading_guard_line BEFORE INSERT OR UPDATE OR DELETE ON tradi
 CREATE FUNCTION trading.guard_detail() RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE doc_type text; issue_type text; purpose text;
 BEGIN
-  IF TG_OP <> 'DELETE' AND EXISTS (SELECT 1 FROM trading.document WHERE id = NEW.document_id AND status = 'confirmed')
+  IF TG_OP <> 'DELETE' AND EXISTS (SELECT 1 FROM trading.document WHERE id = NEW.document_id AND status = 'confirmed'
+    AND (TG_OP <> 'INSERT' OR xmin <> pg_current_xact_id()::text::xid))
      AND (TG_OP = 'INSERT' OR TG_TABLE_NAME <> 'transfer_detail' OR
        (TG_OP = 'UPDATE' AND NEW.document_id IS DISTINCT FROM OLD.document_id)) THEN
     RAISE EXCEPTION 'trading_confirm:immutable_detail';
@@ -133,15 +135,17 @@ BEGIN
   END IF;
   IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
   SELECT document_type INTO doc_type FROM trading.document WHERE id = NEW.document_id;
-  IF doc_type IS DISTINCT FROM CASE TG_TABLE_NAME WHEN 'transfer_detail' THEN 'partner_transfer'
-    WHEN 'sale_detail' THEN 'sale_record' ELSE 'receiving_confirmation' END THEN
+  IF (TG_TABLE_NAME = 'transfer_detail' AND doc_type IS DISTINCT FROM 'partner_transfer') OR
+     (TG_TABLE_NAME = 'sale_detail' AND doc_type IS DISTINCT FROM 'sale_record') OR
+     (TG_TABLE_NAME = 'receiving_detail' AND doc_type IS DISTINCT FROM 'receiving_confirmation') THEN
     RAISE EXCEPTION 'trading_confirm:detail_type';
   END IF;
   IF TG_TABLE_NAME IN ('transfer_detail', 'sale_detail') THEN
     SELECT document_type, issue_purpose INTO issue_type, purpose
       FROM trading.document WHERE id = NEW.linked_issue_id;
-    IF issue_type IS DISTINCT FROM 'goods_issue' OR purpose IS DISTINCT FROM
-      CASE TG_TABLE_NAME WHEN 'transfer_detail' THEN 'partner_transfer' ELSE 'sale' END THEN
+    IF issue_type IS DISTINCT FROM 'goods_issue' OR
+       (TG_TABLE_NAME = 'transfer_detail' AND purpose IS DISTINCT FROM 'partner_transfer') OR
+       (TG_TABLE_NAME = 'sale_detail' AND purpose IS DISTINCT FROM 'sale') THEN
       RAISE EXCEPTION 'trading_confirm:issue_purpose';
     END IF;
   END IF;
