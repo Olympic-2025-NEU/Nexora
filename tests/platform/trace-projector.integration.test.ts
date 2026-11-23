@@ -11,6 +11,8 @@ import { createPrismaTraceProjectorPort } from "../../contexts/traceability/infr
 import { traceConsumers, traceLag } from "../../workers/trace-projector";
 import { backwardTrace } from "../../contexts/traceability/application/backward";
 import { createPrismaBackwardPort } from "../../contexts/traceability/infrastructure/backward-repo";
+import { forwardTrace } from "../../contexts/traceability/application/forward";
+import { createPrismaForwardPort } from "../../contexts/traceability/infrastructure/forward-repo";
 
 if (process.env.NEXORA_TEST_TRACE !== "1" || !process.env.OWNER_DATABASE_URL ||
     !process.env.APP_DATABASE_URL || !process.env.CORE_DATABASE_URL) {
@@ -238,7 +240,7 @@ test("P08 sale and stocktake project from confirmed document sources", async () 
     lineNo: 1, warehouseId, batchId: batches[0], productVariantId: variantId,
     productId, uomId: uom, quantity: "1", sourceIssueLineId: issueLineId } });
   await app.saleDetail.create({ data: { documentId: saleId, linkedIssueId: issueId,
-    soldAt: new Date() } });
+    soldAt: new Date(), buyerRef: "PRIVATE_BUYER_REF" } });
   const sale = await app.document.update({ where: { id: saleId }, data: {
     status: "confirmed", confirmedAt: new Date(), confirmedBySub: "fixture" } });
   await app.document.create({ data: { id: stocktakeId, documentType: "stocktake",
@@ -270,7 +272,8 @@ test("P08 sale and stocktake project from confirmed document sources", async () 
           systemQuantity: "5", countedQuantity: "4", delta: "-1", unit: "EA" }],
         actorSub: "fixture", reason: "counted", occurredAt: new Date().toISOString() } })[0],
   ];
-  for (const event of emitted) await app.outboxMessage.create({ data: { ...event, id: randomUUID() } });
+  for (const event of emitted) await app.outboxMessage.create({ data: { ...event, id: randomUUID(),
+    nextAttemptAt: new Date(Date.now() - 60_000) } });
   const dispatcher = createOutboxDispatcher({ client: app, workerId: `trace-test-${randomUUID()}`,
     handlers: buildHandlerMap({ traceability: traceConsumers(app, core, issuer) }) });
   const first = await dispatcher.tick();
@@ -289,8 +292,8 @@ test("P08 sale and stocktake project from confirmed document sources", async () 
 });
 
 test("P08-T03 backward query keeps source links, remote gap and pages distinct", async () => {
-  const actor = { userId: "fixture", organizationId: "fixture", unitIds: [], roles: ["viewer"] };
-  const port = createPrismaBackwardPort(app);
+  const actor = { userId: "fixture", organizationId: "fixture", unitIds: [warehouseId], roles: ["viewer"] };
+  const port = createPrismaBackwardPort(app, actor);
   const transfer = await app.traceEvent.findFirstOrThrow({ where: {
     batchId: batches[0], eventType: TRADING_EVENT_TYPES.transfer } });
   const focused = await backwardTrace(port, actor, { batchId: batches[0],
@@ -312,4 +315,127 @@ test("P08-T03 backward query keeps source links, remote gap and pages distinct",
   assert.ok(remote.gaps.some((gap) => gap.reason === "remote_source_unavailable" &&
     gap.missingRef?.issuerInstanceId === "trace-remote"));
   assert.equal(remote.nodes.some((node) => node.issuerInstanceId === "trace-remote"), false);
+});
+
+test("P08-T04 forward impact keeps two transfer branches, partial receiving and sale private", async () => {
+  const secondPartnerId = randomUUID();
+  const issueId = randomUUID();
+  const issueLineId = randomUUID();
+  const transferId = randomUUID();
+  await app.partner.create({ data: { id: secondPartnerId, issuerInstanceId: "trace-remote-2",
+    code: randomUUID(), displayName: "Second downstream", createdBySub: "fixture" } });
+  await app.document.create({ data: { id: issueId, documentType: "goods_issue",
+    issuePurpose: "partner_transfer", documentNumber: randomUUID(), status: "draft",
+    createdBySub: "fixture", correlationId: randomUUID() } });
+  await app.documentLine.create({ data: { id: issueLineId, documentId: issueId,
+    lineNo: 1, warehouseId, batchId: batches[0], productVariantId: variantId,
+    productId, uomId: uom, quantity: "3" } });
+  const issue = await app.document.update({ where: { id: issueId }, data: {
+    status: "confirmed", confirmedAt: new Date(), confirmedBySub: "fixture" } });
+  await app.document.create({ data: { id: transferId, documentType: "partner_transfer",
+    documentNumber: randomUUID(), status: "draft", createdBySub: "fixture",
+    correlationId: randomUUID() } });
+  await app.documentLine.create({ data: { id: randomUUID(), documentId: transferId,
+    lineNo: 1, warehouseId, batchId: batches[0], productVariantId: variantId,
+    productId, uomId: uom, quantity: "3", sourceIssueLineId: issueLineId } });
+  await app.transferDetail.create({ data: { documentId: transferId, linkedIssueId: issueId,
+    destinationPartnerId: secondPartnerId } });
+  const transfer = await app.document.update({ where: { id: transferId }, data: {
+    status: "confirmed", confirmedAt: new Date(), confirmedBySub: "fixture" } });
+  const originLot = { issuerInstanceId: issuer, lotId: origins[0] };
+  const [issueEvent] = serializeDomainEvent({ type: TRADING_EVENT_TYPES.issue,
+    aggregateType: "document", aggregateId: issueId, aggregateVersion: issue.version,
+    correlationId: randomUUID(), payload: { eventId: randomUUID(), documentId: issueId,
+      documentVersion: issue.version, lines: [{ lineId: issueLineId, batchId: batches[0],
+        warehouseId, originLot, quantity: "3", unit: "EA" }], movementIds: [randomUUID()],
+      actorSub: "fixture", occurredAt: new Date().toISOString() } });
+  await app.outboxMessage.create({ data: { ...issueEvent, id: randomUUID(),
+    nextAttemptAt: new Date(Date.now() - 60_000) } });
+  const dispatcher = createOutboxDispatcher({ client: app, workerId: `trace-test-${randomUUID()}`,
+    handlers: buildHandlerMap({ traceability: traceConsumers(app, core, issuer) }) });
+  assert.equal((await dispatcher.tick()).delivered, 1);
+  const [transferEvent] = serializeDomainEvent({ type: TRADING_EVENT_TYPES.transfer,
+    aggregateType: "document", aggregateId: transferId, aggregateVersion: transfer.version,
+    correlationId: randomUUID(), payload: { eventId: randomUUID(), transferId,
+      linkedIssueId: issueId, destinationPartnerId: secondPartnerId,
+      lines: [{ sourceLineId: issueLineId, batchId: batches[0], originLot,
+        quantity: "3", unit: "EA" }], occurredAt: new Date().toISOString() } });
+  await app.outboxMessage.create({ data: { ...transferEvent, id: randomUUID(),
+    nextAttemptAt: new Date(Date.now() - 60_000) } });
+  assert.equal((await dispatcher.tick()).delivered, 1);
+
+  const actor = { userId: "fixture", organizationId: "fixture", unitIds: [warehouseId], roles: ["viewer"] };
+  const graph = await forwardTrace(createPrismaForwardPort(app, actor), actor,
+    { batchId: batches[0], depth: 10, limit: 100 });
+  const transfers = graph.impact.filter((row) => row.kind === "transfer");
+  assert.equal(transfers.length, 2);
+  assert.deepEqual(new Set(transfers.map((row) => row.quantity)), new Set(["2", "3"]));
+  assert.deepEqual(new Set(transfers.map((row) => row.partner?.issuerInstanceId)),
+    new Set(["trace-remote", "trace-remote-2"]));
+  assert.equal(graph.gaps.filter((gap) => gap.reason === "downstream_unreported").length, 2);
+  assert.ok(graph.impact.some((row) => row.kind === "sale" && row.quantity === "1"));
+  assert.equal(JSON.stringify(graph).includes("PRIVATE_BUYER_REF"), false);
+  const receiving = await forwardTrace(createPrismaForwardPort(app, actor), actor,
+    { batchId: batches[1], depth: 10 });
+  assert.ok(receiving.impact.some((row) => row.kind === "receiving" &&
+    row.sentQuantity === "2" && row.actualQuantity === "1" && row.quantity === "1"));
+  assert.equal(receiving.impact.some((row) => row.kind === "transfer"), false);
+  const cIssueId = randomUUID();
+  const cIssueLineId = randomUUID();
+  const cSaleId = randomUUID();
+  await app.document.create({ data: { id: cIssueId, documentType: "goods_issue",
+    issuePurpose: "sale", documentNumber: randomUUID(), status: "draft",
+    createdBySub: "fixture", correlationId: randomUUID() } });
+  await app.documentLine.create({ data: { id: cIssueLineId, documentId: cIssueId,
+    lineNo: 1, warehouseId, batchId: batches[1], productVariantId: variantId,
+    productId, uomId: uom, quantity: "1" } });
+  const cIssue = await app.document.update({ where: { id: cIssueId }, data: {
+    status: "confirmed", confirmedAt: new Date(), confirmedBySub: "fixture" } });
+  await app.document.create({ data: { id: cSaleId, documentType: "sale_record",
+    documentNumber: randomUUID(), status: "draft", createdBySub: "fixture",
+    correlationId: randomUUID() } });
+  await app.documentLine.create({ data: { id: randomUUID(), documentId: cSaleId,
+    lineNo: 1, warehouseId, batchId: batches[1], productVariantId: variantId,
+    productId, uomId: uom, quantity: "1", sourceIssueLineId: cIssueLineId } });
+  await app.saleDetail.create({ data: { documentId: cSaleId, linkedIssueId: cIssueId,
+    soldAt: new Date(), buyerRef: "PRIVATE_C_BUYER" } });
+  const cSale = await app.document.update({ where: { id: cSaleId }, data: {
+    status: "confirmed", confirmedAt: new Date(), confirmedBySub: "fixture" } });
+  const cOriginLot = { issuerInstanceId: issuer, lotId: origins[1] };
+  const [cIssueEvent] = serializeDomainEvent({ type: TRADING_EVENT_TYPES.issue,
+    aggregateType: "document", aggregateId: cIssueId, aggregateVersion: cIssue.version,
+    correlationId: randomUUID(), payload: { eventId: randomUUID(), documentId: cIssueId,
+      documentVersion: cIssue.version, lines: [{ lineId: cIssueLineId,
+        batchId: batches[1], warehouseId, originLot: cOriginLot, quantity: "1", unit: "EA" }],
+      movementIds: [randomUUID()], actorSub: "fixture", occurredAt: new Date().toISOString() } });
+  await app.outboxMessage.create({ data: { ...cIssueEvent, id: randomUUID(),
+    nextAttemptAt: new Date(Date.now() - 60_000) } });
+  assert.equal((await dispatcher.tick()).delivered, 1);
+  const [cSaleEvent] = serializeDomainEvent({ type: TRADING_EVENT_TYPES.sale,
+    aggregateType: "document", aggregateId: cSaleId, aggregateVersion: cSale.version,
+    correlationId: randomUUID(), payload: { eventId: randomUUID(), saleId: cSaleId,
+      linkedIssueId: cIssueId, lines: [{ sourceLineId: cIssueLineId,
+        batchId: batches[1], originLot: cOriginLot, quantity: "1", unit: "EA" }],
+      occurredAt: new Date().toISOString() } });
+  await app.outboxMessage.create({ data: { ...cSaleEvent, id: randomUUID(),
+    nextAttemptAt: new Date(Date.now() - 60_000) } });
+  assert.equal((await dispatcher.tick()).delivered, 1);
+  const cGraph = await forwardTrace(createPrismaForwardPort(app, actor), actor,
+    { batchId: batches[1], depth: 10 });
+  assert.ok(cGraph.impact.some((row) => row.kind === "sale" && row.quantity === "1" &&
+    row.sourceDocumentId === cSaleId));
+  assert.equal(JSON.stringify(cGraph).includes("PRIVATE_C_BUYER"), false);
+  const cIssueImpact = cGraph.impact.find((row) => row.sourceDocumentId === cIssueId);
+  const cReceivingImpact = cGraph.impact.find((row) => row.kind === "receiving");
+  assert.ok(cIssueImpact && cReceivingImpact);
+  assert.equal(cGraph.edges.some((edge) => edge.fromEventId === cReceivingImpact.eventId &&
+    edge.toEventId === cIssueImpact.eventId), false);
+  const deniedActor = { ...actor, unitIds: [randomUUID()] };
+  const denied = await forwardTrace(createPrismaForwardPort(app, deniedActor), deniedActor,
+    { batchId: batches[0] });
+  assert.equal(denied.nodes.length, 0);
+  assert.equal(denied.impact.length, 0);
+  const backwardDenied = await backwardTrace(createPrismaBackwardPort(app, deniedActor), deniedActor,
+    { batchId: batches[0] });
+  assert.equal(backwardDenied.nodes.length, 0);
 });

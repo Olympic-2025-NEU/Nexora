@@ -212,7 +212,9 @@ add("get", "/api/v1/lots/{id}/history", "M04", "Lot history", "TraceHistory", { 
 add("get", "/api/v1/lots/{id}/trace/backward", "M04", "Trace backward", "TraceGraph", {
   query: ["documentId", "depth", "cursor", "limit"],
   description: "Authenticated local backward graph. Only explicit confirmed source links imply causality. Same-batch events provide context; missing remote source, unknown local allocation and projector lag remain explicit gaps. Cursor freezes the recorded-at snapshot; depth counts source-link hops (1–10)." });
-add("get", "/api/v1/lots/{id}/trace/forward", "M04", "Trace forward", "TraceGraph", { query: ["depth", "cursor", "limit"] });
+add("get", "/api/v1/lots/{id}/trace/forward", "M04", "Trace forward", "TraceGraph", {
+  query: ["depth", "cursor", "limit"],
+  description: "Authenticated local forward graph and per-document-line impact. Stored child-to-source links are traversed in reverse; sourceRelation preserves the original relationship. Confirmed local quantities are not additive across issue, transfer and sale. Partner downstream remains unknown until a verified report arrives in P09. No buyer reference or private partner contact is returned." });
 action("/api/v1/lots/{id}/qr", "M04", "Issue QR token", "QrIssued", { body: "QrCreate", ifMatch: false, status: 201 });
 action("/api/v1/lots/{id}/qr/{tokenId}/revoke", "M04", "Revoke QR token", null, { body: "Reason", ifMatch: false, idempotent: false, status: 204 });
 add("get", "/api/v1/public/passport/{token}", "M04", "Public product passport", "PassportPublic", { auth: "public", errors: [404, 429, 503], description: "Only allowlisted public fields; no member email, private stock, raw partner payload or unscanned files." });

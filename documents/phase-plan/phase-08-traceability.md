@@ -27,9 +27,9 @@
 
 ## P08-T04 — Forward trace và impact list
 
-- [ ] Từ batch cần kiểm tra tìm issue, transfer, receiver và sale record downstream; dedupe theo issuer-qualified IDs, không tiết lộ bên mua/private field nếu thiếu quyền.
-- [ ] Báo affected quantity/partner theo dữ liệu biết được, tách `confirmed`, `partner-asserted`, `unknown`; kết quả có thời gian dữ liệu và gap markers.
-- [ ] Test lô chia nhiều nhánh, partial receiving, sale tại C; P09 chạy lại xuyên instance cho AC-09.
+- [x] Từ batch cần kiểm tra tìm issue, transfer, receiver và sale record downstream; dedupe theo issuer-qualified IDs, không tiết lộ bên mua/private field nếu thiếu quyền. [Bằng chứng T04](evidence/p08-t04.md).
+- [x] Báo affected quantity/partner theo dữ liệu biết được, tách `confirmed`, `partner-asserted`, `unknown`; kết quả có thời gian dữ liệu và gap markers. [Bằng chứng T04](evidence/p08-t04.md).
+- [x] Test lô chia nhiều nhánh, partial receiving, sale tại C; P09 chạy lại xuyên instance cho AC-09. [Bằng chứng T04](evidence/p08-t04.md).
 - **Đầu ra:** impact API/UI tối thiểu; **kiểm chứng:** nguồn ID và số lượng khớp chứng từ.
 
 ## P08-T05 — Chính sách công bố Passport

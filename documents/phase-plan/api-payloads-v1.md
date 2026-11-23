@@ -82,7 +82,8 @@ Confirm/cancel cần `If-Match`; confirm cần `Idempotency-Key`. 409 cho stale 
 | Method/path | Request | Response/rule |
 | --- | --- | --- |
 | `GET /api/v1/lots/{id}/history` | `?cursor&limit` | `{lot,events:[{eventId,type,issuer,occurredAt,sourceDocumentId,verificationState,gap}],nextCursor}` |
-| `GET /api/v1/lots/{id}/trace/backward|forward` | `?depth` max10, `cursor`, `limit` | `{nodes:[{issuer,lotId,eventId,state}],edges:[{from,to,relation}],gaps,asOf}`; visited set/cycle limit |
+| `GET /api/v1/lots/{id}/trace/backward` | `?documentId&depth&cursor&limit` | `TraceGraph` với `root`, `nodes` có issuer-qualified origin/source/occurredAt/recordedAt, `edges`, `gaps`, `localProjection`, `asOf`, `truncated`, `nextCursor`; chỉ link nguồn tường minh |
+| `GET /api/v1/lots/{id}/trace/forward` | `?depth&cursor&limit` | Cùng graph shape, edge theo chiều nguồn→downstream và `sourceRelation` giữ quan hệ gốc; `impact` per confirmed document line `{eventId,sourceDocumentId,sourceLineId,kind,quantity,uomId,uomCode?,verificationState,partner?,sentQuantity?,actualQuantity?}`; transfer chưa có downstream summary có gap `unknown`; quantity của issue/transfer/sale là các bước, không cộng thành tổng |
 | `POST /api/v1/lots/{id}/qr` | `{policyVersion}`, `Idempotency-Key` | 201 `{qrUrl,tokenId}`; token raw trả một lần hoặc QR image; không lộ private UUID trong URL |
 | `POST /api/v1/lots/{id}/qr/{tokenId}/revoke` | `{reason}` | 204, audit; cache public invalidate |
 | `GET /api/v1/public/passport/{token}` | Không auth/body | `{productName,publicLotCode,originIssuer,timeline,verificationState,gaps,asOf}` theo allowlist; 404 cho token revoked/unknown |

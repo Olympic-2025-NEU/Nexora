@@ -4042,7 +4042,7 @@ paths:
         - M04
       operationId: getLotsByIdTraceForward
       summary: Trace forward
-      description: Target contract; runtime implementation is tracked by the owning phase.
+      description: Authenticated local forward graph and per-document-line impact. Stored child-to-source links are traversed in reverse; sourceRelation preserves the original relationship. Confirmed local quantities are not additive across issue, transfer and sale. Partner downstream remains unknown until a verified report arrives in P09. No buyer reference or private partner contact is returned.
       security:
         - oidc: []
       x-nexora-roles:
@@ -6864,6 +6864,8 @@ components:
               toEventId:
                 type: string
                 format: uuid
+              sourceRelation:
+                type: string
               missingRef:
                 type: object
                 additionalProperties: false
@@ -6902,11 +6904,14 @@ components:
                     type: string
                   eventId:
                     type: string
+              partnerIssuerInstanceId:
+                type: string
               state:
                 type: string
                 enum:
                   - missing
                   - pending
+                  - unknown
               reason:
                 type: string
                 enum:
@@ -6916,6 +6921,70 @@ components:
                   - projection_pending
                   - depth_limit
                   - node_limit
+                  - downstream_unreported
+        impact:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required:
+              - eventId
+              - sourceDocumentId
+              - sourceLineId
+              - kind
+              - quantity
+              - uomId
+              - verificationState
+            properties:
+              eventId:
+                type: string
+                format: uuid
+              sourceDocumentId:
+                type: string
+                format: uuid
+              sourceLineId:
+                type: string
+                format: uuid
+              kind:
+                type: string
+                enum:
+                  - issue
+                  - transfer
+                  - receiving
+                  - sale
+              quantity:
+                type: string
+                pattern: ^(0|[1-9][0-9]*)(\.[0-9]{1,3})?$
+              uomId:
+                type: string
+                format: uuid
+              uomCode:
+                type: string
+              verificationState:
+                type: string
+                enum:
+                  - confirmed
+                  - partner_asserted
+              sourceIssueLineId:
+                type: string
+                format: uuid
+              sentQuantity:
+                type: string
+                pattern: ^(0|[1-9][0-9]*)(\.[0-9]{1,3})?$
+              actualQuantity:
+                type: string
+                pattern: ^(0|[1-9][0-9]*)(\.[0-9]{1,3})?$
+              partner:
+                type: object
+                additionalProperties: false
+                required:
+                  - issuerInstanceId
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  issuerInstanceId:
+                    type: string
         asOf:
           type: string
           format: date-time

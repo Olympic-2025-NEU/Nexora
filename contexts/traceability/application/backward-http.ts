@@ -22,7 +22,7 @@ export async function traceBackwardRoute(request: NextRequest, batchId: string):
       if (!["documentId", "depth", "limit", "cursor"].includes(key) || query.getAll(key).length !== 1)
         throw new DomainError("TRACE_QUERY_INVALID", 422);
     }
-    const result = await backwardTrace(createPrismaBackwardPort(getPrismaClient()), actor, {
+    const result = await backwardTrace(createPrismaBackwardPort(getPrismaClient(), actor), actor, {
       batchId, documentId: query.get("documentId") ?? undefined,
       depth: optionalInteger(query.get("depth"), "TRACE_QUERY_INVALID"),
       limit: optionalInteger(query.get("limit"), "TRACE_QUERY_INVALID"),
