@@ -201,7 +201,7 @@ Correction phải cùng type, trỏ chứng từ confirmed liền trước, có 
 
 ### `traceability.trace_event`
 
-`id`, `created_at`; `issuer_instance_id text!`, `external_event_id text!`, `event_type text!`, `batch_id uuid?→catalog.batch.id`, `document_id uuid?→trading.document.id`, `source_message_id uuid?` (P09 thêm FK inbox), `origin_issuer_instance_id text!`, `origin_lot_id text!`, `occurred_at timestamptz!`, `verification_state text! CHECK IN ('local_verified','partner_asserted','missing')`, `payload_version text!`, `summary jsonb!`, `checksum_hex char(64)!`. Unique `(issuer_instance_id,external_event_id)`; index `(batch_id,occurred_at)`, `(origin_issuer_instance_id,origin_lot_id,occurred_at)`. Không UPDATE/DELETE event; correction event mới tham chiếu cũ trong summary/schema.
+`id`, `created_at`; `issuer_instance_id text!`, `external_event_id text!`, `event_type text!`, `batch_id uuid?→catalog.batch.id`, `document_id uuid?→trading.document.id`, `source_message_id uuid?` (P09 thêm FK inbox), `origin_issuer_instance_id text!`, `origin_lot_id text!`, `occurred_at timestamptz!`, `verification_state text! CHECK IN ('local_verified','partner_asserted','missing')`, `payload_version text!`, `summary jsonb!`, `evidence_refs uuid[]! DEFAULT '{}'` (attachment IDs, T07 kiểm tra scan/visibility trước khi công bố; không giả FK đa hình), `checksum_hex char(64)!`. Unique `(issuer_instance_id,external_event_id)`; index `(batch_id,occurred_at)`, `(origin_issuer_instance_id,origin_lot_id,occurred_at)`. Không UPDATE/DELETE event; correction event mới tham chiếu cũ trong summary/schema.
 
 ### `traceability.trace_link`
 

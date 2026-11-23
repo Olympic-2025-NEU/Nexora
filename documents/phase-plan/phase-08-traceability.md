@@ -6,9 +6,9 @@
 
 ## P08-T01 — Mô hình provenance và liên kết lô
 
-- [ ] Migration `trace_event`, `trace_link`, `passport_projection`, `qr_token`; mỗi event có issuer-qualified batch ID, source document/event, occurred/recorded time, event version, evidence refs, verification status.
+- [x] Migration `trace_event`, `trace_link`, `passport_projection`, `qr_token`; mỗi event có issuer-qualified batch ID, source document/event, occurred/recorded time, event version, evidence refs, verification status. [Bằng chứng T01](evidence/p08-t01.md).
 - [ ] Link goods receipt/issue/transfer/receiving/stocktake/sale bằng quan hệ có hướng; phân biệt nguồn local verified với partner-asserted và missing/pending.
-- [ ] Chốt uniqueness `(issuer, eventId)` và source action để retry handler không tạo event trùng; không tạo event từ Draft/rollback.
+- [x] Chốt uniqueness `(issuer, eventId)` và source action để retry handler không tạo event trùng; không tạo event từ Draft/rollback. [Bằng chứng T01](evidence/p08-t01.md).
 - **Đầu ra:** schema và trace port; **kiểm chứng:** movement/event truy được tới chứng từ nguồn.
 
 ## P08-T02 — Projector từ domain event

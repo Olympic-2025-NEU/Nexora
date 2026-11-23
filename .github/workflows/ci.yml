@@ -2,11 +2,26 @@ name: ci
 
 on:
   push:
-    branches: [develop, main, "chore/**", "spike/**", "phase-*/**", "phase01/**", "phase-03", "phase03/**", "phase-04", "phase04/**", "phase-07", "phase07/**"]
+    branches: [develop, main, "chore/**", "spike/**", "phase-*/**", "phase01/**", "phase-03", "phase03/**", "phase-04", "phase04/**", "phase-07", "phase07/**", "phase-08", "phase08/**"]
   pull_request:
     branches: [develop, main]
 
 jobs:
+  platform-trace:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Install and generate Prisma client
+        run: npm ci && npm run db:generate
+      - name: Trace schema upgrade, fresh DB, provenance and role tests
+        run: npm run test:platform:trace
+
   platform-schema:
     runs-on: ubuntu-latest
     timeout-minutes: 15

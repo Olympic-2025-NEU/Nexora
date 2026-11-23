@@ -8,7 +8,7 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
-  schemas  = ["platform", "system", "catalog", "inventory", "trading"]
+  schemas  = ["platform", "system", "catalog", "inventory", "trading", "traceability"]
 }
 
 model AuditLog {
@@ -499,6 +499,9 @@ model Batch {
   balances StockBalance[]
   movements StockMovement[]
   documentLines DocumentLine[]
+  traceEvents TraceEvent[]
+  passportProjection PassportProjection?
+  qrTokens QrToken[]
 
   @@unique([productId, localCode])
   @@unique([productVariantId, localCode])
@@ -608,6 +611,7 @@ model Document {
   transferIssues TransferDetail[] @relation("TransferIssue")
   saleIssues SaleDetail[] @relation("SaleIssue")
   approvals ApprovalRequest[]
+  traceEvents TraceEvent[]
 
   @@unique([documentType, documentNumber], map: "uq_trading_document_number")
   @@index([status, createdAt(sort: Desc)], map: "idx_trading_document_status_time")
@@ -710,4 +714,89 @@ model SaleDetail {
   @@index([linkedIssueId], map: "idx_trading_sale_issue")
   @@map("sale_detail")
   @@schema("trading")
+}
+
+// P08 — append-only provenance. Federation source FK is added in P09.
+model TraceEvent {
+  id                     String   @id @db.Uuid
+  createdAt              DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  issuerInstanceId       String   @map("issuer_instance_id")
+  externalEventId        String   @map("external_event_id")
+  eventType              String   @map("event_type")
+  batchId                String?  @map("batch_id") @db.Uuid
+  documentId             String?  @map("document_id") @db.Uuid
+  sourceMessageId        String?  @map("source_message_id") @db.Uuid
+  originIssuerInstanceId String   @map("origin_issuer_instance_id")
+  originLotId            String   @map("origin_lot_id")
+  occurredAt             DateTime @map("occurred_at") @db.Timestamptz(6)
+  verificationState      String   @map("verification_state")
+  payloadVersion         String   @map("payload_version")
+  summary                Json     @db.JsonB
+  evidenceRefs           String[] @default([]) @map("evidence_refs") @db.Uuid
+  checksumHex            String   @map("checksum_hex") @db.Char(64)
+
+  batch     Batch?     @relation(fields: [batchId], references: [id])
+  document  Document?  @relation(fields: [documentId], references: [id])
+  outgoing  TraceLink[] @relation("TraceLinkFrom")
+  incoming  TraceLink[] @relation("TraceLinkTo")
+
+  @@unique([issuerInstanceId, externalEventId], map: "uq_trace_event_external")
+  @@index([batchId, occurredAt], map: "idx_trace_event_batch_time")
+  @@index([originIssuerInstanceId, originLotId, occurredAt], map: "idx_trace_event_origin_time")
+  @@map("trace_event")
+  @@schema("traceability")
+}
+
+model TraceLink {
+  id                String   @id @db.Uuid
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  fromEventId       String   @map("from_event_id") @db.Uuid
+  toEventId         String?  @map("to_event_id") @db.Uuid
+  missingRef        Json?    @map("missing_ref") @db.JsonB
+  relation          String
+  verificationState String   @map("verification_state")
+
+  fromEvent TraceEvent  @relation("TraceLinkFrom", fields: [fromEventId], references: [id])
+  toEvent   TraceEvent? @relation("TraceLinkTo", fields: [toEventId], references: [id])
+
+  @@index([toEventId], map: "idx_trace_link_to_event")
+  @@map("trace_link")
+  @@schema("traceability")
+}
+
+model PassportProjection {
+  id             String   @id @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+  version        Int      @default(1)
+  batchId        String   @unique(map: "uq_passport_batch") @map("batch_id") @db.Uuid
+  publicPayload  Json     @map("public_payload") @db.JsonB
+  sourceEventIds String[] @default([]) @map("source_event_ids") @db.Uuid
+  policyVersion  String   @map("policy_version")
+  builtAt        DateTime @map("built_at") @db.Timestamptz(6)
+  state          String   @default("stale")
+  checksumHex    String   @map("checksum_hex") @db.Char(64)
+
+  batch Batch @relation(fields: [batchId], references: [id])
+
+  @@index([state, builtAt], map: "idx_passport_state_built")
+  @@map("passport_projection")
+  @@schema("traceability")
+}
+
+model QrToken {
+  id           String    @id @db.Uuid
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  batchId      String    @map("batch_id") @db.Uuid
+  tokenHash    String    @unique(map: "uq_qr_token_hash") @map("token_hash") @db.Char(64)
+  state        String    @default("revoked")
+  expiresAt    DateTime? @map("expires_at") @db.Timestamptz(6)
+  revokedAt    DateTime? @map("revoked_at") @db.Timestamptz(6)
+  createdBySub String    @map("created_by_sub")
+
+  batch Batch @relation(fields: [batchId], references: [id])
+
+  @@index([batchId, state], map: "idx_qr_batch_state")
+  @@map("qr_token")
+  @@schema("traceability")
 }
