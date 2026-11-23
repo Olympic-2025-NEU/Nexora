@@ -30,7 +30,6 @@ export async function saleRoute(request: NextRequest, id?: string, action?: stri
     if (!action) {
       if (!isUuid(body.linkedIssueId)) throw new DomainError("LINKED_ISSUE_ID_INVALID", 422);
       if (body.buyerRef !== undefined && typeof body.buyerRef !== "string") throw new DomainError("BUYER_REF_INVALID", 422);
-      if (typeof body.buyerRef === "string" && body.buyerRef.trim().length > 64) throw new DomainError("BUYER_REF_TOO_LONG", 422);
       if (body.soldAt !== undefined && (typeof body.soldAt !== "string" ||
         !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?(?:Z|[+-]\d\d:\d\d)$/.test(body.soldAt) ||
         !Number.isFinite(Date.parse(body.soldAt)))) throw new DomainError("INVALID_SOLD_AT", 422);

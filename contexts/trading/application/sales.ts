@@ -34,6 +34,9 @@ export function createSaleService(ports: Ports) {
     doc.lines.forEach((line) => scope(ctx, line.warehouseId));
     const issue = await ctx.tx.document.findUnique({ where: { id: doc.saleDetail.linkedIssueId },
       select: { documentNumber: true } });
+    const sourceMovements = await ctx.tx.stockMovement.findMany({ where: { kind: "issue",
+      sourceLineId: { in: doc.lines.map((line) => line.sourceIssueLineId!).filter(Boolean) } },
+    select: { sourceLineId: true, delta: true, balanceAfter: true } });
     return { id, documentNumber: doc.documentNumber, status: doc.status, version: doc.version,
       createdAt: doc.createdAt.toISOString(), confirmedAt: doc.confirmedAt?.toISOString() ?? null,
       linkedIssueId: doc.saleDetail.linkedIssueId, linkedIssueNumber: issue?.documentNumber,
@@ -41,7 +44,10 @@ export function createSaleService(ports: Ports) {
       lines: doc.lines.map((line) => ({ id: line.id, sourceIssueLineId: line.sourceIssueLineId,
         lineNo: line.lineNo, warehouseId: line.warehouseId, batchId: line.batchId,
         productVariantId: line.productVariantId, productId: line.productId,
-        quantity: line.quantity!.toFixed(3), uomId: line.uomId })) };
+        quantity: line.quantity!.toFixed(3), uomId: line.uomId,
+        stockEffect: (() => { const movement = sourceMovements.find((row) => row.sourceLineId === line.sourceIssueLineId);
+          return movement ? { issueBefore: movement.balanceAfter.sub(movement.delta).toFixed(3),
+            issueAfter: movement.balanceAfter.toFixed(3) } : null; })() })) };
   }
   return {
     view,

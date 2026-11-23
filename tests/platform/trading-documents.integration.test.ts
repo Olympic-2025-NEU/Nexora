@@ -167,6 +167,8 @@ test("sale from approved issue leaves 6 to 4 balance unchanged, one trace event;
   assert.equal(posted.movementIds.length, 0);
   assert.equal(await balance(), "4.000");
   assert.equal(await db.stockMovement.count(), movementCount);
+  assert.deepEqual((await saleCommand("read", {}, (ctx) => saleService().view(ctx, sale.id))).lines[0]!.stockEffect,
+    { issueBefore: "6.000", issueAfter: "4.000" });
   assert.equal(await db.outboxMessage.count({ where: { aggregateId: sale.id, eventType: "trading.sale.recorded.v1" } }), 1);
   assert.equal((await db.outboxMessage.findFirstOrThrow({ where: { aggregateId: sale.id,
     eventType: "trading.sale.recorded.v1" } })).destination, "traceability");
