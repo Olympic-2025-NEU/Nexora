@@ -23,9 +23,11 @@ import Ajv2020 from "ajv/dist/2020.js";
 import addFormats from "ajv-formats";
 import canonicalize from "canonicalize";
 import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 import envelopeSchema from "../../contracts/events/envelope-v1.schema.json";
 import { createOutboxDispatcher } from "../../platform/outbox/dispatcher";
 import { buildHandlerMap } from "../../composition/event-handlers";
+import { approvalInbox } from "../../composition/approvals";
 
 if (process.env.NEXORA_TEST_DB !== "1") throw new Error("Disposable PostgreSQL required");
 const owner = new PrismaClient({ datasources: { db: { url: process.env.OWNER_DATABASE_URL! } } });
@@ -595,6 +597,148 @@ test("rejected bridge decision never permits issue movement", { timeout: 120_000
       "goods_issue", doc.id, "confirm", doc.version + 2), randomUUID(), "goods_issue"),
   { code: "WRONG_STATE", httpStatus: 409 });
   assert.equal(await db.stockMovement.count({ where: { sourceLineId: doc.lines[0]!.id } }), 0);
+});
+
+test("reconciliation is atomic, duplicate delivery is inert, conflicting late result is audited", {
+  timeout: 120_000,
+}, async () => {
+  const doc = await command("create", {}, (ctx) => tradingService.create(ctx, "goods_issue", {
+    purpose: "other", lines: [line("1")],
+  }), undefined, "goods_issue");
+  await command("submit", {}, (ctx) => tradingService.action(ctx, "goods_issue", doc.id, "submit", doc.version),
+    undefined, "goods_issue");
+  await approve(doc.id, "rejected");
+  const row = await db.approvalRequest.findUniqueOrThrow({ where: { documentId: doc.id } });
+  assert.equal((await db.document.findUniqueOrThrow({ where: { id: doc.id } })).status, "rejected");
+  const audits = await db.auditLog.count({ where: { targetId: row.id, action: "workflow.reconcile.synced" } });
+  await reconcileApproval(db, FlowableClient.fromEnv(), row.id, applyApprovalResult);
+  assert.equal(await db.auditLog.count({ where: { targetId: row.id, action: "workflow.reconcile.synced" } }), audits);
+  const engine = FlowableClient.fromEnv();
+  const history = await engine.getHistory(row.flowableProcessId!);
+  const conflicting = Object.create(engine) as FlowableClient;
+  conflicting.getHistory = async () => ({ ...history, variables: history.variables.map((variable) =>
+    variable.name === "decision" ? { ...variable, value: "approved" } : variable) });
+  await reconcileApproval(db, conflicting, row.id, applyApprovalResult);
+  await reconcileApproval(db, conflicting, row.id, applyApprovalResult);
+  assert.equal((await db.document.findUniqueOrThrow({ where: { id: doc.id } })).status, "rejected");
+  assert.equal(await db.auditLog.count({ where: { targetId: row.id,
+    action: "workflow.approval.late_result_ignored" } }), 1);
+  await assert.rejects(command("confirm", {}, (ctx) => tradingService.action(ctx,
+    "goods_issue", doc.id, "confirm", doc.version + 2), randomUUID(), "goods_issue"),
+  { code: "WRONG_STATE", httpStatus: 409 });
+  assert.equal(await db.stockMovement.count({ where: { sourceLineId: doc.lines[0]!.id } }), 0);
+});
+
+test("cancel supersedes an unsent decision intent", { timeout: 120_000 }, async () => {
+  const doc = await command("create", {}, (ctx) => tradingService.create(ctx, "goods_issue", {
+    purpose: "other", lines: [line("1")],
+  }), undefined, "goods_issue");
+  await command("submit", {}, (ctx) => tradingService.action(ctx, "goods_issue", doc.id, "submit", doc.version),
+    undefined, "goods_issue");
+  const engine = FlowableClient.fromEnv();
+  const requested = await db.outboxMessage.findFirstOrThrow({ where: { aggregateType: "approval_request",
+    eventType: "workflow.approval.requested.v1", payload: { path: ["documentId"], equals: doc.id } } });
+  await createFlowableStarter(db, engine)(requested as OutboxMessage);
+  const row = await db.approvalRequest.findUniqueOrThrow({ where: { documentId: doc.id } });
+  const task = (await engine.queryTasks({ processInstanceId: row.flowableProcessId! }))[0]!;
+  const resolver = async (sub: string) => ({ sub, active: true, role: "approver", warehouseIds: [warehouseId] });
+  const intent = await db.$transaction((tx) => recordDecisionIntent(tx, resolver, {
+    approvalRequestId: row.id, actorSub: "fixture-approver", decision: "approved",
+    flowableTaskId: task.id, expectedVersion: row.version,
+  }));
+  const message = await db.outboxMessage.findFirstOrThrow({ where: { aggregateId: row.id,
+    eventType: "workflow.approval.decision_requested.v1", aggregateVersion: intent.version } });
+  await command("cancel", {}, (ctx) => tradingService.action(ctx, "goods_issue", doc.id,
+    "cancel", doc.version + 1), undefined, "goods_issue");
+  await createFlowableDecider(db, engine, resolver)(message as OutboxMessage);
+  assert.equal((await engine.getTask(task.id)).id, task.id);
+  assert.equal((await db.approvalRequest.findUniqueOrThrow({ where: { id: row.id } })).state, "cancelled");
+  assert.equal((await db.document.findUniqueOrThrow({ where: { id: doc.id } })).status, "cancelled");
+  assert.equal(await db.stockMovement.count({ where: { sourceLineId: doc.lines[0]!.id } }), 0);
+});
+
+test("engine outage preserves submit and intent; recovery converges without stock before confirm", {
+  timeout: 120_000,
+}, async () => {
+  const doc = await command("create", {}, (ctx) => tradingService.create(ctx, "goods_issue", {
+    purpose: "other", lines: [line("1")],
+  }), undefined, "goods_issue");
+  await command("submit", {}, (ctx) => tradingService.action(ctx, "goods_issue", doc.id,
+    "submit", doc.version), undefined, "goods_issue");
+  const row = await db.approvalRequest.findUniqueOrThrow({ where: { documentId: doc.id } });
+  const request = await db.outboxMessage.findFirstOrThrow({ where: { aggregateId: row.id,
+    eventType: "workflow.approval.requested.v1" } });
+  const engine = FlowableClient.fromEnv();
+  const down = new FlowableClient({ baseUrl: process.env.FLOWABLE_BASE_URL!, user: "unavailable",
+    password: "unavailable" }, async () => { throw new Error("Engine unavailable"); });
+  await assert.rejects(createFlowableStarter(db, down)(request as OutboxMessage));
+  assert.equal((await db.document.findUniqueOrThrow({ where: { id: doc.id } })).status, "pending_approval");
+  assert.equal(await db.stockMovement.count({ where: { sourceLineId: doc.lines[0]!.id } }), 0);
+  await createFlowableStarter(db, engine)(request as OutboxMessage);
+  await reconcileApproval(db, engine, row.id, applyApprovalResult);
+  const pending = await db.approvalRequest.findUniqueOrThrow({ where: { id: row.id } });
+  const resolver = async (sub: string) => ({ sub, active: true, role: "approver", warehouseIds: [warehouseId] });
+  const intent = await db.$transaction((tx) => recordDecisionIntent(tx, resolver, {
+    approvalRequestId: row.id, actorSub: "fixture-approver", decision: "approved",
+    flowableTaskId: pending.flowableTaskId!, expectedVersion: pending.version,
+  }));
+  const message = await db.outboxMessage.findFirstOrThrow({ where: { aggregateId: row.id,
+    eventType: "workflow.approval.decision_requested.v1", aggregateVersion: intent.version } });
+  await assert.rejects(createFlowableDecider(db, down, resolver)(message as OutboxMessage));
+  assert.equal((await db.approvalRequest.findUniqueOrThrow({ where: { id: row.id } })).state, "decision_pending");
+  assert.equal(await db.stockMovement.count({ where: { sourceLineId: doc.lines[0]!.id } }), 0);
+  await createFlowableDecider(db, engine, resolver)(message as OutboxMessage);
+  await reconcileApproval(db, engine, row.id, applyApprovalResult);
+  assert.equal((await engine.findInstances(row.id)).length, 1);
+  assert.equal((await engine.getHistory(pending.flowableProcessId!)).endActivityIds.includes("approvedEnd"), true);
+  assert.equal((await db.approvalRequest.findUniqueOrThrow({ where: { id: row.id } })).state, "approved");
+  assert.equal((await db.document.findUniqueOrThrow({ where: { id: doc.id } })).status, "approved");
+  assert.equal(await db.stockMovement.count({ where: { sourceLineId: doc.lines[0]!.id } }), 0);
+});
+
+test("isolated engine upgrade keeps v1 and v2 decisions bound to their own issue", {
+  timeout: 120_000,
+}, async () => {
+  const engine = FlowableClient.fromEnv();
+  const make = async () => {
+    const doc = await command("create", {}, (ctx) => tradingService.create(ctx, "goods_issue", {
+      purpose: "other", lines: [line("1")],
+    }), undefined, "goods_issue");
+    await command("submit", {}, (ctx) => tradingService.action(ctx, "goods_issue", doc.id,
+      "submit", doc.version), undefined, "goods_issue");
+    const row = await db.approvalRequest.findUniqueOrThrow({ where: { documentId: doc.id } });
+    const message = await db.outboxMessage.findFirstOrThrow({ where: { aggregateId: row.id,
+      eventType: "workflow.approval.requested.v1" } });
+    await createFlowableStarter(db, engine)(message as OutboxMessage);
+    await reconcileApproval(db, engine, row.id, applyApprovalResult);
+    return { doc, row: await db.approvalRequest.findUniqueOrThrow({ where: { id: row.id } }) };
+  };
+  const first = await make();
+  assert.equal(first.row.flowableDefinitionVersion, 1);
+  const source = readFileSync("deploy/flowable/processes/goods-issue-approval.bpmn20.xml", "utf8");
+  const fixture = source.replace('name="Goods Issue Approval"', 'name="Goods Issue Approval v2"');
+  assert.notEqual(fixture, source);
+  const form = new FormData();
+  form.set("deploymentName", "fixture-goods-issue-v2");
+  form.set("file", new Blob([fixture], { type: "application/xml" }), "goods-issue-approval.bpmn20.xml");
+  const deployed = await fetch(`${process.env.FLOWABLE_BASE_URL}/repository/deployments`, {
+    method: "POST", headers: { authorization: `Basic ${Buffer.from(`${process.env.FLOWABLE_ADMIN_USER}:${process.env.FLOWABLE_ADMIN_PASSWORD}`).toString("base64")}` },
+    body: form,
+  });
+  assert.equal(deployed.status, 201);
+  const second = await make();
+  assert.equal(second.row.flowableDefinitionVersion, 2);
+  const inbox = await approvalInbox({ userId: "fixture-approver", organizationId: "fixture-org",
+    roles: ["approver"], unitIds: [warehouseId] });
+  assert.ok([first, second].every(({ row }) => inbox.some((item) => item.approvalRequestId === row.id)));
+  for (const { doc, row } of [first, second]) {
+    const history = await engine.getHistory(row.flowableProcessId!);
+    assert.equal((await engine.getDefinition(history.processDefinitionId)).version, row.flowableDefinitionVersion);
+    await approve(doc.id);
+    assert.equal((await db.document.findUniqueOrThrow({ where: { id: doc.id } })).status, "approved");
+    assert.equal((await engine.getHistory(row.flowableProcessId!)).endActivityIds.includes("approvedEnd"), true);
+    assert.equal(await db.stockMovement.count({ where: { sourceLineId: doc.lines[0]!.id } }), 0);
+  }
 });
 
 test("concurrent receipt confirms on same document return one 409, not a raw immutable-line error", async () => {
