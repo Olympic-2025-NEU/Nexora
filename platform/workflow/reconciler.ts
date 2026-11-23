@@ -28,7 +28,7 @@ export async function reconcileApproval(db: PrismaClient, engine: FlowableClient
     if (["approved", "rejected", "confirmed", "cancelled"].includes(row.state) && row.flowableProcessId) {
       const terminal = await readHistory(engine, row.flowableProcessId);
       if (terminal?.endTime && terminal.variables.some((variable) => variable.name === "decision") &&
-        (row.state === "cancelled" || historyDecision(terminal, row) !== "match")) {
+        (historyDecision(terminal, row) !== "match" || (row.state === "cancelled" && !row.engineCompletedAt))) {
         const decision = terminal.variables.find((variable) => variable.name === "decision")?.value;
         await auditAnomaly(db, row, String(decision), row.state);
       }
@@ -127,12 +127,24 @@ export async function reconcileApproval(db: PrismaClient, engine: FlowableClient
 }
 
 export function createReconciler(db: PrismaClient, engine: FlowableClient, applyResult?: ApprovalResultPort) {
+  let terminalOffset = 0;
   return {
     async tick() {
       const rows = await db.approvalRequest.findMany({ where: {
-        OR: [{ state: { in: ["starting", "pending", "decision_pending", "approved", "rejected"] } },
+        OR: [{ state: { in: ["starting", "pending", "decision_pending"] } },
           { state: "cancelled", engineCleanupAt: null }],
       }, orderBy: { updatedAt: "asc" }, take: 50 });
+      const terminalWhere: Prisma.ApprovalRequestWhereInput = { OR: [
+        { state: { in: ["approved", "rejected"] } },
+        { state: "cancelled", flowableProcessId: { not: null } }] };
+      const terminalCount = await db.approvalRequest.count({ where: terminalWhere });
+      if (terminalCount) {
+        if (terminalOffset >= terminalCount) terminalOffset = 0;
+        const terminal = await db.approvalRequest.findMany({ where: terminalWhere,
+          orderBy: { id: "asc" }, skip: terminalOffset, take: 50 });
+        terminalOffset += terminal.length;
+        rows.push(...terminal);
+      }
       for (const row of rows) {
         try { await reconcileApproval(db, engine, row.id, applyResult); }
         catch (error) { console.error(JSON.stringify({ event: "workflow.engine.unreachable", approvalRequestId: row.id,

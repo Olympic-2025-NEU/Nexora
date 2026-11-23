@@ -6,8 +6,8 @@ import { PrismaClient } from "@prisma/client";
 import { getPrismaClient } from "../../platform/persistence/prisma";
 import { createPrismaIdempotency } from "../../platform/http/idempotency";
 import { runCommand } from "../../platform/http/pipeline";
-import { tradingService, tradingUnitOfWork, tradingPorts, transferService, stocktakeService, saleService,
-  applyApprovalResult } from "../../composition/trading";
+import { tradingService, tradingUnitOfWork, tradingPorts, transferService, stocktakeService, saleService } from "../../composition/trading";
+import { applyApprovalResult } from "../../composition/workflow";
 import { createReceivingService, type ActualInput } from "../../contexts/trading/application/receivings";
 import { createCatalogRepos } from "../../contexts/catalog/infrastructure/prisma-repos";
 import { createDocumentService } from "../../contexts/trading/application/documents";

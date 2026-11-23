@@ -207,6 +207,7 @@
     "deploy/keycloak/bootstrap.mjs",
     "deploy/scripts/backup-objects.mjs",
     "deploy/scripts/debug-realm.mjs",
+    "deploy/scripts/journey-p07-t07.mjs",
     "deploy/scripts/partner-handshake.mjs",
     "deploy/scripts/prepare.mjs",
     "deploy/scripts/render-apisix-routes.mjs",

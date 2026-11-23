@@ -14,10 +14,6 @@ import { createReceivingService } from "@/contexts/trading/application/receiving
 import { createStocktakeService } from "@/contexts/trading/application/stocktakes";
 import { createSaleService } from "@/contexts/trading/application/sales";
 import { EVENT_DESTINATIONS } from "@/contracts/events/registry";
-import { createTradingRepos } from "@/contexts/trading/infrastructure/prisma-repos";
-
-export const applyApprovalResult = (tx: Prisma.TransactionClient, documentId: string,
-  result: "approved" | "rejected") => createTradingRepos(tx).applyApprovalResult(documentId, result);
 
 export const tradingPorts: TradingPorts = {
   adjust: adjustStock,
