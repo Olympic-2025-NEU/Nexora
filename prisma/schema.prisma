@@ -8,7 +8,7 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
-  schemas  = ["platform", "system", "catalog", "inventory"]
+  schemas  = ["platform", "system", "catalog", "inventory", "trading"]
 }
 
 model AuditLog {
@@ -174,6 +174,7 @@ model ApprovalRequest {
   version                   Int                  @default(1)
   createdAt                 DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt                 DateTime             @default(now()) @map("updated_at") @db.Timestamptz(6)
+  document                  Document             @relation(fields: [documentId], references: [id])
 
   @@index([state, updatedAt])
   @@map("approval_request")
@@ -260,6 +261,7 @@ model Partner {
   createdBySub     String    @map("created_by_sub")
 
   connection       PartnerConnection?
+  transfers        TransferDetail[]
 
   @@map("partner")
   @@schema("system")
@@ -336,6 +338,7 @@ model Uom {
 
   variantUoms    ProductVariantUom[]
   priceListItems PriceListItem[]
+  documentLines  DocumentLine[]
 
   @@map("uom")
   @@schema("catalog")
@@ -358,6 +361,7 @@ model Product {
   variants ProductVariant[]
   images   ProductImage[]
   batches  Batch[]
+  documentLines DocumentLine[]
 
   @@index([isActive, name])
   @@map("product")
@@ -384,6 +388,7 @@ model ProductVariant {
   priceListItems PriceListItem[]
   balances       StockBalance[]
   movements      StockMovement[]
+  documentLines  DocumentLine[]
 
   @@map("product_variant")
   @@schema("catalog")
@@ -493,6 +498,7 @@ model Batch {
   variant  ProductVariant @relation(fields: [productVariantId], references: [id])
   balances StockBalance[]
   movements StockMovement[]
+  documentLines DocumentLine[]
 
   @@unique([productId, localCode])
   @@unique([productVariantId, localCode])
@@ -520,6 +526,7 @@ model Warehouse {
   memberships MembershipWarehouse[]
   balances    StockBalance[]
   movements   StockMovement[]
+  documentLines DocumentLine[]
 
   @@map("warehouse")
   @@schema("inventory")
@@ -565,10 +572,125 @@ model StockMovement {
   variant    ProductVariant  @relation(fields: [productVariantId], references: [id])
   reversal   StockMovement?  @relation("StockMovementReversal", fields: [reversalOf], references: [id])
   reversedBy StockMovement[] @relation("StockMovementReversal")
+  sourceLine DocumentLine @relation(fields: [sourceLineId], references: [id])
 
   @@unique([sourceLineId, kind])
   @@index([batchId, createdAt(sort: Desc)])
   @@index([warehouseId, batchId, createdAt(sort: Desc)])
   @@map("stock_movement")
   @@schema("inventory")
+}
+
+model Document {
+  id                     String   @id @db.Uuid
+  createdAt              DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+  version                Int      @default(1)
+  documentType           String   @map("document_type")
+  issuePurpose           String?  @map("issue_purpose")
+  documentNumber         String   @map("document_number")
+  status                 String   @default("draft")
+  createdBySub           String   @map("created_by_sub")
+  confirmedBySub         String?  @map("confirmed_by_sub")
+  confirmedAt            DateTime? @map("confirmed_at") @db.Timestamptz(6)
+  cancelledAt            DateTime? @map("cancelled_at") @db.Timestamptz(6)
+  note                   String?
+  correctionOfDocumentId String?  @map("correction_of_document_id") @db.Uuid
+  correctionReason       String?  @map("correction_reason")
+  correlationId          String   @map("correlation_id")
+
+  correctionOf Document? @relation("DocumentCorrection", fields: [correctionOfDocumentId], references: [id])
+  corrections  Document[] @relation("DocumentCorrection")
+  lines        DocumentLine[]
+  transferDetail TransferDetail? @relation("TransferDocument")
+  receivingDetail ReceivingDetail?
+  saleDetail SaleDetail? @relation("SaleDocument")
+  transferIssue TransferDetail? @relation("TransferIssue")
+  saleIssue SaleDetail? @relation("SaleIssue")
+  approvals ApprovalRequest[]
+
+  @@unique([documentType, documentNumber], map: "uq_trading_document_number")
+  @@index([status, createdAt(sort: Desc)], map: "idx_trading_document_status_time")
+  @@index([documentType, createdAt(sort: Desc)], map: "idx_trading_document_type_time")
+  @@index([correctionOfDocumentId], map: "idx_trading_document_correction")
+  @@map("document")
+  @@schema("trading")
+}
+
+model DocumentLine {
+  id                String   @id @db.Uuid
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  documentId        String   @map("document_id") @db.Uuid
+  lineNo            Int      @map("line_no")
+  warehouseId       String   @map("warehouse_id") @db.Uuid
+  batchId           String   @map("batch_id") @db.Uuid
+  productVariantId  String   @map("product_variant_id") @db.Uuid
+  productId         String   @map("product_id") @db.Uuid
+  quantity          Decimal? @db.Decimal(20, 3)
+  actualQuantity    Decimal? @map("actual_quantity") @db.Decimal(20, 3)
+  countedQuantity   Decimal? @map("counted_quantity") @db.Decimal(20, 3)
+  uomId             String   @map("uom_id") @db.Uuid
+  sourceIssueLineId String?  @map("source_issue_line_id") @db.Uuid
+  sourceLineRef     String?  @map("source_line_ref") @db.Uuid
+
+  document Document @relation(fields: [documentId], references: [id])
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id])
+  batch Batch @relation(fields: [batchId, productVariantId], references: [id, productVariantId])
+  variant ProductVariant @relation(fields: [productVariantId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+  uom Uom @relation(fields: [uomId], references: [id])
+  sourceIssueLine DocumentLine? @relation("IssueLine", fields: [sourceIssueLineId], references: [id])
+  linkedLines DocumentLine[] @relation("IssueLine")
+  movements StockMovement[]
+
+  @@unique([documentId, lineNo], map: "uq_trading_line_number")
+  @@unique([id, documentId], map: "uq_trading_line_document")
+  @@index([batchId, documentId], map: "idx_trading_line_batch_document")
+  @@map("document_line")
+  @@schema("trading")
+}
+
+model TransferDetail {
+  documentId          String    @id @map("document_id") @db.Uuid
+  linkedIssueId       String    @unique(map: "uq_trading_transfer_issue") @map("linked_issue_id") @db.Uuid
+  destinationPartnerId String   @map("destination_partner_id") @db.Uuid
+  deliveryState       String    @default("pending") @map("delivery_state")
+  technicalAckAt      DateTime? @map("technical_ack_at") @db.Timestamptz(6)
+  businessReceiptAt   DateTime? @map("business_receipt_at") @db.Timestamptz(6)
+
+  document Document @relation("TransferDocument", fields: [documentId], references: [id])
+  linkedIssue Document @relation("TransferIssue", fields: [linkedIssueId], references: [id])
+  destinationPartner Partner @relation(fields: [destinationPartnerId], references: [id])
+
+  @@map("transfer_detail")
+  @@schema("trading")
+}
+
+model ReceivingDetail {
+  documentId             String   @id @map("document_id") @db.Uuid
+  sourceIssuerInstanceId String   @map("source_issuer_instance_id")
+  sourceTransferId       String   @map("source_transfer_id")
+  inboundMessageId       String?  @map("inbound_message_id") @db.Uuid
+  sentQuantity           Decimal  @map("sent_quantity") @db.Decimal(20, 3)
+  actualQuantity         Decimal? @map("actual_quantity") @db.Decimal(20, 3)
+  discrepancyReason      String?  @map("discrepancy_reason")
+
+  document Document @relation(fields: [documentId], references: [id])
+
+  @@unique([sourceIssuerInstanceId, sourceTransferId], map: "uq_trading_receiving_source")
+  @@map("receiving_detail")
+  @@schema("trading")
+}
+
+model SaleDetail {
+  documentId    String   @id @map("document_id") @db.Uuid
+  linkedIssueId String   @unique(map: "uq_trading_sale_issue") @map("linked_issue_id") @db.Uuid
+  buyerRef      String?  @map("buyer_ref")
+  soldAt        DateTime @map("sold_at") @db.Timestamptz(6)
+
+  document Document @relation("SaleDocument", fields: [documentId], references: [id])
+  linkedIssue Document @relation("SaleIssue", fields: [linkedIssueId], references: [id])
+
+  @@map("sale_detail")
+  @@schema("trading")
 }
