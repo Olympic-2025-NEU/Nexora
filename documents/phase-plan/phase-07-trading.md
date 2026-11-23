@@ -24,7 +24,7 @@ Document lines / Inventory confirm: tham chiếu **`product_variant_id`** + qty 
 ## P07-T03 — Goods receipt và issue
 
 - [ ] API/use case tạo/edit/submit/confirm receipt và issue; validate issuer/product/batch/warehouse/expiry/quality, unit, quantity và permission.
-- [ ] Confirm receipt tăng stock, issue giảm stock; trong cùng transaction cập nhật status/version, movement/balance, audit, outbox. Idempotency key + source uniqueness chống double click/retry.
+- [x] Confirm receipt tăng stock, issue giảm stock; trong cùng transaction cập nhật status/version, movement/balance, audit, outbox. Idempotency key + source uniqueness chống double click/retry.
 - [ ] UI nhập/xuất từ batch picker và hiển thị balance trước/sau; lỗi thiếu hàng/đã sửa version rõ.
 - **Đầu ra:** hai luồng end-to-end; **kiểm chứng:** AC-03/04, rollback và hai issue cạnh tranh trên PG thật.
 

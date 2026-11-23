@@ -56,14 +56,14 @@ after(async () => { await db.$disconnect(); await owner.$disconnect(); });
 
 async function command<T>(action: string, body: unknown,
   work: (ctx: Parameters<typeof tradingService.create>[0]) => Promise<T>, key?: string,
-  kind: TradingKind = "goods_receipt"): Promise<T> {
+  kind: TradingKind = "goods_receipt", actingActor: Actor = actor): Promise<T> {
   return runCommand({ requestId: randomUUID() }, {
-    authenticate: async () => actor, resolveTenant: async () => actor.organizationId,
+    authenticate: async () => actingActor, resolveTenant: async () => actingActor.organizationId,
     action: `trading:${kind === "goods_receipt" ? "receipt" : "issue"}:${action}`,
     unitOfWork: tradingUnitOfWork,
     method: "POST", routeKey: `receipt:${action}`, payload: body,
     idempotencyKey: key, idempotencyPort: createPrismaIdempotency(db),
-    domain: (ctx) => work({ tx: ctx.tx, actor, requestId: ctx.requestId, emit: ctx.emit }),
+    domain: (ctx) => work({ tx: ctx.tx, actor: actingActor, requestId: ctx.requestId, emit: ctx.emit }),
   });
 }
 
@@ -88,6 +88,8 @@ test("receipt 20 from pack, atomic movement, audit, outbox, replay and stale gua
   assert.equal((await db.stockBalance.findUniqueOrThrow({ where: {
     warehouseId_batchId: { warehouseId, batchId } } })).quantity.toFixed(3), "20.000");
   assert.equal(await db.stockMovement.count({ where: { sourceLineId: receipt.lines[0]!.id } }), 1);
+  const movement = await db.stockMovement.findFirstOrThrow({ where: { sourceLineId: receipt.lines[0]!.id } });
+  await assert.rejects(db.stockMovement.create({ data: { ...movement, id: randomUUID() } }), { code: "P2002" });
   assert.equal(await db.auditLog.count({ where: { targetId: receipt.id, action: "trading.document.confirm" } }), 1);
   assert.equal(await db.outboxMessage.count({ where: { aggregateId: receipt.id,
     eventType: "trading.receipt.confirmed.v1" } }), 1);
@@ -197,6 +199,9 @@ test("approved issue 12 posts once; two issues race for remaining stock with rea
     const confirmed = await command("confirm", { id: first.id }, (ctx) => tradingService.action(ctx,
       "goods_issue", first.id, "confirm", first.version), randomUUID(), "goods_issue");
     assert.equal(confirmed.status, "confirmed");
+    assert.equal(await db.auditLog.count({ where: { targetId: first.id, action: "trading.document.confirm" } }), 1);
+    assert.equal(await db.outboxMessage.count({ where: { aggregateId: first.id,
+      eventType: "trading.issue.confirmed.v1" } }), 1);
     assert.equal((await db.stockBalance.findUniqueOrThrow({ where: {
       warehouseId_batchId: { warehouseId, batchId } } })).quantity.toFixed(3), "8.000");
     assert.equal(await db.stockMovement.count({ where: { sourceLineId: first.lines[0]!.id } }), 1);
@@ -280,8 +285,9 @@ test("issue with third line on empty balance fails 422, leaves approved document
     await approve(doc.id);
     const before = (await db.stockBalance.findUniqueOrThrow({ where: {
       warehouseId_batchId: { warehouseId, batchId } } })).quantity.toFixed(3);
+    const retryKey = randomUUID();
     await assert.rejects(command("confirm", { id: doc.id }, (ctx) => tradingService.action(ctx,
-      "goods_issue", doc.id, "confirm", doc.version + 1), randomUUID(), "goods_issue"),
+      "goods_issue", doc.id, "confirm", doc.version + 1), retryKey, "goods_issue"),
     (err: unknown) => err instanceof Error && "code" in err && err.code === "INSUFFICIENT_STOCK" &&
       "batchId" in err && err.batchId === emptyBatchId);
     assert.equal((await db.document.findUniqueOrThrow({ where: { id: doc.id } })).status, "pending_approval");
@@ -291,4 +297,112 @@ test("issue with third line on empty balance fails 422, leaves approved document
       warehouseId_batchId: { warehouseId, batchId } } })).quantity.toFixed(3), before);
     assert.equal(await db.outboxMessage.count({ where: { aggregateId: doc.id,
       eventType: "trading.issue.confirmed.v1" } }), 0);
+    const supply = await command("create", {}, (ctx) => tradingService.create(ctx, "goods_receipt", {
+      lines: [{ ...line("1"), batchId: emptyBatchId }],
+    }));
+    await command("confirm", { id: supply.id }, (ctx) => tradingService.action(ctx,
+      "goods_receipt", supply.id, "confirm", supply.version), randomUUID());
+    const retry = await command("confirm", { id: doc.id }, (ctx) => tradingService.action(ctx,
+      "goods_issue", doc.id, "confirm", doc.version + 1), retryKey, "goods_issue");
+    assert.equal(retry.status, "confirmed");
+    assert.equal(retry.movementIds?.length, 3);
   });
+
+test("expired and quarantined batches reject receipt confirmation with typed 422 errors", async () => {
+  const draft = await command("create", {}, (ctx) => tradingService.create(ctx, "goods_receipt",
+    { lines: [line("1")] }));
+  await owner.batch.update({ where: { id: batchId }, data: {
+    expiresOn: new Date(Date.now() - 86_400_000),
+  } });
+  try {
+    await assert.rejects(command("confirm", { id: draft.id }, (ctx) => tradingService.action(ctx,
+      "goods_receipt", draft.id, "confirm", draft.version)), { code: "BATCH_EXPIRED", httpStatus: 422 });
+    await owner.batch.update({ where: { id: batchId }, data: { expiresOn: null, qualityStatus: "inspect" } });
+    await assert.rejects(command("confirm", { id: draft.id }, (ctx) => tradingService.action(ctx,
+      "goods_receipt", draft.id, "confirm", draft.version)), { code: "BATCH_QUALITY_BLOCKED", httpStatus: 422 });
+  } finally {
+    await owner.batch.update({ where: { id: batchId }, data: { expiresOn: null, qualityStatus: "available" } });
+  }
+  assert.equal((await db.document.findUniqueOrThrow({ where: { id: draft.id } })).status, "draft");
+});
+
+test("two reversed multi-batch issues lock in same order and only one can confirm", { timeout: 120_000 }, async () => {
+  const receipt = await command("create", {}, (ctx) => tradingService.create(ctx, "goods_receipt", {
+    lines: [line("20"), { ...line("20"), batchId: emptyBatchId }],
+  }));
+  await command("confirm", { id: receipt.id }, (ctx) => tradingService.action(ctx,
+    "goods_receipt", receipt.id, "confirm", receipt.version), randomUUID());
+  const make = async (reversed: boolean) => {
+    const lines = [line("12"), { ...line("12"), batchId: emptyBatchId }];
+    const doc = await command("create", {}, (ctx) => tradingService.create(ctx, "goods_issue", {
+      purpose: "other", lines: reversed ? lines.reverse() : lines,
+    }), undefined, "goods_issue");
+    await command("submit", { id: doc.id }, (ctx) => tradingService.action(ctx,
+      "goods_issue", doc.id, "submit", doc.version), undefined, "goods_issue");
+    await approve(doc.id);
+    return { ...doc, version: doc.version + 1 };
+  };
+  const [first, second] = await Promise.all([make(false), make(true)]);
+  let ready = 0;
+  let release!: () => void;
+  const barrier = new Promise<void>((resolve) => { release = resolve; });
+  const racing = createDocumentService({ ...tradingPorts, async confirmApproval(tx, input) {
+    await tradingPorts.confirmApproval(tx, input);
+    if (++ready === 2) release();
+    await barrier;
+  } });
+  const results = await Promise.allSettled([first, second].map((doc) => command("confirm", { id: doc.id },
+    (ctx) => racing.action(ctx, "goods_issue", doc.id, "confirm", doc.version), randomUUID(), "goods_issue")));
+  assert.equal(results.filter((outcome) => outcome.status === "fulfilled").length, 1);
+  assert.equal(results.filter((outcome) => outcome.status === "rejected" &&
+    outcome.reason.code === "INSUFFICIENT_STOCK").length, 1);
+  for (const doc of [first, second]) {
+    const persisted = await db.document.findUniqueOrThrow({ where: { id: doc.id } });
+    assert.equal(persisted.version, persisted.status === "confirmed" ? doc.version + 1 : doc.version);
+    assert.equal(await db.stockMovement.count({ where: { sourceLineId: { in: doc.lines.map((row) => row.id) } } }),
+      persisted.status === "confirmed" ? 2 : 0);
+  }
+});
+
+test("draft may be empty, edit uses one version increment, rejects wrong batch and scope", async () => {
+  const draft = await command("create", {}, (ctx) => tradingService.create(ctx, "goods_receipt", { lines: [] }));
+  await assert.rejects(command("confirm", { id: draft.id }, (ctx) => tradingService.action(ctx,
+    "goods_receipt", draft.id, "confirm", draft.version)), { code: "NO_LINES", httpStatus: 422 });
+  const edited = await command("edit", { id: draft.id }, (ctx) => tradingService.edit(ctx,
+    "goods_receipt", draft.id, draft.version, { lines: [line("1")], note: "Loaded" }));
+  assert.equal(edited.version, draft.version + 1);
+  assert.equal(edited.note, "Loaded");
+  await assert.rejects(command("edit", {}, (ctx) => tradingService.edit(ctx,
+    "goods_receipt", draft.id, draft.version, { note: "stale" })), { code: "VERSION_CONFLICT" });
+  await assert.rejects(command("create", {}, (ctx) => tradingService.create(ctx,
+    "goods_receipt", { lines: [{ ...line("1"), batchId: randomUUID() }] })),
+  { code: "BATCH_PRODUCT_MISMATCH", httpStatus: 422 });
+  await assert.rejects(command("create", {}, (ctx) => tradingService.create(ctx,
+    "goods_receipt", { lines: [line("1")] }), undefined, "goods_receipt",
+  { ...actor, unitIds: [] }), { code: "WAREHOUSE_SCOPE_REQUIRED", httpStatus: 403 });
+});
+
+test("rejected bridge decision never permits issue movement", { timeout: 120_000 }, async () => {
+  const doc = await command("create", {}, (ctx) => tradingService.create(ctx, "goods_issue", {
+    purpose: "other", lines: [line("1")],
+  }), undefined, "goods_issue");
+  await command("submit", { id: doc.id }, (ctx) => tradingService.action(ctx,
+    "goods_issue", doc.id, "submit", doc.version), undefined, "goods_issue");
+  await approve(doc.id, "rejected");
+  await assert.rejects(command("confirm", { id: doc.id }, (ctx) => tradingService.action(ctx,
+    "goods_issue", doc.id, "confirm", doc.version + 1), randomUUID(), "goods_issue"),
+  { code: "APPROVAL_REJECTED", httpStatus: 409 });
+  assert.equal(await db.stockMovement.count({ where: { sourceLineId: doc.lines[0]!.id } }), 0);
+});
+
+test("concurrent receipt confirms on same document return one 409, not a raw immutable-line error", async () => {
+  const doc = await command("create", {}, (ctx) => tradingService.create(ctx, "goods_receipt", {
+    lines: [line("1", packUomId)],
+  }));
+  const results = await Promise.allSettled([0, 1].map(() => command("confirm", { id: doc.id },
+    (ctx) => tradingService.action(ctx, "goods_receipt", doc.id, "confirm", doc.version), randomUUID())));
+  assert.equal(results.filter((outcome) => outcome.status === "fulfilled").length, 1);
+  assert.equal(results.filter((outcome) => outcome.status === "rejected" &&
+    outcome.reason.code === "VERSION_CONFLICT").length, 1);
+  assert.equal(await db.stockMovement.count({ where: { sourceLineId: doc.lines[0]!.id } }), 1);
+});

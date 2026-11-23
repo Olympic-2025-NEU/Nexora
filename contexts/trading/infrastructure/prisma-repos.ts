@@ -76,6 +76,9 @@ export function createTradingRepos(tx: Prisma.TransactionClient) {
         receivingDetail: true, saleDetail: true,
       } });
     },
+    async lockDocument(id: string) {
+      await tx.$queryRaw`SELECT id FROM trading.document WHERE id = ${id}::uuid FOR UPDATE`;
+    },
 
     findVariant(id: string) {
       return tx.productVariant.findUnique({ where: { id }, include: { product: true,
@@ -114,7 +117,7 @@ export function createTradingRepos(tx: Prisma.TransactionClient) {
     async list(filters: {
       status?: DocumentStatus; type?: DocumentType; from?: Date; to?: Date;
       partnerId?: string; batchId?: string; cursorId?: string; limit: number;
-      warehouseIds?: readonly string[];
+      warehouseIds?: readonly string[]; creatorSub?: string;
     }) {
       const where: Prisma.DocumentWhereInput = {
         ...(filters.status ? { status: filters.status } : {}),
@@ -122,7 +125,10 @@ export function createTradingRepos(tx: Prisma.TransactionClient) {
         ...(filters.from || filters.to ? { createdAt: { gte: filters.from, lt: filters.to } } : {}),
         ...(filters.partnerId ? { transferDetail: { destinationPartnerId: filters.partnerId } } : {}),
         ...(filters.batchId ? { lines: { some: { batchId: filters.batchId } } } : {}),
-        ...(filters.warehouseIds ? { lines: { every: { warehouseId: { in: [...filters.warehouseIds] } } } } : {}),
+        ...(filters.warehouseIds ? { OR: [
+          { createdBySub: filters.creatorSub, lines: { none: {} } },
+          { lines: { some: {}, every: { warehouseId: { in: [...filters.warehouseIds] } } } },
+        ] } : {}),
       };
       const rows = await tx.document.findMany({ where, orderBy: [{ createdAt: "desc" }, { id: "desc" }],
         take: filters.limit + 1, ...(filters.cursorId ? { cursor: { id: filters.cursorId }, skip: 1 } : {}) });

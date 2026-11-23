@@ -82,6 +82,9 @@ export function createDocumentService(ports: TradingPorts) {
     const repo = createTradingRepos(ctx.tx);
     const doc = await repo.getAggregate(id);
     if (!doc || doc.documentType !== kind) throw new DomainError("DOCUMENT_NOT_FOUND", 404);
+    if (!doc.lines.length && !ctx.actor.roles.includes("administrator") && doc.createdBySub !== ctx.actor.userId) {
+      throw new DomainError("WAREHOUSE_SCOPE_REQUIRED", 403);
+    }
     const lines = await Promise.all(doc.lines.map(async (line) => {
       inScope(ctx.actor, line.warehouseId);
       const converted = doc.status === "draft" && line.quantity
@@ -134,7 +137,8 @@ export function createDocumentService(ports: TradingPorts) {
     view,
     async list(ctx: Context, kind: TradingKind, status?: DocumentStatus, cursorId?: string, limit = 20) {
       const page = await createTradingRepos(ctx.tx).list({ type: kind, status, cursorId, limit,
-        ...(ctx.actor.roles.includes("administrator") ? {} : { warehouseIds: ctx.actor.unitIds }) });
+        ...(ctx.actor.roles.includes("administrator") ? {} : { warehouseIds: ctx.actor.unitIds,
+          creatorSub: ctx.actor.userId }) });
       return { items: await Promise.all(page.items.map((doc) => view(ctx, doc.id, kind))), nextCursorId: page.nextCursorId };
     },
     async edit(ctx: Context, kind: TradingKind, id: string, expectedVersion: number,
@@ -161,6 +165,7 @@ export function createDocumentService(ports: TradingPorts) {
     },
     async action(ctx: Context, kind: TradingKind, id: string, action: "submit" | "confirm" | "cancel", version: number) {
       const repo = createTradingRepos(ctx.tx);
+      await repo.lockDocument(id);
       const doc = await repo.getAggregate(id);
       if (!doc || doc.documentType !== kind) throw new DomainError("DOCUMENT_NOT_FOUND", 404);
       if (doc.version !== version) throw new DomainError("VERSION_CONFLICT", 409);
