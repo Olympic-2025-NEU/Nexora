@@ -71,7 +71,7 @@ export async function stocktakeRoute(request: NextRequest, id?: string, action?:
         if (!("organizationId" in ctx.actor)) throw new DomainError("TENANT_FORBIDDEN", 403);
         const args = { tx: ctx.tx, actor: ctx.actor, requestId, emit: ctx.emit };
         if (id && version !== null && action === "cancel") return service.cancel(args, id, version);
-        if (action === "confirm") throw new DomainError("WRONG_STATE", 409);
+        if (id && version !== null && action === "confirm") return service.confirm(args, id, version);
         if (id && version !== null) return service.edit(args, id, version, body as { lines?: StocktakeLineInput[]; note?: string });
         return service.create(args, body as StocktakeInput);
       },
