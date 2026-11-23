@@ -64,6 +64,7 @@
     "app/api/v1/stocktakes/[id]/[action]/route.ts",
     "app/api/v1/stocktakes/[id]/route.ts",
     "app/api/v1/stocktakes/route.ts",
+    "app/api/v1/trace/status/route.ts",
     "app/api/v1/transfers/[id]/[action]/route.ts",
     "app/api/v1/transfers/[id]/route.ts",
     "app/api/v1/transfers/route.ts",
@@ -117,6 +118,8 @@
     "app/reset-password/ResetPasswordClient.tsx",
     "app/reset-password/page.tsx",
     "app/theme/ThemeProvider.tsx",
+    "app/trace/_components/trace-status.tsx",
+    "app/trace/page.tsx",
     "app/trading/_components/documents-client.tsx",
     "app/trading/_components/history-client.tsx",
     "app/trading/approvals/approvals-client.tsx",
@@ -185,9 +188,13 @@
     "contexts/system/index.ts",
     "contexts/system/infrastructure/prisma-repos.ts",
     "contexts/traceability/application/port.ts",
+    "contexts/traceability/application/status-http.ts",
+    "contexts/traceability/application/trace-projector.ts",
     "contexts/traceability/domain/provenance.ts",
     "contexts/traceability/index.ts",
+    "contexts/traceability/infrastructure/lag.ts",
     "contexts/traceability/infrastructure/prisma-repos.ts",
+    "contexts/traceability/infrastructure/projector-repos.ts",
     "contexts/trading/application/checklist.ts",
     "contexts/trading/application/documents.ts",
     "contexts/trading/application/history-http.ts",
@@ -339,6 +346,8 @@
     "tests/platform/outbox.integration.test.ts",
     "tests/platform/scan.integration.test.mjs",
     "tests/platform/schema.integration.mjs",
+    "tests/platform/trace-projector.integration.test.ts",
+    "tests/platform/trace-restore.integration.test.ts",
     "tests/platform/trace-schema.integration.test.ts",
     "tests/platform/trading-conformance.integration.test.ts",
     "tests/platform/trading-documents.integration.test.ts",
@@ -348,6 +357,7 @@
     "tests/platform/workflow.integration.test.ts",
     "tests/system/m01-policy.test.mjs",
     "worker/entrypoint.js",
-    "workers/outbox-dispatcher.ts"
+    "workers/outbox-dispatcher.ts",
+    "workers/trace-projector.ts"
   ]
 }

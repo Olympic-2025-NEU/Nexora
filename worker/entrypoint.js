@@ -6,10 +6,12 @@ import { validateConfig } from "../deploy/config.mjs";
 import { requestId, response, log, timed } from "../deploy/health.mjs";
 import { main as startOutbox } from "./dist/workers/outbox-dispatcher.js";
 import { createPrismaIdempotency } from "./dist/platform/http/idempotency.js";
+import { traceLag } from "./dist/workers/trace-projector.js";
 
 validateConfig(process.env, "worker");
 const prisma = new PrismaClient();
-const { dispatcher } = startOutbox(prisma);
+const core = new PrismaClient({ datasources: { db: { url: process.env.CORE_DATABASE_URL } } });
+const { dispatcher } = startOutbox(prisma, core, process.env.NEXORA_ISSUER_INSTANCE_ID);
 const idempotency = createPrismaIdempotency(prisma);
 async function purgeIdempotency() {
   try {
@@ -34,7 +36,7 @@ async function ready(id) {
   try {
     const auth = Buffer.from(`${process.env.FLOWABLE_ADMIN_USER}:${process.env.FLOWABLE_ADMIN_PASSWORD}`).toString("base64");
     await Promise.all([
-      timed(prisma.$queryRaw`SELECT 1`), redisPing(),
+      timed(prisma.$queryRaw`SELECT 1`), timed(core.$queryRaw`SELECT 1`), redisPing(),
       fetch(`${process.env.FLOWABLE_BASE_URL.replace(/\/$/, "")}/service/management/engine`, {
         headers: { authorization: `Basic ${auth}`, "x-request-id": id }, signal: AbortSignal.timeout(2000),
       }).then((result) => { if (!result.ok) throw Error("workflow"); }),
@@ -53,11 +55,11 @@ http.createServer(async (req, res) => {
   if (req.url === "/metrics") {
     const up = await ready(id);
     log("worker", id, "metrics", up ? "up" : "down");
-    let stats;
-    try { stats = await dispatcher.stats(); }
+    let stats, lag;
+    try { [stats, lag] = await Promise.all([dispatcher.stats(), traceLag(prisma)]); }
     catch { res.writeHead(503); res.end(); return; }
     res.writeHead(200, { "content-type": "text/plain; version=0.0.4", "cache-control": "no-store", "x-request-id": id });
-    res.end(`# TYPE service_up gauge\nservice_up{service="worker"} ${Number(up)}\n# TYPE worker_queue_depth gauge\nworker_queue_depth ${stats.pending + stats.retryDue + stats.leased}\n# TYPE worker_outbox_dead_letter gauge\nworker_outbox_dead_letter ${stats.deadLetter}\n`);
+    res.end(`# TYPE service_up gauge\nservice_up{service="worker"} ${Number(up)}\n# TYPE worker_queue_depth gauge\nworker_queue_depth ${stats.pending + stats.retryDue + stats.leased}\n# TYPE worker_outbox_dead_letter gauge\nworker_outbox_dead_letter ${stats.deadLetter}\n# TYPE trace_projection_pending gauge\ntrace_projection_pending ${lag.pending}\n# TYPE trace_projection_lag_seconds gauge\ntrace_projection_lag_seconds ${lag.seconds}\n`);
     return;
   }
   res.writeHead(404); res.end();

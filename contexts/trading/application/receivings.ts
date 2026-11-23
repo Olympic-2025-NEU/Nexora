@@ -11,15 +11,17 @@ import { createAnnouncementService, type Announcement } from "./inbound-announce
 import { createPrismaAnnouncementSource } from "../infrastructure/inbound-announcements";
 
 type Context = { tx: Prisma.TransactionClient; actor: Actor; requestId: string; emit(event: OutboxEventInput): void };
-type Ports = { audit(tx: Prisma.TransactionClient, input: { actorSub: string; action: string; id: string;
+export type ReceivingPorts = { audit(tx: Prisma.TransactionClient, input: { actorSub: string; action: string; id: string;
   requestId: string; before?: string; after: string; version: number }): Promise<void>;
   adjust(tx: Prisma.TransactionClient, input: { warehouseId: string; batchId: string; productId: string;
     productVariantId: string; sourceLineId: string; kind: "receiving"; delta: Decimal;
     actorSub: string; correlationId: string }): Promise<{ movement: { id: string } }>;
-  event(type: "receipt", input: { id: string; version: number; actorSub: string; correlationId: string;
-    lines: { id: string; warehouseId: string; batchId: string; quantity: string;
-      originIssuerInstanceId: string; originLotId: string; unit: "EA" | "KG" | "L" }[];
-    movementIds: string[] }): OutboxEventInput[] };
+  receivingEvent(input: { id: string; sourceIssuerInstanceId: string; sourceTransferId: string;
+    version: number; correlationId: string; occurredAt: string;
+    sentLines: { sourceLineId: string; originLot: { issuerInstanceId: string; lotId: string };
+      sentQuantity: string; unit: "EA" | "KG" | "L" }[];
+    actualLines: { sourceLineId: string; localBatchId: string; actualQuantity: string;
+      unit: "EA" | "KG" | "L" }[]; discrepancyReason?: string }): OutboxEventInput[] };
 export type ActualInput = { sourceLineId: string; localBatchId: string; warehouseId: string;
   actualQuantity: string; unit: "EA" | "KG" | "L" };
 export type ReceivingEdit = { actualLines?: { sourceLineId: string; actualQuantity?: string;
@@ -38,7 +40,7 @@ function scope(ctx: Context, warehouseId: string) {
   }
 }
 
-export function createReceivingService(ports: Ports, instanceId: string) {
+export function createReceivingService(ports: ReceivingPorts, instanceId: string) {
   const source = (ctx: Context) => createAnnouncementService(createPrismaAnnouncementSource(ctx.tx), instanceId);
   const repo = (ctx: Context) => createTradingRepos(ctx.tx);
   async function mapping(ctx: Context, lot: Announcement["lots"][number], batchId: string, warehouseId: string, unit: string) {
@@ -251,13 +253,14 @@ export function createReceivingService(ports: Ports, instanceId: string) {
         movementIds.push(result.movement.id);
       }
       const occurredAt = updated.confirmedAt!.toISOString();
-      const eventLines = prepared.filter(({ line }) => line.actualQuantity!.gt(0)).map(({ line, batch, lot }) => ({
-        id: line.id, warehouseId: line.warehouseId, batchId: line.batchId,
-        quantity: line.actualQuantity!.toFixed(3), originIssuerInstanceId: batch.originIssuerInstanceId,
-        originLotId: batch.originLotId, unit: lot.unit,
-      }));
-      for (const event of ports.event("receipt", { id, version: updated.version, actorSub: ctx.actor.userId,
-        correlationId: doc.correlationId, lines: eventLines, movementIds })) ctx.emit(event);
+      for (const event of ports.receivingEvent({ id, version: updated.version,
+        sourceIssuerInstanceId: message.issuerInstanceId,
+        sourceTransferId: message.sourceDocument.id, correlationId: doc.correlationId, occurredAt,
+        sentLines: prepared.map(({ line, lot }) => ({ sourceLineId: lot.sourceLineId,
+          originLot: lot.originLot, sentQuantity: line.quantity!.toFixed(), unit: lot.unit })),
+        actualLines: prepared.map(({ line, lot }) => ({ sourceLineId: lot.sourceLineId,
+          localBatchId: line.batchId, actualQuantity: line.actualQuantity!.toFixed(), unit: lot.unit })),
+        ...(reason ? { discrepancyReason: reason } : {}) })) ctx.emit(event);
       const envelope = { schemaVersion: "1.0", messageId: randomUUID(), eventId: randomUUID(),
         eventType: "receipt.confirmed.v1", issuerInstanceId: instanceId,
         recipientInstanceId: message.issuerInstanceId, occurredAt, publishedAt: occurredAt,

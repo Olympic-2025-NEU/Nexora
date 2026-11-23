@@ -9,10 +9,14 @@ import { applyDocumentAction, InvalidTransitionError } from "../domain/document"
 import { createTradingRepos } from "../infrastructure/prisma-repos";
 
 type Context = { tx: Prisma.TransactionClient; actor: Actor; requestId: string; emit(event: OutboxEventInput): void };
-type Ports = { audit(tx: Prisma.TransactionClient, input: { actorSub: string; action: string; id: string;
-  requestId: string; before?: string; after: string; version: number }): Promise<void> };
+export type TransferPorts = { audit(tx: Prisma.TransactionClient, input: { actorSub: string; action: string; id: string;
+  requestId: string; before?: string; after: string; version: number }): Promise<void>;
+  transferEvent(input: { id: string; linkedIssueId: string; destinationPartnerId: string;
+    version: number; correlationId: string; occurredAt: string;
+    lines: { sourceLineId: string; batchId: string; originLot: { issuerInstanceId: string; lotId: string };
+      quantity: string; unit: "EA" | "KG" | "L" }[] }): OutboxEventInput[] };
 
-export function createTransferService(ports: Ports, instanceId: string) {
+export function createTransferService(ports: TransferPorts, instanceId: string) {
   if (!instanceId?.trim()) throw new Error("NEXORA_ISSUER_INSTANCE_ID is required");
   const scope = (ctx: Context, warehouseId: string) => {
     if (!ctx.actor.roles.includes("administrator") && !ctx.actor.unitIds.includes(warehouseId)) {
@@ -155,6 +159,11 @@ export function createTransferService(ports: Ports, instanceId: string) {
         eventType: "transfer.announced.v1", schemaVersion: "1", payload,
         destination: "federation", correlationId: doc.correlationId,
         nextAttemptAt: new Date("9999-12-31T00:00:00.000Z") });
+      for (const event of ports.transferEvent({ id, linkedIssueId: issue.id,
+        destinationPartnerId: destination.id, version: updated.version,
+        correlationId: doc.correlationId, occurredAt,
+        lines: lots.map((lot) => ({ sourceLineId: lot.sourceLineId, batchId: lot.senderBatch.batchId,
+          originLot: lot.originLot, quantity: lot.quantity, unit: lot.unit })) })) ctx.emit(event);
       await ports.audit(ctx.tx, { actorSub: ctx.actor.userId, action: "trading.transfer.confirm", id,
         requestId: ctx.requestId, before: doc.status, after: "confirmed", version: updated.version });
       return { id, status: "confirmed", version: updated.version, confirmedAt: occurredAt, movementIds: [] };

@@ -3886,6 +3886,45 @@ paths:
           $ref: "#/components/responses/Error"
         "503":
           $ref: "#/components/responses/Error"
+  /api/v1/trace/status:
+    get:
+      tags:
+        - M04
+      operationId: getTraceStatus
+      summary: Local trace projector status
+      description: Authenticated local outbox lag. A caught-up queue does not assert that remote partner history is complete.
+      security:
+        - oidc: []
+      x-nexora-roles:
+        - administrator
+        - staff
+        - approver
+        - viewer
+      x-nexora-scope: resource
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - data
+                  - requestId
+                properties:
+                  data:
+                    $ref: "#/components/schemas/TraceProjectorStatus"
+                  requestId:
+                    type: string
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
   /api/v1/lots/{id}/history:
     get:
       tags:
@@ -6644,6 +6683,30 @@ components:
           enum:
             - approve
             - reject
+    TraceProjectorStatus:
+      type: object
+      additionalProperties: false
+      required:
+        - state
+        - pendingEvents
+        - lagSeconds
+        - checkedAt
+      properties:
+        state:
+          type: string
+          enum:
+            - caught_up
+            - pending
+            - lagging
+        pendingEvents:
+          type: integer
+          minimum: 0
+        lagSeconds:
+          type: number
+          minimum: 0
+        checkedAt:
+          type: string
+          format: date-time
     TraceHistory:
       type: object
       additionalProperties: false
@@ -7404,7 +7467,7 @@ components:
               minLength: 1
             lotId:
               type: string
-              format: uuid
+              minLength: 1
         sourceEventIds:
           type: array
           items:

@@ -41,15 +41,24 @@ export NEXORA_TEST_TRACE=1
 export OWNER_DATABASE_URL="postgresql://migrator:test_migrator@127.0.0.1:$port/nexora_upgrade"
 export DATABASE_URL="$OWNER_DATABASE_URL"
 export APP_DATABASE_URL="postgresql://app_runtime:test_app@127.0.0.1:$port/nexora_upgrade"
+export CORE_DATABASE_URL="postgresql://core_data:test_core@127.0.0.1:$port/nexora_upgrade"
 printf 'P08-T01: upgrade existing P07 database\n'
 npx prisma migrate deploy --schema "$temp_root/schema.prisma"
 npx prisma migrate deploy
 npx prisma migrate deploy
-node --test --require tsx/cjs tests/platform/trace-schema.integration.test.ts
+node --test --require tsx/cjs tests/platform/trace-schema.integration.test.ts tests/platform/trace-projector.integration.test.ts
 
 printf 'P08-T01: migrate empty database\n'
 export OWNER_DATABASE_URL="postgresql://migrator:test_migrator@127.0.0.1:$port/nexora_fresh"
 export DATABASE_URL="$OWNER_DATABASE_URL"
 export APP_DATABASE_URL="postgresql://app_runtime:test_app@127.0.0.1:$port/nexora_fresh"
+export CORE_DATABASE_URL="postgresql://core_data:test_core@127.0.0.1:$port/nexora_fresh"
 npx prisma migrate deploy
-node --test --require tsx/cjs tests/platform/trace-schema.integration.test.ts
+node --test --require tsx/cjs tests/platform/trace-schema.integration.test.ts tests/platform/trace-projector.integration.test.ts
+
+printf 'P08-T02: restore and replay trace source\n'
+MSYS_NO_PATHCONV=1 docker exec "$container" pg_dump -U postgres -Fc -d nexora_fresh -f /tmp/p08-trace.dump
+MSYS_NO_PATHCONV=1 docker exec "$container" pg_restore -U postgres --no-owner -d nexora_restore /tmp/p08-trace.dump
+export APP_DATABASE_URL="postgresql://app_runtime:test_app@127.0.0.1:$port/nexora_restore"
+export CORE_DATABASE_URL="postgresql://core_data:test_core@127.0.0.1:$port/nexora_restore"
+node --test --require tsx/cjs tests/platform/trace-restore.integration.test.ts

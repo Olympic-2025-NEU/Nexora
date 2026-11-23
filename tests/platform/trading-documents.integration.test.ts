@@ -825,8 +825,10 @@ test("offline dispatcher retains frozen envelope; replay and concurrency never d
   assert.equal((await db.stockBalance.findUniqueOrThrow({ where: { warehouseId_batchId: { warehouseId, batchId } } })).quantity.toFixed(), before.quantity.toFixed());
   assert.equal(await db.stockMovement.count(), movements);
   const rows = await db.outboxMessage.findMany({ where: { aggregateId: doc.id } });
-  assert.equal(rows.length, 1);
-  const row = rows[0]!;
+  assert.equal(rows.length, 2);
+  const row = rows.find((entry) => entry.eventType === "transfer.announced.v1")!;
+  assert.equal(rows.find((entry) => entry.eventType === "trading.transfer.confirmed.v1")?.destination,
+    "traceability");
   const envelope = row.payload as Record<string, unknown>;
   const ajv = new Ajv2020({ strict: false });
   addFormats(ajv);
@@ -849,7 +851,7 @@ test("offline dispatcher retains frozen envelope; replay and concurrency never d
   assert.equal(held.status, "pending");
   assert.equal(held.attemptCount, 0);
   assert.deepEqual(held.payload, row.payload);
-  assert.equal(await db.outboxMessage.count({ where: { aggregateId: doc.id } }), 1);
+  assert.equal(await db.outboxMessage.count({ where: { aggregateId: doc.id } }), 2);
 });
 
 test("transfer validation and confirm recheck partner, scope and line snapshot", { timeout: 120_000 }, async () => {
@@ -920,7 +922,8 @@ test("G07 seeded real announcement: receipt20, approved issue12, transfer, actua
     { linkedIssueId: sent.id, destinationPartnerId: partnerId }));
   await transferCommand("confirm", { transfer: transfer.id }, (ctx) => transferService().confirm(ctx,
     transfer.id, transfer.version), randomUUID());
-  const announced = await db.outboxMessage.findFirstOrThrow({ where: { aggregateId: transfer.id } });
+  const announced = await db.outboxMessage.findFirstOrThrow({ where: {
+    aggregateId: transfer.id, eventType: "transfer.announced.v1" } });
   const envelope = announced.payload as Record<string, unknown>;
   const sourceLot = (envelope.lots as { sourceLineId: string; senderBatch: { batchId: string } }[])[0]!;
   await db.$transaction((tx) => receiving.source({ tx, actor, requestId: randomUUID(), emit: () => {} })
@@ -959,7 +962,7 @@ test("G07 seeded real announcement: receipt20, approved issue12, transfer, actua
   const rows = await db.outboxMessage.findMany({ where: { aggregateId: draft.id } });
   assert.equal(rows.length, 2);
   assert.deepEqual(new Set(rows.map((row) => row.eventType)),
-    new Set(["trading.receipt.confirmed.v1", "receipt.confirmed.v1"]));
+    new Set(["trading.receiving.confirmed.v1", "receipt.confirmed.v1"]));
   const reply = rows.find((row) => row.eventType === "receipt.confirmed.v1")!;
   const payload = reply.payload as Record<string, unknown>;
   const ajv = new Ajv2020({ strict: false }); addFormats(ajv);
@@ -1110,6 +1113,6 @@ test("all-zero receiving emits both events, no movement, full actualLines and em
   const payload = reply.payload as Record<string, unknown>;
   assert.deepEqual(payload.lots, []);
   assert.equal((payload.actualLines as { actualQuantity: string }[])[0]!.actualQuantity, "0");
-  assert.equal((rows.find((row) => row.eventType === "trading.receipt.confirmed.v1")!.payload as {
-    lines: unknown[] }).lines.length, 0);
+  assert.equal((rows.find((row) => row.eventType === "trading.receiving.confirmed.v1")!.payload as {
+    actualLines: { actualQuantity: string }[] }).actualLines[0]?.actualQuantity, "0");
 });

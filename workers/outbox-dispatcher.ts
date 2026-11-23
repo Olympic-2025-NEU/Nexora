@@ -10,12 +10,14 @@ import { createFlowableStarter } from "../platform/workflow/flowable-starter";
 import { createFlowableDecider } from "../platform/workflow/flowable-decider";
 import { createReconciler } from "../platform/workflow/reconciler";
 import { scanStuckWork } from "../platform/observability/alerts";
+import { traceConsumers, traceLag } from "./trace-projector";
 
-export function main(client: PrismaClient) {
+export function main(client: PrismaClient, core: PrismaClient, issuerInstanceId: string) {
   const engine = FlowableClient.fromEnv();
   const reconciler = createReconciler(client, engine, applyApprovalResult);
   const dispatcher = createOutboxDispatcher({ client, workerId: `worker-${randomUUID()}`,
-    handlers: buildHandlerMap({ workflow: new Map([
+    handlers: buildHandlerMap({ traceability: traceConsumers(client, core, issuerInstanceId),
+      workflow: new Map([
       [WORKFLOW_EVENT_TYPES.requested, createFlowableStarter(client, engine)],
       [WORKFLOW_EVENT_TYPES.decisionRequested, createFlowableDecider(client, engine, membershipActorResolver(client))],
     ]) }) });
@@ -30,7 +32,12 @@ export function main(client: PrismaClient) {
   const interval = setInterval(() => { if (!stopped) void reconciler.tick(); }, 5_000);
   const scan = () => { if (!stopped) void scanStuckWork(client).catch(() => {
     console.error(JSON.stringify({ event: "ops.scan.failed", service: "outbox-dispatcher" }));
-  }); };
+  });
+    if (!stopped) void traceLag(client).then((lag) => {
+      if (lag.seconds > 300) console.error(JSON.stringify({ event: "trace.projector.lag",
+        service: "outbox-dispatcher", pending: lag.pending, seconds: lag.seconds }));
+    }).catch(() => console.error(JSON.stringify({ event: "trace.projector.lag_probe_failed" })));
+  };
   scan();
   const alertInterval = setInterval(scan, 60_000);
   return { dispatcher, stop: () => { stopped = true; clearInterval(interval); clearInterval(alertInterval); } };

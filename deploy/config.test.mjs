@@ -59,7 +59,8 @@ for (const field of [
 
 test("runtime processes fail before serving with named missing variables", () => {
   for (const [service, field] of [["erp", "DATABASE_URL"], ["worker", "REDIS_URL"], ["core-data", "S3_SECRET_KEY"]]) {
-    const env = { ...examples[0], DATABASE_URL: examples[0].APP_DATABASE_URL };
+    const env = { ...examples[0], DATABASE_URL: examples[0].APP_DATABASE_URL,
+      NEXORA_ISSUER_INSTANCE_ID: examples[0].INSTANCE_ID };
     validateConfig(env, service);
     delete env[field];
     assert.throws(() => validateConfig(env, service), { message: `Invalid or missing ${field}` });

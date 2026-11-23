@@ -205,6 +205,8 @@ add("get", "/api/v1/approvals/inbox", "M03", "List actionable approval tasks", "
 doc.paths["/api/v1/approvals/inbox"].get.responses["200"].content["application/json"].schema = envelope(arr(ref("ApprovalTask")));
 add("post", "/api/v1/approvals/{id}/decisions", "M03", "Record approval decision intent", "ApprovalDecisionResult", { body: "ApprovalDecisionInput", roles: ["approver"], idempotent: true, status: 202, description: "Creator cannot decide own issue. Decision intent commits before Flowable completion; result is asynchronous." });
 
+add("get", "/api/v1/trace/status", "M04", "Local trace projector status", "TraceProjectorStatus", {
+  description: "Authenticated local outbox lag. A caught-up queue does not assert that remote partner history is complete." });
 add("get", "/api/v1/lots/{id}/history", "M04", "Lot history", "TraceHistory", { query: ["cursor", "limit"] });
 add("get", "/api/v1/lots/{id}/trace/backward", "M04", "Trace backward", "TraceGraph", { query: ["depth", "cursor", "limit"] });
 add("get", "/api/v1/lots/{id}/trace/forward", "M04", "Trace forward", "TraceGraph", { query: ["depth", "cursor", "limit"] });

@@ -30,7 +30,7 @@
         },
         "lotId": {
           "type": "string",
-          "format": "uuid"
+          "minLength": 1
         }
       }
     },

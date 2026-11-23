@@ -13,9 +13,9 @@
 
 ## P08-T02 — Projector từ domain event
 
-- [ ] Consumer outbox xây trace event sau commit, có lease/retry/dead-letter, version handler; rebuild projection từ log nguồn deterministic.
-- [ ] Nếu consumer down, nghiệp vụ local vẫn confirm; UI hiển thị projection lag thay vì báo lịch sử đầy đủ sai. Alert khi lag vượt ngưỡng.
-- [ ] Test duplicate/out-of-order event, missing source và replay sau restore; không cho actor sửa tay lịch sử confirmed.
+- [x] Consumer outbox xây trace event sau commit, có lease/retry/dead-letter, version handler; rebuild projection từ log nguồn deterministic. [Bằng chứng T02](evidence/p08-t02.md).
+- [x] Nếu consumer down, nghiệp vụ local vẫn confirm; UI hiển thị projection lag thay vì báo lịch sử đầy đủ sai. Alert khi lag vượt ngưỡng. [Bằng chứng T02](evidence/p08-t02.md).
+- [x] Test duplicate/out-of-order event, missing source và replay sau restore; không cho actor sửa tay lịch sử confirmed. [Bằng chứng T02](evidence/p08-t02.md).
 - **Đầu ra:** projector + metrics; **kiểm chứng:** cùng nguồn phát lại cho cùng trace, không mất event.
 
 ## P08-T03 — Backward trace

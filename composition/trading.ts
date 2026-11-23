@@ -9,13 +9,13 @@ import { createPrismaIdempotency } from "@/platform/http/idempotency";
 import { createRequest, confirmApproval, cancelRequest, cancelApprovedRequest } from "@/platform/workflow/approval-service";
 import { computeLineSnapshotSha256 } from "@/contracts/workflow/line-snapshot";
 import { serializeDomainEvent, TRADING_EVENT_TYPES } from "@/contracts/events/registry";
-import { createTransferService } from "@/contexts/trading/application/transfers";
-import { createReceivingService } from "@/contexts/trading/application/receivings";
+import { createTransferService, type TransferPorts } from "@/contexts/trading/application/transfers";
+import { createReceivingService, type ReceivingPorts } from "@/contexts/trading/application/receivings";
 import { createStocktakeService } from "@/contexts/trading/application/stocktakes";
 import { createSaleService } from "@/contexts/trading/application/sales";
 import { EVENT_DESTINATIONS } from "@/contracts/events/registry";
 
-export const tradingPorts: TradingPorts = {
+export const tradingPorts: TradingPorts & TransferPorts & ReceivingPorts = {
   adjust: adjustStock,
   async audit(tx, input) {
     await prismaAuditRecorder.record(tx, { actor: { kind: "user", sub: input.actorSub },
@@ -32,6 +32,23 @@ export const tradingPorts: TradingPorts = {
             lotId: line.originLotId }, quantity: line.quantity, unit: line.unit })),
         ...(type === "issue" ? { movementIds: input.movementIds } : {}),
         actorSub: input.actorSub, occurredAt: new Date().toISOString() } });
+  },
+  transferEvent(input) {
+    return serializeDomainEvent({ type: TRADING_EVENT_TYPES.transfer, aggregateType: "document",
+      aggregateId: input.id, aggregateVersion: input.version, correlationId: input.correlationId,
+      destinations: [EVENT_DESTINATIONS.traceability],
+      payload: { eventId: randomUUID(), transferId: input.id, linkedIssueId: input.linkedIssueId,
+        destinationPartnerId: input.destinationPartnerId, lines: input.lines, occurredAt: input.occurredAt } });
+  },
+  receivingEvent(input) {
+    return serializeDomainEvent({ type: TRADING_EVENT_TYPES.receiving, aggregateType: "document",
+      aggregateId: input.id, aggregateVersion: input.version, correlationId: input.correlationId,
+      destinations: [EVENT_DESTINATIONS.traceability],
+      payload: { eventId: randomUUID(), receivingId: input.id,
+        sourceIssuerInstanceId: input.sourceIssuerInstanceId,
+        sourceTransferId: input.sourceTransferId, sentLines: input.sentLines,
+        actualLines: input.actualLines, occurredAt: input.occurredAt,
+        ...(input.discrepancyReason ? { discrepancyReason: input.discrepancyReason } : {}) } });
   },
   submit: createRequest,
   hash: computeLineSnapshotSha256,

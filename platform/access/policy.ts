@@ -115,6 +115,9 @@ const ACTION_POLICIES: Record<string, ActionPolicy> = {
   "trading:sale:confirm": { roles: ["staff"], adminAlwaysAllowed: true },
   "trading:sale:cancel": { roles: ["staff"], adminAlwaysAllowed: true },
 
+  // --- Traceability ---
+  "trace:read": { roles: ["staff", "approver", "viewer"], adminAlwaysAllowed: true },
+
   // --- Catalog/Inventory (P06 + P065) ---
   "catalog:product:create": { roles: ["administrator", "staff"], adminAlwaysAllowed: true },
   "catalog:product:read": { roles: ["staff", "approver", "viewer"], adminAlwaysAllowed: true },

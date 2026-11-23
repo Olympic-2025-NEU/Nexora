@@ -308,6 +308,8 @@ services:
     command: ["node", "worker/entrypoint.js"]
     environment:
       DATABASE_URL: ${APP_DATABASE_URL}
+      CORE_DATABASE_URL: ${CORE_DATABASE_URL}
+      NEXORA_ISSUER_INSTANCE_ID: ${INSTANCE_ID}
       FLOWABLE_BASE_URL: ${FLOWABLE_BASE_URL}
       REDIS_URL: ${REDIS_URL}
       FLOWABLE_ADMIN_USER: ${FLOWABLE_ADMIN_USER}

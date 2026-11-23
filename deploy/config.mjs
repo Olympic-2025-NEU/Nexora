@@ -47,7 +47,8 @@ const groups = {
 
 const runtime = {
   erp: { DATABASE_URL: "database", OIDC_ISSUER_URL: "url", PUBLIC_BASE_URL: "url" },
-  worker: { DATABASE_URL: "database", FLOWABLE_BASE_URL: "url", REDIS_URL: "redis", FLOWABLE_ADMIN_USER: "id", FLOWABLE_ADMIN_PASSWORD: "secret" },
+  worker: { DATABASE_URL: "database", CORE_DATABASE_URL: "database", NEXORA_ISSUER_INSTANCE_ID: "id",
+    FLOWABLE_BASE_URL: "url", REDIS_URL: "redis", FLOWABLE_ADMIN_USER: "id", FLOWABLE_ADMIN_PASSWORD: "secret" },
   "core-data": {
     CORE_DATABASE_URL: "database", S3_ENDPOINT: "url", S3_ACCESS_KEY: "secret",
     S3_SECRET_KEY: "secret", S3_BUCKET_PRIVATE: "bucket",

@@ -178,13 +178,13 @@ const faultDocs = (point: "adjust" | "audit" | "event" | "approval") => createDo
 const faultTransfer = (point: "audit" | "event") => createTransferService({
   ...tradingPorts,
   ...(point === "audit" ? { audit: async () => { throw FAULT; } } : {}),
-  ...(point === "event" ? { event: () => { throw FAULT; } } : {}),
+  ...(point === "event" ? { transferEvent: () => { throw FAULT; } } : {}),
 }, "local-instance");
 const faultReceiving = (point: "adjust" | "audit" | "event") => createReceivingService({
   ...tradingPorts,
   ...(point === "adjust" ? { adjust: async () => { throw FAULT; } } : {}),
   ...(point === "audit" ? { audit: async () => { throw FAULT; } } : {}),
-  ...(point === "event" ? { event: () => { throw FAULT; } } : {}),
+  ...(point === "event" ? { receivingEvent: () => { throw FAULT; } } : {}),
 }, "remote-instance");
 type StocktakeEventInput = Parameters<Parameters<typeof createStocktakeService>[0]["event"]>[0];
 type SaleEventInput = Parameters<Parameters<typeof createSaleService>[0]["event"]>[0];
@@ -289,7 +289,8 @@ async function receivingDraft() {
     { linkedIssueId: issue.id, destinationPartnerId: partnerId }));
   await transferCommand("confirm", { id: transfer.id }, (ctx) => transferService().confirm(ctx,
     transfer.id, transfer.version), randomUUID());
-  const announced = await db.outboxMessage.findFirstOrThrow({ where: { aggregateId: transfer.id } });
+  const announced = await db.outboxMessage.findFirstOrThrow({ where: {
+    aggregateId: transfer.id, eventType: "transfer.announced.v1" } });
   const envelope = announced.payload as Record<string, unknown>;
   const sourceLot = (envelope.lots as { sourceLineId: string; senderBatch: { batchId: string } }[])[0]!;
   const real = createReceivingService(tradingPorts, "remote-instance");
@@ -399,7 +400,9 @@ test("invariant scan: balances equal movement sums and confirmed documents carry
     assert.ok(await db.auditLog.count({ where: { targetId: doc.id, action: confirmAction[doc.documentType] } }) >= 1,
       `${doc.documentType} ${doc.id} missing confirm audit`);
     const outbox = await db.outboxMessage.count({ where: { aggregateId: doc.id } });
-    if (doc.documentType === "partner_transfer" || doc.documentType === "sale_record") {
+    if (doc.documentType === "partner_transfer") {
+      assert.equal(outbox, 2, `${doc.documentType} ${doc.id} outbox count`);
+    } else if (doc.documentType === "sale_record") {
       assert.equal(outbox, 1, `${doc.documentType} ${doc.id} outbox count`);
     } else if (doc.documentType === "receiving_confirmation") {
       assert.equal(outbox, 2, `receiving ${doc.id} outbox count`);
