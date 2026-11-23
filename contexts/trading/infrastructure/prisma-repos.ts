@@ -77,9 +77,42 @@ export function createTradingRepos(tx: Prisma.TransactionClient) {
       } });
     },
 
+    findVariant(id: string) {
+      return tx.productVariant.findUnique({ where: { id }, include: { product: true,
+        uoms: { include: { uom: true } } } });
+    },
+    findBatch(id: string) { return tx.batch.findUnique({ where: { id } }); },
+    findWarehouse(id: string) { return tx.warehouse.findUnique({ where: { id } }); },
+    findOrganization() { return tx.organization.findUnique({ where: { singletonSlot: 1 } }); },
+    findApproval(documentId: string) { return tx.approvalRequest.findUnique({ where: { documentId } }); },
+    findActiveCorrection(id: string) {
+      return tx.document.findFirst({ where: { correctionOfDocumentId: id, status: { not: "cancelled" } } });
+    },
+    createLines(documentId: string, lines: Omit<Prisma.DocumentLineUncheckedCreateInput, "documentId">[]) {
+      return tx.documentLine.createMany({ data: lines.map((line) => ({ ...line, documentId })) });
+    },
+    normalizeLine(id: string, quantity: string, uomId: string) {
+      return tx.documentLine.update({ where: { id }, data: { quantity, uomId } });
+    },
+    async transition(id: string, status: string, expectedVersion: number, next: string, actorSub: string) {
+      const changed = await tx.document.updateMany({ where: { id, status, version: expectedVersion },
+        data: { status: next, version: { increment: 1 }, updatedAt: new Date(),
+          ...(next === "confirmed" ? { confirmedAt: new Date(), confirmedBySub: actorSub } : {}),
+          ...(next === "cancelled" ? { cancelledAt: new Date() } : {}) } });
+      return changed.count === 1 ? tx.document.findUniqueOrThrow({ where: { id } }) : null;
+    },
+    async lockBalances(keys: readonly { warehouseId: string; batchId: string }[]) {
+      for (const key of keys) {
+        await tx.$queryRaw`SELECT warehouse_id FROM inventory.stock_balance
+          WHERE warehouse_id = ${key.warehouseId}::uuid AND batch_id = ${key.batchId}::uuid FOR UPDATE`;
+      }
+      return tx.stockBalance.findMany({ where: { OR: keys.map((key) => ({ ...key })) } });
+    },
+
     async list(filters: {
       status?: DocumentStatus; type?: DocumentType; from?: Date; to?: Date;
       partnerId?: string; batchId?: string; cursorId?: string; limit: number;
+      warehouseIds?: readonly string[];
     }) {
       const where: Prisma.DocumentWhereInput = {
         ...(filters.status ? { status: filters.status } : {}),
@@ -87,6 +120,7 @@ export function createTradingRepos(tx: Prisma.TransactionClient) {
         ...(filters.from || filters.to ? { createdAt: { gte: filters.from, lt: filters.to } } : {}),
         ...(filters.partnerId ? { transferDetail: { destinationPartnerId: filters.partnerId } } : {}),
         ...(filters.batchId ? { lines: { some: { batchId: filters.batchId } } } : {}),
+        ...(filters.warehouseIds ? { lines: { every: { warehouseId: { in: [...filters.warehouseIds] } } } } : {}),
       };
       const rows = await tx.document.findMany({ where, orderBy: [{ createdAt: "desc" }, { id: "desc" }],
         take: filters.limit + 1, ...(filters.cursorId ? { cursor: { id: filters.cursorId }, skip: 1 } : {}) });
