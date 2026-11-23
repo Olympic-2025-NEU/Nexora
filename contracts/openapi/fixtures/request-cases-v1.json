@@ -315,6 +315,26 @@
       },
       "invalid": {}
     },
+    "PassportPolicyAccess": {
+      "valid": {
+        "organization": "public",
+        "product": "public",
+        "batch": "public",
+        "timeline": "public",
+        "evidence": "private"
+      },
+      "invalid": {
+        "organization": "public",
+        "product": "public",
+        "batch": "public",
+        "timeline": "all",
+        "evidence": "private"
+      }
+    },
+    "PassportPolicyVersion": {
+      "valid": { "version": 1 },
+      "invalid": { "version": 0 }
+    },
     "QrCreate": {
       "valid": {
         "policyVersion": "v1"

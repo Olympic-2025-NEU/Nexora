@@ -34,9 +34,9 @@
 
 ## P08-T05 — Chính sách công bố Passport
 
-- [ ] Allowlist field public/partner/private cho organization, product, batch, timeline, evidence; version policy và owner phê duyệt; mặc định private.
-- [ ] Projection công khai chỉ từ dữ liệu đã confirm + evidence `clean` có quyền public; không trả secret, PII, giá, tồn nội bộ, file private hoặc toàn bộ raw event.
-- [ ] Rebuild và revoke projection khi policy/quality thay đổi; retention/caching và invalidation có test. Audit ai đổi policy.
+- [x] Allowlist field public/partner/private cho organization, product, batch, timeline, evidence; version policy và owner phê duyệt; mặc định private. [Bằng chứng T05](evidence/p08-t05.md).
+- [x] Projection công khai chỉ từ dữ liệu đã confirm + evidence `clean` có quyền public; không trả secret, PII, giá, tồn nội bộ, file private hoặc toàn bộ raw event. T05 chưa công bố evidence nào; T07 mới gắn file clean/public. [Bằng chứng T05](evidence/p08-t05.md).
+- [x] Rebuild và revoke projection khi policy/quality thay đổi; retention/caching và invalidation có test. Audit ai đổi policy. T06 sẽ kiểm trạng thái active ở public endpoint với `no-store`. [Bằng chứng T05](evidence/p08-t05.md).
 - **Đầu ra:** policy engine/projection; **kiểm chứng:** snapshot public contract không chứa field cấm.
 
 ## P08-T06 — QR token và endpoint public

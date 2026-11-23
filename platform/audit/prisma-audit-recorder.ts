@@ -7,7 +7,7 @@ import { safeErrorCode } from "../observability/diagnostics";
 const statuses = new Set([
   "draft", "pending", "pending_approval", "approved", "rejected", "confirmed",
   "cancelled", "active", "disabled", "rotating", "suspended", "clean", "infected", "error",
-  "archived", "available", "restricted", "inspect",
+  "archived", "available", "restricted", "inspect", "stale", "revoked",
 ]);
 const kinds = new Set(["evidence_metadata", "trace_projection", "ot_reading", "archive_manifest"]);
 const visibilities = new Set(["private", "partner", "public"]);

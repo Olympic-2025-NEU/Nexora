@@ -13,6 +13,7 @@ import { backwardTrace } from "../../contexts/traceability/application/backward"
 import { createPrismaBackwardPort } from "../../contexts/traceability/infrastructure/backward-repo";
 import { forwardTrace } from "../../contexts/traceability/application/forward";
 import { createPrismaForwardPort } from "../../contexts/traceability/infrastructure/forward-repo";
+import { createPassportService } from "../../contexts/traceability/application/passport-service";
 
 if (process.env.NEXORA_TEST_TRACE !== "1" || !process.env.OWNER_DATABASE_URL ||
     !process.env.APP_DATABASE_URL || !process.env.CORE_DATABASE_URL) {
@@ -147,7 +148,8 @@ test("P08 transfer waits for its confirmed issue source, then links and replays 
       linkedIssueId: issueId, destinationPartnerId: partnerId,
       lines: [{ sourceLineId: issueLineId, batchId: batches[0], originLot,
         quantity: "2", unit: "EA" }], occurredAt } });
-  const pending = await app.outboxMessage.create({ data: { ...transferMessage, id: randomUUID() } });
+  const pending = await app.outboxMessage.create({ data: { ...transferMessage, id: randomUUID(),
+    nextAttemptAt: new Date(Date.now() - 60_000) } });
   const dispatcher = createOutboxDispatcher({ client: app, workerId: `trace-test-${randomUUID()}`,
     handlers: buildHandlerMap({ traceability: traceConsumers(app, core, issuer) }) });
   assert.equal((await dispatcher.tick()).retried, 1);
@@ -159,7 +161,8 @@ test("P08 transfer waits for its confirmed issue source, then links and replays 
       documentVersion: issue.version, lines: [{ lineId: issueLineId, batchId: batches[0],
         warehouseId, originLot, quantity: "2", unit: "EA" }], movementIds: [randomUUID()],
       actorSub: "fixture", occurredAt } });
-  await app.outboxMessage.create({ data: { ...issueMessage, id: randomUUID() } });
+  await app.outboxMessage.create({ data: { ...issueMessage, id: randomUUID(),
+    nextAttemptAt: new Date(Date.now() - 60_000) } });
   assert.equal((await dispatcher.tick()).delivered, 1);
   await app.outboxMessage.update({ where: { id: pending.id }, data: {
     nextAttemptAt: new Date(Date.now() - 1000) } });
@@ -205,7 +208,8 @@ test("P08 receiving keeps a verified local source and an explicit remote gap", a
         sentQuantity: "2", unit: "EA" }],
       actualLines: [{ sourceLineId, localBatchId: batches[1], actualQuantity: "1", unit: "EA" }],
       discrepancyReason: "one unit missing", occurredAt: new Date().toISOString() } });
-  await app.outboxMessage.create({ data: { ...serialized, id: randomUUID() } });
+  await app.outboxMessage.create({ data: { ...serialized, id: randomUUID(),
+    nextAttemptAt: new Date(Date.now() - 60_000) } });
   const dispatcher = createOutboxDispatcher({ client: app, workerId: `trace-test-${randomUUID()}`,
     handlers: buildHandlerMap({ traceability: traceConsumers(app, core, issuer) }) });
   assert.equal((await dispatcher.tick()).delivered, 1);
@@ -438,4 +442,70 @@ test("P08-T04 forward impact keeps two transfer branches, partial receiving and 
   const backwardDenied = await backwardTrace(createPrismaBackwardPort(app, deniedActor), deniedActor,
     { batchId: batches[0] });
   assert.equal(backwardDenied.nodes.length, 0);
+});
+
+test("P08-T05 owner approval builds only allowlisted public data and invalidates on source or quality change", async () => {
+  const admin = { userId: "fixture-owner", organizationId: "fixture",
+    unitIds: [], roles: ["administrator"] };
+  const viewer = { ...admin, roles: ["viewer"] };
+  const service = createPassportService(app);
+  const privateAccess = { organization: "private", product: "private", batch: "private",
+    timeline: "private", evidence: "private" };
+  await assert.rejects(service.createDraft(viewer, batches[0], privateAccess, randomUUID()),
+    { code: "POLICY_DENIED" });
+  const draft = await service.createDraft(admin, batches[0], privateAccess, randomUUID());
+  assert.equal(draft.state, "draft");
+  assert.equal(draft.policyVersion, 1);
+  assert.equal((await service.approve(admin, batches[0], 1, randomUUID())).projectionState,
+    "revoked");
+  const publicAccess = { organization: "public", product: "public", batch: "public",
+    timeline: "public", evidence: "private" };
+  const second = await service.createDraft(admin, batches[0], publicAccess, randomUUID());
+  assert.equal(second.policyVersion, 2);
+  assert.equal((await service.approve(admin, batches[0], 2, randomUUID())).projectionState,
+    "active");
+  const firstProjection = await app.passportProjection.findUniqueOrThrow({ where: {
+    batchId: batches[0] } });
+  assert.deepEqual(Object.keys(firstProjection.publicPayload as object).sort(), ["productName",
+    "publicLotCode", "originIssuer", "timeline", "verificationState", "gaps", "asOf"].sort());
+  assert.equal(firstProjection.policyVersion, "v2");
+  assert.equal(JSON.stringify(firstProjection.publicPayload).includes("PRIVATE_BUYER_REF"), false);
+  assert.equal(JSON.stringify(firstProjection.publicPayload).includes("PRIVATE_C_BUYER"), false);
+  assert.ok(firstProjection.sourceEventIds.length > 0);
+  assert.equal(await app.passportPolicy.count({ where: { batchId: batches[0],
+    state: "approved" } }), 1);
+
+  const newSource = await receipt([batches[0]], new Date().toISOString());
+  assert.equal((await app.passportProjection.findUniqueOrThrow({ where: {
+    batchId: batches[0] } })).state, "stale");
+  assert.equal((await service.rebuild(admin, batches[0], randomUUID())).state, "stale");
+  const pendingPayload = (await app.passportProjection.findUniqueOrThrow({ where: {
+    batchId: batches[0] } })).publicPayload;
+  assert.ok(JSON.stringify(pendingPayload).includes("projection_pending"));
+  await app.outboxMessage.update({ where: { id: newSource.outbox.id }, data: {
+    nextAttemptAt: new Date(Date.now() - 60_000) } });
+  const dispatcher = createOutboxDispatcher({ client: app, workerId: `trace-test-${randomUUID()}`,
+    handlers: buildHandlerMap({ traceability: traceConsumers(app, core, issuer) }) });
+  assert.equal((await dispatcher.tick()).delivered, 1);
+  assert.equal((await app.passportProjection.findUniqueOrThrow({ where: {
+    batchId: batches[0] } })).state, "stale");
+  assert.equal((await service.rebuild(admin, batches[0], randomUUID())).state, "active");
+  assert.notEqual((await app.passportProjection.findUniqueOrThrow({ where: {
+    batchId: batches[0] } })).checksumHex, firstProjection.checksumHex);
+
+  await app.batch.update({ where: { id: batches[0] }, data: { qualityStatus: "restricted" } });
+  assert.equal((await app.passportProjection.findUniqueOrThrow({ where: {
+    batchId: batches[0] } })).state, "revoked");
+  assert.equal((await service.rebuild(admin, batches[0], randomUUID())).state, "revoked");
+  await app.batch.update({ where: { id: batches[0] }, data: { qualityStatus: "available" } });
+  assert.equal((await service.rebuild(admin, batches[0], randomUUID())).state, "active");
+  await service.revoke(admin, batches[0], "owner decision", randomUUID());
+  assert.equal((await app.passportProjection.findUniqueOrThrow({ where: {
+    batchId: batches[0] } })).state, "revoked");
+  await assert.rejects(service.rebuild(admin, batches[0], randomUUID()),
+    { code: "PASSPORT_POLICY_NOT_ACTIVE" });
+  assert.ok(await app.auditLog.count({ where: { targetType: "passport_policy" } }) >= 6);
+  const revokeAudit = await app.auditLog.findFirstOrThrow({ where: {
+    action: "passport.policy.revoke", targetType: "passport_policy" } });
+  assert.equal((revokeAudit.afterSummary as { status: string }).status, "revoked");
 });

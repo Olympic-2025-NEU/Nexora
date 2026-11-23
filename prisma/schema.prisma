@@ -501,6 +501,7 @@ model Batch {
   documentLines DocumentLine[]
   traceEvents TraceEvent[]
   passportProjection PassportProjection?
+  passportPolicies PassportPolicy[]
   qrTokens QrToken[]
 
   @@unique([productId, localCode])
@@ -781,6 +782,31 @@ model PassportProjection {
 
   @@index([state, builtAt], map: "idx_passport_state_built")
   @@map("passport_projection")
+  @@schema("traceability")
+}
+
+model PassportPolicy {
+  id                     String    @id @db.Uuid
+  createdAt              DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  batchId                String    @map("batch_id") @db.Uuid
+  policyVersion          Int       @map("policy_version")
+  state                  String    @default("draft")
+  organizationVisibility String    @default("private") @map("organization_visibility")
+  productVisibility      String    @default("private") @map("product_visibility")
+  batchVisibility        String    @default("private") @map("batch_visibility")
+  timelineVisibility     String    @default("private") @map("timeline_visibility")
+  evidenceVisibility     String    @default("private") @map("evidence_visibility")
+  createdBySub           String    @map("created_by_sub")
+  approvedBySub          String?   @map("approved_by_sub")
+  approvedAt             DateTime? @map("approved_at") @db.Timestamptz(6)
+  revokedBySub           String?   @map("revoked_by_sub")
+  revokedAt              DateTime? @map("revoked_at") @db.Timestamptz(6)
+
+  batch Batch @relation(fields: [batchId], references: [id])
+
+  @@unique([batchId, policyVersion], map: "uq_passport_policy_version")
+  @@index([batchId, state], map: "idx_passport_policy_state")
+  @@map("passport_policy")
   @@schema("traceability")
 }
 

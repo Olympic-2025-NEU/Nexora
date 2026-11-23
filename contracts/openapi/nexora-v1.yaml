@@ -4092,6 +4092,272 @@ paths:
           $ref: "#/components/responses/Error"
         "503":
           $ref: "#/components/responses/Error"
+  /api/v1/lots/{id}/passport-policy:
+    get:
+      tags:
+        - M04
+      operationId: getLotsByIdPassportPolicy
+      summary: Read passport policy
+      description: Owner administrator reads versioned policy and projection status; default is no public policy.
+      security:
+        - oidc: []
+      x-nexora-roles:
+        - administrator
+      x-nexora-scope: organization-admin
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - data
+                  - requestId
+                properties:
+                  data:
+                    $ref: "#/components/schemas/PassportPolicyRead"
+                  requestId:
+                    type: string
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
+    post:
+      tags:
+        - M04
+      operationId: postLotsByIdPassportPolicy
+      summary: Draft passport policy
+      description: Create the next private-by-default visibility policy version. A draft does not publish.
+      security:
+        - oidc: []
+      x-nexora-roles:
+        - administrator
+      x-nexora-scope: organization-admin
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PassportPolicyAccess"
+      responses:
+        "201":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - data
+                  - requestId
+                properties:
+                  data:
+                    $ref: "#/components/schemas/PassportPolicyView"
+                  requestId:
+                    type: string
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "422":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
+  /api/v1/lots/{id}/passport-policy/approve:
+    post:
+      tags:
+        - M04
+      operationId: postLotsByIdPassportPolicyApprove
+      summary: Approve passport policy
+      description: Owner administrator approves one draft version and rebuilds the allowlisted projection atomically. Public projection is active only for an available batch with organization, product and batch visibility public.
+      security:
+        - oidc: []
+      x-nexora-roles:
+        - administrator
+      x-nexora-scope: organization-admin
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PassportPolicyVersion"
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - data
+                  - requestId
+                properties:
+                  data:
+                    $ref: "#/components/schemas/PassportPolicyApproved"
+                  requestId:
+                    type: string
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "422":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
+  /api/v1/lots/{id}/passport-policy/revoke:
+    post:
+      tags:
+        - M04
+      operationId: postLotsByIdPassportPolicyRevoke
+      summary: Revoke passport policy
+      description: Revoke approved policy and projection; public QR reading fails closed.
+      security:
+        - oidc: []
+      x-nexora-roles:
+        - administrator
+      x-nexora-scope: organization-admin
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Reason"
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - data
+                  - requestId
+                properties:
+                  data:
+                    $ref: "#/components/schemas/PassportPolicyState"
+                  requestId:
+                    type: string
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "422":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
+  /api/v1/lots/{id}/passport-policy/rebuild:
+    post:
+      tags:
+        - M04
+      operationId: postLotsByIdPassportPolicyRebuild
+      summary: Rebuild passport projection
+      description: Rebuild from confirmed trace source after stale event or quality change; never auto-publish restricted batches.
+      security:
+        - oidc: []
+      x-nexora-roles:
+        - administrator
+      x-nexora-scope: organization-admin
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - data
+                  - requestId
+                properties:
+                  data:
+                    $ref: "#/components/schemas/PassportPolicyState"
+                  requestId:
+                    type: string
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "422":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
   /api/v1/lots/{id}/qr:
     post:
       tags:
@@ -7030,6 +7296,203 @@ components:
         tokenId:
           type: string
           format: uuid
+    PassportPolicyAccess:
+      type: object
+      additionalProperties: false
+      required:
+        - organization
+        - product
+        - batch
+        - timeline
+        - evidence
+      properties:
+        organization:
+          type: string
+          enum:
+            - private
+            - partner
+            - public
+        product:
+          type: string
+          enum:
+            - private
+            - partner
+            - public
+        batch:
+          type: string
+          enum:
+            - private
+            - partner
+            - public
+        timeline:
+          type: string
+          enum:
+            - private
+            - partner
+            - public
+        evidence:
+          type: string
+          enum:
+            - private
+            - partner
+            - public
+    PassportPolicyVersion:
+      type: object
+      additionalProperties: false
+      required:
+        - version
+      properties:
+        version:
+          type: integer
+          minimum: 1
+    PassportPolicyView:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - batchId
+        - policyVersion
+        - createdAt
+        - state
+        - organizationVisibility
+        - productVisibility
+        - batchVisibility
+        - timelineVisibility
+        - evidenceVisibility
+        - createdBySub
+        - approvedBySub
+        - approvedAt
+        - revokedBySub
+        - revokedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        batchId:
+          type: string
+          format: uuid
+        policyVersion:
+          type: integer
+          minimum: 1
+        createdAt:
+          type: string
+          format: date-time
+        state:
+          type: string
+          enum:
+            - draft
+            - approved
+            - revoked
+        organizationVisibility:
+          type: string
+          enum:
+            - private
+            - partner
+            - public
+        productVisibility:
+          type: string
+          enum:
+            - private
+            - partner
+            - public
+        batchVisibility:
+          type: string
+          enum:
+            - private
+            - partner
+            - public
+        timelineVisibility:
+          type: string
+          enum:
+            - private
+            - partner
+            - public
+        evidenceVisibility:
+          type: string
+          enum:
+            - private
+            - partner
+            - public
+        createdBySub:
+          type: string
+        approvedBySub:
+          type: string
+          nullable: true
+        approvedAt:
+          type: string
+          format: date-time
+          nullable: true
+        revokedBySub:
+          type: string
+          nullable: true
+        revokedAt:
+          type: string
+          format: date-time
+          nullable: true
+    PassportPolicyRead:
+      type: object
+      additionalProperties: false
+      required:
+        - policies
+        - projection
+      properties:
+        policies:
+          type: array
+          items:
+            $ref: "#/components/schemas/PassportPolicyView"
+        projection:
+          type: object
+          additionalProperties: false
+          required:
+            - state
+            - policyVersion
+            - builtAt
+            - version
+          properties:
+            state:
+              type: string
+              enum:
+                - active
+                - stale
+                - revoked
+            policyVersion:
+              type: string
+            builtAt:
+              type: string
+              format: date-time
+            version:
+              type: integer
+              minimum: 1
+          nullable: true
+    PassportPolicyApproved:
+      type: object
+      additionalProperties: false
+      required:
+        - policy
+        - projectionState
+      properties:
+        policy:
+          $ref: "#/components/schemas/PassportPolicyView"
+        projectionState:
+          type: string
+          enum:
+            - active
+            - stale
+            - revoked
+    PassportPolicyState:
+      type: object
+      additionalProperties: false
+      required:
+        - state
+      properties:
+        state:
+          type: string
+          enum:
+            - active
+            - stale
+            - revoked
+        policyVersion:
+          type: string
     Reason:
       type: object
       additionalProperties: false

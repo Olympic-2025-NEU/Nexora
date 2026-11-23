@@ -436,6 +436,46 @@
       ]
     },
     {
+      "method": "GET",
+      "path": "/api/v1/lots/{id}/passport-policy",
+      "auth": "protected",
+      "roles": ["administrator"],
+      "scope": "organization-admin",
+      "success": ["200"]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/lots/{id}/passport-policy",
+      "auth": "protected",
+      "roles": ["administrator"],
+      "scope": "organization-admin",
+      "success": ["201"]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/lots/{id}/passport-policy/approve",
+      "auth": "protected",
+      "roles": ["administrator"],
+      "scope": "organization-admin",
+      "success": ["200"]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/lots/{id}/passport-policy/revoke",
+      "auth": "protected",
+      "roles": ["administrator"],
+      "scope": "organization-admin",
+      "success": ["200"]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/lots/{id}/passport-policy/rebuild",
+      "auth": "protected",
+      "roles": ["administrator"],
+      "scope": "organization-admin",
+      "success": ["200"]
+    },
+    {
       "method": "POST",
       "path": "/api/v1/lots/{id}/qr",
       "auth": "protected",

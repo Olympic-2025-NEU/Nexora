@@ -215,6 +215,20 @@ add("get", "/api/v1/lots/{id}/trace/backward", "M04", "Trace backward", "TraceGr
 add("get", "/api/v1/lots/{id}/trace/forward", "M04", "Trace forward", "TraceGraph", {
   query: ["depth", "cursor", "limit"],
   description: "Authenticated local forward graph and per-document-line impact. Stored child-to-source links are traversed in reverse; sourceRelation preserves the original relationship. Confirmed local quantities are not additive across issue, transfer and sale. Partner downstream remains unknown until a verified report arrives in P09. No buyer reference or private partner contact is returned." });
+add("get", "/api/v1/lots/{id}/passport-policy", "M04", "Read passport policy", "PassportPolicyRead", {
+  roles: ADMIN, scope: "organization-admin", description: "Owner administrator reads versioned policy and projection status; default is no public policy." });
+add("post", "/api/v1/lots/{id}/passport-policy", "M04", "Draft passport policy", "PassportPolicyView", {
+  roles: ADMIN, scope: "organization-admin", body: "PassportPolicyAccess",
+  description: "Create the next private-by-default visibility policy version. A draft does not publish." });
+add("post", "/api/v1/lots/{id}/passport-policy/approve", "M04", "Approve passport policy", "PassportPolicyApproved", {
+  roles: ADMIN, scope: "organization-admin", body: "PassportPolicyVersion", status: 200,
+  description: "Owner administrator approves one draft version and rebuilds the allowlisted projection atomically. Public projection is active only for an available batch with organization, product and batch visibility public." });
+add("post", "/api/v1/lots/{id}/passport-policy/revoke", "M04", "Revoke passport policy", "PassportPolicyState", {
+  roles: ADMIN, scope: "organization-admin", body: "Reason", status: 200,
+  description: "Revoke approved policy and projection; public QR reading fails closed." });
+add("post", "/api/v1/lots/{id}/passport-policy/rebuild", "M04", "Rebuild passport projection", "PassportPolicyState", {
+  roles: ADMIN, scope: "organization-admin", status: 200,
+  description: "Rebuild from confirmed trace source after stale event or quality change; never auto-publish restricted batches." });
 action("/api/v1/lots/{id}/qr", "M04", "Issue QR token", "QrIssued", { body: "QrCreate", ifMatch: false, status: 201 });
 action("/api/v1/lots/{id}/qr/{tokenId}/revoke", "M04", "Revoke QR token", null, { body: "Reason", ifMatch: false, idempotent: false, status: 204 });
 add("get", "/api/v1/public/passport/{token}", "M04", "Public product passport", "PassportPublic", { auth: "public", errors: [404, 429, 503], description: "Only allowlisted public fields; no member email, private stock, raw partner payload or unscanned files." });

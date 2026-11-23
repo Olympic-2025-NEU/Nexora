@@ -211,6 +211,10 @@ Correction phải cùng type, trỏ chứng từ confirmed liền trước, có 
 
 `id`, `created_at`, `updated_at`, `version`; `batch_id uuid!→catalog.batch.id UNIQUE`, `public_payload jsonb!`, `source_event_ids uuid[]!`, `policy_version text!`, `built_at timestamptz!`, `state text! CHECK IN ('active','revoked','stale')`, `checksum_hex char(64)!`. Chỉ chứa allowlist public; index `(state,built_at)`.
 
+### `traceability.passport_policy` (P08-T05)
+
+`id uuid!`, `created_at timestamptz!`, `batch_id uuid!→catalog.batch.id`, `policy_version integer!>0`, `state text! CHECK IN ('draft','approved','revoked')`; năm cột visibility `organization_visibility`, `product_visibility`, `batch_visibility`, `timeline_visibility`, `evidence_visibility` đều `private|partner|public`, mặc định private. `created_by_sub text!`, `approved_by_sub/approved_at` và `revoked_by_sub/revoked_at` nullable theo state. Unique `(batch_id,policy_version)`, một draft và một approved tối đa trên mỗi lô. Chỉ Administrator trong organization được duyệt/revoke; giữ các phiên bản cũ và audit, không ghi đè policy đã duyệt. Projection chỉ active khi lô `available`, policy approved và organization/product/batch đều public; timeline chỉ xuất nếu public, evidence T07 yêu cầu attachment clean và quyền public riêng. New trace outbox/event làm projection stale, quality change revoke; rebuild thủ công từ nguồn đã confirm. API public T06 phải đọc `state=active` và đặt `no-store`, không cache payload cũ.
+
 ### `traceability.qr_token`
 
 `id`, `created_at`; `batch_id uuid!→catalog.batch.id`, `token_hash char(64)! UNIQUE`, `state text! CHECK IN ('active','revoked')`, `expires_at timestamptz?`, `revoked_at timestamptz?`, `created_by_sub text!`; index `(batch_id,state)`. URL dùng random token >=128 bit, chỉ hash trong DB; không nhúng batch UUID.
