@@ -96,11 +96,15 @@ export function createDocumentService(ports: TradingPorts) {
         ...(converted ? { stockQuantity: converted.stockQuantity, stockUomId: converted.stockUomId } : {}) };
     }));
     const approval = kind === "goods_issue" ? await repo.findApproval(id) : null;
+    const approvalHistory = approval ? await repo.findApprovalHistory(approval.id) : [];
     return { id: doc.id, documentType: doc.documentType, documentNumber: doc.documentNumber,
       status: doc.status, version: doc.version, note: doc.note, purpose: doc.issuePurpose,
       correctionOfDocumentId: doc.correctionOfDocumentId, correctionReason: doc.correctionReason,
       createdAt: doc.createdAt.toISOString(), confirmedAt: doc.confirmedAt?.toISOString() ?? null,
-      approval: approval ? { id: approval.id, state: approval.state } : null, lines };
+      approval: approval ? { id: approval.id, state: approval.state, lineHash: approval.lineSnapshotSha256,
+        processInstanceId: approval.flowableProcessId, processDefinitionVersion: approval.flowableDefinitionVersion,
+        history: approvalHistory.map((entry) => ({ action: entry.action, at: entry.createdAt.toISOString(),
+          before: entry.beforeSummary, after: entry.afterSummary })) } : null, lines };
   }
 
   async function correction(ctx: Context, id: string, kind: TradingKind, input: DocumentInput) {
@@ -171,7 +175,7 @@ export function createDocumentService(ports: TradingPorts) {
       if (doc.version !== version) throw new DomainError("VERSION_CONFLICT", 409);
       if (action === "submit" && kind !== "goods_issue") throw new DomainError("WRONG_STATE", 409);
       if (action === "confirm" && kind === "goods_issue") {
-        if (doc.status !== "pending_approval") throw new DomainError("WRONG_STATE", 409);
+        if (doc.status !== "approved") throw new DomainError("WRONG_STATE", 409);
       } else {
         try { checkTransition(kind, doc.status, action); } catch (err) { normalizeTransition(err); }
       }

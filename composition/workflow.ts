@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import type { PrismaClient } from "@prisma/client";
+import type { Prisma, PrismaClient } from "@prisma/client";
 import type { ActorResolver } from "../platform/workflow/approval-request";
+import { createTradingRepos } from "../contexts/trading/infrastructure/prisma-repos";
+
+export const applyApprovalResult = (tx: Prisma.TransactionClient, documentId: string,
+  result: "approved" | "rejected") => createTradingRepos(tx).applyApprovalResult(documentId, result);
 
 export function membershipActorResolver(db: PrismaClient): ActorResolver {
   return async (sub) => {

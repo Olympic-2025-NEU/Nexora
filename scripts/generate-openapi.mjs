@@ -201,8 +201,9 @@ for (const [name, createBody, patchBody] of documentTypes) {
 }
 action("/api/v1/issues/{id}/submit", "M03", "Submit issue for approval", "Document", { status: 202 });
 list("/api/v1/documents", "M03", "List documents", "Document", EVERY_USER, ["type", "status", "batchId", "partnerId", "from", "to"]);
-list("/api/v1/approvals/tasks", "M03", "List approval tasks", "ApprovalTask", ["approver"], []);
-action("/api/v1/approvals/{approvalRequestId}/decision", "M03", "Record approval decision intent", "ApprovalDecisionResult", { body: "ApprovalDecisionInput", roles: ["approver"], status: 202, description: "If-Match refers to approvalVersion. Creator cannot approve their own issue. Flowable completion occurs asynchronously." });
+add("get", "/api/v1/approvals/inbox", "M03", "List actionable approval tasks", "ApprovalTask", { roles: ["approver"], description: "Candidate-group tasks in current warehouse scope, excluding creator. Age reflects submission time." });
+doc.paths["/api/v1/approvals/inbox"].get.responses["200"].content["application/json"].schema = envelope(arr(ref("ApprovalTask")));
+add("post", "/api/v1/approvals/{id}/decisions", "M03", "Record approval decision intent", "ApprovalDecisionResult", { body: "ApprovalDecisionInput", roles: ["approver"], idempotent: true, status: 202, description: "Creator cannot decide own issue. Decision intent commits before Flowable completion; result is asynchronous." });
 
 add("get", "/api/v1/lots/{id}/history", "M04", "Lot history", "TraceHistory", { query: ["cursor", "limit"] });
 add("get", "/api/v1/lots/{id}/trace/backward", "M04", "Trace backward", "TraceGraph", { query: ["depth", "cursor", "limit"] });

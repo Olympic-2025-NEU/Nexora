@@ -91,6 +91,16 @@ export function createTradingRepos(tx: Prisma.TransactionClient) {
     findWarehouse(id: string) { return tx.warehouse.findUnique({ where: { id } }); },
     findOrganization() { return tx.organization.findUnique({ where: { singletonSlot: 1 } }); },
     findApproval(documentId: string) { return tx.approvalRequest.findUnique({ where: { documentId } }); },
+    findApprovalHistory(approvalRequestId: string) {
+      return tx.auditLog.findMany({ where: { targetType: "approval_request", targetId: approvalRequestId },
+        orderBy: { createdAt: "asc" } });
+    },
+    async applyApprovalResult(documentId: string, result: "approved" | "rejected") {
+      const changed = await tx.document.updateMany({ where: { id: documentId, documentType: "goods_issue",
+        status: "pending_approval" }, data: { status: result, version: { increment: 1 }, updatedAt: new Date() } });
+      return changed.count === 1 ? result :
+        `existing:${(await tx.document.findUnique({ where: { id: documentId } }))?.status ?? "missing"}`;
+    },
     findActiveCorrection(id: string) {
       return tx.document.findFirst({ where: { correctionOfDocumentId: id, status: { not: "cancelled" } } });
     },

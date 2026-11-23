@@ -3,10 +3,13 @@
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { adminApi } from "@/app/lib/admin-api";
+import Link from "next/link";
 
 type Kind = "receipts" | "issues";
 type Document = { id: string; documentNumber: string; status: string; version: number;
-  createdAt: string; approval?: { state: string } | null; lines: { stockQuantity?: string; quantity: string;
+  createdAt: string; approval?: { state: string; lineHash: string; processInstanceId: string | null;
+    processDefinitionVersion: number | null; history: { action: string; at: string;
+      before: unknown; after: unknown }[] } | null; lines: { stockQuantity?: string; quantity: string;
     warehouseId: string; batchId: string; productVariantId: string; uomId: string }[] };
 type Batch = { id: string; productVariantId: string; localCode: string; expiresOn?: string };
 type Variant = { id: string; label: string };
@@ -19,7 +22,7 @@ function scaled(value: string) {
 }
 function display(value: bigint) { return `${value / BigInt(1000)}.${String(value % BigInt(1000)).padStart(3, "0")}`; }
 
-export function DocumentsClient({ kind }: { kind: Kind }) {
+export function DocumentsClient({ kind, id }: { kind: Kind; id?: string }) {
   const [docs, setDocs] = useState<Document[]>([]);
   const [variants, setVariants] = useState<Variant[]>([]);
   const [batches, setBatches] = useState<Batch[]>([]);
@@ -65,6 +68,15 @@ export function DocumentsClient({ kind }: { kind: Kind }) {
     queueMicrotask(() => { if (!cancelled) void load().catch((err: Error) => setError(err.message)); });
     return () => { cancelled = true; };
   }, [load]);
+  useEffect(() => {
+    if (!id) return;
+    let cancelled = false;
+    void adminApi(`/api/v1/${kind}/${id}`).then(async (response) => {
+      if (!response.ok) throw await responseError(response);
+      if (!cancelled) setSelected((await response.json()).data as Document);
+    }).catch((err: Error) => { if (!cancelled) setError(err.message); });
+    return () => { cancelled = true; };
+  }, [id, kind]);
   useEffect(() => {
     if (!variantId) return;
     void adminApi(`/api/v1/variants/${variantId}/uoms`).then(async (response) => {
@@ -124,7 +136,8 @@ export function DocumentsClient({ kind }: { kind: Kind }) {
 
   return <main className="mx-auto max-w-5xl space-y-6 p-6">
     <h1 className="text-2xl font-semibold">{kind === "receipts" ? "Nhập kho" : "Xuất kho"}</h1>
-    <nav className="flex gap-4"><a href="/trading/receipts">Nhập kho</a><a href="/trading/issues">Xuất kho</a></nav>
+    <nav className="flex gap-4"><Link href="/trading/receipts">Nhập kho</Link><Link href="/trading/issues">Xuất kho</Link>
+      {kind === "issues" && <Link href="/trading/approvals">Hộp duyệt</Link>}</nav>
     <form onSubmit={submit} className="grid gap-3 rounded border p-4 sm:grid-cols-2">
       <label>Sản phẩm / biến thể<select className="w-full border p-2" value={variantId} required
         onChange={(event) => { setVariantId(event.target.value); setBatchId(""); }}>
@@ -156,15 +169,27 @@ export function DocumentsClient({ kind }: { kind: Kind }) {
       <strong>{selected.documentNumber}</strong> · {selected.status} · duyệt: {selected.approval?.state ?? "không yêu cầu"}
       {selected.status === "draft" && kind === "receipts" && <button disabled={busy} onClick={() => void act("confirm")}>Xác nhận</button>}
       {selected.status === "draft" && kind === "issues" && <button disabled={busy} onClick={() => void act("submit")}>Gửi duyệt</button>}
-      {selected.status === "pending_approval" && kind === "issues" && <button disabled={busy || selected.approval?.state !== "approved"}
+      {selected.status === "approved" && kind === "issues" && <button disabled={busy || selected.approval?.state !== "approved"}
         onClick={() => void act("confirm")}>Xác nhận xuất kho</button>}
-      {["draft", "pending_approval"].includes(selected.status) && <button disabled={busy} onClick={() => void act("cancel")}>Huỷ</button>}
+      {["draft", "pending_approval", "approved"].includes(selected.status) && <button disabled={busy} onClick={() => void act("cancel")}>Huỷ</button>}
       <button onClick={() => void select(selected.id)}>Tải lại</button>
+      {kind === "issues" && <section className="mt-4 space-y-2 border-t pt-3">
+        <h2 className="font-semibold">Phê duyệt</h2>
+        <p>Chứng từ: {selected.status} · Bridge: {selected.approval?.state ?? "chưa gửi"}</p>
+        {["requested", "starting", "decision_pending"].includes(selected.approval?.state ?? "") &&
+          <p role="status">Đang chờ workflow engine</p>}
+        <p>Process instance: {selected.approval?.processInstanceId ?? "chưa có"} · Definition version: {selected.approval?.processDefinitionVersion ?? "chưa có"}</p>
+        <p>Line hash: {selected.approval?.lineHash.slice(0, 12) ?? "—"}</p>
+        <ul>{selected.approval?.history.map((entry, index) => <li key={`${entry.at}-${index}`}>
+          {new Date(entry.at).toLocaleString("vi-VN")} · {entry.action === "workflow.approval.late_result_ignored"
+            ? "Late result ignored (anomaly)" : entry.action} · {JSON.stringify(entry.before)} · {JSON.stringify(entry.after)}
+        </li>)}</ul>
+      </section>}
     </section>}
     <section><h2 className="text-lg font-semibold">Chứng từ</h2><ul className="space-y-2">
-      {docs.map((doc) => <li key={doc.id}><button onClick={() => void select(doc.id)}>
-        {doc.documentNumber} · {doc.status} · {new Date(doc.createdAt).toLocaleDateString("vi-VN")}
-      </button></li>)}
+       {docs.map((doc) => <li key={doc.id}><button onClick={() => void select(doc.id)}>
+         {doc.documentNumber} · {doc.status} · {new Date(doc.createdAt).toLocaleDateString("vi-VN")}
+       </button>{kind === "issues" && <Link className="ml-3 underline" href={`/trading/issues/${doc.id}`}>Chi tiết</Link>}</li>)}
     </ul></section>
   </main>;
 }

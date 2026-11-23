@@ -7,6 +7,7 @@ import { getPrismaClient } from "../../platform/persistence/prisma";
 import { createPrismaIdempotency } from "../../platform/http/idempotency";
 import { runCommand } from "../../platform/http/pipeline";
 import { tradingService, tradingUnitOfWork, tradingPorts, transferService, stocktakeService, saleService } from "../../composition/trading";
+import { applyApprovalResult } from "../../composition/workflow";
 import { createReceivingService, type ActualInput } from "../../contexts/trading/application/receivings";
 import { createCatalogRepos } from "../../contexts/catalog/infrastructure/prisma-repos";
 import { createDocumentService } from "../../contexts/trading/application/documents";
@@ -22,9 +23,11 @@ import Ajv2020 from "ajv/dist/2020.js";
 import addFormats from "ajv-formats";
 import canonicalize from "canonicalize";
 import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 import envelopeSchema from "../../contracts/events/envelope-v1.schema.json";
 import { createOutboxDispatcher } from "../../platform/outbox/dispatcher";
 import { buildHandlerMap } from "../../composition/event-handlers";
+import { approvalInbox } from "../../composition/approvals";
 
 if (process.env.NEXORA_TEST_DB !== "1") throw new Error("Disposable PostgreSQL required");
 const owner = new PrismaClient({ datasources: { db: { url: process.env.OWNER_DATABASE_URL! } } });
@@ -136,7 +139,7 @@ test("sale from approved issue leaves 6 to 4 balance unchanged, one trace event;
     "goods_issue", source.id, "submit", source.version), undefined, "goods_issue");
   await approve(source.id);
   await command("confirm", { id: source.id }, (ctx) => tradingService.action(ctx,
-    "goods_issue", source.id, "confirm", source.version + 1), randomUUID(), "goods_issue");
+    "goods_issue", source.id, "confirm", source.version + 2), randomUUID(), "goods_issue");
   const balance = async () => (await db.stockBalance.findUniqueOrThrow({ where: { warehouseId_batchId: {
     warehouseId, batchId: lot } } })).quantity.toFixed(3);
   assert.equal(await balance(), "4.000");
@@ -307,7 +310,7 @@ test("issue submit creates one bridge request; unapproved confirm fails; cancel 
   await assert.rejects(command("confirm", input, (ctx) => tradingService.action(ctx,
     "goods_issue", issue.id, "confirm", issue.version), undefined, "goods_issue"), { code: "VERSION_CONFLICT" });
   await assert.rejects(command("confirm", { ...input, version: issue.version + 1 }, (ctx) => tradingService.action(ctx,
-    "goods_issue", issue.id, "confirm", issue.version + 1), undefined, "goods_issue"), { code: "APPROVAL_NOT_YET_APPROVED" });
+    "goods_issue", issue.id, "confirm", issue.version + 1), undefined, "goods_issue"), { code: "WRONG_STATE" });
   const cancelled = await command("cancel", {}, (ctx) => tradingService.action(ctx,
     "goods_issue", issue.id, "cancel", issue.version + 1), undefined, "goods_issue");
   assert.equal(cancelled.status, "cancelled");
@@ -367,7 +370,7 @@ async function approve(id: string, decision: "approved" | "rejected" = "approved
   await createFlowableDecider(db, engine, resolver)(message as OutboxMessage);
   const deadline = Date.now() + 15_000;
   while (Date.now() < deadline) {
-    await reconcileApproval(db, engine, row.id);
+    await reconcileApproval(db, engine, row.id, applyApprovalResult);
     const state = (await db.approvalRequest.findUniqueOrThrow({ where: { id: row.id } })).state;
     if (state === decision) return;
     await new Promise((resolve) => setTimeout(resolve, 50));
@@ -381,7 +384,7 @@ async function issue(quantity: string, count = 1, purpose: "other" | "partner_tr
   await command("submit", { id: doc.id }, (ctx) => tradingService.action(ctx,
     "goods_issue", doc.id, "submit", doc.version), undefined, "goods_issue");
   await approve(doc.id);
-  return { ...doc, version: doc.version + 1 };
+  return { ...doc, version: doc.version + 2 };
 }
 
 test("approved issue 12 posts once; two issues race for remaining stock with real bridge decisions",
@@ -447,7 +450,7 @@ test("two lines of 5 on same batch fail against total balance 8, without partial
       "available" in error && error.available === "8.000");
     assert.equal((await db.stockBalance.findUniqueOrThrow({ where: {
       warehouseId_batchId: { warehouseId, batchId } } })).quantity.toFixed(3), before);
-    assert.equal((await db.document.findUniqueOrThrow({ where: { id: doc.id } })).status, "pending_approval");
+    assert.equal((await db.document.findUniqueOrThrow({ where: { id: doc.id } })).status, "approved");
     assert.equal(await db.stockMovement.count({ where: { sourceLineId: { in: doc.lines.map((row) => row.id) } } }), 0);
   });
 
@@ -469,7 +472,7 @@ test("approved request cancels atomically; stock UOM is frozen after submit desp
     }, data: { factorToStockUom: "20" } });
     await approve(packed.id);
     const confirmed = await command("confirm", { id: packed.id }, (ctx) => tradingService.action(ctx,
-      "goods_issue", packed.id, "confirm", packed.version + 1), randomUUID(), "goods_issue");
+      "goods_issue", packed.id, "confirm", packed.version + 2), randomUUID(), "goods_issue");
     assert.equal(confirmed.status, "confirmed");
     assert.equal((await db.stockMovement.findUniqueOrThrow({ where: { sourceLineId_kind: {
       sourceLineId: normalized.id, kind: "issue",
@@ -488,10 +491,10 @@ test("issue with third line on empty balance fails 422, leaves approved document
       warehouseId_batchId: { warehouseId, batchId } } })).quantity.toFixed(3);
     const retryKey = randomUUID();
     await assert.rejects(command("confirm", { id: doc.id }, (ctx) => tradingService.action(ctx,
-      "goods_issue", doc.id, "confirm", doc.version + 1), retryKey, "goods_issue"),
+      "goods_issue", doc.id, "confirm", doc.version + 2), retryKey, "goods_issue"),
     (err: unknown) => err instanceof Error && "code" in err && err.code === "INSUFFICIENT_STOCK" &&
       "batchId" in err && err.batchId === emptyBatchId);
-    assert.equal((await db.document.findUniqueOrThrow({ where: { id: doc.id } })).status, "pending_approval");
+    assert.equal((await db.document.findUniqueOrThrow({ where: { id: doc.id } })).status, "approved");
     assert.equal((await db.approvalRequest.findUniqueOrThrow({ where: { documentId: doc.id } })).state, "approved");
     assert.equal(await db.stockMovement.count({ where: { sourceLineId: { in: doc.lines.map((row) => row.id) } } }), 0);
     assert.equal((await db.stockBalance.findUniqueOrThrow({ where: {
@@ -504,7 +507,7 @@ test("issue with third line on empty balance fails 422, leaves approved document
     await command("confirm", { id: supply.id }, (ctx) => tradingService.action(ctx,
       "goods_receipt", supply.id, "confirm", supply.version), randomUUID());
     const retry = await command("confirm", { id: doc.id }, (ctx) => tradingService.action(ctx,
-      "goods_issue", doc.id, "confirm", doc.version + 1), retryKey, "goods_issue");
+      "goods_issue", doc.id, "confirm", doc.version + 2), retryKey, "goods_issue");
     assert.equal(retry.status, "confirmed");
     assert.equal(retry.movementIds?.length, 3);
   });
@@ -541,7 +544,7 @@ test("two reversed multi-batch issues lock in same order and only one can confir
     await command("submit", { id: doc.id }, (ctx) => tradingService.action(ctx,
       "goods_issue", doc.id, "submit", doc.version), undefined, "goods_issue");
     await approve(doc.id);
-    return { ...doc, version: doc.version + 1 };
+    return { ...doc, version: doc.version + 2 };
   };
   const [first, second] = await Promise.all([make(false), make(true)]);
   let ready = 0;
@@ -591,9 +594,151 @@ test("rejected bridge decision never permits issue movement", { timeout: 120_000
     "goods_issue", doc.id, "submit", doc.version), undefined, "goods_issue");
   await approve(doc.id, "rejected");
   await assert.rejects(command("confirm", { id: doc.id }, (ctx) => tradingService.action(ctx,
-    "goods_issue", doc.id, "confirm", doc.version + 1), randomUUID(), "goods_issue"),
-  { code: "APPROVAL_REJECTED", httpStatus: 409 });
+      "goods_issue", doc.id, "confirm", doc.version + 2), randomUUID(), "goods_issue"),
+  { code: "WRONG_STATE", httpStatus: 409 });
   assert.equal(await db.stockMovement.count({ where: { sourceLineId: doc.lines[0]!.id } }), 0);
+});
+
+test("reconciliation is atomic, duplicate delivery is inert, conflicting late result is audited", {
+  timeout: 120_000,
+}, async () => {
+  const doc = await command("create", {}, (ctx) => tradingService.create(ctx, "goods_issue", {
+    purpose: "other", lines: [line("1")],
+  }), undefined, "goods_issue");
+  await command("submit", {}, (ctx) => tradingService.action(ctx, "goods_issue", doc.id, "submit", doc.version),
+    undefined, "goods_issue");
+  await approve(doc.id, "rejected");
+  const row = await db.approvalRequest.findUniqueOrThrow({ where: { documentId: doc.id } });
+  assert.equal((await db.document.findUniqueOrThrow({ where: { id: doc.id } })).status, "rejected");
+  const audits = await db.auditLog.count({ where: { targetId: row.id, action: "workflow.reconcile.synced" } });
+  await reconcileApproval(db, FlowableClient.fromEnv(), row.id, applyApprovalResult);
+  assert.equal(await db.auditLog.count({ where: { targetId: row.id, action: "workflow.reconcile.synced" } }), audits);
+  const engine = FlowableClient.fromEnv();
+  const history = await engine.getHistory(row.flowableProcessId!);
+  const conflicting = Object.create(engine) as FlowableClient;
+  conflicting.getHistory = async () => ({ ...history, variables: history.variables.map((variable) =>
+    variable.name === "decision" ? { ...variable, value: "approved" } : variable) });
+  await reconcileApproval(db, conflicting, row.id, applyApprovalResult);
+  await reconcileApproval(db, conflicting, row.id, applyApprovalResult);
+  assert.equal((await db.document.findUniqueOrThrow({ where: { id: doc.id } })).status, "rejected");
+  assert.equal(await db.auditLog.count({ where: { targetId: row.id,
+    action: "workflow.approval.late_result_ignored" } }), 1);
+  await assert.rejects(command("confirm", {}, (ctx) => tradingService.action(ctx,
+    "goods_issue", doc.id, "confirm", doc.version + 2), randomUUID(), "goods_issue"),
+  { code: "WRONG_STATE", httpStatus: 409 });
+  assert.equal(await db.stockMovement.count({ where: { sourceLineId: doc.lines[0]!.id } }), 0);
+});
+
+test("cancel supersedes an unsent decision intent", { timeout: 120_000 }, async () => {
+  const doc = await command("create", {}, (ctx) => tradingService.create(ctx, "goods_issue", {
+    purpose: "other", lines: [line("1")],
+  }), undefined, "goods_issue");
+  await command("submit", {}, (ctx) => tradingService.action(ctx, "goods_issue", doc.id, "submit", doc.version),
+    undefined, "goods_issue");
+  const engine = FlowableClient.fromEnv();
+  const requested = await db.outboxMessage.findFirstOrThrow({ where: { aggregateType: "approval_request",
+    eventType: "workflow.approval.requested.v1", payload: { path: ["documentId"], equals: doc.id } } });
+  await createFlowableStarter(db, engine)(requested as OutboxMessage);
+  const row = await db.approvalRequest.findUniqueOrThrow({ where: { documentId: doc.id } });
+  const task = (await engine.queryTasks({ processInstanceId: row.flowableProcessId! }))[0]!;
+  const resolver = async (sub: string) => ({ sub, active: true, role: "approver", warehouseIds: [warehouseId] });
+  const intent = await db.$transaction((tx) => recordDecisionIntent(tx, resolver, {
+    approvalRequestId: row.id, actorSub: "fixture-approver", decision: "approved",
+    flowableTaskId: task.id, expectedVersion: row.version,
+  }));
+  const message = await db.outboxMessage.findFirstOrThrow({ where: { aggregateId: row.id,
+    eventType: "workflow.approval.decision_requested.v1", aggregateVersion: intent.version } });
+  await command("cancel", {}, (ctx) => tradingService.action(ctx, "goods_issue", doc.id,
+    "cancel", doc.version + 1), undefined, "goods_issue");
+  await createFlowableDecider(db, engine, resolver)(message as OutboxMessage);
+  assert.equal((await engine.getTask(task.id)).id, task.id);
+  assert.equal((await db.approvalRequest.findUniqueOrThrow({ where: { id: row.id } })).state, "cancelled");
+  assert.equal((await db.document.findUniqueOrThrow({ where: { id: doc.id } })).status, "cancelled");
+  assert.equal(await db.stockMovement.count({ where: { sourceLineId: doc.lines[0]!.id } }), 0);
+});
+
+test("engine outage preserves submit and intent; recovery converges without stock before confirm", {
+  timeout: 120_000,
+}, async () => {
+  const doc = await command("create", {}, (ctx) => tradingService.create(ctx, "goods_issue", {
+    purpose: "other", lines: [line("1")],
+  }), undefined, "goods_issue");
+  await command("submit", {}, (ctx) => tradingService.action(ctx, "goods_issue", doc.id,
+    "submit", doc.version), undefined, "goods_issue");
+  const row = await db.approvalRequest.findUniqueOrThrow({ where: { documentId: doc.id } });
+  const request = await db.outboxMessage.findFirstOrThrow({ where: { aggregateId: row.id,
+    eventType: "workflow.approval.requested.v1" } });
+  const engine = FlowableClient.fromEnv();
+  const down = new FlowableClient({ baseUrl: process.env.FLOWABLE_BASE_URL!, user: "unavailable",
+    password: "unavailable" }, async () => { throw new Error("Engine unavailable"); });
+  await assert.rejects(createFlowableStarter(db, down)(request as OutboxMessage));
+  assert.equal((await db.document.findUniqueOrThrow({ where: { id: doc.id } })).status, "pending_approval");
+  assert.equal(await db.stockMovement.count({ where: { sourceLineId: doc.lines[0]!.id } }), 0);
+  await createFlowableStarter(db, engine)(request as OutboxMessage);
+  await reconcileApproval(db, engine, row.id, applyApprovalResult);
+  const pending = await db.approvalRequest.findUniqueOrThrow({ where: { id: row.id } });
+  const resolver = async (sub: string) => ({ sub, active: true, role: "approver", warehouseIds: [warehouseId] });
+  const intent = await db.$transaction((tx) => recordDecisionIntent(tx, resolver, {
+    approvalRequestId: row.id, actorSub: "fixture-approver", decision: "approved",
+    flowableTaskId: pending.flowableTaskId!, expectedVersion: pending.version,
+  }));
+  const message = await db.outboxMessage.findFirstOrThrow({ where: { aggregateId: row.id,
+    eventType: "workflow.approval.decision_requested.v1", aggregateVersion: intent.version } });
+  await assert.rejects(createFlowableDecider(db, down, resolver)(message as OutboxMessage));
+  assert.equal((await db.approvalRequest.findUniqueOrThrow({ where: { id: row.id } })).state, "decision_pending");
+  assert.equal(await db.stockMovement.count({ where: { sourceLineId: doc.lines[0]!.id } }), 0);
+  await createFlowableDecider(db, engine, resolver)(message as OutboxMessage);
+  await reconcileApproval(db, engine, row.id, applyApprovalResult);
+  assert.equal((await engine.findInstances(row.id)).length, 1);
+  assert.equal((await engine.getHistory(pending.flowableProcessId!)).endActivityIds.includes("approvedEnd"), true);
+  assert.equal((await db.approvalRequest.findUniqueOrThrow({ where: { id: row.id } })).state, "approved");
+  assert.equal((await db.document.findUniqueOrThrow({ where: { id: doc.id } })).status, "approved");
+  assert.equal(await db.stockMovement.count({ where: { sourceLineId: doc.lines[0]!.id } }), 0);
+});
+
+test("isolated engine upgrade keeps v1 and v2 decisions bound to their own issue", {
+  timeout: 120_000,
+}, async () => {
+  const engine = FlowableClient.fromEnv();
+  const make = async () => {
+    const doc = await command("create", {}, (ctx) => tradingService.create(ctx, "goods_issue", {
+      purpose: "other", lines: [line("1")],
+    }), undefined, "goods_issue");
+    await command("submit", {}, (ctx) => tradingService.action(ctx, "goods_issue", doc.id,
+      "submit", doc.version), undefined, "goods_issue");
+    const row = await db.approvalRequest.findUniqueOrThrow({ where: { documentId: doc.id } });
+    const message = await db.outboxMessage.findFirstOrThrow({ where: { aggregateId: row.id,
+      eventType: "workflow.approval.requested.v1" } });
+    await createFlowableStarter(db, engine)(message as OutboxMessage);
+    await reconcileApproval(db, engine, row.id, applyApprovalResult);
+    return { doc, row: await db.approvalRequest.findUniqueOrThrow({ where: { id: row.id } }) };
+  };
+  const first = await make();
+  assert.equal(first.row.flowableDefinitionVersion, 1);
+  const source = readFileSync("deploy/flowable/processes/goods-issue-approval.bpmn20.xml", "utf8");
+  const fixture = source.replace('name="Goods Issue Approval"', 'name="Goods Issue Approval v2"');
+  assert.notEqual(fixture, source);
+  const form = new FormData();
+  form.set("deploymentName", "fixture-goods-issue-v2");
+  form.set("file", new Blob([fixture], { type: "application/xml" }), "goods-issue-approval.bpmn20.xml");
+  const deployed = await fetch(`${process.env.FLOWABLE_BASE_URL}/repository/deployments`, {
+    method: "POST", headers: { authorization: `Basic ${Buffer.from(`${process.env.FLOWABLE_ADMIN_USER}:${process.env.FLOWABLE_ADMIN_PASSWORD}`).toString("base64")}` },
+    body: form,
+  });
+  assert.equal(deployed.status, 201);
+  const second = await make();
+  assert.equal(second.row.flowableDefinitionVersion, 2);
+  const inbox = await approvalInbox({ userId: "fixture-approver", organizationId: "fixture-org",
+    roles: ["approver"], unitIds: [warehouseId] });
+  assert.ok([first, second].every(({ row }) => inbox.some((item) => item.approvalRequestId === row.id)));
+  for (const { doc, row } of [first, second]) {
+    const history = await engine.getHistory(row.flowableProcessId!);
+    assert.equal((await engine.getDefinition(history.processDefinitionId)).version, row.flowableDefinitionVersion);
+    await approve(doc.id);
+    assert.equal((await db.document.findUniqueOrThrow({ where: { id: doc.id } })).status, "approved");
+    assert.equal((await engine.getHistory(row.flowableProcessId!)).endActivityIds.includes("approvedEnd"), true);
+    assert.equal(await db.stockMovement.count({ where: { sourceLineId: doc.lines[0]!.id } }), 0);
+  }
 });
 
 test("concurrent receipt confirms on same document return one 409, not a raw immutable-line error", async () => {
@@ -615,7 +760,7 @@ async function transferIssue() {
     "goods_issue", doc.id, "submit", doc.version), undefined, "goods_issue");
   await approve(doc.id);
   await command("confirm", { id: doc.id }, (ctx) => tradingService.action(ctx,
-    "goods_issue", doc.id, "confirm", doc.version + 1), randomUUID(), "goods_issue");
+    "goods_issue", doc.id, "confirm", doc.version + 2), randomUUID(), "goods_issue");
   return doc;
 }
 
@@ -770,7 +915,7 @@ test("G07 seeded real announcement: receipt20, approved issue12, transfer, actua
     "goods_issue", sent.id, "submit", sent.version), undefined, "goods_issue");
   await approve(sent.id);
   await command("confirm", { id: sent.id }, (ctx) => tradingService.action(ctx,
-    "goods_issue", sent.id, "confirm", sent.version + 1), randomUUID(), "goods_issue");
+    "goods_issue", sent.id, "confirm", sent.version + 2), randomUUID(), "goods_issue");
   const transfer = await transferCommand("create", { issue: sent.id }, (ctx) => transferService().create(ctx,
     { linkedIssueId: sent.id, destinationPartnerId: partnerId }));
   await transferCommand("confirm", { transfer: transfer.id }, (ctx) => transferService().confirm(ctx,

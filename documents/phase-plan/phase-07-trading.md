@@ -56,6 +56,7 @@ Document lines / Inventory confirm: tham chiếu **`product_variant_id`** + qty 
 - [ ] Approver khác creator thao tác qua gateway/UI; kết quả engine được đồng bộ idempotent về app. Confirm phải kiểm local approval state + quyền hiện thời, không dựa vào client tự khai `approved=true`.
 - [ ] Test Flowable down, kết quả task lặp/đến muộn qua poller, rejected rồi confirm, process version upgrade; không tạo stock khi chưa duyệt.
 - **Đầu ra:** process + UI + integration; **kiểm chứng:** Flowable process history và AC-12 end-to-end.
+- P07-T07 evidence: `evidence/p07-t07.md`. Disposable PostgreSQL/Flowable battery and UI build verify integration paths; gateway HTTP journey remains open until a configured live stack and distinct user fixtures are available. Checkboxes above remain open at HTTP end-to-end level.
 
 ## P07-T08 — Cross-module transaction và query lịch sử
 

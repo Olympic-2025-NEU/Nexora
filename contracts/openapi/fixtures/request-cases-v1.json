@@ -23,7 +23,7 @@
     },
     "ApprovalDecisionInput": {
       "valid": {
-        "decision": "approved"
+        "decision": "approve"
       },
       "invalid": {}
     },
