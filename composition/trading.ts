@@ -4,13 +4,13 @@ import { Prisma } from "@prisma/client";
 import { getPrismaClient } from "@/platform/persistence/prisma";
 import { prismaAuditRecorder } from "@/platform/audit/prisma-audit-recorder";
 import { adjustStock } from "@/contexts/inventory/application/adjust-stock";
-import { createDocumentService } from "@/contexts/trading/application/documents";
+import { createDocumentService, type TradingPorts } from "@/contexts/trading/application/documents";
 import { createPrismaIdempotency } from "@/platform/http/idempotency";
 import { createRequest, confirmApproval, cancelRequest, cancelApprovedRequest } from "@/platform/workflow/approval-service";
 import { computeLineSnapshotSha256 } from "@/contracts/workflow/line-snapshot";
 import { serializeDomainEvent, TRADING_EVENT_TYPES } from "@/contracts/events/registry";
 
-export const tradingService = createDocumentService({
+export const tradingPorts: TradingPorts = {
   adjust: adjustStock,
   async audit(tx, input) {
     await prismaAuditRecorder.record(tx, { actor: { kind: "user", sub: input.actorSub },
@@ -46,7 +46,8 @@ export const tradingService = createDocumentService({
     if (approved) await cancelApprovedRequest(tx, args);
     else await cancelRequest(tx, args);
   },
-});
+};
+export const tradingService = createDocumentService(tradingPorts);
 
 export const tradingIdempotency = () => createPrismaIdempotency(getPrismaClient());
 export const tradingRead = async <T>(work: (tx: Prisma.TransactionClient) => Promise<T>) =>

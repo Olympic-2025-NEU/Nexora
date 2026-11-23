@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { DomainError } from "@/platform/kernel/errors";
+import { Decimal } from "@prisma/client/runtime/library";
 import { applyDocumentAction, assertCorrection, type DocumentType, type DocumentStatus } from "../domain/document";
 
 export function checkTransition(type: "goods_receipt" | "goods_issue", status: string, action: "edit" | "submit" | "confirm" | "cancel") {
@@ -26,4 +27,16 @@ export function checkLines(lines: readonly { lineNo: number; warehouseId: string
       throw new DomainError("MISSING_LINE_FIELD", 422);
     }
   }
+}
+
+export function aggregateDemand(lines: readonly { warehouseId: string; batchId: string; quantity: Decimal }[]) {
+  const demand = new Map<string, { warehouseId: string; batchId: string; requested: Decimal }>();
+  for (const line of lines) {
+    const key = `${line.warehouseId}:${line.batchId}`;
+    const current = demand.get(key);
+    demand.set(key, { warehouseId: line.warehouseId, batchId: line.batchId,
+      requested: (current?.requested ?? new Decimal(0)).add(line.quantity) });
+  }
+  return [...demand.values()].sort((a, b) =>
+    a.warehouseId.localeCompare(b.warehouseId) || a.batchId.localeCompare(b.batchId));
 }

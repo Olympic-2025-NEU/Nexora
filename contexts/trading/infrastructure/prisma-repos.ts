@@ -48,10 +48,10 @@ export function createTradingRepos(tx: Prisma.TransactionClient) {
     },
 
     async replaceLines(documentId: string, expectedVersion: number,
-      lines: Omit<Prisma.DocumentLineUncheckedCreateInput, "documentId">[]) {
+      lines: Omit<Prisma.DocumentLineUncheckedCreateInput, "documentId">[], note?: string) {
       const result = await tx.document.updateMany({
         where: { id: documentId, version: expectedVersion, status: "draft" },
-        data: { version: { increment: 1 }, updatedAt: new Date() },
+        data: { version: { increment: 1 }, updatedAt: new Date(), ...(note !== undefined ? { note } : {}) },
       });
       if (!result.count) return null;
       await tx.documentLine.deleteMany({ where: { documentId } });
@@ -106,7 +106,9 @@ export function createTradingRepos(tx: Prisma.TransactionClient) {
         await tx.$queryRaw`SELECT warehouse_id FROM inventory.stock_balance
           WHERE warehouse_id = ${key.warehouseId}::uuid AND batch_id = ${key.batchId}::uuid FOR UPDATE`;
       }
-      return tx.stockBalance.findMany({ where: { OR: keys.map((key) => ({ ...key })) } });
+      return tx.stockBalance.findMany({ where: { OR: keys.map((key) => ({
+        warehouseId: key.warehouseId, batchId: key.batchId,
+      })) } });
     },
 
     async list(filters: {

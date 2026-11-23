@@ -7,7 +7,7 @@ import type { OutboxEventInput } from "@/platform/outbox/message";
 import { DomainError } from "@/platform/kernel/errors";
 import { InvalidTransitionError, type DocumentStatus } from "../domain/document";
 import { createTradingRepos } from "../infrastructure/prisma-repos";
-import { checkCorrection, checkLines, checkTransition } from "./checklist";
+import { aggregateDemand, checkCorrection, checkLines, checkTransition } from "./checklist";
 import { convertToStock } from "./uom-conversion";
 
 export type TradingKind = "goods_receipt" | "goods_issue";
@@ -151,12 +151,9 @@ export function createDocumentService(ports: TradingPorts) {
         const lines = input.lines.map((line, i) => ({ id: randomUUID(), lineNo: i + 1,
           warehouseId: line.warehouseId, batchId: line.batchId, productVariantId: line.productVariantId,
           productId: prepared[i]!.productId, uomId: line.uomId, quantity: line.quantity }));
-        if (!await repo.replaceLines(id, expectedVersion, lines)) throw new DomainError("VERSION_CONFLICT", 409);
+        if (!await repo.replaceLines(id, expectedVersion, lines, input.note)) throw new DomainError("VERSION_CONFLICT", 409);
       } else if (!await repo.updateDraft(id, expectedVersion, { note: input.note })) {
         throw new DomainError("VERSION_CONFLICT", 409);
-      }
-      if (input.lines && input.note !== undefined) {
-        if (!await repo.updateDraft(id, expectedVersion + 1, { note: input.note })) throw new DomainError("VERSION_CONFLICT", 409);
       }
       await ports.audit(ctx.tx, { actorSub: ctx.actor.userId, action: "trading.document.edit",
         id, requestId: ctx.requestId, before: "draft", after: "draft", version: expectedVersion + 1 });
@@ -196,9 +193,14 @@ export function createDocumentService(ports: TradingPorts) {
       const next = action === "submit" ? "pending_approval" : action === "confirm" ? "confirmed" : "cancelled";
       const updated = await repo.transition(id, doc.status, version, next, ctx.actor.userId);
       if (!updated) throw new DomainError("VERSION_CONFLICT", 409);
-      const hash = () => ports.hash(lines.map((line) => ({ lineNo: line.lineNo,
+      const hash = () => ports.hash(lines.map((line) => {
+        if (line.quantity!.mul(1000).gt(Number.MAX_SAFE_INTEGER)) {
+          throw new DomainError("APPROVAL_QUANTITY_UNSAFE", 422);
+        }
+        return { lineNo: line.lineNo,
         warehouseId: line.warehouseId, productId: line.productId, batchId: line.batchId,
-        quantity: Number(line.quantity!.toFixed()), unit: line.uomId })));
+        quantity: Number(line.quantity!.toFixed()), unit: line.uomId };
+      }));
       if (action === "submit") {
         await ports.submit(ctx.tx, { documentId: id, submittedDocumentVersion: updated.version,
           creatorSub: doc.createdBySub, warehouseIds: [...new Set(lines.map((line) => line.warehouseId))].sort(),
@@ -213,15 +215,8 @@ export function createDocumentService(ports: TradingPorts) {
           if (approval.lineSnapshotSha256 !== hash()) throw new DomainError("APPROVAL_LINE_MISMATCH", 409);
           await ports.confirmApproval(ctx.tx, { approvalRequestId: approval.id,
             actorSub: ctx.actor.userId, currentLineSnapshotSha256: hash() });
-          const demand = new Map<string, { warehouseId: string; batchId: string; requested: Decimal }>();
-          for (const line of lines) {
-            const key = `${line.warehouseId}:${line.batchId}`;
-            const existing = demand.get(key);
-            demand.set(key, { warehouseId: line.warehouseId, batchId: line.batchId,
-              requested: (existing?.requested ?? new Decimal(0)).add(line.quantity!) });
-          }
-          const keys = [...demand.values()].sort((a, b) =>
-            a.warehouseId.localeCompare(b.warehouseId) || a.batchId.localeCompare(b.batchId));
+          const keys = aggregateDemand(lines.map((line) => ({ warehouseId: line.warehouseId,
+            batchId: line.batchId, quantity: line.quantity! })));
           const balances = await repo.lockBalances(keys);
           for (const key of keys) {
             const available = balances.find((row) => row.warehouseId === key.warehouseId && row.batchId === key.batchId)?.quantity ?? new Decimal(0);

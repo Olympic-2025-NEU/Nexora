@@ -2,7 +2,8 @@
 import { test } from "node:test";
 import { strict as assert } from "node:assert";
 import { convertToStock } from "./uom-conversion";
-import { checkLines } from "./checklist";
+import { aggregateDemand, checkLines } from "./checklist";
+import { Decimal } from "@prisma/client/runtime/library";
 
 const uoms = [{ uomId: "stock", isStockKeeping: true, factorToStockUom: "1" },
   { uomId: "pack", isStockKeeping: false, factorToStockUom: "0.125" }];
@@ -18,4 +19,12 @@ test("confirm checklist rejects missing or duplicate lines", () => {
   const line = { lineNo: 1, warehouseId: "w", batchId: "b", productVariantId: "v", productId: "p", uomId: "u", quantity: "1" };
   assert.throws(() => checkLines([line, line]), { code: "LINE_NUMBER_INVALID" });
   assert.throws(() => checkLines([{ ...line, quantity: null }]), { code: "MISSING_LINE_FIELD" });
+});
+test("two individually affordable lines aggregate before balance check", () => {
+  const demand = aggregateDemand(["12", "12"].map((quantity) => ({
+    warehouseId: "w", batchId: "b", quantity: new Decimal(quantity),
+  })));
+  assert.equal(demand.length, 1);
+  assert.equal(demand[0]!.requested.toFixed(3), "24.000");
+  assert.ok(demand[0]!.requested.gt(new Decimal(20)));
 });
