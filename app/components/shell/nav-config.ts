@@ -60,6 +60,11 @@ export const APP_NAV: NavItem[] = [
     labelKey: "nav.partners",
     roles: "*",
   },
+  {
+    href: "/trace",
+    labelKey: "nav.trace",
+    roles: ["administrator", "staff", "approver", "viewer"],
+  },
 ];
 
 export const ADMIN_NAV: NavItem[] = [

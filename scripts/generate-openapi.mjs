@@ -11,7 +11,7 @@ const WRITER = ["administrator", "staff"];
 const filterTypes = {
   cursor: str(), limit: { type: "integer", minimum: 1, maximum: 100, default: 20 },
   depth: { type: "integer", minimum: 1, maximum: 10 },
-  id: uuid, warehouseId: uuid, productId: uuid, batchId: uuid, partnerId: uuid,
+  id: uuid, documentId: uuid, warehouseId: uuid, productId: uuid, batchId: uuid, partnerId: uuid,
   targetId: str({ maxLength: 128 }), requestId: str({ maxLength: 128 }),
   download: str({ enum: ["1"] }),
   from: str({ format: "date-time" }), to: str({ format: "date-time" }),
@@ -97,8 +97,9 @@ function add(method, path, tag, summary, response, options = {}) {
   if (options.idempotent) params.push(pointer("IdempotencyKey"));
   if (options.list) params.push(pointer("Cursor"), pointer("Limit"));
   for (const name of options.query ?? []) {
-    if (name === "cursor" || name === "limit") continue;
-    params.push({ name, in: "query", schema: filterTypes[name] ?? str() });
+    if (name === "cursor" || name === "limit") {
+      if (!options.list) params.push(pointer(name === "cursor" ? "Cursor" : "Limit"));
+    } else params.push({ name, in: "query", schema: filterTypes[name] ?? str() });
   }
 
   const body = options.body
@@ -208,7 +209,9 @@ add("post", "/api/v1/approvals/{id}/decisions", "M03", "Record approval decision
 add("get", "/api/v1/trace/status", "M04", "Local trace projector status", "TraceProjectorStatus", {
   description: "Authenticated local outbox lag. A caught-up queue does not assert that remote partner history is complete." });
 add("get", "/api/v1/lots/{id}/history", "M04", "Lot history", "TraceHistory", { query: ["cursor", "limit"] });
-add("get", "/api/v1/lots/{id}/trace/backward", "M04", "Trace backward", "TraceGraph", { query: ["depth", "cursor", "limit"] });
+add("get", "/api/v1/lots/{id}/trace/backward", "M04", "Trace backward", "TraceGraph", {
+  query: ["documentId", "depth", "cursor", "limit"],
+  description: "Authenticated local backward graph. Only explicit confirmed source links imply causality. Same-batch events provide context; missing remote source, unknown local allocation and projector lag remain explicit gaps. Cursor freezes the recorded-at snapshot; depth counts source-link hops (1–10)." });
 add("get", "/api/v1/lots/{id}/trace/forward", "M04", "Trace forward", "TraceGraph", { query: ["depth", "cursor", "limit"] });
 action("/api/v1/lots/{id}/qr", "M04", "Issue QR token", "QrIssued", { body: "QrCreate", ifMatch: false, status: 201 });
 action("/api/v1/lots/{id}/qr/{tokenId}/revoke", "M04", "Revoke QR token", null, { body: "Reason", ifMatch: false, idempotent: false, status: 204 });

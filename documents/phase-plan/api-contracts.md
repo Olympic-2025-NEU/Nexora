@@ -28,6 +28,8 @@
 
 Các route `/{type}` trên là ký hiệu rút gọn; OpenAPI phải liệt kê từng path cụ thể, không implement dynamic catch-all cho mọi loại chứng từ.
 
+`GET /api/v1/lots/{id}/trace/backward` (P08-T03) nhận local batch UUID, tùy chọn `documentId` cùng lô, `depth` 1–10 (mặc định 3), `limit` 1–100 (mặc định 20), `cursor` snapshot. Mỗi node trả `eventId`, issuer, batch ID, origin issuer/lot, event type, `occurredAt`, `recordedAt`, verification, source document/event/version và số hop. Edge chỉ biểu thị link nguồn đã lưu; node cùng lô nhưng không có link chỉ là bối cảnh, không suy ra phân bổ lượng receipt→issue. `gaps` phân biệt remote source chưa có, local allocation chưa biết, projector còn chờ, giới hạn depth/nút. `localProjection` là tình trạng hàng đợi **toàn instance**, không chứng nhận upstream đã đầy đủ. Cursor đóng băng `recordedAt` và link creation cutoff, gắn với batch/document/depth; mỗi trang tối đa 100 node, truy vấn tối đa 2000 node rồi trả `truncated`/gap. API yêu cầu user role có `trace:read`, trả `private, no-store`; P09 mới bổ sung graph cross-instance có xác minh.
+
 ### M03 document transition contract (P07-T01)
 
 Source of truth for the pure domain matrix and guards: `contexts/trading/domain/document.ts`. Document status, approval request state, and stock effect are independent. `approved` means approved by the bridge, **not** stock posted; `confirmed` means the document was posted. Only `confirm` can cause a stock effect. `edit` keeps Draft status and requires current `If-Match` version; no `PATCH status` and no delete of confirmed documents.

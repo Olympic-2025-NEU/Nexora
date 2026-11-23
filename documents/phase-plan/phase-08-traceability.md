@@ -20,9 +20,9 @@
 
 ## P08-T03 — Backward trace
 
-- [ ] Từ batch/document tại C truy ngược theo receipt → transfer/issue → batch nguồn, có depth/cycle limit, pagination và quyền xem.
-- [ ] Trong P08 chỉ có local links; node upstream chưa có federation hiển thị `pending/missing`, không tự bịa producer hoặc xác nhận partner. P09 nối thêm verified summaries A/B.
-- [ ] API trả node/edge/source/verification/occurredAt rõ để UI dựng timeline; test cycle, branch và cùng lot code khác issuer.
+- [x] Từ batch hoặc chứng từ tại C truy ngược qua link nguồn tường minh; có depth 1–10, visited set chống cycle, snapshot cursor, phân trang và quyền `trace:read`. Phiếu nhập/xuất cùng lô là bối cảnh, không tự gán phân bổ lượng. [Bằng chứng T03](evidence/p08-t03.md).
+- [x] Trong P08 chỉ có local links; nguồn remote chưa có federation hiển thị `missing`, projector chưa bắt kịp hiển thị `pending`; không tự bịa producer hoặc xác nhận partner. P09 nối thêm verified summaries A/B. [Bằng chứng T03](evidence/p08-t03.md).
+- [x] API trả node/edge/source/verification/occurredAt/recordedAt và gap rõ để UI dựng timeline; test cycle, branch và cùng lot code khác issuer. [Bằng chứng T03](evidence/p08-t03.md).
 - **Đầu ra:** backward query; **kiểm chứng:** chain local đúng và gap rõ.
 
 ## P08-T04 — Forward trace và impact list

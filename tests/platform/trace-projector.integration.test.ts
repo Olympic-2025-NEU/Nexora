@@ -9,6 +9,8 @@ import { createOutboxDispatcher } from "../../platform/outbox/dispatcher";
 import { TRADING_EVENT_TYPES, serializeDomainEvent } from "../../contracts/events/registry";
 import { createPrismaTraceProjectorPort } from "../../contexts/traceability/infrastructure/projector-repos";
 import { traceConsumers, traceLag } from "../../workers/trace-projector";
+import { backwardTrace } from "../../contexts/traceability/application/backward";
+import { createPrismaBackwardPort } from "../../contexts/traceability/infrastructure/backward-repo";
 
 if (process.env.NEXORA_TEST_TRACE !== "1" || !process.env.OWNER_DATABASE_URL ||
     !process.env.APP_DATABASE_URL || !process.env.CORE_DATABASE_URL) {
@@ -284,4 +286,30 @@ test("P08 sale and stocktake project from confirmed document sources", async () 
     source.id);
   assert.equal((await app.traceEvent.findFirstOrThrow({ where: { documentId: stocktakeId } })).eventType,
     TRADING_EVENT_TYPES.stocktake);
+});
+
+test("P08-T03 backward query keeps source links, remote gap and pages distinct", async () => {
+  const actor = { userId: "fixture", organizationId: "fixture", unitIds: [], roles: ["viewer"] };
+  const port = createPrismaBackwardPort(app);
+  const transfer = await app.traceEvent.findFirstOrThrow({ where: {
+    batchId: batches[0], eventType: TRADING_EVENT_TYPES.transfer } });
+  const focused = await backwardTrace(port, actor, { batchId: batches[0],
+    documentId: transfer.documentId!, depth: 2 });
+  assert.equal(focused.nodes.length, 2);
+  assert.equal(focused.edges.length, 1);
+  assert.equal(focused.edges[0].toEventId, focused.nodes[1].eventId);
+  assert.equal(focused.nodes[0].source.documentId, transfer.documentId);
+  assert.equal(focused.nodes.some((node) => node.eventType === TRADING_EVENT_TYPES.receipt), false);
+  const first = await backwardTrace(port, actor, { batchId: batches[0], limit: 2 });
+  assert.equal(first.nodes.length, 2);
+  assert.ok(first.nextCursor);
+  const second = await backwardTrace(port, actor, { batchId: batches[0],
+    limit: 2, cursor: first.nextCursor });
+  assert.equal(second.asOf, first.asOf);
+  assert.equal(first.nodes.some((node) => second.nodes.some((other) =>
+    other.eventId === node.eventId)), false);
+  const remote = await backwardTrace(port, actor, { batchId: batches[1] });
+  assert.ok(remote.gaps.some((gap) => gap.reason === "remote_source_unavailable" &&
+    gap.missingRef?.issuerInstanceId === "trace-remote"));
+  assert.equal(remote.nodes.some((node) => node.issuerInstanceId === "trace-remote"), false);
 });

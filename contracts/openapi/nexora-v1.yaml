@@ -3947,6 +3947,8 @@ paths:
           schema:
             type: string
             format: uuid
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
       responses:
         "200":
           description: Success
@@ -3979,7 +3981,7 @@ paths:
         - M04
       operationId: getLotsByIdTraceBackward
       summary: Trace backward
-      description: Target contract; runtime implementation is tracked by the owning phase.
+      description: Authenticated local backward graph. Only explicit confirmed source links imply causality. Same-batch events provide context; missing remote source, unknown local allocation and projector lag remain explicit gaps. Cursor freezes the recorded-at snapshot; depth counts source-link hops (1–10).
       security:
         - oidc: []
       x-nexora-roles:
@@ -3995,12 +3997,19 @@ paths:
           schema:
             type: string
             format: uuid
+        - name: documentId
+          in: query
+          schema:
+            type: string
+            format: uuid
         - name: depth
           in: query
           schema:
             type: integer
             minimum: 1
             maximum: 10
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
       responses:
         "200":
           description: Success
@@ -4055,6 +4064,8 @@ paths:
             type: integer
             minimum: 1
             maximum: 10
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
       responses:
         "200":
           description: Success
@@ -6751,56 +6762,183 @@ components:
       type: object
       additionalProperties: false
       required:
+        - root
         - nodes
         - edges
         - gaps
         - asOf
+        - localProjection
+        - truncated
       properties:
+        root:
+          type: object
+          additionalProperties: false
+          required:
+            - batchId
+          properties:
+            batchId:
+              type: string
+              format: uuid
+            documentId:
+              type: string
+              format: uuid
         nodes:
           type: array
           items:
             type: object
             additionalProperties: false
             required:
-              - issuer
-              - lotId
               - eventId
-              - state
+              - issuerInstanceId
+              - batchId
+              - originLot
+              - eventType
+              - occurredAt
+              - recordedAt
+              - verificationState
+              - depth
+              - source
             properties:
-              issuer:
-                type: string
-              lotId:
-                type: string
-                format: uuid
               eventId:
                 type: string
                 format: uuid
-              state:
+              issuerInstanceId:
                 type: string
+              batchId:
+                type: string
+                format: uuid
+                nullable: true
+              originLot:
+                type: object
+                additionalProperties: false
+                required:
+                  - issuerInstanceId
+                  - lotId
+                properties:
+                  issuerInstanceId:
+                    type: string
+                  lotId:
+                    type: string
+              eventType:
+                type: string
+              occurredAt:
+                type: string
+                format: date-time
+              recordedAt:
+                type: string
+                format: date-time
+              verificationState:
+                type: string
+              depth:
+                type: integer
+                minimum: 0
+              source:
+                type: object
+                additionalProperties: false
+                required:
+                  - documentId
+                  - eventId
+                  - payloadVersion
+                properties:
+                  documentId:
+                    type: string
+                    format: uuid
+                    nullable: true
+                  eventId:
+                    type: string
+                  payloadVersion:
+                    type: string
         edges:
           type: array
           items:
             type: object
             additionalProperties: false
             required:
-              - from
+              - fromEventId
               - relation
+              - verificationState
             properties:
-              from:
+              fromEventId:
                 type: string
                 format: uuid
-              to:
+              toEventId:
                 type: string
                 format: uuid
+              missingRef:
+                type: object
+                additionalProperties: false
+                required:
+                  - issuerInstanceId
+                  - eventId
+                properties:
+                  issuerInstanceId:
+                    type: string
+                  eventId:
+                    type: string
               relation:
+                type: string
+              verificationState:
                 type: string
         gaps:
           type: array
           items:
-            type: string
+            type: object
+            additionalProperties: false
+            required:
+              - state
+              - reason
+            properties:
+              fromEventId:
+                type: string
+                format: uuid
+              missingRef:
+                type: object
+                additionalProperties: false
+                required:
+                  - issuerInstanceId
+                  - eventId
+                properties:
+                  issuerInstanceId:
+                    type: string
+                  eventId:
+                    type: string
+              state:
+                type: string
+                enum:
+                  - missing
+                  - pending
+              reason:
+                type: string
+                enum:
+                  - local_allocation_unknown
+                  - remote_source_unavailable
+                  - local_source_unavailable
+                  - projection_pending
+                  - depth_limit
+                  - node_limit
         asOf:
           type: string
           format: date-time
+        localProjection:
+          type: object
+          additionalProperties: false
+          required:
+            - state
+            - pendingEvents
+          properties:
+            state:
+              type: string
+              enum:
+                - caught_up
+                - pending
+                - lagging
+            pendingEvents:
+              type: integer
+              minimum: 0
+        truncated:
+          type: boolean
+        nextCursor:
+          type: string
     QrCreate:
       type: object
       additionalProperties: false

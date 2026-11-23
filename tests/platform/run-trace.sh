@@ -42,6 +42,7 @@ export OWNER_DATABASE_URL="postgresql://migrator:test_migrator@127.0.0.1:$port/n
 export DATABASE_URL="$OWNER_DATABASE_URL"
 export APP_DATABASE_URL="postgresql://app_runtime:test_app@127.0.0.1:$port/nexora_upgrade"
 export CORE_DATABASE_URL="postgresql://core_data:test_core@127.0.0.1:$port/nexora_upgrade"
+node --test --require tsx/cjs contexts/traceability/application/backward.test.ts
 printf 'P08-T01: upgrade existing P07 database\n'
 npx prisma migrate deploy --schema "$temp_root/schema.prisma"
 npx prisma migrate deploy
