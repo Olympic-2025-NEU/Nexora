@@ -684,6 +684,20 @@ model ReceivingDetail {
   @@schema("trading")
 }
 
+model InboundMessage {
+  messageId           String   @id @map("message_id") @db.Uuid
+  eventType           String   @map("event_type")
+  issuerInstanceId    String   @map("issuer_instance_id")
+  recipientInstanceId String   @map("recipient_instance_id")
+  payload             Json
+  payloadHash         String   @map("payload_hash") @db.Char(64)
+  receivedAt          DateTime @default(now()) @map("received_at") @db.Timestamptz(6)
+
+  @@index([receivedAt(sort: Desc)], map: "idx_inbound_message_received")
+  @@map("inbound_message")
+  @@schema("platform")
+}
+
 model SaleDetail {
   documentId    String   @id @map("document_id") @db.Uuid
   linkedIssueId String   @unique(map: "uq_trading_sale_issue") @map("linked_issue_id") @db.Uuid

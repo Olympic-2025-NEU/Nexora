@@ -22,7 +22,7 @@ test("versioned schema contains platform tables, expected constraints and migrat
   const tables = await migrator.$queryRaw`
     SELECT table_name FROM information_schema.tables
     WHERE table_schema = 'platform' ORDER BY table_name`;
-  assert.deepEqual(tables.map((row) => row.table_name), ["approval_request", "attachment", "audit_log", "core_record", "idempotency_record", "outbox_message"]);
+  assert.deepEqual(tables.map((row) => row.table_name), ["approval_request", "attachment", "audit_log", "core_record", "idempotency_record", "inbound_message", "outbox_message"]);
 
   const columns = await migrator.$queryRaw`
     SELECT table_name, column_name FROM information_schema.columns
@@ -52,6 +52,8 @@ test("versioned schema contains platform tables, expected constraints and migrat
     "schema_version", "payload", "destination", "correlation_id", "status", "attempt_count",
     "next_attempt_at", "lease_owner", "lease_until", "last_error_code", "delivered_at",
   ]);
+  assert.deepEqual(byTable("inbound_message"), ["message_id", "event_type", "issuer_instance_id",
+    "recipient_instance_id", "payload", "payload_hash", "received_at"]);
 
   const constraints = await migrator.$queryRaw`
     SELECT conname FROM pg_constraint
