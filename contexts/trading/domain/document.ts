@@ -105,3 +105,179 @@ export const DOCUMENT_RULES: Readonly<Record<DocumentType, DocumentRule>> = Obje
     transitions: directTransitions,
   }),
 });
+
+export type DocumentErrorCode =
+  | "WRONG_STATE" | "SELF_DECISION" | "APPROVAL_NOT_CONFIRMED" | "APPROVAL_LINES_CHANGED"
+  | "WAREHOUSE_SCOPE_REQUIRED" | "ISSUE_PURPOSE_MISMATCH" | "ISSUE_NOT_CONFIRMED"
+  | "ISSUE_ALREADY_LINKED" | "ISSUE_LINES_MISMATCH" | "PARTNER_INACTIVE"
+  | "CORRECTION_INVALID" | "CORRECTION_REASON_REQUIRED" | "CORRECTION_ALREADY_ACTIVE"
+  | "RECEIVING_LINES_MISMATCH" | "RECEIVING_QUANTITY_INVALID" | "RECEIVING_OVER_SENT"
+  | "DISCREPANCY_REASON_REQUIRED";
+
+const businessErrors: readonly DocumentErrorCode[] = [
+  "SELF_DECISION", "WAREHOUSE_SCOPE_REQUIRED", "ISSUE_PURPOSE_MISMATCH", "ISSUE_NOT_CONFIRMED",
+  "ISSUE_LINES_MISMATCH", "PARTNER_INACTIVE", "CORRECTION_INVALID", "CORRECTION_REASON_REQUIRED",
+  "RECEIVING_LINES_MISMATCH", "RECEIVING_QUANTITY_INVALID", "RECEIVING_OVER_SENT",
+  "DISCREPANCY_REASON_REQUIRED",
+];
+
+export class InvalidTransitionError extends Error {
+  readonly httpStatus: 409 | 422;
+
+  constructor(readonly code: DocumentErrorCode) {
+    super(code);
+    this.name = "InvalidTransitionError";
+    this.httpStatus = businessErrors.includes(code) ? 422 : 409;
+  }
+}
+
+export type ApprovalSnapshot = Readonly<{
+  state: "approved" | "rejected" | "pending" | "cancelled" | "halted";
+  actorSub?: string;
+  approvedLineSnapshotSha256?: string;
+  currentLineSnapshotSha256?: string;
+  actorHasWarehouseScope?: boolean;
+}>;
+
+export function applyDocumentAction(input: Readonly<{
+  type: DocumentType;
+  status: DocumentStatus;
+  action: DocumentAction;
+  createdBySub?: string;
+  approval?: ApprovalSnapshot;
+}>): DocumentStatus {
+  const rule = DOCUMENT_RULES[input.type].transitions.find(
+    (item) => item.from === input.status && item.action === input.action,
+  );
+  if (!rule) throw new InvalidTransitionError("WRONG_STATE");
+  if (rule.actorRule === "approver_not_creator") {
+    const decision = input.action === "approve" ? "approved" : "rejected";
+    if (input.approval?.state !== decision) {
+      throw new InvalidTransitionError("APPROVAL_NOT_CONFIRMED");
+    }
+    if (!input.createdBySub || !input.approval.actorSub) {
+      throw new InvalidTransitionError("APPROVAL_NOT_CONFIRMED");
+    }
+    if (input.createdBySub === input.approval.actorSub) {
+      throw new InvalidTransitionError(rule.errorCode);
+    }
+  }
+  if (rule.actorRule === "approved_issue_confirm") {
+    if (input.approval?.state !== "approved") {
+      throw new InvalidTransitionError(rule.errorCode);
+    }
+    if (!input.approval.approvedLineSnapshotSha256 ||
+        input.approval.approvedLineSnapshotSha256 !== input.approval.currentLineSnapshotSha256) {
+      throw new InvalidTransitionError("APPROVAL_LINES_CHANGED");
+    }
+    if (input.approval.actorHasWarehouseScope !== true) {
+      throw new InvalidTransitionError("WAREHOUSE_SCOPE_REQUIRED");
+    }
+  }
+  return rule.to;
+}
+
+export function documentStockEffect(type: DocumentType, status: DocumentStatus): StockEffect {
+  return status === "confirmed" ? DOCUMENT_RULES[type].stockEffect : "none";
+}
+
+export type IssueLine = Readonly<{
+  id: string;
+  lineNo: number;
+  warehouseId: string;
+  batchId: string;
+  productVariantId: string;
+  productId: string;
+  uomId: string;
+  quantity: string;
+}>;
+
+export type LinkedIssueLine = Omit<IssueLine, "id"> & Readonly<{ sourceIssueLineId: string }>;
+
+export function assertIssueLink(input: Readonly<{
+  targetType: "partner_transfer" | "sale_record";
+  issueType: DocumentType;
+  issueStatus: DocumentStatus;
+  issuePurpose: IssuePurpose;
+  alreadyLinked: boolean;
+  destinationPartnerActive?: boolean;
+  issueLines: readonly IssueLine[];
+  linkedLines: readonly LinkedIssueLine[];
+}>): void {
+  const purpose = input.targetType === "partner_transfer" ? "partner_transfer" : "sale";
+  if (input.issueType !== "goods_issue" || input.issuePurpose !== purpose) {
+    throw new InvalidTransitionError("ISSUE_PURPOSE_MISMATCH");
+  }
+  if (input.issueStatus !== "confirmed") throw new InvalidTransitionError("ISSUE_NOT_CONFIRMED");
+  if (input.alreadyLinked) throw new InvalidTransitionError("ISSUE_ALREADY_LINKED");
+  if (input.targetType === "partner_transfer" && input.destinationPartnerActive !== true) {
+    throw new InvalidTransitionError("PARTNER_INACTIVE");
+  }
+  const source = new Map(input.issueLines.map((line) => [line.id, line]));
+  if (!source.size || source.size !== input.issueLines.length || input.linkedLines.length !== source.size) {
+    throw new InvalidTransitionError("ISSUE_LINES_MISMATCH");
+  }
+  for (const line of input.linkedLines) {
+    const original = source.get(line.sourceIssueLineId);
+    if (!original || original.lineNo !== line.lineNo ||
+        original.warehouseId !== line.warehouseId || original.batchId !== line.batchId ||
+        original.productVariantId !== line.productVariantId || original.productId !== line.productId ||
+        original.uomId !== line.uomId || original.quantity !== line.quantity) {
+      throw new InvalidTransitionError("ISSUE_LINES_MISMATCH");
+    }
+    source.delete(line.sourceIssueLineId);
+  }
+  if (source.size) throw new InvalidTransitionError("ISSUE_LINES_MISMATCH");
+}
+
+export function assertCorrection(input: Readonly<{
+  documentId: string;
+  documentType: DocumentType;
+  correctionOfDocumentId?: string | null;
+  correctionReason?: string | null;
+  sourceType?: DocumentType;
+  sourceStatus?: DocumentStatus;
+  existingActiveCorrection?: boolean;
+}>): void {
+  if (input.correctionOfDocumentId == null && input.correctionReason == null) return;
+  if (!input.correctionReason?.trim()) throw new InvalidTransitionError("CORRECTION_REASON_REQUIRED");
+  if (!input.correctionOfDocumentId || input.correctionOfDocumentId === input.documentId ||
+      input.sourceType !== input.documentType || input.sourceStatus !== "confirmed") {
+    throw new InvalidTransitionError("CORRECTION_INVALID");
+  }
+  if (input.existingActiveCorrection) throw new InvalidTransitionError("CORRECTION_ALREADY_ACTIVE");
+}
+
+function decimalQuantity(value: string): string {
+  if (!/^(?:0|[1-9]\d{0,16})(?:\.\d{1,3})?$/.test(value)) {
+    throw new InvalidTransitionError("RECEIVING_QUANTITY_INVALID");
+  }
+  const [whole, fraction = ""] = value.split(".");
+  return whole.padStart(17, "0") + fraction.padEnd(3, "0");
+}
+
+export function assertReceivingLines(input: Readonly<{
+  sourceLines: readonly Readonly<{ id: string; quantity: string }>[];
+  lines: readonly Readonly<{ sourceLineRef: string; quantity: string; actualQuantity: string }>[];
+  discrepancyReason?: string | null;
+}>): void {
+  const source = new Map(input.sourceLines.map((line) => [line.id, line.quantity]));
+  if (!source.size || source.size !== input.sourceLines.length || source.size !== input.lines.length) {
+    throw new InvalidTransitionError("RECEIVING_LINES_MISMATCH");
+  }
+  let discrepancy = false;
+  for (const line of input.lines) {
+    const sent = source.get(line.sourceLineRef);
+    if (sent === undefined || decimalQuantity(sent) !== decimalQuantity(line.quantity)) {
+      throw new InvalidTransitionError("RECEIVING_LINES_MISMATCH");
+    }
+    const actual = decimalQuantity(line.actualQuantity);
+    if (actual > decimalQuantity(sent)) throw new InvalidTransitionError("RECEIVING_OVER_SENT");
+    if (actual !== decimalQuantity(sent)) discrepancy = true;
+    source.delete(line.sourceLineRef);
+  }
+  if (source.size) throw new InvalidTransitionError("RECEIVING_LINES_MISMATCH");
+  if (discrepancy && !input.discrepancyReason?.trim()) {
+    throw new InvalidTransitionError("DISCREPANCY_REASON_REQUIRED");
+  }
+}
