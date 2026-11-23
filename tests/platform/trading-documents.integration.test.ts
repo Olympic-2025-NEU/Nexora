@@ -6,7 +6,7 @@ import { PrismaClient } from "@prisma/client";
 import { getPrismaClient } from "../../platform/persistence/prisma";
 import { createPrismaIdempotency } from "../../platform/http/idempotency";
 import { runCommand } from "../../platform/http/pipeline";
-import { tradingService, tradingUnitOfWork, tradingPorts, transferService, stocktakeService } from "../../composition/trading";
+import { tradingService, tradingUnitOfWork, tradingPorts, transferService, stocktakeService, saleService } from "../../composition/trading";
 import { createReceivingService, type ActualInput } from "../../contexts/trading/application/receivings";
 import { createCatalogRepos } from "../../contexts/catalog/infrastructure/prisma-repos";
 import { createDocumentService } from "../../contexts/trading/application/documents";
@@ -94,6 +94,86 @@ async function stockCommand<T>(action: string, body: unknown,
     domain: (ctx) => work({ tx: ctx.tx, actor: actingActor, requestId: ctx.requestId, emit: ctx.emit }),
   });
 }
+
+async function saleCommand<T>(action: "create" | "confirm" | "cancel" | "read", body: unknown,
+  work: (ctx: Parameters<ReturnType<typeof saleService>["create"]>[0]) => Promise<T>, key?: string,
+  actingActor: Actor = actor): Promise<T> {
+  return runCommand({ requestId: randomUUID() }, {
+    authenticate: async () => actingActor, resolveTenant: async () => actingActor.organizationId,
+    action: `trading:sale:${action}`, unitOfWork: tradingUnitOfWork,
+    method: "POST", routeKey: `sale:${action}`, payload: body,
+    idempotencyKey: key, idempotencyPort: createPrismaIdempotency(db),
+    domain: (ctx) => work({ tx: ctx.tx, actor: actingActor, requestId: ctx.requestId, emit: ctx.emit }),
+  });
+}
+
+test("sale from approved issue leaves 6 to 4 balance unchanged, one trace event; rejects invalid source", {
+  timeout: 120_000,
+}, async () => {
+  const lot = randomUUID();
+  await owner.batch.create({ data: { id: lot, productId, productVariantId: variantId, localCode: randomUUID(),
+    originIssuerInstanceId: "issuer", originLotId: randomUUID(), qualityStatus: "available", createdBySub: "fixture" } });
+  const receipt = await command("create", {}, (ctx) => tradingService.create(ctx, "goods_receipt",
+    { lines: [{ ...line("6"), batchId: lot }] }));
+  await command("confirm", { id: receipt.id }, (ctx) => tradingService.action(ctx,
+    "goods_receipt", receipt.id, "confirm", receipt.version), randomUUID());
+  assert.equal((await db.stockBalance.findUniqueOrThrow({ where: { warehouseId_batchId: {
+    warehouseId, batchId: lot } } })).quantity.toFixed(3), "6.000");
+  const source = await command("create", {}, (ctx) => tradingService.create(ctx, "goods_issue",
+    { purpose: "sale", lines: [{ ...line("2"), batchId: lot }] }), undefined, "goods_issue");
+  await assert.rejects(saleCommand("create", {}, (ctx) => saleService().create(ctx, {
+    linkedIssueId: source.id,
+  })), { code: "ISSUE_NOT_CONFIRMED", httpStatus: 409 });
+  const wrong = await command("create", {}, (ctx) => tradingService.create(ctx, "goods_issue",
+    { purpose: "other", lines: [{ ...line("1"), batchId: lot }] }), undefined, "goods_issue");
+  await assert.rejects(saleCommand("create", {}, (ctx) => saleService().create(ctx, {
+    linkedIssueId: wrong.id,
+  })), { code: "ISSUE_WRONG_PURPOSE", httpStatus: 422 });
+  await assert.rejects(saleCommand("create", {}, (ctx) => saleService().create(ctx, {
+    linkedIssueId: randomUUID(),
+  })), { code: "ISSUE_NOT_FOUND", httpStatus: 422 });
+  await command("submit", { id: source.id }, (ctx) => tradingService.action(ctx,
+    "goods_issue", source.id, "submit", source.version), undefined, "goods_issue");
+  await approve(source.id);
+  await command("confirm", { id: source.id }, (ctx) => tradingService.action(ctx,
+    "goods_issue", source.id, "confirm", source.version + 1), randomUUID(), "goods_issue");
+  const balance = async () => (await db.stockBalance.findUniqueOrThrow({ where: { warehouseId_batchId: {
+    warehouseId, batchId: lot } } })).quantity.toFixed(3);
+  assert.equal(await balance(), "4.000");
+  const movementCount = await db.stockMovement.count();
+  await assert.rejects(saleCommand("create", {}, (ctx) => saleService().create(ctx, {
+    linkedIssueId: source.id, soldAt: new Date(Date.now() + 86_400_000).toISOString(),
+  })), { code: "INVALID_SOLD_AT", httpStatus: 422 });
+  await assert.rejects(saleCommand("create", {}, (ctx) => saleService().create(ctx, {
+    linkedIssueId: source.id, buyerRef: "x".repeat(65),
+  })), { code: "BUYER_REF_TOO_LONG", httpStatus: 422 });
+  const cancelled = await saleCommand("create", {}, (ctx) => saleService().create(ctx, {
+    linkedIssueId: source.id, buyerRef: "  ref-1  ",
+  }));
+  assert.equal(cancelled.buyerRef, "ref-1");
+  assert.equal(cancelled.lines[0]!.sourceIssueLineId, source.lines[0]!.id);
+  await assert.rejects(saleCommand("create", {}, (ctx) => saleService().create(ctx, {
+    linkedIssueId: source.id,
+  })), { code: "SALE_ALREADY_EXISTS", httpStatus: 409 });
+  await saleCommand("cancel", { id: cancelled.id }, (ctx) => saleService().cancel(ctx, cancelled.id, cancelled.version));
+  const sale = await saleCommand("create", {}, (ctx) => saleService().create(ctx, { linkedIssueId: source.id }));
+  await assert.rejects(saleCommand("confirm", { id: sale.id }, (ctx) =>
+    saleService().confirm(ctx, sale.id, sale.version), randomUUID(), { ...actor, unitIds: [] }),
+  { code: "WAREHOUSE_SCOPE_REQUIRED", httpStatus: 403 });
+  const key = randomUUID();
+  const confirm = () => saleCommand("confirm", { id: sale.id }, (ctx) => saleService().confirm(ctx, sale.id, sale.version), key);
+  const posted = await confirm();
+  assert.deepEqual(await confirm(), posted);
+  assert.equal(posted.movementIds.length, 0);
+  assert.equal(await balance(), "4.000");
+  assert.equal(await db.stockMovement.count(), movementCount);
+  assert.equal(await db.outboxMessage.count({ where: { aggregateId: sale.id, eventType: "trading.sale.recorded.v1" } }), 1);
+  assert.equal((await db.outboxMessage.findFirstOrThrow({ where: { aggregateId: sale.id,
+    eventType: "trading.sale.recorded.v1" } })).destination, "traceability");
+  await assert.rejects(saleCommand("create", {}, (ctx) => saleService().create(ctx, {
+    linkedIssueId: source.id,
+  })), { code: "SALE_ALREADY_EXISTS", httpStatus: 409 });
+});
 
 test("stocktake signed variance, zero lines, found stock, packing, reason and replay", async () => {
   const lot = randomUUID(), found = randomUUID();

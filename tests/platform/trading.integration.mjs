@@ -266,6 +266,35 @@ test("transfer, sale and receiving raw SQL validate links and totals", async () 
   assert.equal((await app.receivingDetail.findMany({ where: { sourceTransferId: cancelledSource } })).length, 2);
 });
 
+test("deferred sale constraint blocks second active issue link and releases cancelled draft", async () => {
+  const issue = header("goods_issue", { issuePurpose: "sale" });
+  await app.$transaction(async (tx) => {
+    await insertHeader(tx, issue);
+    await insertLine(tx, line(issue.id));
+    await confirm(tx, issue.id);
+  });
+  const makeSale = async () => {
+    const sale = header("sale_record");
+    await app.$transaction(async (tx) => {
+      await insertHeader(tx, sale);
+      await tx.$executeRaw`INSERT INTO trading.sale_detail(document_id,linked_issue_id,sold_at)
+        VALUES (${sale.id}::uuid,${issue.id}::uuid,now())`;
+    });
+    return sale;
+  };
+  const first = await makeSale();
+  await assert.rejects(makeSale(), { code: "P2002" });
+  await app.document.update({ where: { id: first.id }, data: { status: "cancelled", cancelledAt: new Date() } });
+  const replacement = await makeSale();
+  assert.equal((await app.saleDetail.findMany({ where: { linkedIssueId: issue.id } })).length, 2);
+  await app.$transaction(async (tx) => {
+    await insertLine(tx, line(replacement.id, { sourceIssueLineId:
+      (await tx.documentLine.findFirstOrThrow({ where: { documentId: issue.id } })).id }));
+    await confirm(tx, replacement.id);
+  });
+  await assert.rejects(makeSale(), { code: "P2002" });
+});
+
 test("partial correction uniqueness and caller-owned repository transaction", async () => {
   const source = header();
   await app.$transaction(async (tx) => {
