@@ -285,6 +285,9 @@ services:
       # Membership invite provisions users via Keycloak Admin (same creds as bootstrap).
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME}
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD}
+      FLOWABLE_BASE_URL: 
+      FLOWABLE_ADMIN_USER: 
+      FLOWABLE_ADMIN_PASSWORD: 
     depends_on:
       db-migrate:
         condition: service_completed_successfully
