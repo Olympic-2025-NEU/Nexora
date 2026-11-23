@@ -21,7 +21,7 @@ Chọn công nghệ qua spike **không** nghĩa app/core đã triển khai. Hai 
 | [D11](../adr/D11-dxos-principles-evidence.md) → [0011](../adr/0011-four-principles-proof.md) | Bốn nguyên lý **đã chốt thiết kế** | BTC + P12 |
 | [D12](../adr/D12-gitops-demo.md) → [0012](../adr/0012-gitops-demo.md) | k3s/Argo **có điều kiện** | P12 drift/reconcile |
 | [D13](../adr/D13-versions-licenses-resources.md) → [0013](../adr/0013-versions-licenses.md) | Digest/license/RAM snapshot **đã ghi** | P00-T04 npm inventory pass; P01 peak, P13 release SBOM |
-| [D14](../adr/D14-stock-movement-ownership.md) → [0014](../adr/0014-movement-ownership.md) | Movement ownership **đã chốt thiết kế** | P07/P09 tests |
+| [D14](../adr/D14-stock-movement-ownership.md) → [0014](../adr/0014-movement-ownership.md) | **Closed at P07-T01 contract level**: [matrix, guards, evidence](./evidence/p07-t01.md) | Runtime DB/HTTP/Flowable tests P07-T02/T03/T07/T08; cross-instance P09 |
 | [D15](../adr/D15-headless-core-boundary.md) → [0015](../adr/0015-headless-tier2-boundary.md) | Ba runtime **đã chốt**; headless spike pass | Core Data/File API sản phẩm chưa có |
 | **D16** → [0016](../adr/0016-ui-surface-partitioning.md) | UI surfaces **đã chốt** (`/admin` hệ thống; `/catalog` `/inventory` `/partners`; trading/trace sau) | Migrate legacy `/admin/products…`; P07–P11 route maps |
 
@@ -44,7 +44,7 @@ Smoke: [infra](./evidence/spikes/infra/README.md), [pg semantics spike](./eviden
 | D11 Principles | P00/P12 | Design locked | [0011](../adr/0011-four-principles-proof.md) | Evidence: `D11-dxos-principles-evidence.md` |
 | D12 GitOps | P12 | Conditional | [0012](../adr/0012-gitops-demo.md) | Evidence: `D12-gitops-demo.md` |
 | D13 Versions | P01/P13 | Snapshot recorded | [0013](../adr/0013-versions-licenses.md) | Evidence: `D13-versions-licenses-resources.md` |
-| D14 Movement | P00/P07 | **Accepted P00 design** | [0014](../adr/0014-movement-ownership.md) | D03 primitive/static contract pass; P07 real confirms |
+| D14 Movement | P00/P07 | **Closed P07-T01 contract; runtime pending** | [0014](../adr/0014-movement-ownership.md) | [T01 evidence](./evidence/p07-t01.md); real confirms and movements P07-T02/T03/T08, bridge P07-T07, A/B/C P09 |
 | D15 Headless | P00/P01 | **Accepted** (spike) | [0015](../adr/0015-headless-tier2-boundary.md) | Evidence: `D15-headless-core-boundary.md` |
 | D16 UI surfaces | ERP UI / P07–P11 | **Accepted** 2026-11-22 | [0016](../adr/0016-ui-surface-partitioning.md) | BRD/SRS: `documents/requirements/` |
 | D17 Catalog upgrade | **P065** (trước P07) | **ADR Accepted design** 2026-11-22; **DDL chờ Dev duyệt pack** | [0017](../adr/0017-catalog-variant-uom-price.md) | Pack [`evidence/p065-schema-design.md`](./evidence/p065-schema-design.md); BRD/SRS product-catalog; plan [`phase-06.5`](./phase-06.5-catalog-business-upgrade.md); G06.5 |

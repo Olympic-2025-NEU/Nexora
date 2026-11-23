@@ -158,6 +158,19 @@ Add `product_variant_id uuid!→product_variant.id`; keep `product_id` denormali
 
 Stocktake dùng `document` + `document_line.counted_quantity`; variance = counted − balance snapshot dưới lock khi confirm, lưu `stock_movement.delta` nếu khác 0. Nếu variance=0 vẫn confirm/audit/trace nhưng không tạo zero movement. Receipt nhập nội bộ, issue và receiving theo D14. Confirmed document và lines **không UPDATE/DELETE** ở runtime (trigger + grants); sửa sai qua chứng từ bù mới có `correction_of_document_id`/reason và quy trình duyệt bình thường khi là issue. `stock_movement.reversal_of` chỉ dùng nếu ADR thiết kế exact reversal 1:1; MVP không có generic reversal API hoặc tự hoàn tác transfer xuyên instance.
 
+**D14 đóng ở tầng contract P07-T01** ([evidence](./evidence/p07-t01.md)); runtime cần T02/T03/T07/T08 và cross-instance P09. Status chứng từ, state bridge phê duyệt và stock effect là ba trục riêng: `approved` là đã qua duyệt, chưa ghi tồn; chỉ `confirmed` mới có thể ghi movement. `draft/cancelled/rejected` không ghi tồn. Một GoodsIssue có `issue_purpose` duy nhất bất biến từ lúc tạo; transfer chỉ được link issue purpose `partner_transfer`, sale chỉ link purpose `sale`. Mỗi link giữ UNIQUE 1–1 riêng như trên; purpose ngăn dùng chung issue cho cả transfer và sale. Transfer/sale copy chính xác từng source issue line (lot/qty/UOM/variant), không chỉ tổng số. GoodsReceipt (+) **chỉ** nhập nội bộ; hàng chuyển từ đối tác chỉ nhập qua ReceivingConfirmation (+ actual) một lần, không thêm GoodsReceipt cho cùng lô hàng đó.
+
+| `document_type` | Confirm movement `kind` | `delta` | Nguồn ghi tồn |
+| --- | --- | --- | --- |
+| `goods_receipt` | `receipt` | `+quantity` | Nhập nội bộ, không phải partner transfer |
+| `goods_issue` | `issue` | `−quantity` | Chỉ sau local approval approved + hash dòng + current warehouse scope |
+| `partner_transfer` | none | none | Tham chiếu issue confirmed, không trừ lần hai |
+| `receiving_confirmation` | `receiving` | `+actual_quantity` (zero: no movement) | Một lần cho nguồn transfer; từng source line không bỏ sót |
+| `stocktake` | `stocktake` | `counted_quantity − balance_at_confirm` (zero: no movement) | Balance đọc dưới lock tại confirm, không nhập expected |
+| `sale_record` | none | none | Tham chiếu issue confirmed, không trừ lần hai |
+
+Correction phải cùng type, trỏ chứng từ confirmed liền trước, có reason khác rỗng, mỗi predecessor tối đa một correction chưa cancel tại một thời điểm (T02 index có điều kiện, T03 guard cùng transaction). Correction của correction hợp lệ; movement theo dòng correction, không tự hoàn tác gốc hoặc cascade transfer/sale. GoodsIssue correction vẫn qua approval. Confirm tại T03/T08 dùng command pipeline P04 (`Idempotency-Key`, current `If-Match`), ghi document + movement/balance + audit + outbox atomic; cancel pending đồng thời tombstone approval request ở T07. V1 không có auto-expiry, pending tới decision/cancel.
+
 ## P08 — `traceability`
 
 ### `traceability.trace_event`

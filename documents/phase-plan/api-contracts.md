@@ -28,6 +28,36 @@
 
 Các route `/{type}` trên là ký hiệu rút gọn; OpenAPI phải liệt kê từng path cụ thể, không implement dynamic catch-all cho mọi loại chứng từ.
 
+### M03 document transition contract (P07-T01)
+
+Source of truth for the pure domain matrix and guards: `contexts/trading/domain/document.ts`. Document status, approval request state, and stock effect are independent. `approved` means approved by the bridge, **not** stock posted; `confirmed` means the document was posted. Only `confirm` can cause a stock effect. `edit` keeps Draft status and requires current `If-Match` version; no `PATCH status` and no delete of confirmed documents.
+
+| Document type | Allowed status/action/status | Effect upon confirm |
+| --- | --- | --- |
+| `goods_issue` | `draft/edit/draft`, `draft/submit/pending_approval`, `pending_approval/approve/approved`, `pending_approval/reject/rejected`, `approved/confirm/confirmed`, `draft\|pending_approval\|approved/cancel/cancelled` | `issue` (negative quantity) |
+| `goods_receipt` | `draft/edit/draft`, `draft/confirm/confirmed`, `draft/cancel/cancelled` | `receipt` (positive internal receipt only) |
+| `partner_transfer` | Same direct-confirm graph as goods receipt | none; linked confirmed issue already posted |
+| `receiving_confirmation` | Same direct-confirm graph as goods receipt | `receiving` (positive actual; zero skips movement) |
+| `stocktake` | Same direct-confirm graph as goods receipt | `stocktake` (counted − balance at confirm; zero skips movement) |
+| `sale_record` | Same direct-confirm graph as goods receipt | none; linked confirmed issue already posted |
+
+`pending_approval`, `approved`, and `rejected` are unreachable for all non-issue types. `rejected`, `confirmed`, and `cancelled` are terminal. Rejected issues require a **new** document; no edit/resubmit. An approval decision after cancel does not change the cancelled document. Cancel while pending also tombstones its bridge request in the same transaction (T07); late engine decisions cannot resurrect it. V1 has **no automatic expiry**: pending approval lasts until a decision or cancellation. Expiry policy belongs to T07, not this contract.
+
+Every issue requires the `goods-issue-approval` bridge. Decision requires a current Approver, complete warehouse scope, and actor different from creator. Project `approve/reject` only from a proven local bridge decision. At issue confirm, call bridge `confirmApproval`/`assertConfirmable` within the caller transaction: require local `approved`, compare freshly computed current line hash to approved `line_snapshot_sha256` (canonical `{lineNo,warehouseId,productId,batchId,quantity,unit}`), recheck actor's **current** warehouse scope, and apply `If-Match` to **current** document version, not submitted version. Approval never posts stock; Flowable is never called from the domain. `halted`/engine ambiguity blocks confirmation.
+
+`issue_purpose` is required and fixed at creation for goods issue only (`partner_transfer`, `sale`, `other`). Transfer/sale link a confirmed issue with matching purpose, at most once per target kind; purpose prevents cross-kind double allocation. Copy **every** source issue line exactly, including source line ID, lot, variant, warehouse, UOM and canonical quantity. Transfer additionally requires an active partner. Receiving requires one `source_line_ref` per authenticated transfer source line, no missing/extra/duplicate lines; each actual is between 0 and sent, with reason when different. Over-receipt is dispute/422, never stock added beyond sent. Partner inbound receiving is the sole positive event for those goods: do not create a second goods receipt for the same shipment. Goods receipts are internal only.
+
+Correction is a **new document of the same type** with both `correction_of_document_id` (confirmed immediate predecessor) and nonblank `correction_reason`; no pair for a normal document. A correction may correct another confirmed correction. At most one non-cancelled correction per predecessor at once. It follows its own type's full lifecycle (including issue approval) and posts only its **own entered lines**; no automatic reversal or cascade to linked transfer/sale. Stocktake input contains counted quantity; read balance under lock at confirm and calculate `delta = counted − balance_at_confirm`. Confirm with delta zero still audits but writes no zero movement. Correction-chain ownership and constraints belong to T02/T03; cross-instance discrepancies to P09.
+
+Header requirements: `document_type`, server-generated `document_number` (type prefix + date + 12 UUID characters, retry unique collision), `created_by_sub`, `correlation_id`; issue also `issue_purpose`, correction also paired `correction_of_document_id`/`correction_reason`. Each line requires `line_no`, `warehouse_id`, `batch_id`, `product_variant_id`, denormalized `product_id`, `uom_id`; receipt/issue/transfer/sale require `quantity`, transfer/sale also `source_issue_line_id`; receiving requires sent `quantity`, `actual_quantity`, `source_line_ref`; stocktake requires `counted_quantity`. Transfer detail requires `linked_issue_id`, `destination_partner_id`; receiving requires `source_issuer_instance_id`, `source_transfer_id` (plus sent/actual totals); sale requires `linked_issue_id`, `sold_at`; `buyer_ref` optional, no price/payment/PII. Input quantity is in selected UOM; server converts to variant stock UOM before Inventory port.
+
+| Failure | Domain codes | Planned HTTP mapping |
+| --- | --- | --- |
+| Invalid state/action, terminal edit/delete/second confirm, bridge not approved or changed hash, already-linked issue/active correction | `WRONG_STATE`, `APPROVAL_NOT_CONFIRMED`, `APPROVAL_LINES_CHANGED`, `ISSUE_ALREADY_LINKED`, `CORRECTION_ALREADY_ACTIVE` | 409 |
+| Business validation, self-decision, missing scope fact, wrong purpose/line match, invalid correction, over-receipt/discrepancy | `SELF_DECISION`, `WAREHOUSE_SCOPE_REQUIRED`, `ISSUE_PURPOSE_MISMATCH`, `ISSUE_NOT_CONFIRMED`, `ISSUE_LINES_MISMATCH`, `PARTNER_INACTIVE`, `CORRECTION_INVALID`, `CORRECTION_REASON_REQUIRED`, `RECEIVING_LINES_MISMATCH`, `RECEIVING_QUANTITY_INVALID`, `RECEIVING_OVER_SENT`, `DISCREPANCY_REASON_REQUIRED` | 422 at domain boundary; HTTP permission/scope failures remain 403 via authz layer |
+
+All confirm actions in T03/T08 must pass the P04 command pipeline with `Idempotency-Key`, then atomically write document/status/version, Inventory movement/balance when nonzero, audit and outbox in **one** transaction. Outbox delivery occurs after commit; transfer/sale never write movement. Runtime HTTP mapping, stock checks and transaction proof belong to T03/T08, not T01.
+
 ### 2.1. Cây thư mục route theo cụm chức năng
 
 ```text
