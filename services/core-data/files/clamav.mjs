@@ -35,6 +35,10 @@ function command(host, port, request, { timeoutMs = 20_000 } = {}) {
 export function createClamAvScanner({ host = 'clamav', port = 3310, timeoutMs = 20_000 } = {}) {
   const options = { timeoutMs };
   return {
+    async reload() {
+      const reply = await command(host, port, (socket) => socket.write('zRELOAD\0'), options);
+      if (reply !== 'RELOADING') throw new ScannerError('SCANNER_PROTOCOL');
+    },
     async version() {
       const version = await command(host, port, (socket) => socket.write('zVERSION\0'), options);
       if (!/^ClamAV [\w.\-+/: ]{3,120}$/.test(version)) throw new ScannerError('SCANNER_PROTOCOL');

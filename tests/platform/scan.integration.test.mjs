@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { createServer as createTcpServer } from 'node:net';
 import { createServer as createHttpServer } from 'node:http';
 import { setTimeout as delay } from 'node:timers/promises';
-import { after, test } from 'node:test';
+import { after, before, test } from 'node:test';
 import { PrismaClient } from '@prisma/client';
 import { createClamAvScanner } from '../../services/core-data/files/clamav.mjs';
 import { createS3FileStore } from '../../services/core-data/files/s3-store.mjs';
@@ -31,15 +31,28 @@ const administrator = { sub: 'p03-scan-admin', role: 'administrator' };
 after(async () => { await Promise.all([admin.$disconnect(), core.$disconnect()]); });
 
 async function ready() {
-  for (let attempt = 0; attempt < 240; attempt++) {
+  // The pinned image ships a daily.cvd older than the 7-day gate. freshclam
+  // often writes the update before clamd's socket exists, so the daemon is
+  // never notified and keeps serving the stale database. RELOAD picks up the
+  // files already on disk; retry until that update has landed.
+  let lastError = 'unavailable';
+  for (let attempt = 0; attempt < 480; attempt++) {
     try {
       await scanner.version();
       if (!await coreStore.exists('quarantine', `probe-${randomUUID()}`)) return;
-    } catch { /* Services and signature database may still be starting. */ }
+      lastError = 'storage probe failed';
+    } catch (error) {
+      lastError = error.code || error.message;
+      if (lastError === 'SCANNER_SIGNATURE_STALE' && attempt % 15 === 0) {
+        try { await scanner.reload(); } catch { /* clamd is still starting */ }
+      }
+    }
     await delay(1000);
   }
-  throw new Error('ClamAV or SeaweedFS did not become ready in four minutes');
+  throw new Error(`ClamAV or SeaweedFS did not become ready in eight minutes (${lastError})`);
 }
+
+before(async () => { await ready(); });
 
 async function upload(text) {
   return files.upload({ actor: staff, body: Buffer.from(text), declaredType: 'text/plain',
@@ -52,7 +65,6 @@ async function locked(id) {
 }
 
 test('real ClamAV scan gates private bytes and records result atomically', async () => {
-  await ready();
   const accepted = await upload('clean scan fixture');
   assert.equal(accepted.scanState, 'pending');
   await locked(accepted.id);
