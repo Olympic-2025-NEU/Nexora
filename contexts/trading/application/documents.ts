@@ -31,7 +31,8 @@ export type TradingPorts = {
   hash(lines: { lineNo: number; warehouseId: string; productId: string; batchId: string; quantity: number; unit: string }[]): string;
   confirmApproval(tx: Prisma.TransactionClient, input: { approvalRequestId: string; actorSub: string;
     currentLineSnapshotSha256: string }): Promise<void>;
-  cancelApproval(tx: Prisma.TransactionClient, input: { approvalRequestId: string; actorSub: string; reason: string }): Promise<void>;
+  cancelApproval(tx: Prisma.TransactionClient, input: { approvalRequestId: string; actorSub: string; reason: string;
+    approved: boolean }): Promise<void>;
 };
 
 function inScope(actor: Actor, warehouseId: string) {
@@ -174,10 +175,9 @@ export function createDocumentService(ports: TradingPorts) {
       }
       doc.lines.forEach((line) => inScope(ctx.actor, line.warehouseId));
       const approval = kind === "goods_issue" ? await repo.findApproval(id) : null;
-      if (action === "cancel" && approval?.state === "approved") throw new DomainError("APPROVAL_CANCEL_UNSUPPORTED", 409);
       if (action === "cancel" && approval && approval.state !== "cancelled") {
         await ports.cancelApproval(ctx.tx, { approvalRequestId: approval.id, actorSub: ctx.actor.userId,
-          reason: "Document cancelled" });
+          reason: "Document cancelled", approved: approval.state === "approved" });
       }
       let lines = doc.lines;
       if (action !== "cancel") {

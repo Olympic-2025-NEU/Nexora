@@ -6,7 +6,7 @@ import { prismaAuditRecorder } from "@/platform/audit/prisma-audit-recorder";
 import { adjustStock } from "@/contexts/inventory/application/adjust-stock";
 import { createDocumentService } from "@/contexts/trading/application/documents";
 import { createPrismaIdempotency } from "@/platform/http/idempotency";
-import { createRequest, confirmApproval, cancelRequest } from "@/platform/workflow/approval-service";
+import { createRequest, confirmApproval, cancelRequest, cancelApprovedRequest } from "@/platform/workflow/approval-service";
 import { computeLineSnapshotSha256 } from "@/contracts/workflow/line-snapshot";
 import { serializeDomainEvent, TRADING_EVENT_TYPES } from "@/contracts/events/registry";
 
@@ -41,7 +41,11 @@ export const tradingService = createDocumentService({
           : membership.warehouses.map((row) => row.warehouseId) } : null;
     }, async () => {}, input);
   },
-  async cancelApproval(tx, input) { await cancelRequest(tx, input); },
+  async cancelApproval(tx, input) {
+    const { approved, ...args } = input;
+    if (approved) await cancelApprovedRequest(tx, args);
+    else await cancelRequest(tx, args);
+  },
 });
 
 export const tradingIdempotency = () => createPrismaIdempotency(getPrismaClient());
