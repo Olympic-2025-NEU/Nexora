@@ -129,14 +129,17 @@ export function createTradingRepos(tx: Prisma.TransactionClient) {
 
     async list(filters: {
       status?: DocumentStatus; type?: DocumentType; from?: Date; to?: Date;
-      partnerId?: string; batchId?: string; cursorId?: string; limit: number;
+      partnerId?: string; sourceIssuerInstanceId?: string; batchId?: string; cursorId?: string; limit: number;
       warehouseIds?: readonly string[]; creatorSub?: string;
     }) {
       const where: Prisma.DocumentWhereInput = {
         ...(filters.status ? { status: filters.status } : {}),
         ...(filters.type ? { documentType: filters.type } : {}),
         ...(filters.from || filters.to ? { createdAt: { gte: filters.from, lt: filters.to } } : {}),
-        ...(filters.partnerId ? { transferDetail: { destinationPartnerId: filters.partnerId } } : {}),
+        ...(filters.partnerId ? { AND: [{ OR: [
+          { transferDetail: { destinationPartnerId: filters.partnerId } },
+          ...(filters.sourceIssuerInstanceId ? [{ receivingDetail: { sourceIssuerInstanceId: filters.sourceIssuerInstanceId } }] : []),
+        ] }] } : {}),
         ...(filters.batchId ? { lines: { some: { batchId: filters.batchId } } } : {}),
         ...(filters.warehouseIds ? { OR: [
           { createdBySub: filters.creatorSub, lines: { none: {} } },

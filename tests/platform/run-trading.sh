@@ -49,3 +49,5 @@ curl -fsS --max-time 60 -u "$FLOWABLE_ADMIN_USER:$FLOWABLE_ADMIN_PASSWORD" \
   "$FLOWABLE_BASE_URL/repository/deployments" -o /dev/null
 export DATABASE_URL="postgresql://app_runtime:test_app@127.0.0.1:$port/nexora_fresh"
 node --test --require tsx/cjs tests/platform/trading-documents.integration.test.ts
+
+node --test --require tsx/cjs tests/platform/trading-conformance.integration.test.ts
