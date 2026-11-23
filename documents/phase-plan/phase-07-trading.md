@@ -37,8 +37,8 @@ Document lines / Inventory confirm: tham chiếu **`product_variant_id`** + qty 
 
 ## P07-T05 — Receiving confirmation thực tế
 
-- [ ] B/C tạo receiving Draft từ message đã xác thực hoặc nhập tham chiếu có quy tắc; hiển thị sent quantity, actual quantity, lot mapping và reason chênh lệch.
-- [ ] Confirm tăng stock theo **actual**, không theo sent/ACK; không confirm GoodsReceipt nhập cùng hàng lần nữa. Partial/zero receipt hợp lệ và reason bắt buộc nếu khác; over-receipt ở v1 vào dispute/422, không cộng vượt. Duplicate confirm không nhân tồn. Ghi discrepancy, event mới và audit trong transaction.
+- [x] B/C tạo receiving Draft từ nguồn seeded kiểm schema/hash/recipient (chưa xác thực chữ ký); hiển thị sent quantity, actual quantity, lot mapping và reason chênh lệch. Xem `evidence/p07-t05.md`; browser journey chưa chạy.
+- [x] Confirm tăng stock theo **actual**, không theo sent/ACK; không confirm GoodsReceipt nhập cùng hàng lần nữa. Partial/zero receipt hợp lệ và reason bắt buộc nếu khác; over-receipt ở v1 trả 422, không cộng vượt. Duplicate confirm không nhân tồn. Ghi discrepancy, event mới và audit trong transaction; test PG/Flowable ở `evidence/p07-t05.md`.
 - [ ] Không tự sửa phiếu nguồn A; trạng thái đối chiếu của sender qua federation event ở P09. UI bắt người nhận xác nhận số lượng thực.
 - **Đầu ra:** receipt use case; **kiểm chứng:** A gửi 12, B nhận 10 thì B +10, chênh 2 có nguồn; AC-06 hoàn chỉnh ở P09.
 
