@@ -2,7 +2,7 @@ name: ci
 
 on:
   push:
-    branches: [develop, main, "chore/**", "spike/**", "phase-*/**", "phase01/**", "phase-03", "phase03/**", "phase-04", "phase04/**"]
+    branches: [develop, main, "chore/**", "spike/**", "phase-*/**", "phase01/**", "phase-03", "phase03/**", "phase-04", "phase04/**", "phase-07", "phase07/**"]
   pull_request:
     branches: [develop, main]
 

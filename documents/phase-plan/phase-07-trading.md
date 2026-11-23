@@ -8,10 +8,10 @@ Document lines / Inventory confirm: tham chiếu **`product_variant_id`** + qty 
 
 ## P07-T01 — Loại chứng từ và transition contract
 
-- [ ] Chốt field/status/action cho goods receipt, goods issue, partner transfer, receiving confirmation, stocktake và sale record; chỉ loại cần trong kịch bản MVP được phép đi tới confirm.
+- [x] Chốt field/status/action cho goods receipt, goods issue, partner transfer, receiving confirmation, stocktake và sale record; chỉ loại cần trong kịch bản MVP được phép đi tới confirm.
 - [ ] Draft không đổi stock và được sửa với version; Confirmed bất biến, sửa sai bằng chứng từ bù mới có `correction_of_document_id`/reason và movement theo loại chứng từ bù. Không cho PATCH status hay xóa confirmed; không làm generic reversal xuyên instance trong MVP.
 - [ ] V1 mọi GoodsIssue cần approval Flowable, Approver khác creator; chốt timeout/từ chối/quá hạn theo D06, transition invalid có test.
-- [ ] Đóng D14: GoodsReceipt nhập nội bộ +, GoodsIssue −, ReceivingConfirmation + actual, Stocktake ± variance; PartnerTransfer và SaleRecord chỉ tham chiếu issue đã confirm. Một issue outbound ↔ một transfer khớp lot/qty trong MVP; không tạo receipt nhập thứ hai cho cùng receiving.
+- [x] Đóng D14: GoodsReceipt nhập nội bộ +, GoodsIssue −, ReceivingConfirmation + actual, Stocktake ± variance; PartnerTransfer và SaleRecord chỉ tham chiếu issue đã confirm. Một issue outbound ↔ một transfer khớp lot/qty trong MVP; không tạo receipt nhập thứ hai cho cùng receiving.
 - **Đầu ra:** state machine và API contract cập nhật; **kiểm chứng:** Draft/cancel/reject không tạo movement.
 
 ## P07-T02 — Migration và repository chứng từ
