@@ -34,9 +34,9 @@
 
 ## P09-T05 — External lot mapping và dependency gap
 
-- [ ] Map `(origin issuer ID, origin lot ID)` và `(sender instance ID, sender batch ID)` sang external reference và local batch khi receiving; không hợp nhất lot chỉ vì SKU/tên trùng. Khi B→C, giữ origin A nhưng ghi rõ B là bên khẳng định và link message A→B.
-- [ ] Event đến trước thông tin lot/parent tạo `pending_dependency`/gap, reprocess idempotent khi dependency tới; cycle/unknown mapping bị đánh dấu.
-- [ ] Tách bản tóm tắt upstream được phép chia sẻ khỏi master data local; cập nhật provenance và policy version ở trace projection.
+- [x] Map `(origin issuer ID, origin lot ID)` và `(sender instance ID, sender batch ID)` sang external reference trong inbox, sau đó local batch bằng `bindExternalLot` khi receiving; không hợp nhất theo SKU/tên. B→C giữ origin A, `assertedBy=B` và ref A→B. [Bằng chứng T05](evidence/p09-t05.md).
+- [x] Event đến trước lot/parent tạo `pending_dependency` và gap trace link; resolver chạy khi inbound/bind và định kỳ trong worker, reprocess idempotent; cycle reject và origin mismatch đánh dấu rejected. [Bằng chứng T05](evidence/p09-t05.md).
+- [x] Summary partner dùng allowlist riêng, có issuer khẳng định, origin và sharing policy version; mapping/trace link mới đánh dấu passport projection stale để tái dựng theo chính sách. [Bằng chứng T05](evidence/p09-t05.md).
 - **Đầu ra:** mapping/resolver; **kiểm chứng:** out-of-order và cùng lot code khác issuer vẫn đúng.
 
 ## P09-T06 — Business receiving và discrepancy round trip

@@ -179,6 +179,7 @@
     "contexts/catalog/domain/types.ts",
     "contexts/catalog/index.ts",
     "contexts/catalog/infrastructure/prisma-repos.ts",
+    "contexts/federation/application/identity-mapping.ts",
     "contexts/federation/application/receive-event.ts",
     "contexts/finance/domain/invoice.ts",
     "contexts/finance/index.ts",

@@ -170,12 +170,32 @@ model InboxMessage {
   errorCode        String?  @map("error_code")
   partner          Partner  @relation(fields: [partnerId], references: [id])
   ack              PartnerAck?
+  identityMappings IdentityMapping[]
 
   @@unique([issuerInstanceId, messageId], map: "uq_inbox_issuer_message")
   @@unique([issuerInstanceId, eventId, eventType], map: "uq_inbox_issuer_event_type")
   @@index([state, receivedAt], map: "idx_inbox_state_received")
   @@index([eventId], map: "idx_inbox_event")
   @@map("inbox_message")
+  @@schema("federation")
+}
+
+model IdentityMapping {
+  id                     String   @id @db.Uuid
+  createdAt              DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  originIssuerInstanceId String   @map("origin_issuer_instance_id")
+  originLotId            String   @map("origin_lot_id")
+  senderInstanceId       String   @map("sender_instance_id")
+  senderBatchId          String   @map("sender_batch_id")
+  localBatchId           String   @map("local_batch_id") @db.Uuid
+  sourceMessageId        String   @map("source_message_id") @db.Uuid
+  verificationState      String   @default("partner_asserted") @map("verification_state")
+  localBatch             Batch     @relation(fields: [localBatchId], references: [id])
+  sourceMessage          InboxMessage @relation(fields: [sourceMessageId], references: [id])
+
+  @@unique([senderInstanceId, senderBatchId, originIssuerInstanceId, originLotId], map: "uq_identity_sender_origin")
+  @@index([localBatchId], map: "idx_identity_local_batch")
+  @@map("identity_mapping")
   @@schema("federation")
 }
 
@@ -567,6 +587,7 @@ model Batch {
   passportProjection PassportProjection?
   passportPolicies PassportPolicy[]
   qrTokens QrToken[]
+  identityMappings IdentityMapping[]
 
   @@unique([productId, localCode])
   @@unique([productVariantId, localCode])

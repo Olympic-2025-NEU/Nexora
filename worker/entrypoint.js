@@ -7,6 +7,7 @@ import { requestId, response, log, timed } from "../deploy/health.mjs";
 import { main as startOutbox } from "./dist/workers/outbox-dispatcher.js";
 import { createPrismaIdempotency } from "./dist/platform/http/idempotency.js";
 import { traceLag } from "./dist/workers/trace-projector.js";
+import { resolvePendingDependencies } from "./dist/contexts/federation/application/identity-mapping.js";
 
 validateConfig(process.env, "worker");
 const prisma = new PrismaClient();
@@ -22,6 +23,16 @@ async function purgeIdempotency() {
   }
 }
 setInterval(() => { void purgeIdempotency(); }, 60 * 60 * 1_000);
+async function reconcileFederation() {
+  try {
+    const resolved = await resolvePendingDependencies(prisma);
+    if (resolved) console.log(JSON.stringify({ service: "worker", outcome: "federation_resolved", resolved }));
+  } catch {
+    console.error(JSON.stringify({ service: "worker", outcome: "federation_resolver_failed" }));
+  }
+}
+setInterval(() => { void reconcileFederation(); }, 60_000);
+void reconcileFederation();
 function redisPing() {
   return timed(new Promise((resolve, reject) => {
     const url = new URL(process.env.REDIS_URL);

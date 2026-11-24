@@ -8,6 +8,7 @@ import { getPrismaClient } from "@/platform/persistence/prisma";
 import { auditDeny } from "@/platform/audit/security-audit";
 import { FederationContractError, FEDERATION_MAX_BYTES } from "@/contracts/events/federation";
 import { receiveFederationEvent } from "@/contexts/federation/application/receive-event";
+import { MappingError } from "@/contexts/federation/application/identity-mapping";
 
 async function boundedBody(request: NextRequest): Promise<string> {
   const declared = Number(request.headers.get("content-length") ?? 0);
@@ -55,7 +56,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       process.env.NEXORA_ISSUER_INSTANCE_ID ?? "");
     return NextResponse.json(ack, { status: 202 });
   } catch (error) {
-    if (error instanceof FederationContractError) {
+    if (error instanceof FederationContractError || error instanceof MappingError) {
       auditDeny(actor, "federation.event.receive", requestId, error.code);
       return NextResponse.json({ error: error.code, retryable: false }, { status: error.status });
     }

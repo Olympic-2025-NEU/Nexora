@@ -4,6 +4,8 @@ import type { PrismaClient, Prisma } from "@prisma/client";
 import { classifyFederationReplay, FederationContractError,
   validateFederationEnvelope } from "../../../contracts/events/federation";
 import type { PartnerActor } from "../../../platform/identity/partner-actor";
+import { assertAcyclic, resolveInbox,
+  resolvePendingDependencies } from "./identity-mapping";
 
 export type TechnicalAck = { messageId: string; ackId: string; acceptedAt: string;
   status: "validated" | "pending_dependency" };
@@ -15,9 +17,11 @@ export async function receiveFederationEvent(db: PrismaClient, raw: string,
   const checked = validateFederationEnvelope(raw, { receiverInstanceId,
     partnerIssuerInstanceId: actor.issuerInstanceId });
   const { envelope, hash } = checked;
+  if (checked.clockSkewWarning) console.warn(JSON.stringify({ service: "federation-inbound",
+    code: "CLOCK_SKEW_WARNING", messageId: envelope.messageId }));
   if (envelope.sharingPolicyVersion !== "v1")
     throw new FederationContractError("UNSUPPORTED_SHARING_POLICY", 422);
-  return db.$transaction(async (tx) => {
+  const ack = await db.$transaction(async (tx) => {
     const connection = await tx.partnerConnection.findUnique({
       where: { inboundClientId: actor.clientId }, include: { partner: true },
     });
@@ -45,6 +49,7 @@ export async function receiveFederationEvent(db: PrismaClient, raw: string,
       if (replay.kind === "replay" && existing.ack) return replay.ack as TechnicalAck;
       throw new Error("INBOX_ACK_MISSING");
     }
+    await assertAcyclic(tx, envelope as Parameters<typeof assertAcyclic>[1]);
     const acceptedAt = new Date().toISOString();
     const ack: TechnicalAck = { messageId: envelope.messageId, ackId: randomUUID(),
       acceptedAt, status: "validated" };
@@ -55,9 +60,17 @@ export async function receiveFederationEvent(db: PrismaClient, raw: string,
       schemaVersion: envelope.schemaVersion, payloadSha256: hash,
       payload: envelope as Prisma.InputJsonObject, partnerId: actor.partnerId,
       state: "validated" } });
+    const state = await resolveInbox(tx, inboxId);
+    if (state === "pending_dependency") ack.status = "pending_dependency";
     await tx.partnerAck.create({ data: { id: randomUUID(), inboxId,
       ackId: ack.ackId, ackStatus: ack.status,
       responseBody: ack as Prisma.InputJsonObject, sentAt: new Date(acceptedAt) } });
     return ack;
   });
+  // A newly arrived parent can satisfy an earlier child. A separate resolver worker
+  // may call the same idempotent function after a crash or during backfill.
+  try { await resolvePendingDependencies(db); }
+  catch { console.error(JSON.stringify({ service: "federation-inbound",
+    outcome: "dependency_resolver_retry_pending" })); }
+  return ack;
 }
