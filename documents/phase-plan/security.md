@@ -39,7 +39,7 @@ Threat-test tối thiểu: XSS reflection trên field text chứng từ/Passport
 - Gateway đặt default deny, route allowlist; OIDC bearer cho private/federation, auth-code+PKCE cho browser theo ADR; public route giới hạn method/size/rate. Header do gateway thêm phải được xóa từ request bên ngoài trước khi set lại.
 - Keycloak admin, Flowable REST, storage console, metrics nội bộ và gateway admin API không public. Secret trong env/secret store dev, không commit; rotate test cho partner credential.
 - File upload: MIME/extension/size allowlist, key ngẫu nhiên, bucket quarantine, ClamAV scan theo phiên bản signature; chỉ chuyển trạng thái `clean` mới cho tải/chia sẻ. Scan lỗi = fail closed, không tạo public URL. Chứng từ private không đi qua QR policy mặc định.
-- QR token opaque, không mã hóa raw DB ID; revoke/rotate được; projection allowlist, không PII, giá, credential, ghi chú nội bộ. Cache public phải invalidated khi chính sách/batch status đổi.
+- QR token opaque 256 bit, không mã hóa raw DB ID; DB chỉ lưu hash, raw URL trả một lần, hết hạn sau 30 ngày. Revoke/rotate được; policy/version hoặc quality đổi làm token cũ vô hiệu. Endpoint API và trang `/passport/*` đều đi qua gateway rate limit 30 req/s burst 15; 404 đồng nhất khi token sai/hết hạn/revoked. Projection allowlist, không PII, giá, credential, ghi chú nội bộ. Public API và HTML dùng `no-store`, `no-referrer`, không index để chính sách/batch status đổi có hiệu lực ngay.
 - AI: tool input schema, output limit, log redacted, không SQL tùy ý; kết quả dữ liệu có ID nguồn và quyền của user; prompt injection từ document/partner event không được biến thành lệnh hệ thống.
 
 ## 4. Các tình huống đe dọa phải test

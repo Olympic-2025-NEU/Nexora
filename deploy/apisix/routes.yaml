@@ -360,6 +360,38 @@ routes:
         key: remote_addr
         rejected_code: 429
 
+  - id: erp-trace-ui
+    uri: /trace*
+    methods: [GET, HEAD]
+    upstream:
+      type: roundrobin
+      nodes:
+        "${ERP_UPSTREAM}": 1
+    plugins:
+      request-id: {}
+      <<: *strip-identity-headers
+      limit-req:
+        rate: 100
+        burst: 50
+        key: remote_addr
+        rejected_code: 429
+
+  - id: erp-passport-ui
+    uri: /passport/*
+    methods: [GET, HEAD]
+    upstream:
+      type: roundrobin
+      nodes:
+        "${ERP_UPSTREAM}": 1
+    plugins:
+      request-id: {}
+      <<: *strip-identity-headers
+      limit-req:
+        rate: 30
+        burst: 15
+        key: remote_addr
+        rejected_code: 429
+
   # Public auth + home when browsers hit gateway root (not only /erp/*).
   - id: erp-public-home
     uri: /

@@ -135,7 +135,7 @@ export const schemas = {
       pendingEvents: { type: "integer", minimum: 0 } }, ["state", "pendingEvents"]),
     truncated: { type: "boolean" }, nextCursor: str(),
   }, ["root", "nodes", "edges", "gaps", "asOf", "localProjection", "truncated"]),
-  QrCreate: obj({ policyVersion: str({ minLength: 1 }) }, ["policyVersion"]),
+  QrCreate: obj({ policyVersion: str({ pattern: "^v[1-9][0-9]{0,10}$", maxLength: 12 }) }, ["policyVersion"]),
   QrIssued: obj({ qrUrl: str({ format: "uri" }), tokenId: uuid }, ["qrUrl", "tokenId"]),
   PassportPolicyAccess: obj({ organization: enumeration("private", "partner", "public"),
     product: enumeration("private", "partner", "public"),

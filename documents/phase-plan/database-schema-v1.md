@@ -217,7 +217,7 @@ Correction phải cùng type, trỏ chứng từ confirmed liền trước, có 
 
 ### `traceability.qr_token`
 
-`id`, `created_at`; `batch_id uuid!→catalog.batch.id`, `token_hash char(64)! UNIQUE`, `state text! CHECK IN ('active','revoked')`, `expires_at timestamptz?`, `revoked_at timestamptz?`, `created_by_sub text!`; index `(batch_id,state)`. URL dùng random token >=128 bit, chỉ hash trong DB; không nhúng batch UUID.
+`id`, `created_at`; `batch_id uuid!→catalog.batch.id`, `token_hash char(64)! UNIQUE`, `policy_version text?`, `issuance_key_hash char(64)? UNIQUE`, `state text! CHECK IN ('active','revoked')`, `expires_at timestamptz?`, `revoked_at timestamptz?`, `created_by_sub text!`; index `(batch_id,state)`. T06 phát hành 32 byte random, encode base64url 43 ký tự; DB chỉ giữ SHA-256 token và SHA-256 của actor+batch+`Idempotency-Key`. URL `/passport/{token}` không chứa batch UUID. Token có hạn 30 ngày; gọi lại cùng key trả 409 vì raw token chỉ trả một lần. Policy version đổi hoặc projection bị revoke thì trigger thu hồi token active; public GET còn kiểm tra active policy, projection, checksum, quality, expiry tại thời điểm đọc. Retain token hash để audit/denylist; không lưu raw URL.
 
 ## P09 — `federation`
 

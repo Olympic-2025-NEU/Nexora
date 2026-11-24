@@ -8,6 +8,13 @@ const nextConfig: NextConfig = {
   },
   cacheComponents: true,
   partialPrefetching: true,
+  async headers() {
+    return [{ source: "/passport/:token", headers: [
+      { key: "Cache-Control", value: "private, no-store, max-age=0" },
+      { key: "Referrer-Policy", value: "no-referrer" },
+      { key: "X-Robots-Tag", value: "noindex, nofollow" },
+    ] }];
+  },
   /** ADR 0016 — legacy /admin product mounts → bounded-context surfaces. */
   async redirects() {
     return [

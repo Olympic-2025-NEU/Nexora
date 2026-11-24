@@ -41,9 +41,9 @@
 
 ## P08-T06 — QR token và endpoint public
 
-- [ ] QR chứa URL/token opaque ngắn gọn, không chứa ID đoán được hay dữ liệu nhạy cảm. Token có lifecycle active/revoked, rate limit và kiểm tra input.
-- [ ] Gateway public route chỉ GET Passport; private route trace yêu cầu auth; anti-enumeration, cache header và lỗi revoked/unknown không lộ metadata.
-- [ ] UI in/tải QR và trang mobile Passport hiển thị nguồn/tình trạng xác minh/gap, không gắn nhãn chứng nhận không có bằng chứng.
+- [x] QR chứa URL/token opaque ngắn gọn, không chứa ID đoán được hay dữ liệu nhạy cảm. Token có lifecycle active/revoked, rate limit và kiểm tra input. [Bằng chứng T06](evidence/p08-t06.md).
+- [x] Gateway public route chỉ GET/HEAD Passport; private route trace yêu cầu auth; anti-enumeration, cache header và lỗi revoked/unknown không lộ metadata. [Bằng chứng T06](evidence/p08-t06.md).
+- [x] UI in/tải QR và trang mobile Passport hiển thị nguồn/tình trạng xác minh/gap, không gắn nhãn chứng nhận không có bằng chứng. [Bằng chứng T06](evidence/p08-t06.md).
 - **Đầu ra:** QR + Passport UI/API; **kiểm chứng:** scan thật, revoke, guessing và private leak tests.
 
 ## P08-T07 — Evidence và chất lượng lịch sử

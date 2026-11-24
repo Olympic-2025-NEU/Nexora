@@ -229,9 +229,13 @@ add("post", "/api/v1/lots/{id}/passport-policy/revoke", "M04", "Revoke passport 
 add("post", "/api/v1/lots/{id}/passport-policy/rebuild", "M04", "Rebuild passport projection", "PassportPolicyState", {
   roles: ADMIN, scope: "organization-admin", status: 200,
   description: "Rebuild from confirmed trace source after stale event or quality change; never auto-publish restricted batches." });
-action("/api/v1/lots/{id}/qr", "M04", "Issue QR token", "QrIssued", { body: "QrCreate", ifMatch: false, status: 201 });
-action("/api/v1/lots/{id}/qr/{tokenId}/revoke", "M04", "Revoke QR token", null, { body: "Reason", ifMatch: false, idempotent: false, status: 204 });
-add("get", "/api/v1/public/passport/{token}", "M04", "Public product passport", "PassportPublic", { auth: "public", errors: [404, 429, 503], description: "Only allowlisted public fields; no member email, private stock, raw partner payload or unscanned files." });
+action("/api/v1/lots/{id}/qr", "M04", "Issue QR token", "QrIssued", { body: "QrCreate", ifMatch: false, status: 201,
+  description: "Administrator or unit-scoped staff issues a 256-bit opaque token for an active approved projection. Raw URL is returned once, expires in 30 days; repeating the Idempotency-Key returns 409." });
+action("/api/v1/lots/{id}/qr/{tokenId}/revoke", "M04", "Revoke QR token", null, { body: "Reason", ifMatch: false, idempotent: false, status: 204,
+  description: "Authenticated owner or unit-scoped staff revokes an issued token immediately and records an audit event." });
+add("get", "/api/v1/public/passport/{token}", "M04", "Public product passport", "PassportPublic", { auth: "public", errors: [404, 429, 503], description: "Only active, unexpired token, approved policy, available batch and verified allowlisted projection. Invalid, unknown and revoked are indistinguishable 404; no-store. Gateway rate limit 30 req/s, burst 15." });
+doc.paths["/api/v1/public/passport/{token}"].get.parameters[0].schema =
+  str({ pattern: "^[A-Za-z0-9_-]{43}$", minLength: 43, maxLength: 43 });
 add("post", "/api/v1/federation/events", "M04", "Accept federation event", "FederationAck", { auth: "m2m", body: "FederationEnvelope", raw: true, status: 202, errors: [401, 403, 409, 413, 422, 503], description: "Technical ACK after inbox commit; never confirms physical receiving or changes stock. Client ID and issuer must match partner mapping." });
 list("/api/v1/federation/deliveries", "M04", "List outbound delivery status", "FederationDelivery", ADMIN, ["status", "partnerId"]);
 action("/api/v1/federation/deliveries/{id}/retry", "M04", "Retry outbound delivery", "FederationRetryResult", { body: "Reason", roles: ADMIN, status: 202, ifMatch: false });

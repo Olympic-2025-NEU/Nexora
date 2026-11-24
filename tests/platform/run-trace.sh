@@ -33,7 +33,7 @@ cp prisma/schema.prisma "$temp_root/schema.prisma"
 cp prisma/migrations/migration_lock.toml "$temp_root/migrations/"
 for migration in prisma/migrations/*/; do
   case "$migration" in
-    *20261123060000_traceability_baseline/|*20261124010000_passport_policy/) ;;
+    *20261123060000_traceability_baseline/|*20261124010000_passport_policy/|*20261124020000_qr_lifecycle/) ;;
     *) cp -R "$migration" "$temp_root/migrations/" ;;
   esac
 done
@@ -42,7 +42,7 @@ export OWNER_DATABASE_URL="postgresql://migrator:test_migrator@127.0.0.1:$port/n
 export DATABASE_URL="$OWNER_DATABASE_URL"
 export APP_DATABASE_URL="postgresql://app_runtime:test_app@127.0.0.1:$port/nexora_upgrade"
 export CORE_DATABASE_URL="postgresql://core_data:test_core@127.0.0.1:$port/nexora_upgrade"
-node --test --require tsx/cjs contexts/traceability/application/backward.test.ts contexts/traceability/application/forward.test.ts contexts/traceability/application/passport-policy.test.ts
+node --test --require tsx/cjs contexts/traceability/application/backward.test.ts contexts/traceability/application/forward.test.ts contexts/traceability/application/passport-policy.test.ts contexts/traceability/application/qr-token.test.ts
 printf 'P08-T01: upgrade existing P07 database\n'
 npx prisma migrate deploy --schema "$temp_root/schema.prisma"
 npx prisma migrate deploy

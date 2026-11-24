@@ -4364,7 +4364,7 @@ paths:
         - M04
       operationId: postLotsByIdQr
       summary: Issue QR token
-      description: Target contract; runtime implementation is tracked by the owning phase.
+      description: Administrator or unit-scoped staff issues a 256-bit opaque token for an active approved projection. Raw URL is returned once, expires in 30 days; repeating the Idempotency-Key returns 409.
       security:
         - oidc: []
       x-nexora-roles:
@@ -4423,7 +4423,7 @@ paths:
         - M04
       operationId: postLotsByIdQrByTokenIdRevoke
       summary: Revoke QR token
-      description: Target contract; runtime implementation is tracked by the owning phase.
+      description: Authenticated owner or unit-scoped staff revokes an issued token immediately and records an audit event.
       security:
         - oidc: []
       x-nexora-roles:
@@ -4474,7 +4474,7 @@ paths:
         - M04
       operationId: getPublicPassportByToken
       summary: Public product passport
-      description: Only allowlisted public fields; no member email, private stock, raw partner payload or unscanned files.
+      description: Only active, unexpired token, approved policy, available batch and verified allowlisted projection. Invalid, unknown and revoked are indistinguishable 404; no-store. Gateway rate limit 30 req/s, burst 15.
       security: []
       x-nexora-roles: []
       x-nexora-scope: anonymous
@@ -4484,7 +4484,9 @@ paths:
           required: true
           schema:
             type: string
-            minLength: 1
+            pattern: ^[A-Za-z0-9_-]{43}$
+            minLength: 43
+            maxLength: 43
       responses:
         "200":
           description: Success
@@ -7282,7 +7284,8 @@ components:
       properties:
         policyVersion:
           type: string
-          minLength: 1
+          pattern: ^v[1-9][0-9]{0,10}$
+          maxLength: 12
     QrIssued:
       type: object
       additionalProperties: false

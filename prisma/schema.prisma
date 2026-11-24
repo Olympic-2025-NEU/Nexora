@@ -815,6 +815,8 @@ model QrToken {
   createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   batchId      String    @map("batch_id") @db.Uuid
   tokenHash    String    @unique(map: "uq_qr_token_hash") @map("token_hash") @db.Char(64)
+  policyVersion String?  @map("policy_version")
+  issuanceKeyHash String? @unique(map: "uq_qr_issuance_key") @map("issuance_key_hash") @db.Char(64)
   state        String    @default("revoked")
   expiresAt    DateTime? @map("expires_at") @db.Timestamptz(6)
   revokedAt    DateTime? @map("revoked_at") @db.Timestamptz(6)

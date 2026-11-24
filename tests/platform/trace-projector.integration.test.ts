@@ -14,6 +14,7 @@ import { createPrismaBackwardPort } from "../../contexts/traceability/infrastruc
 import { forwardTrace } from "../../contexts/traceability/application/forward";
 import { createPrismaForwardPort } from "../../contexts/traceability/infrastructure/forward-repo";
 import { createPassportService } from "../../contexts/traceability/application/passport-service";
+import { createQrService } from "../../contexts/traceability/application/qr-token";
 
 if (process.env.NEXORA_TEST_TRACE !== "1" || !process.env.OWNER_DATABASE_URL ||
     !process.env.APP_DATABASE_URL || !process.env.CORE_DATABASE_URL) {
@@ -508,4 +509,63 @@ test("P08-T05 owner approval builds only allowlisted public data and invalidates
   const revokeAudit = await app.auditLog.findFirstOrThrow({ where: {
     action: "passport.policy.revoke", targetType: "passport_policy" } });
   assert.equal((revokeAudit.afterSummary as { status: string }).status, "revoked");
+});
+
+test("P08-T06 real projected lot QR remains private, expires and revokes with policy or quality", async () => {
+  const admin = { userId: "fixture-owner", organizationId: "fixture",
+    unitIds: [], roles: ["administrator"] };
+  const viewer = { ...admin, roles: ["viewer"] };
+  const scopedOut = { ...admin, unitIds: [randomUUID()], roles: ["staff"] };
+  const publication = createPassportService(app);
+  const access = { organization: "public", product: "public", batch: "public",
+    timeline: "public", evidence: "private" };
+  const policy = await publication.createDraft(admin, batches[1], access, randomUUID());
+  assert.equal(policy.policyVersion, 1);
+  assert.equal((await publication.approve(admin, batches[1], 1, randomUUID())).projectionState,
+    "active");
+  const qr = createQrService(app, "https://passport.example");
+  const key = randomUUID();
+  const first = await qr.issue(admin, batches[1], "v1", key, randomUUID());
+  assert.equal(first.qrUrl.includes(batches[1]), false);
+  const token = new URL(first.qrUrl).pathname.split("/").at(-1)!;
+  assert.equal(token.length, 43);
+  const row = await app.qrToken.findUniqueOrThrow({ where: { id: first.tokenId } });
+  assert.equal(row.tokenHash.length, 64);
+  assert.equal(row.tokenHash.includes(token), false);
+  assert.equal(row.policyVersion, "v1");
+  assert.equal((await qr.publicPassport(token))?.publicLotCode,
+    (await app.batch.findUniqueOrThrow({ where: { id: batches[1] } })).localCode);
+  assert.equal(await qr.publicPassport("A".repeat(43)), null);
+  assert.equal(await qr.publicPassport("../secret"), null);
+  await assert.rejects(qr.issue(admin, batches[1], "v1", key, randomUUID()),
+    { code: "QR_ALREADY_ISSUED" });
+  await assert.rejects(qr.issue(viewer, batches[1], "v1", randomUUID(), randomUUID()),
+    { code: "POLICY_DENIED" });
+  await assert.rejects(qr.issue(scopedOut, batches[1], "v1", randomUUID(), randomUUID()),
+    { code: "BATCH_NOT_FOUND" });
+
+  await qr.revoke(admin, batches[1], first.tokenId, "test revoke", randomUUID());
+  assert.equal(await qr.publicPassport(token), null);
+  assert.equal((await app.qrToken.findUniqueOrThrow({ where: { id: first.tokenId } })).state,
+    "revoked");
+  const second = await qr.issue(admin, batches[1], "v1", randomUUID(), randomUUID());
+  const secondToken = new URL(second.qrUrl).pathname.split("/").at(-1)!;
+  await app.qrToken.update({ where: { id: second.tokenId },
+    data: { expiresAt: new Date(Date.now() - 1000) } });
+  assert.equal(await qr.publicPassport(secondToken), null);
+  const third = await qr.issue(admin, batches[1], "v1", randomUUID(), randomUUID());
+  const thirdToken = new URL(third.qrUrl).pathname.split("/").at(-1)!;
+  const next = await publication.createDraft(admin, batches[1], access, randomUUID());
+  assert.equal(next.policyVersion, 2);
+  await publication.approve(admin, batches[1], 2, randomUUID());
+  assert.equal(await qr.publicPassport(thirdToken), null);
+  assert.equal((await app.qrToken.findUniqueOrThrow({ where: { id: third.tokenId } })).state,
+    "revoked");
+  const fourth = await qr.issue(admin, batches[1], "v2", randomUUID(), randomUUID());
+  const fourthToken = new URL(fourth.qrUrl).pathname.split("/").at(-1)!;
+  await app.batch.update({ where: { id: batches[1] }, data: { qualityStatus: "restricted" } });
+  assert.equal(await qr.publicPassport(fourthToken), null);
+  assert.equal((await app.qrToken.findUniqueOrThrow({ where: { id: fourth.tokenId } })).state,
+    "revoked");
+  assert.ok(await app.auditLog.count({ where: { targetType: "qr_token" } }) >= 5);
 });
