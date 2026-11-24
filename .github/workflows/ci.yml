@@ -33,6 +33,21 @@ jobs:
       - name: Trace schema upgrade, fresh DB, provenance and role tests
         run: npm run test:platform:trace
 
+  platform-federation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Install and generate Prisma client
+        run: npm ci && npm run db:generate
+      - name: PostgreSQL inbound trust, dedupe, mapping and dependency tests
+        run: npm run test:platform:federation
+
   platform-schema:
     runs-on: ubuntu-latest
     timeout-minutes: 15
