@@ -55,8 +55,8 @@
 
 ## P08-T08 — Gate G08
 
-- [ ] Trace local và Passport/QR chạy từ chứng từ M03 thật; AC-08 pass. Backward/forward local, duplicate event, policy/revoke/privacy tests pass.
-- [ ] AC-07/09 cross-instance chưa đánh dấu Done cho tới G09; ghi rõ những gap trước khi nhận federation.
+- [x] Trace local và Passport/QR chạy từ chứng từ M03 thật; AC-08 pass ở gate tự động local. Backward/forward local, duplicate event, policy/revoke/privacy tests pass. [Bằng chứng G08](evidence/G08.md).
+- [x] AC-07/09 cross-instance chưa đánh dấu Done cho tới G09; ghi rõ những gap trước khi nhận federation. [Bằng chứng G08](evidence/G08.md).
 - **Bằng chứng:** event→source links, API graph fixture, QR scan, policy snapshot, projector retry logs.
 
 ## Hồ sơ giao AI theo từng task

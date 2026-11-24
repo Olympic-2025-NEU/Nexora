@@ -4,6 +4,9 @@ import { createHash, randomUUID } from "node:crypto";
 import { after, test } from "node:test";
 import { PrismaClient } from "@prisma/client";
 import canonicalize from "canonicalize";
+import QRCode from "qrcode";
+import jsQR from "jsqr";
+import { PNG } from "pngjs";
 import { buildHandlerMap } from "../../composition/event-handlers";
 import { createOutboxDispatcher } from "../../platform/outbox/dispatcher";
 import { TRADING_EVENT_TYPES, serializeDomainEvent } from "../../contracts/events/registry";
@@ -16,6 +19,10 @@ import { createPrismaForwardPort } from "../../contexts/traceability/infrastruct
 import { createPassportService } from "../../contexts/traceability/application/passport-service";
 import { createQrService } from "../../contexts/traceability/application/qr-token";
 import { createTraceEvidenceService } from "../../contexts/traceability/application/evidence-service";
+import { tradingService } from "../../composition/trading";
+import { appendOutbox } from "../../platform/outbox/writer";
+import type { Actor } from "../../platform/identity/actor";
+import type { OutboxEventInput } from "../../platform/outbox/message";
 
 if (process.env.NEXORA_TEST_TRACE !== "1" || !process.env.OWNER_DATABASE_URL ||
     !process.env.APP_DATABASE_URL || !process.env.CORE_DATABASE_URL) {
@@ -671,4 +678,85 @@ test("P08-T07 clean public evidence is linked by checksum and short-lived access
   assert.ok(investigated.gaps.includes("evidence_investigation"));
   assert.equal(investigated.timeline.flatMap((item) => item.evidence).length, 0);
   assert.ok(await app.auditLog.count({ where: { targetType: "trace_evidence" } }) >= 3);
+});
+
+test("P08-T08 M03 confirm flows through outbox to local trace and public QR", async () => {
+  const batchId = randomUUID();
+  const originLotId = randomUUID();
+  const actor: Actor = { userId: "gate-staff", organizationId: "fixture",
+    roles: ["staff"], unitIds: [warehouseId] };
+  const ownerActor: Actor = { ...actor, userId: "gate-owner",
+    roles: ["administrator"], unitIds: [] };
+  await owner.batch.create({ data: { id: batchId, productId, productVariantId: variantId,
+    localCode: randomUUID(), originIssuerInstanceId: issuer, originLotId,
+    qualityStatus: "available", createdBySub: actor.userId } });
+  const create = await app.$transaction(async (tx) => tradingService.create({ tx, actor,
+    requestId: randomUUID(), emit: () => { throw new Error("Draft emitted event"); } },
+  "goods_receipt", { lines: [{ warehouseId, productVariantId: variantId,
+    batchId, quantity: "7", uomId: uom }] }));
+  assert.equal(create.status, "draft");
+  assert.equal(await app.outboxMessage.count({ where: { aggregateId: create.id } }), 0);
+  const events: OutboxEventInput[] = [];
+  const confirm = await app.$transaction(async (tx) => {
+    const result = await tradingService.action({ tx, actor, requestId: randomUUID(),
+      emit: (event) => { events.push(event); } }, "goods_receipt", create.id,
+    "confirm", create.version);
+    await appendOutbox(tx, events);
+    return result;
+  });
+  assert.equal(confirm.status, "confirmed");
+  assert.equal(events.length, 1);
+  assert.equal((await app.stockBalance.findUniqueOrThrow({ where: {
+    warehouseId_batchId: { warehouseId, batchId } } })).quantity.toFixed(3), "7.000");
+  const source = await app.outboxMessage.findFirstOrThrow({ where: {
+    aggregateId: create.id, eventType: TRADING_EVENT_TYPES.receipt } });
+  assert.equal(source.status, "pending");
+  assert.equal(await app.traceEvent.count({ where: { documentId: create.id } }), 0);
+  const dispatcher = createOutboxDispatcher({ client: app, workerId: `gate-${randomUUID()}`,
+    handlers: buildHandlerMap({ traceability: traceConsumers(app, core, issuer) }) });
+  assert.equal((await dispatcher.tick()).delivered, 1);
+  const projected = await app.traceEvent.findFirstOrThrow({ where: { documentId: create.id } });
+  assert.equal(projected.batchId, batchId);
+  assert.equal(projected.verificationState, "local_verified");
+  assert.equal(projected.originLotId, originLotId);
+  assert.equal((await app.document.findUniqueOrThrow({ where: { id: projected.documentId! } })).status,
+    "confirmed");
+  const backward = await backwardTrace(createPrismaBackwardPort(app, actor), actor,
+    { batchId, documentId: create.id });
+  const forward = await forwardTrace(createPrismaForwardPort(app, actor), actor,
+    { batchId });
+  for (const graph of [backward, forward]) {
+    assert.equal(graph.nodes.length, 1);
+    assert.equal(graph.nodes[0].source.documentId, create.id);
+    assert.equal(graph.nodes[0].verificationState, "local_verified");
+    assert.equal(graph.localProjection.state, "caught_up");
+  }
+  const publication = createPassportService(app);
+  const policy = await publication.createDraft(ownerActor, batchId,
+    { organization: "public", product: "public", batch: "public",
+      timeline: "public", evidence: "private" }, randomUUID());
+  assert.equal((await publication.approve(ownerActor, batchId, policy.policyVersion,
+    randomUUID())).projectionState, "active");
+  const qr = createQrService(app, "https://passport.example");
+  const issued = await qr.issue(ownerActor, batchId, `v${policy.policyVersion}`,
+    randomUUID(), randomUUID());
+  const qrPng = PNG.sync.read(await QRCode.toBuffer(issued.qrUrl,
+    { type: "png", errorCorrectionLevel: "M", margin: 4, width: 320 }));
+  assert.equal(jsQR(new Uint8ClampedArray(qrPng.data), qrPng.width,
+    qrPng.height)?.data, issued.qrUrl);
+  const token = new URL(issued.qrUrl).pathname.split("/").at(-1)!;
+  const passport = await qr.publicPassport(token);
+  assert.ok(passport);
+  assert.equal(passport.timeline.length, 1);
+  assert.equal(passport.timeline[0].sourceId, projected.externalEventId);
+  assert.equal(passport.timeline[0].verificationState, "confirmed");
+  assert.equal(issued.qrUrl.includes(batchId), false);
+  assert.equal(JSON.stringify(passport).includes(batchId), false);
+  assert.equal(JSON.stringify(passport).includes(warehouseId), false);
+  await app.outboxMessage.update({ where: { id: source.id }, data: {
+    status: "retry_due", nextAttemptAt: new Date(Date.now() - 1000), deliveredAt: null } });
+  assert.equal((await dispatcher.tick()).delivered, 1);
+  assert.equal(await app.traceEvent.count({ where: { documentId: create.id } }), 1);
+  await qr.revoke(ownerActor, batchId, issued.tokenId, "gate revoke", randomUUID());
+  assert.equal(await qr.publicPassport(token), null);
 });

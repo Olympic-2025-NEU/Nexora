@@ -18,7 +18,7 @@ after(async () => { await Promise.all([app.$disconnect(), core.$disconnect()]); 
 test("P08 restored trace source replays to the same checksum and graph", async () => {
   const records = await core.coreRecord.findMany({ where: { kind: "trace_projection" },
     orderBy: { sourceId: "asc" } });
-  assert.equal(records.length, 2);
+  assert.ok(records.length >= 2);
   const before = records.map((row) => ({ id: row.id, checksumHex: row.checksumHex,
     version: row.version, sourceId: row.sourceId }));
   const eventCount = await app.traceEvent.count();
