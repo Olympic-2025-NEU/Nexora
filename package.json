@@ -18,7 +18,7 @@
     "check:licenses": "node scripts/check-licenses.mjs",
     "generate:openapi": "node scripts/generate-openapi.mjs",
     "check:openapi": "node scripts/generate-openapi.mjs --check && redocly lint contracts/openapi/nexora-v1.yaml --format=summary",
-    "test:contracts": "npm run check:openapi && node scripts/validate-contracts.mjs && node scripts/run-python-jcs.mjs",
+    "test:contracts": "npm run check:openapi && node scripts/validate-contracts.mjs && node scripts/run-python-jcs.mjs && node --test --require tsx/cjs contracts/events/federation.test.ts",
     "test:identity": "node --test --require tsx/cjs platform/identity/token.test.ts platform/identity/partner-actor.test.ts",
     "test:catalog": "node --test --require tsx/cjs contexts/catalog/domain/quantity.test.ts contexts/catalog/domain/normalize-uom.test.ts contexts/inventory/application/adjust-stock.test.ts",
     "test:trading": "node --test --require tsx/cjs contexts/trading/domain/document.test.ts contexts/trading/application/inbound-announcements.test.ts",

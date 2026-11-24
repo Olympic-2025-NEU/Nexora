@@ -247,6 +247,8 @@
     "contexts/trading/index.ts",
     "contexts/trading/infrastructure/inbound-announcements.ts",
     "contexts/trading/infrastructure/prisma-repos.ts",
+    "contracts/events/federation.test.ts",
+    "contracts/events/federation.ts",
     "contracts/events/registry.test.ts",
     "contracts/events/registry.ts",
     "contracts/workflow/line-snapshot.ts",

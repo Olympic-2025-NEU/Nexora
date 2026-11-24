@@ -13,9 +13,9 @@
 
 ## P09-T02 — Federation envelope và version negotiation
 
-- [ ] Chốt schema v1 ở `event-contracts.md` với event issuer, origin lot, sender-local batch, upstream message refs, quantity decimal, unit, source document, evidence allowlist, policy/version; OpenAPI/JSON Schema và fixture hợp lệ/sai.
-- [ ] Chốt version support/unknown-version response, max payload, canonical hash và timestamp tolerance; không gửi raw document/private file qua federation.
-- [ ] Contract tests sender/receiver, trong đó duplicate same ID+hash idempotent, same ID+different hash conflict.
+- [x] Chốt schema v1 ở `event-contracts.md` với event issuer, origin lot, sender-local batch, upstream message refs, quantity decimal, unit, source document, evidence allowlist, policy/version; OpenAPI/JSON Schema và fixture hợp lệ/sai. [Bằng chứng T02](evidence/p09-t02.md).
+- [x] Chốt version support/unknown-version response, max payload, canonical hash và timestamp tolerance; không gửi raw document/private file qua federation. [Bằng chứng T02](evidence/p09-t02.md).
+- [x] Contract tests sender/receiver, trong đó duplicate same ID+hash idempotent, same ID+different hash conflict. [Bằng chứng T02](evidence/p09-t02.md).
 - **Đầu ra:** schema/validator; **kiểm chứng:** A và B chạy được contract test độc lập.
 
 ## P09-T03 — Outbound delivery

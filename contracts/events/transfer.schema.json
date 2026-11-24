@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nexora.local/contracts/events/transfer.schema.json",
+  "title": "TransferAnnouncedV1",
+  "allOf": [
+    { "$ref": "envelope-v1.schema.json" },
+    {
+      "type": "object",
+      "required": ["linkedIssueId", "sentQuantity"],
+      "properties": {
+        "eventType": { "const": "transfer.announced.v1" },
+        "sourceDocument": { "properties": { "type": { "const": "partner_transfer" } } }
+      },
+      "not": { "anyOf": [
+        { "required": ["actualLines"] }, { "required": ["actualQuantity"] },
+        { "required": ["discrepancyQuantity"] }, { "required": ["discrepancyReason"] },
+        { "required": ["sourceTransfer"] }, { "required": ["originLot"] },
+        { "required": ["downstreamPartnerRef"] }, { "required": ["impactType"] },
+        { "required": ["sourceEventRefs"] }, { "required": ["disclosureScope"] }
+      ] }
+    }
+  ]
+}

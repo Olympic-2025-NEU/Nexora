@@ -2,6 +2,8 @@
 
 Trường payload theo từng event và ACK v1 ở [event-payloads-v1.md](./event-payloads-v1.md); BPMN/bridge ở [workflow-spec-v1.md](./workflow-spec-v1.md). Tài liệu này giữ invariant và ví dụ, không thay JSON Schema thực khi implement.
 
+Schema vận hành v1: `contracts/events/envelope-v1.schema.json` khóa field chung và allowlist; `transfer.schema.json`, `receipt.schema.json`, `downstream-impact.schema.json` khóa các field của từng loại sự kiện. `contracts/events/federation.ts` là validator chung cho sender/receiver: raw JSON <=256 KiB, không duplicate key, `schemaVersion=1.0`, unknown event/version báo `422`, decimal string tối đa 3 chữ số thập phân, unknown field bị loại, JCS SHA-256 trên toàn envelope. `publishedAt` lệch đồng hồ quá 5 phút chỉ phát cảnh báo, không loại sự kiện lịch sử. Không đưa raw document, private URL/file, token hoặc secret vào envelope. `messageId` và toàn bộ payload phải giữ nguyên qua mỗi lần retry; receiver replay cùng issuer+ID+hash trả ACK cũ, ID cũ/hash mới báo `409 MESSAGE_ID_REUSED`, cùng issuer+event/type dưới ID mới báo `409 EVENT_ID_REUSED`. Contract test Node và vector hash Python chạy bằng `npm run test:contracts` độc lập với DB; inbox persistence/ACK HTTP thuộc P09-T04.
+
 ## 1. Ba loại sự kiện không được trộn
 
 | Loại | Ví dụ | Sở hữu/độ tin cậy |
