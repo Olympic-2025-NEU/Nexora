@@ -27,9 +27,9 @@
 
 ## P09-T04 — Inbound trust, inbox và dedupe
 
-- [ ] Gateway + service xác thực client identity/scope, đối chiếu partner active, issuer/recipient trong envelope, signature nếu D05 chọn; sai bất kỳ mục nào reject trước business effect.
-- [ ] PG inbox unique `(issuer, messageId)` và payload hash; ghi validation status/technical ACK trong transaction. Replay cùng nội dung trả ACK cũ, khác nội dung 409 + audit.
-- [ ] Schema/policy/size/clock/unknown lot errors có mã rõ; retryable vs permanent classification để không retry vô hạn.
+- [x] Gateway + service xác thực client identity/scope, đối chiếu partner active, issuer/recipient trong envelope; D05 chọn signed OIDC M2M, không thêm body signature. Sai bất kỳ mục nào reject trước business effect. [Bằng chứng T04](evidence/p09-t04.md).
+- [x] PG inbox unique `(issuer, messageId)` và payload JCS hash; ghi validation status/technical ACK trong transaction. Replay cùng nội dung trả ACK cũ, khác nội dung 409 + security audit. [Bằng chứng T04](evidence/p09-t04.md).
+- [x] Schema/policy/size/clock/unknown lot có phân loại rõ: malformed/version/policy/size là permanent; clock skew chỉ cảnh báo theo T02; unknown lot thuộc dependency pending của T05. API trả `retryable` và mã lỗi ổn định. [Bằng chứng T04](evidence/p09-t04.md).
 - **Đầu ra:** inbox API; **kiểm chứng:** forged issuer, replay, tamper, disabled partner tests.
 
 ## P09-T05 — External lot mapping và dependency gap

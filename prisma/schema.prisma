@@ -153,6 +153,46 @@ model DeliveryAttempt {
   @@schema("federation")
 }
 
+model InboxMessage {
+  id               String   @id @db.Uuid
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  issuerInstanceId String   @map("issuer_instance_id")
+  messageId        String   @map("message_id")
+  eventId          String   @map("event_id")
+  eventType        String   @map("event_type")
+  schemaVersion    String   @map("schema_version")
+  payloadSha256    String   @map("payload_sha256") @db.Char(64)
+  payload          Json     @db.JsonB
+  partnerId        String   @map("partner_id") @db.Uuid
+  state            String   @default("validated")
+  receivedAt       DateTime @default(now()) @map("received_at") @db.Timestamptz(6)
+  appliedAt        DateTime? @map("applied_at") @db.Timestamptz(6)
+  errorCode        String?  @map("error_code")
+  partner          Partner  @relation(fields: [partnerId], references: [id])
+  ack              PartnerAck?
+
+  @@unique([issuerInstanceId, messageId], map: "uq_inbox_issuer_message")
+  @@unique([issuerInstanceId, eventId, eventType], map: "uq_inbox_issuer_event_type")
+  @@index([state, receivedAt], map: "idx_inbox_state_received")
+  @@index([eventId], map: "idx_inbox_event")
+  @@map("inbox_message")
+  @@schema("federation")
+}
+
+model PartnerAck {
+  id           String   @id @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  inboxId      String   @unique @map("inbox_id") @db.Uuid
+  ackId        String   @unique @map("ack_id")
+  ackStatus    String   @map("ack_status")
+  responseBody Json     @map("response_body") @db.JsonB
+  sentAt       DateTime? @map("sent_at") @db.Timestamptz(6)
+  inbox        InboxMessage @relation(fields: [inboxId], references: [id])
+
+  @@map("partner_ack")
+  @@schema("federation")
+}
+
 enum ApprovalRequestState {
   requested
   starting
@@ -285,6 +325,7 @@ model Partner {
 
   connection       PartnerConnection?
   transfers        TransferDetail[]
+  inboxMessages    InboxMessage[]
 
   @@map("partner")
   @@schema("system")

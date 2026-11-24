@@ -19,6 +19,7 @@ const scripts = {
   ops: "tests/platform/run-ops.sh",
   trading: "tests/platform/run-trading.sh",
   trace: "tests/platform/run-trace.sh",
+  federation: "tests/platform/run-federation.sh",
 };
 const script = scripts[process.argv[2]];
 if (!script) {

@@ -388,13 +388,14 @@ export function createSystemRepos(db: Db) {
     async findConnectionByInboundClientId(clientId: string) {
       const conn = await db.partnerConnection.findUnique({
         where: { inboundClientId: clientId },
-        include: { partner: { select: { id: true, code: true, status: true } } },
+        include: { partner: { select: { id: true, code: true, status: true, issuerInstanceId: true } } },
       });
       if (!conn) return null;
       return {
         id: conn.id,
         partnerId: conn.partnerId,
         partnerCode: conn.partner.code,
+        issuerInstanceId: conn.partner.issuerInstanceId,
         partnerStatus: conn.partner.status as PartnerStatus,
         inboundClientId: conn.inboundClientId,
         allowedInboundScope: conn.allowedInboundScope,

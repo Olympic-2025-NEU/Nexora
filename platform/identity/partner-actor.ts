@@ -30,6 +30,8 @@ export interface PartnerActor {
   partnerId: string;
   /** The Partner.code (short identifier). */
   partnerCode: string;
+  /** Remote instance bound to the partner record, never supplied by the request. */
+  issuerInstanceId: string;
   /** Allowed scopes for this connection. */
   allowedScope: string;
   /** Type discriminant. */
@@ -45,6 +47,7 @@ export interface PartnerConnectionRow {
   id: string;
   partnerId: string;
   partnerCode: string;
+  issuerInstanceId: string;
   /** Partner.status — must be active for M2M trust. */
   partnerStatus?: "active" | "suspended";
   inboundClientId: string;
@@ -153,6 +156,7 @@ export async function resolvePartnerActor(
     clientId: connection.inboundClientId,
     partnerId: connection.partnerId,
     partnerCode: connection.partnerCode,
+    issuerInstanceId: connection.issuerInstanceId,
     allowedScope: connection.allowedInboundScope,
     type: "partner",
   };
