@@ -65,7 +65,15 @@ ${key}
   console.log("No deploy/certs/local.pem — HTTPS ssls omitted (HTTP smoke only)");
 }
 
-const out = resolve(root, "apisix/apisix.generated.yaml");
+const relative = env.APISIX_RENDERED_PATH || "./apisix/apisix.generated.yaml";
+const out = resolve(root, relative);
+if (env.APISIX_RENDERED_PATH && (
+  !/^[abc]$/.test(env.INSTANCE_ID ?? "") ||
+  out !== resolve(root, "instances", env.INSTANCE_ID, "apisix.generated.yaml")
+)) {
+  console.error("Invalid APISIX_RENDERED_PATH");
+  process.exit(1);
+}
 mkdirSync(dirname(out), { recursive: true });
 writeFileSync(out, rendered, { mode: 0o600 });
 console.log(`Wrote ${out}`);

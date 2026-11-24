@@ -22,8 +22,9 @@ if (process.env.NODE_ENV === "production") {
 const instanceId = required("INSTANCE_ID");
 const sku = process.env.SEED_PRODUCT_SKU || "DEMO-SKU-A";
 const openingQty = process.env.SEED_OPENING_QTY || "100";
-if (!/^(0|[1-9]\d*)$/.test(openingQty) || openingQty === "0") {
-  throw new Error("SEED_OPENING_QTY must be a positive integer (count UOM)");
+if (!/^(0|[1-9]\d*)$/.test(openingQty) ||
+    (openingQty === "0" && process.env.DEMO_ONLY !== "true")) {
+  throw new Error("SEED_OPENING_QTY must be positive, or zero only for DEMO_ONLY");
 }
 const prisma = new PrismaClient();
 
@@ -56,8 +57,8 @@ async function main() {
     product = await prisma.product.create({
       data: {
         id: productId,
-        name: "Demo Product A",
-        searchText: "demo product a",
+        name: `Demo Product ${instanceId.toUpperCase()}`,
+        searchText: `demo product ${instanceId}`,
         attributes: { description: "P065 seed product" },
         categoryId: CAT_UNCATEGORIZED,
         isActive: true,
@@ -114,13 +115,14 @@ async function main() {
     });
   }
 
-  let warehouse = await prisma.warehouse.findUnique({ where: { code: "WH-A" } });
+  const warehouseCode = `WH-${instanceId.toUpperCase()}`;
+  let warehouse = await prisma.warehouse.findUnique({ where: { code: warehouseCode } });
   if (!warehouse) {
     warehouse = await prisma.warehouse.create({
       data: {
         id: warehouseId,
-        code: "WH-A",
-        name: "Main warehouse A",
+        code: warehouseCode,
+        name: `Main warehouse ${instanceId.toUpperCase()}`,
         status: "active",
         createdBySub: membership.keycloakSub,
       },
@@ -130,8 +132,8 @@ async function main() {
   let batch = await prisma.batch.findUnique({
     where: {
       originIssuerInstanceId_originLotId: {
-        originIssuerInstanceId: instanceId,
-        originLotId: batchId,
+        originIssuerInstanceId: process.env.SEED_ORIGIN_ISSUER_INSTANCE_ID || instanceId,
+        originLotId: process.env.SEED_ORIGIN_LOT_ID || batchId,
       },
     },
   });
@@ -141,10 +143,10 @@ async function main() {
         id: batchId,
         productId: product.id,
         productVariantId: variant.id,
-        localCode: "LOT-A-001",
-        originIssuerInstanceId: instanceId,
-        originLotId: batchId,
-        qualityStatus: "available",
+        localCode: `LOT-${instanceId.toUpperCase()}-001`,
+        originIssuerInstanceId: process.env.SEED_ORIGIN_ISSUER_INSTANCE_ID || instanceId,
+        originLotId: process.env.SEED_ORIGIN_LOT_ID || batchId,
+        qualityStatus: process.env.DEMO_ONLY === "true" ? "inspect" : "available",
         createdBySub: membership.keycloakSub,
       },
     });
@@ -154,7 +156,7 @@ async function main() {
     where: { sourceLineId_kind: { sourceLineId, kind: "receipt" } },
   });
   let opening = "replayed";
-  if (!existingMove) {
+  if (!existingMove && openingQty !== "0") {
     const qty = new Prisma.Decimal(openingQty);
     await prisma.$transaction(async (tx) => {
       await tx.stockBalance.createMany({
@@ -206,6 +208,8 @@ async function main() {
       });
     });
     opening = "created";
+  } else if (openingQty === "0") {
+    opening = "zero";
   }
 
   const staffSubs = (process.env.SEED_STAFF_SUBS || "")

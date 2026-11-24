@@ -68,7 +68,7 @@ docker compose -f deploy/compose.yml --env-file deploy/instances/a.env -p nexora
 docker compose -f deploy/compose.yml --env-file deploy/instances/a.env -p nexora-a ps
 ```
 
-Lặp tương tự B/C với project name/port/volume/realm/credential khác. Script reset chỉ chấp nhận `DEMO_ONLY=true` và project name allowlist `nexora-a|b|c`; không xóa volume production. CI stages: install/lint/typecheck/build → migration empty+upgrade → PG integration → gateway/Keycloak/Flowable/storage/scan → A/B/C federation + Playwright → license/secret scan → image digest/SBOM release. Fail gate nếu stage bắt buộc chưa có.
+P09-T01 dùng `-p nexora-a|nexora-b|nexora-c` và `deploy/abc-topology.md` cho ba project. Các instance có cluster PostgreSQL, Docker network/volume, issuer Keycloak `keycloak-a/b/c`, file APISIX render và cổng host riêng. Script reset chỉ chấp nhận `DEMO_ONLY=true` và project name allowlist `nexora-a|b|c`; không xóa volume production. CI stages: install/lint/typecheck/build → migration empty+upgrade → PG integration → gateway/Keycloak/Flowable/storage/scan → A/B/C federation + Playwright → license/secret scan → image digest/SBOM release. Fail gate nếu stage bắt buộc chưa có.
 
 ## Health, backup và GitOps
 

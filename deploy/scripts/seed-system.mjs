@@ -99,6 +99,13 @@ async function main() {
     if (adminSub !== staffSub) {
       await upsertMembership(prisma, organization.id, staffSub, staffUsername, "staff");
     }
+    if (process.env.KC_APPROVER_USERNAME) {
+      const approverUsername = process.env.KC_APPROVER_USERNAME;
+      if (approverUsername === adminUsername || approverUsername === staffUsername)
+        throw new Error("Approver must be a distinct user");
+      const approverSub = await userSub(token, approverUsername);
+      await upsertMembership(prisma, organization.id, approverSub, approverUsername, "approver");
+    }
 
     const partnerIssuer = process.env.SEED_PARTNER_ISSUER;
     const partnerCode = process.env.SEED_PARTNER_CODE;

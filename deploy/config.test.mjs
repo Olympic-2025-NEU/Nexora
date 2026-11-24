@@ -15,9 +15,16 @@ const examples = ["a", "b", "c"].map((instance) => {
 
 test("all instance contracts parse and isolate ports, buckets and credentials", () => {
   for (const env of examples) validateConfig(env);
-  for (const field of ["GATEWAY_HTTP_PORT", "FLOWABLE_HOST_PORT", "S3_BUCKET_PRIVATE", "POSTGRES_PASSWORD", "ORG_CODE"]) {
+  for (const field of ["GATEWAY_HTTP_PORT", "GATEWAY_HTTPS_PORT", "POSTGRES_HOST_PORT",
+    "KEYCLOAK_HOST_PORT", "FLOWABLE_HOST_PORT", "OIDC_ISSUER_URL", "S3_BUCKET_PRIVATE",
+    "POSTGRES_PASSWORD", "ORG_CODE"]) {
     assert.equal(new Set(examples.map((env) => env[field])).size, 3, field);
   }
+  const ports = examples.flatMap((env) => ["GATEWAY_HTTP_PORT", "GATEWAY_HTTPS_PORT",
+    "POSTGRES_HOST_PORT", "KEYCLOAK_HOST_PORT", "FLOWABLE_HOST_PORT"].map((key) => env[key]));
+  assert.equal(new Set(ports).size, ports.length, "A/B/C host ports must not collide");
+  for (const env of examples) assert.equal(env.APISIX_RENDERED_PATH,
+    `./instances/${env.INSTANCE_ID}/apisix.generated.yaml`);
 });
 
 test("HTTPS PUBLIC_BASE_URL must match GATEWAY_HTTPS_PORT", () => {

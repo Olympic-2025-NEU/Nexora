@@ -6,9 +6,9 @@
 
 ## P09-T01 — Topology ba instance độc lập
 
-- [ ] Compose/profile hoặc script dựng A/B/C với app DB, credentials, volumes, Keycloak realm/client, gateway routes và object namespace riêng; cấu hình secrets ngoài Git.
-- [ ] Chứng minh không có DB link/shared schema giữa A/B/C, không dùng `tenantId` chung. Dừng mạng/stack B: A/C vẫn đọc/ghi nghiệp vụ local và hàng đợi giữ bền.
-- [ ] Fixture bootstrap sản phẩm/lô/kho/partner/role cho chuỗi A→B→C theo `demo-fixtures.md`; lệnh reset demo chỉ tác động môi trường test được chỉ định.
+- [x] Compose/profile và runbook dựng A/B/C với app DB, credentials, volumes, Keycloak realm/client, gateway routes và object namespace riêng; cấu hình secrets ngoài Git. [Bằng chứng T01](evidence/p09-t01.md).
+- [x] Chứng minh không có DB link/shared schema giữa A/B/C, không dùng `tenantId` chung. Dừng stack B: A/C vẫn đọc/ghi nghiệp vụ local và outbox PG giữ bền. Delivery federation thực thuộc T03/T04. [Bằng chứng T01](evidence/p09-t01.md).
+- [x] Fixture bootstrap sản phẩm/lô/kho/partner/role cho chuỗi A→B→C theo `demo-fixtures.md`; lệnh reset demo chỉ tác động môi trường test được chỉ định. [Bằng chứng T01](evidence/p09-t01.md).
 - **Đầu ra:** topology/runbook; **kiểm chứng:** query DB identity từng instance và failure drill.
 
 ## P09-T02 — Federation envelope và version negotiation

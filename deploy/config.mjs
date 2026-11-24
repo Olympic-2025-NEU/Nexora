@@ -109,6 +109,14 @@ export function validateConfig(env, service) {
   for (const [name, type] of Object.entries(fields)) config[name] = check(name, env[name], type);
   if (service) return config;
   if (!/^[abc]$/.test(env.INSTANCE_ID)) fail("INSTANCE_ID");
+  if (env.APISIX_RENDERED_PATH &&
+      env.APISIX_RENDERED_PATH !== `./instances/${env.INSTANCE_ID}/apisix.generated.yaml`)
+    fail("APISIX_RENDERED_PATH");
+  if (env.APISIX_RENDERED_PATH &&
+      (!env.KC_ADMIN_USERNAME || !env.KC_ADMIN_PASSWORD ||
+       !env.KC_APPROVER_USERNAME || !env.KC_APPROVER_PASSWORD ||
+       new Set([env.KC_DEV_USERNAME, env.KC_ADMIN_USERNAME, env.KC_APPROVER_USERNAME]).size !== 3))
+    fail("KC_APPROVER_USERNAME");
 
   for (const [name, user, password, database] of [
     ["APP_DATABASE_URL", "APP_DB_USER", "APP_DB_PASSWORD", "APP_DB_NAME"],

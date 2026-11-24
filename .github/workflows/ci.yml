@@ -2,11 +2,22 @@ name: ci
 
 on:
   push:
-    branches: [develop, main, "chore/**", "spike/**", "phase-*/**", "phase01/**", "phase-03", "phase03/**", "phase-04", "phase04/**", "phase-07", "phase07/**", "phase-08", "phase08/**"]
+    branches: [develop, main, "chore/**", "spike/**", "phase-*/**", "phase01/**", "phase-03", "phase03/**", "phase-04", "phase04/**", "phase-07", "phase07/**", "phase-08", "phase08/**", "phase-09"]
   pull_request:
     branches: [develop, main]
 
 jobs:
+  platform-topology:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Validate independent A/B/C Compose topology
+        run: node --test deploy/config.test.mjs tests/e2e/abc-topology.test.mjs
+
   platform-trace:
     runs-on: ubuntu-latest
     timeout-minutes: 20

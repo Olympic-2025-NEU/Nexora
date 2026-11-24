@@ -39,6 +39,9 @@ yarn-error.log*
 !deploy/instances/*.env.example
 deploy/instances/*.env
 deploy/apisix/apisix.generated.yaml
+deploy/instances/*/apisix.generated.yaml
+deploy/instances/*/fixture-manifest.json
+deploy/instances/abc-drill-result.json
 deploy/certs/*.pem
 deploy/certs/*-key.pem
 deploy/certs/*.key
