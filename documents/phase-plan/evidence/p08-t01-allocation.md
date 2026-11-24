@@ -13,6 +13,7 @@ Date: 2026-11-24. Branch: `phase-08`.
 
 - `npm run test:platform:trading`: a real M03/Flowable issue uses 2 units from one confirmed receipt line and 4 from another; Draft edit replaces rows; posting leaves correct stock. A wrong-lot source and incomplete sum are rejected. A later 4-unit claim on a source with only 3 unallocated units fails with `ISSUE_SOURCE_OVERALLOCATED` and leaves the document approved.
 - `npm run test:platform:trace`: upgraded/fresh databases and restore/replay pass. A fixture with two receipt sources and one issue creates two `derived_from` edges, carries `2.000` and `4.000` allocation details in the backward graph, and appears in forward/core projection. Replaying the same outbox event leaves two links.
+- `npm run test:platform:schema`: upgraded/fresh schema and restored snapshot pass with the new allocation table and migration in the schema inventory.
 - `npm run typecheck`, `npm run lint`, `npm run build:worker`, `npm run test:contracts`, `npm run build`, `npm test` and `npx prisma validate` with a disposable URL all passed. GitHub CI is checked after push.
 
 ## Compatibility boundary

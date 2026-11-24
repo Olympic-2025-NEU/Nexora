@@ -98,7 +98,14 @@ test("versioned schema contains platform tables, expected constraints and migrat
   const trading = await migrator.$queryRaw`
     SELECT table_name FROM information_schema.tables WHERE table_schema = 'trading' ORDER BY table_name`;
   assert.deepEqual(trading.map((row) => row.table_name),
-    ["document", "document_line", "receiving_detail", "sale_detail", "transfer_detail"]);
+    ["document", "document_line", "issue_source_allocation", "receiving_detail", "sale_detail", "transfer_detail"]);
+  assert.ok(migrations.some((row) => row.migration_name === "20261124040000_issue_source_allocation"));
+  const allocation = await migrator.$queryRaw`
+    SELECT column_name FROM information_schema.columns
+    WHERE table_schema='trading' AND table_name='issue_source_allocation'
+    ORDER BY ordinal_position`;
+  assert.deepEqual(allocation.map((row) => row.column_name),
+    ["id", "issue_line_id", "source_line_id", "quantity"]);
   assert.ok(migrations.some((row) => row.migration_name === "20261123010000_trading_documents"));
   assert.ok(migrations.some((row) => row.migration_name === "20261123020000_transfer_active_link"));
   const transferConstraints = await migrator.$queryRaw`

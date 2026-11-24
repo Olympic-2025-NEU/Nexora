@@ -77,7 +77,7 @@ MSYS_NO_PATHCONV=1 docker exec "$container" pg_dump -U postgres -Fc -d nexora_fr
 MSYS_NO_PATHCONV=1 docker exec "$container" pg_restore -U postgres --no-owner -d nexora_trading_restore /tmp/p07-trading.dump
 trading_tables="$(docker exec "$container" psql -X -U postgres -tAc \
   "SELECT count(*) FROM information_schema.tables WHERE table_schema='trading'" -d nexora_trading_restore)"
-test "$trading_tables" = "5"
+test "$trading_tables" = "6"
 trading_triggers="$(docker exec "$container" psql -X -U postgres -tAc \
   "SELECT count(*) FROM pg_trigger WHERE tgname LIKE 'trg_trading_check_%'" -d nexora_trading_restore)"
 test "$trading_triggers" = "5"
