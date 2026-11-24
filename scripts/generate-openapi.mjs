@@ -233,9 +233,25 @@ action("/api/v1/lots/{id}/qr", "M04", "Issue QR token", "QrIssued", { body: "QrC
   description: "Administrator or unit-scoped staff issues a 256-bit opaque token for an active approved projection. Raw URL is returned once, expires in 30 days; repeating the Idempotency-Key returns 409." });
 action("/api/v1/lots/{id}/qr/{tokenId}/revoke", "M04", "Revoke QR token", null, { body: "Reason", ifMatch: false, idempotent: false, status: 204,
   description: "Authenticated owner or unit-scoped staff revokes an issued token immediately and records an audit event." });
+add("get", "/api/v1/lots/{id}/evidence", "M04", "List trace evidence", arr(ref("TraceEvidenceView")), {
+  description: "Authenticated trace scope; lists checksum, visibility, scan state and source linkage only." });
+add("post", "/api/v1/lots/{id}/evidence", "M04", "Attach clean trace evidence", "TraceEvidenceAttached", {
+  body: "TraceEvidenceAttach", status: 201, roles: WRITER,
+  description: "Bind a clean private-bucket attachment to a confirmed local trace event and document. Public visibility requires Administrator and approved public evidence/timeline policy; mutation marks projection stale." });
+add("post", "/api/v1/lots/{id}/evidence/{evidenceId}/revoke", "M04", "Revoke trace evidence", null, {
+  body: "Reason", status: 204, roles: WRITER,
+  description: "Revoke evidence link and invalidate the active Passport projection; existing access URLs are denied immediately." });
 add("get", "/api/v1/public/passport/{token}", "M04", "Public product passport", "PassportPublic", { auth: "public", errors: [404, 429, 503], description: "Only active, unexpired token, approved policy, available batch and verified allowlisted projection. Invalid, unknown and revoked are indistinguishable 404; no-store. Gateway rate limit 30 req/s, burst 15." });
 doc.paths["/api/v1/public/passport/{token}"].get.parameters[0].schema =
   str({ pattern: "^[A-Za-z0-9_-]{43}$", minLength: 43, maxLength: 43 });
+add("get", "/api/v1/public/evidence/{token}", "M04", "Short-lived public evidence download", null, {
+  auth: "public", errors: [404, 429, 503], description: "60-second application-signed capability issued only for clean public evidence. Core Data rechecks QR, policy, batch, projection, evidence and file state, then streams checksum-verified bytes with no-store." });
+doc.paths["/api/v1/public/evidence/{token}"].get.parameters[0].schema =
+  str({ pattern: "^[A-Za-z0-9_-]{43}$", minLength: 43, maxLength: 43 });
+doc.paths["/api/v1/public/evidence/{token}"].get.responses["200"] = {
+  description: "Clean evidence bytes", content: Object.fromEntries(
+    ["application/pdf", "image/png", "image/jpeg", "text/plain"].map((mime) =>
+      [mime, { schema: str({ format: "binary" }) }])) };
 add("post", "/api/v1/federation/events", "M04", "Accept federation event", "FederationAck", { auth: "m2m", body: "FederationEnvelope", raw: true, status: 202, errors: [401, 403, 409, 413, 422, 503], description: "Technical ACK after inbox commit; never confirms physical receiving or changes stock. Client ID and issuer must match partner mapping." });
 list("/api/v1/federation/deliveries", "M04", "List outbound delivery status", "FederationDelivery", ADMIN, ["status", "partnerId"]);
 action("/api/v1/federation/deliveries/{id}/retry", "M04", "Retry outbound delivery", "FederationRetryResult", { body: "Reason", roles: ADMIN, status: 202, ifMatch: false });

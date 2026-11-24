@@ -219,6 +219,12 @@ Correction phải cùng type, trỏ chứng từ confirmed liền trước, có 
 
 `id`, `created_at`; `batch_id uuid!→catalog.batch.id`, `token_hash char(64)! UNIQUE`, `policy_version text?`, `issuance_key_hash char(64)? UNIQUE`, `state text! CHECK IN ('active','revoked')`, `expires_at timestamptz?`, `revoked_at timestamptz?`, `created_by_sub text!`; index `(batch_id,state)`. T06 phát hành 32 byte random, encode base64url 43 ký tự; DB chỉ giữ SHA-256 token và SHA-256 của actor+batch+`Idempotency-Key`. URL `/passport/{token}` không chứa batch UUID. Token có hạn 30 ngày; gọi lại cùng key trả 409 vì raw token chỉ trả một lần. Policy version đổi hoặc projection bị revoke thì trigger thu hồi token active; public GET còn kiểm tra active policy, projection, checksum, quality, expiry tại thời điểm đọc. Retain token hash để audit/denylist; không lưu raw URL.
 
+### `traceability.trace_evidence` và `trace_evidence_access` (P08-T07)
+
+`trace_evidence`: `id uuid PK`, `created_at`, `event_id uuid!→trace_event.id`, `document_id uuid!→trading.document.id`, `attachment_id uuid!→platform.attachment.id`, `checksum_hex char(64)!`, `visibility private|partner|public`, `state active|revoked`, `created_by_sub`, `revoked_at`; unique `(event_id,attachment_id)`, index `(document_id,state)`. Trigger INSERT chỉ nhận event local verified thuộc chứng từ confirmed, đúng document, attachment sạch trong bucket private với SHA-256 khớp. Link không được sửa nguồn/visibility/checksum; chỉ chuyển active→revoked. INSERT/revoke hoặc thay đổi scan/bucket/checksum của file làm Passport projection stale. Bảng link tách khỏi `trace_event.evidence_refs` append-only, giữ nguyên provenance gốc.
+
+`trace_evidence_access`: `id uuid PK`, `created_at`, `token_hash char(64)! UNIQUE`, `qr_token_id uuid!→qr_token.id`, `evidence_id uuid!→trace_evidence.id`, `expires_at timestamptz!` tối đa 120 giây theo constraint; runtime phát hành 60 giây và giới hạn 10 link mỗi Passport. DB chỉ giữ hash capability 256 bit; worker xóa access đã hết hạn hơn một phút mỗi 10 phút. View `public_evidence_download` chỉ cho Core Data đọc object metadata khi access còn hạn, QR/policy/projection/quality active, evidence public/active, document confirmed và file clean/checksum đúng. Core Data không được SELECT raw trace events.
+
 ## P09 — `federation`
 
 ### `federation.inbox_message`

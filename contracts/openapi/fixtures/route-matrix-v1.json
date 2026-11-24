@@ -503,6 +503,30 @@
     },
     {
       "method": "GET",
+      "path": "/api/v1/lots/{id}/evidence",
+      "auth": "protected",
+      "roles": ["administrator", "staff", "approver", "viewer"],
+      "scope": "resource",
+      "success": ["200"]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/lots/{id}/evidence",
+      "auth": "protected",
+      "roles": ["administrator", "staff"],
+      "scope": "resource",
+      "success": ["201"]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/lots/{id}/evidence/{evidenceId}/revoke",
+      "auth": "protected",
+      "roles": ["administrator", "staff"],
+      "scope": "resource",
+      "success": ["204"]
+    },
+    {
+      "method": "GET",
       "path": "/api/v1/lots/{id}/trace/backward",
       "auth": "protected",
       "roles": [
@@ -878,6 +902,14 @@
       "success": [
         "200"
       ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/public/evidence/{token}",
+      "auth": "public",
+      "roles": [],
+      "scope": "anonymous",
+      "success": ["200"]
     },
     {
       "method": "GET",

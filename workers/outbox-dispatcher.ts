@@ -40,5 +40,11 @@ export function main(client: PrismaClient, core: PrismaClient, issuerInstanceId:
   };
   scan();
   const alertInterval = setInterval(scan, 60_000);
-  return { dispatcher, stop: () => { stopped = true; clearInterval(interval); clearInterval(alertInterval); } };
+  const pruneEvidence = () => { if (!stopped) void client.traceEvidenceAccess.deleteMany({
+    where: { expiresAt: { lt: new Date(Date.now() - 60_000) } },
+  }).catch(() => console.error(JSON.stringify({ event: "trace.evidence_access.prune_failed",
+    service: "outbox-dispatcher" }))); };
+  const pruneInterval = setInterval(pruneEvidence, 10 * 60_000);
+  return { dispatcher, stop: () => { stopped = true; clearInterval(interval);
+    clearInterval(alertInterval); clearInterval(pruneInterval); } };
 }

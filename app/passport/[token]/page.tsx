@@ -18,7 +18,8 @@ const labels: Record<string, string> = {
 export default async function PassportPage({ params }: { params: Promise<{ token: string }> }) {
   await connection();
   const { token } = await params;
-  const passport = await createQrService(getPrismaClient()).publicPassport(token);
+  const passport = await createQrService(getPrismaClient(), process.env.PUBLIC_BASE_URL)
+    .publicPassport(token);
   if (!passport) notFound();
   return <main className="mx-auto min-h-screen max-w-2xl bg-white px-4 py-8 text-slate-900 sm:px-8">
     <header className="border-b pb-6">
@@ -42,7 +43,17 @@ export default async function PassportPage({ params }: { params: Promise<{ token
           <p className="font-medium">{labels[item.type] ?? item.type}</p>
           <p className="text-sm text-slate-600">{new Date(item.occurredAt)
             .toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" })}</p>
-          <p className="text-xs text-slate-600">Nguồn local: {item.verificationState}</p>
+          <p className="text-xs text-slate-600">Ghi nhận lúc {new Date(item.recordedAt)
+            .toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" })}</p>
+          <p className="text-xs text-slate-600">Đơn vị phát hành: {item.issuer}; nguồn sự kiện: {item.sourceId}</p>
+          <p className="text-xs text-slate-600">Xác minh: {item.verificationState}</p>
+          {item.sentQuantity !== undefined && <p className="text-xs text-slate-600">
+            Gửi: {item.sentQuantity}; thực nhận: {item.actualQuantity ?? "chưa rõ"}
+          </p>}
+          {item.evidence.map((ref) => <p className="text-xs" key={ref.id}>
+            Evidence SHA-256: {ref.checksum}. {ref.url && <a className="underline"
+              href={ref.url} rel="noreferrer">Tải bằng liên kết 60 giây</a>}
+          </p>)}
         </li>)}</ol> : <p className="mt-3 text-sm">Chưa có sự kiện được phép công bố.</p>}
     </section>
     {passport.gaps.length > 0 && <section className="mt-8 rounded-lg border border-amber-300 p-4">

@@ -141,6 +141,11 @@ function checkOpenApi() {
       }
       for (const code of success) {
         if (code === "204") continue;
+        if (path === "/api/v1/public/evidence/{token}") {
+          assert(op.responses[code].content?.["application/pdf"]?.schema?.format === "binary",
+            `Evidence download must be binary: ${name}`);
+          continue;
+        }
         const schema = op.responses[code].content?.["application/json"]?.schema;
         assert(schema && !JSON.stringify(schema).includes("Generic"), `Untyped response: ${name}`);
         if (path === "/api/v1/federation/events" || path.startsWith("/api/v1/health/")) {

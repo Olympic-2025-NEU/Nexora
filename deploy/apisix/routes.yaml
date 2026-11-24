@@ -130,6 +130,24 @@ routes:
         key: remote_addr
         rejected_code: 429
 
+  - id: public-evidence-v1
+    uri: /api/v1/public/evidence/*
+    methods: [GET, HEAD]
+    upstream:
+      type: roundrobin
+      nodes:
+        "core-data:8080": 1
+    plugins:
+      request-id: {}
+      <<: *strip-identity-headers
+      limit-req:
+        rate: 30
+        burst: 15
+        key: remote_addr
+        rejected_code: 429
+      proxy-rewrite:
+        regex_uri: ["^/api/v1/public/evidence/(.*)", "/public/evidence/$1"]
+
   # -------------------------------------------------------------------------
   # 4. Federation M2M events — POST only, bearer + required scope
   # -------------------------------------------------------------------------

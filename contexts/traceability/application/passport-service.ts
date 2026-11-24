@@ -2,6 +2,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { Prisma, PrismaClient } from "@prisma/client";
 import canonicalize from "canonicalize";
+import { Decimal } from "@prisma/client/runtime/library";
 import type { Actor } from "../../../platform/identity/actor";
 import { checkPolicy } from "../../../platform/access/policy";
 import { prismaAuditRecorder } from "../../../platform/audit/prisma-audit-recorder";
@@ -39,7 +40,9 @@ async function project(tx: Tx, batchId: string, policyVersion: number,
   const batch = await batchOrThrow(tx, batchId);
   const events = await tx.traceEvent.findMany({ where: { batchId },
     include: { outgoing: { select: { toEventId: true, missingRef: true } },
-      document: { select: { status: true } } },
+      document: { include: { lines: true } },
+      evidence: { include: { attachment: { select: { scanState: true, bucket: true,
+        sha256Hex: true } } }, orderBy: { id: "asc" } } },
     orderBy: [{ occurredAt: "asc" }, { id: "asc" }] });
   const sourceDocuments = await tx.documentLine.findMany({ where: { batchId },
     select: { documentId: true }, distinct: ["documentId"] });
@@ -52,11 +55,46 @@ async function project(tx: Tx, batchId: string, policyVersion: number,
     productName: batch.product.name, publicLotCode: batch.localCode,
     originIssuer: batch.originIssuerInstanceId, approvedAt,
     projectionPending: pending > 0,
-    events: events.map((event) => ({ id: event.id, type: event.eventType,
-      occurredAt: event.occurredAt, recordedAt: event.createdAt,
-      verificationState: event.verificationState,
-      confirmed: event.document?.status === "confirmed",
-      links: event.outgoing })),
+    events: events.map((event) => {
+      const lines = event.document?.lines.filter((line) => line.batchId === batchId) ?? [];
+      const summary = event.summary as { documentVersion?: unknown;
+        lines?: { sourceLineId?: unknown; quantity?: unknown }[] };
+      const sourceLines = Array.isArray(summary.lines) ? summary.lines : [];
+      const receiving = event.eventType === "trading.receiving.confirmed.v1";
+      const quantitiesMatch = sourceLines.length === lines.length && lines.every((line) => {
+        const ref = receiving ? line.sourceLineRef :
+          ["trading.transfer.confirmed.v1", "trading.sale.recorded.v1"].includes(event.eventType)
+            ? line.sourceIssueLineId : line.id;
+        const source = sourceLines.find((item) => item && item.sourceLineId === ref);
+        const actual = receiving ? line.actualQuantity :
+          event.eventType === "trading.stocktake.confirmed.v1" ? line.countedQuantity : line.quantity;
+        if (!source || !actual || typeof source.quantity !== "string" ||
+            !/^(0|[1-9][0-9]*)(\.[0-9]{1,3})?$/.test(source.quantity)) return false;
+        return new Decimal(source.quantity).eq(actual);
+      });
+      const sameUnit = new Set(lines.map((line) => line.uomId)).size <= 1;
+      const sentQuantity = receiving && sameUnit && lines.every((line) => line.quantity)
+        ? lines.reduce((sum, line) => sum.add(line.quantity!), new Decimal(0)).toFixed(3)
+        : undefined;
+      const actualQuantity = receiving && sameUnit && lines.every((line) => line.actualQuantity)
+        ? lines.reduce((sum, line) => sum.add(line.actualQuantity!), new Decimal(0)).toFixed(3)
+        : undefined;
+      return { id: event.id, type: event.eventType,
+        occurredAt: event.occurredAt, recordedAt: event.createdAt,
+        issuer: event.issuerInstanceId, sourceId: event.externalEventId,
+        verificationState: event.verificationState,
+        confirmed: event.document?.status === "confirmed",
+        checksumValid: hash({ summary: event.summary, evidenceRefs: event.evidenceRefs }) ===
+          event.checksumHex && summary.documentVersion === event.document?.version &&
+          quantitiesMatch && (!receiving || sameUnit),
+        ...(sentQuantity !== undefined ? { sentQuantity } : {}),
+        ...(actualQuantity !== undefined ? { actualQuantity } : {}),
+        evidence: event.evidence.map((link) => ({ id: link.id, checksum: link.checksumHex,
+          visibility: link.visibility, state: link.state,
+          scanState: link.attachment.scanState, bucket: link.attachment.bucket,
+          fileChecksum: link.attachment.sha256Hex })),
+        links: event.outgoing };
+    }),
   }) : { payload: {}, sourceEventIds: [] as string[] };
   const state = !publish ? "revoked" : pending > 0 ? "stale" : "active";
   const now = new Date();

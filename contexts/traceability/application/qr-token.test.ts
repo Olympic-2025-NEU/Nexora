@@ -27,7 +27,8 @@ test("P08-T06 QR encodes an opaque URL that a decoder can scan", async () => {
 test("P08-T06 public projection rejects extra or private fields", () => {
   const valid = { productName: "Product", publicLotCode: "LOT", originIssuer: "local",
     timeline: [{ type: "receipt", occurredAt: new Date().toISOString(),
-      verificationState: "confirmed" }], verificationState: "confirmed", gaps: [],
+      recordedAt: new Date().toISOString(), issuer: "local", sourceId: "source-1",
+      verificationState: "confirmed", evidence: [] }], verificationState: "confirmed", gaps: [],
     asOf: new Date().toISOString() };
   assert.equal(safePublicPassport(valid), true);
   assert.equal(safePublicPassport({ ...valid, buyerRef: "secret" }), false);

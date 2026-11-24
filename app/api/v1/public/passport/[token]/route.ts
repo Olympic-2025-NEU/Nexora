@@ -12,7 +12,8 @@ const notFound = () => NextResponse.json({ error: "NOT_FOUND" }, { status: 404, 
 export async function GET(_request: NextRequest, context: Context): Promise<NextResponse> {
   try {
     const { token } = await context.params;
-    const passport = await createQrService(getPrismaClient()).publicPassport(token);
+    const passport = await createQrService(getPrismaClient(), process.env.PUBLIC_BASE_URL)
+      .publicPassport(token);
     return passport ? NextResponse.json({ data: passport, requestId: crypto.randomUUID() },
       { headers }) : notFound();
   } catch {

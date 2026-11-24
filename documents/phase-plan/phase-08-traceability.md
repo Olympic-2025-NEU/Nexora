@@ -48,9 +48,9 @@
 
 ## P08-T07 — Evidence và chất lượng lịch sử
 
-- [ ] Gắn attachment đã scan với document/trace event bằng checksum và visibility; presigned URL chỉ sau policy check, giới hạn hạn sống.
-- [ ] Timeline thể hiện date, issuer, source ID, actual/sent discrepancy, verification status; kiểm tra timezone và thứ tự occurred vs recorded.
-- [ ] Dữ liệu nguồn sai/missing đánh dấu trạng thái điều tra; không âm thầm chuẩn hóa hay xóa provenance.
+- [x] Gắn attachment đã scan với document/trace event bằng checksum và visibility; URL capability 60 giây chỉ sau policy check, kiểm lại quyền tại thời điểm tải. [Bằng chứng T07](evidence/p08-t07.md).
+- [x] Timeline thể hiện date, issuer, source ID, actual/sent discrepancy, verification status; kiểm tra timezone và thứ tự occurred vs recorded. [Bằng chứng T07](evidence/p08-t07.md).
+- [x] Dữ liệu nguồn sai/missing đánh dấu trạng thái điều tra; không âm thầm chuẩn hóa hay xóa provenance. [Bằng chứng T07](evidence/p08-t07.md).
 - **Đầu ra:** evidence viewer/provenance fields; **kiểm chứng:** file infected/private không xuất hiện trên Passport.
 
 ## P08-T08 — Gate G08

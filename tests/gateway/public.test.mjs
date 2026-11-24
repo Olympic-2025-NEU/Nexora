@@ -43,6 +43,15 @@ describe("public route auth matrix — documented expectations", () => {
 // ---------------------------------------------------------------------------
 
 describe("routes.yaml public route assertions", () => {
+  it("public evidence bytes go only to Core Data through GET/HEAD with rate limits", () => {
+    const block = routesYaml.split("- id: public-evidence-v1")[1]?.split("\n  - id:")[0];
+    assert.match(block ?? "", /uri:\s*\/api\/v1\/public\/evidence\/\*/);
+    assert.match(block, /methods:\s*\[GET, HEAD\]/);
+    assert.match(block, /core-data:8080/);
+    assert.match(block, /rate:\s*30\b/);
+    assert.match(block, /rejected_code:\s*429\b/);
+    assert.doesNotMatch(block, /openid-connect/);
+  });
   it("gateway exposes the QR destination and trace UI with bounded methods", () => {
     const passport = routesYaml.split("- id: erp-passport-ui")[1]?.split("\n  - id:")[0];
     const trace = routesYaml.split("- id: erp-trace-ui")[1]?.split("\n  - id:")[0];

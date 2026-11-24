@@ -29,8 +29,11 @@ export function passportBaseUrl(raw: string | undefined) {
 }
 
 export type PublicPassport = { productName: string; publicLotCode: string;
-  originIssuer: string; timeline: { type: string; occurredAt: string;
-    verificationState: string }[]; verificationState: string; gaps: string[]; asOf: string };
+  originIssuer: string; timeline: { type: string; occurredAt: string; recordedAt: string;
+    issuer: string; sourceId: string; verificationState: string;
+    sentQuantity?: string; actualQuantity?: string;
+    evidence: { id: string; checksum: string; url?: string }[] }[];
+  verificationState: string; gaps: string[]; asOf: string };
 
 /** A DB row is treated as untrusted: accept only the exact seven-field public contract. */
 export function safePublicPassport(value: unknown): value is PublicPassport {
@@ -45,9 +48,26 @@ export function safePublicPassport(value: unknown): value is PublicPassport {
       row.gaps.some((gap) => typeof gap !== "string" || gap.length > 128)) return false;
   if (!Array.isArray(row.timeline) || row.timeline.length > 2000 ||
       row.timeline.some((item) => !item || typeof item !== "object" || Array.isArray(item) ||
-        Object.keys(item).sort().join(",") !== "occurredAt,type,verificationState" ||
-        ["occurredAt", "type", "verificationState"].some((key) =>
-          typeof item[key] !== "string" || item[key].length > 500))) return false;
+        ["occurredAt", "recordedAt", "issuer", "sourceId", "type", "verificationState", "evidence"]
+          .some((key) => !(key in item)) ||
+        Object.keys(item).some((key) => !["occurredAt", "recordedAt", "issuer", "sourceId",
+          "type", "verificationState", "evidence", "sentQuantity", "actualQuantity"].includes(key)) ||
+        ["occurredAt", "recordedAt", "issuer", "sourceId", "type", "verificationState"]
+          .some((key) => typeof item[key] !== "string" || item[key].length > 500) ||
+        !Number.isFinite(Date.parse(item.occurredAt)) ||
+        !Number.isFinite(Date.parse(item.recordedAt)) ||
+        ["sentQuantity", "actualQuantity"].some((key) => item[key] !== undefined &&
+          (typeof item[key] !== "string" || !/^[0-9]+\.[0-9]{3}$/.test(item[key]))) ||
+        !Array.isArray(item.evidence) || item.evidence.length > 100 ||
+        item.evidence.some((ref: unknown) => {
+          if (!ref || typeof ref !== "object" || Array.isArray(ref)) return true;
+          const value = ref as Record<string, unknown>;
+          return Object.keys(value).sort().join(",") !== "checksum,id" ||
+            typeof value.id !== "string" || !UUID.test(value.id) ||
+            typeof value.checksum !== "string" || !/^[0-9a-f]{64}$/.test(value.checksum);
+        }))) return false;
+  if (row.timeline.reduce((sum, item) => sum + item.evidence.length, 0) > 10)
+    return false;
   return Number.isFinite(Date.parse(row.asOf as string));
 }
 
@@ -126,8 +146,33 @@ export function createQrService(db: PrismaClient, publicBaseUrl?: string) {
           sha(canonicalize(projection.publicPayload)!) !== projection.checksumHex) return null;
       const policy = await db.passportPolicy.findFirst({ where: { batchId: row.batchId,
         policyVersion: Number(row.policyVersion.slice(1)), state: "approved" },
-        select: { id: true } });
-      return policy ? projection.publicPayload as PublicPassport : null;
+        select: { id: true, evidenceVisibility: true } });
+      if (!policy) return null;
+      const payload = projection.publicPayload as PublicPassport;
+      if (policy.evidenceVisibility !== "public") return payload;
+      const ids = [...new Set(payload.timeline.flatMap((item) => item.evidence.map((ref) => ref.id)))];
+      if (!ids.length) return payload;
+      const links = await db.traceEvidence.findMany({ where: { id: { in: ids },
+        event: { batchId: row.batchId, verificationState: "local_verified",
+          document: { status: "confirmed" } },
+        state: "active", visibility: "public", attachment: {
+          scanState: "clean", bucket: "private", visibility: "private" } },
+        select: { id: true, checksumHex: true, attachment: { select: { sha256Hex: true } } } });
+      const valid = new Map(links.filter((link) => link.checksumHex === link.attachment.sha256Hex)
+        .map((link) => [link.id, link]));
+      const urls = new Map<string, string>();
+      const base = passportBaseUrl(publicBaseUrl);
+      for (const id of ids) {
+        if (!valid.has(id)) continue;
+        const capability = newQrToken();
+        await db.traceEvidenceAccess.create({ data: { id: randomUUID(),
+          tokenHash: sha(capability), qrTokenId: row.id, evidenceId: id,
+          expiresAt: new Date(Date.now() + 60_000) } });
+        urls.set(id, new URL(`/api/v1/public/evidence/${capability}`, base).toString());
+      }
+      return { ...payload, timeline: payload.timeline.map((item) => ({ ...item,
+        evidence: item.evidence.filter((ref) => urls.has(ref.id)).map((ref) =>
+          ({ ...ref, url: urls.get(ref.id)! })) })) };
     },
   };
 }

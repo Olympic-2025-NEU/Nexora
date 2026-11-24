@@ -91,7 +91,7 @@ export async function adminApi(
   const headers = new Headers(init.headers);
   const token = getAdminAccessToken();
   if (token) headers.set("Authorization", `Bearer ${token}`);
-  if (init.body && !headers.has("content-type")) {
+  if (init.body && !(init.body instanceof FormData) && !headers.has("content-type")) {
     headers.set("content-type", "application/json");
   }
 
@@ -107,7 +107,7 @@ export async function adminApi(
   const retryHeaders = new Headers(init.headers);
   const nextToken = getAdminAccessToken();
   if (nextToken) retryHeaders.set("Authorization", `Bearer ${nextToken}`);
-  if (init.body && !retryHeaders.has("content-type")) {
+  if (init.body && !(init.body instanceof FormData) && !retryHeaders.has("content-type")) {
     retryHeaders.set("content-type", "application/json");
   }
   res = await fetch(path, { ...init, headers: retryHeaders });

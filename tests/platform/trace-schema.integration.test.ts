@@ -27,16 +27,20 @@ test("P08 schema, role grants, migration and safe initial states", async () => {
   const tables = await owner.$queryRaw<{ table_name: string }[]>`
     SELECT table_name FROM information_schema.tables WHERE table_schema='traceability' ORDER BY table_name`;
   assert.deepEqual(tables.map((row) => row.table_name),
-    ["passport_policy", "passport_projection", "qr_token", "trace_event", "trace_link"]);
+    ["passport_policy", "passport_projection", "public_evidence_download", "qr_token",
+      "trace_event", "trace_evidence", "trace_evidence_access", "trace_link"]);
   const rights = await owner.$queryRaw<Array<Record<string, boolean>>>`
     SELECT has_table_privilege('app_runtime','traceability.trace_event','INSERT') AS event_insert,
       has_table_privilege('app_runtime','traceability.trace_event','UPDATE') AS event_update,
       has_table_privilege('app_runtime','traceability.trace_event','DELETE') AS event_delete,
       has_table_privilege('app_runtime','traceability.passport_policy','INSERT') AS policy_insert,
       has_table_privilege('app_runtime','traceability.passport_projection','UPDATE') AS passport_update,
-      has_table_privilege('core_data','traceability.trace_event','SELECT') AS core_event_read`;
+      has_table_privilege('core_data','traceability.trace_event','SELECT') AS core_event_read,
+      has_table_privilege('core_data','traceability.public_evidence_download','SELECT') AS core_public_read,
+      has_table_privilege('app_runtime','traceability.trace_evidence','INSERT') AS evidence_insert`;
   assert.deepEqual(rights[0], { event_insert: true, event_update: false,
-    event_delete: false, policy_insert: true, passport_update: true, core_event_read: false });
+    event_delete: false, policy_insert: true, passport_update: true,
+    core_event_read: false, core_public_read: true, evidence_insert: true });
   const migration = await owner.$queryRaw<{ migration_name: string }[]>`
     SELECT migration_name FROM public._prisma_migrations
     WHERE migration_name='20261123060000_traceability_baseline' AND finished_at IS NOT NULL`;
@@ -45,6 +49,10 @@ test("P08 schema, role grants, migration and safe initial states", async () => {
     SELECT migration_name FROM public._prisma_migrations
     WHERE migration_name='20261124010000_passport_policy' AND finished_at IS NOT NULL`;
   assert.equal(policyMigration.length, 1);
+  const evidenceMigration = await owner.$queryRaw<{ migration_name: string }[]>`
+    SELECT migration_name FROM public._prisma_migrations
+    WHERE migration_name='20261124030000_trace_evidence' AND finished_at IS NOT NULL`;
+  assert.equal(evidenceMigration.length, 1);
   const indexes = await owner.$queryRaw<{ indexname: string }[]>`
     SELECT indexname FROM pg_indexes WHERE schemaname='traceability'`;
   for (const name of ["uq_trace_event_external", "uq_trace_event_local_action",

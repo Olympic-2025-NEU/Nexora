@@ -341,6 +341,18 @@
       },
       "invalid": {}
     },
+    "TraceEvidenceAttach": {
+      "valid": {
+        "eventId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        "attachmentId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        "visibility": "private"
+      },
+      "invalid": {
+        "eventId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        "attachmentId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        "visibility": "unsafe"
+      }
+    },
     "Reason": {
       "valid": {
         "reason": "Reviewed by administrator"

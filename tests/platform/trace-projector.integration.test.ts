@@ -15,6 +15,7 @@ import { forwardTrace } from "../../contexts/traceability/application/forward";
 import { createPrismaForwardPort } from "../../contexts/traceability/infrastructure/forward-repo";
 import { createPassportService } from "../../contexts/traceability/application/passport-service";
 import { createQrService } from "../../contexts/traceability/application/qr-token";
+import { createTraceEvidenceService } from "../../contexts/traceability/application/evidence-service";
 
 if (process.env.NEXORA_TEST_TRACE !== "1" || !process.env.OWNER_DATABASE_URL ||
     !process.env.APP_DATABASE_URL || !process.env.CORE_DATABASE_URL) {
@@ -54,7 +55,8 @@ async function receipt(batchIds: string[], occurredAt: string) {
     aggregateType: "document", aggregateId: documentId, aggregateVersion: document.version,
     correlationId: randomUUID(), payload });
   const outbox = await app.outboxMessage.create({ data: { ...serialized, id: randomUUID(),
-    createdAt: new Date(Date.now() - 10 * 60_000) } });
+    createdAt: new Date(Date.now() - 10 * 60_000),
+    nextAttemptAt: new Date(Date.now() - 60_000) } });
   return { documentId, payload, outbox };
 }
 
@@ -568,4 +570,105 @@ test("P08-T06 real projected lot QR remains private, expires and revokes with po
   assert.equal((await app.qrToken.findUniqueOrThrow({ where: { id: fourth.tokenId } })).state,
     "revoked");
   assert.ok(await app.auditLog.count({ where: { targetType: "qr_token" } }) >= 5);
+});
+
+test("P08-T07 clean public evidence is linked by checksum and short-lived access rechecks policy", async () => {
+  const admin = { userId: "fixture-owner", organizationId: "fixture",
+    unitIds: [], roles: ["administrator"] };
+  const staff = { ...admin, roles: ["staff"], unitIds: [warehouseId] };
+  const evidence = createTraceEvidenceService(app);
+  const publication = createPassportService(app);
+  const qr = createQrService(app, "https://passport.example");
+  const event = await app.traceEvent.findFirstOrThrow({ where: { batchId: batches[1],
+    eventType: TRADING_EVENT_TYPES.receipt } });
+  const bytes = Buffer.from("clean public evidence fixture");
+  const checksum = createHash("sha256").update(bytes).digest("hex");
+  const fileId = randomUUID();
+  const privateId = randomUUID();
+  const infectedId = randomUUID();
+  for (const [id, state, bucket] of [
+    [fileId, "clean", "private"], [privateId, "clean", "private"],
+    [infectedId, "infected", "quarantine"]] as const) {
+    await owner.attachment.create({ data: { id, ownerType: "core_record", bucket,
+      objectKey: `${bucket}/${randomUUID()}`, sha256Hex: checksum, mimeType: "text/plain",
+      sizeBytes: BigInt(bytes.length), scanState: state, visibility: "private",
+      createdBySub: admin.userId, ...(state === "clean" ? {
+        scannedAt: new Date(), scanEngineVersion: "ClamAV test" } : {}) } });
+  }
+  await app.batch.update({ where: { id: batches[1] }, data: { qualityStatus: "available" } });
+  const access = { organization: "public", product: "public", batch: "public",
+    timeline: "public", evidence: "public" };
+  const draft = await publication.createDraft(admin, batches[1], access, randomUUID());
+  assert.equal(draft.policyVersion, 3);
+  await publication.approve(admin, batches[1], 3, randomUUID());
+  await assert.rejects(evidence.attach({ ...staff, unitIds: [randomUUID()] }, batches[1],
+    event.id, privateId, "private", randomUUID()), { code: "BATCH_NOT_FOUND" });
+  await assert.rejects(evidence.attach(staff, batches[1], event.id, fileId,
+    "public", randomUUID()), { code: "POLICY_DENIED" });
+  await assert.rejects(evidence.attach(admin, batches[1], event.id, infectedId,
+    "public", randomUUID()), { code: "FILE_NOT_CLEAN" });
+  const publicLink = await evidence.attach(admin, batches[1], event.id, fileId,
+    "public", randomUUID());
+  await evidence.attach(admin, batches[1], event.id, privateId, "private", randomUUID());
+  assert.equal((await app.passportProjection.findUniqueOrThrow({ where: {
+    batchId: batches[1] } })).state, "stale");
+  assert.equal((await publication.rebuild(admin, batches[1], randomUUID())).state, "active");
+  const issued = await qr.issue(admin, batches[1], "v3", randomUUID(), randomUUID());
+  const token = new URL(issued.qrUrl).pathname.split("/").at(-1)!;
+  const passport = await qr.publicPassport(token);
+  assert.ok(passport);
+  const timeline = passport.timeline.find((item) => item.sourceId === event.externalEventId);
+  assert.ok(timeline);
+  assert.equal(timeline.issuer, issuer);
+  assert.ok(timeline.recordedAt.endsWith("Z"));
+  assert.deepEqual(timeline.evidence.map((ref) => ref.id), [publicLink.id]);
+  assert.equal(timeline.evidence[0].checksum, checksum);
+  assert.equal(JSON.stringify(passport).includes(privateId), false);
+  const receiving = passport.timeline.find((item) => item.type === TRADING_EVENT_TYPES.receiving);
+  assert.equal(receiving?.sentQuantity, "2.000");
+  assert.equal(receiving?.actualQuantity, "1.000");
+  assert.ok(passport.gaps.includes("receiving_discrepancy"));
+  const capability = new URL(timeline.evidence[0].url!).pathname.split("/").at(-1)!;
+  const accessHash = createHash("sha256").update(capability).digest("hex");
+  const view = await core.$queryRaw<{ attachment_id: string }[]>`
+    SELECT attachment_id FROM traceability.public_evidence_download
+    WHERE token_hash = ${accessHash}`;
+  assert.deepEqual(view.map((row) => row.attachment_id), [fileId]);
+  const accessRow = await app.traceEvidenceAccess.findFirstOrThrow({ where: {
+    tokenHash: accessHash } });
+  await owner.traceEvidenceAccess.update({ where: { id: accessRow.id }, data: {
+    createdAt: new Date(Date.now() - 120_000), expiresAt: new Date(Date.now() - 60_000) } });
+  assert.equal((await core.$queryRaw<{ attachment_id: string }[]>`
+    SELECT attachment_id FROM traceability.public_evidence_download
+    WHERE token_hash = ${accessHash}`).length, 0);
+  const renewed = await qr.publicPassport(token);
+  assert.ok(renewed?.timeline.flatMap((item) => item.evidence).some((ref) => ref.id === publicLink.id));
+  await evidence.revoke(admin, batches[1], publicLink.id, "withdraw evidence", randomUUID());
+  assert.equal((await core.$queryRaw<{ attachment_id: string }[]>`
+    SELECT attachment_id FROM traceability.public_evidence_download
+    WHERE token_hash = ${accessHash}`).length, 0);
+  assert.equal(await qr.publicPassport(token), null);
+  await publication.rebuild(admin, batches[1], randomUUID());
+  const after = await qr.publicPassport(token);
+  assert.ok(after);
+  assert.equal(after.timeline.flatMap((item) => item.evidence).length, 0);
+  await assert.rejects(evidence.attach(admin, batches[1], event.id, privateId,
+    "public", randomUUID()), { code: "TRACE_EVIDENCE_EXISTS" });
+  const anotherId = randomUUID();
+  await owner.attachment.create({ data: { id: anotherId, ownerType: "core_record",
+    bucket: "private", objectKey: `clean/${randomUUID()}`, sha256Hex: checksum,
+    mimeType: "text/plain", sizeBytes: BigInt(bytes.length), scanState: "clean",
+    visibility: "private", createdBySub: admin.userId, scannedAt: new Date(),
+    scanEngineVersion: "ClamAV test" } });
+  await evidence.attach(admin, batches[1], event.id, anotherId, "public", randomUUID());
+  await publication.rebuild(admin, batches[1], randomUUID());
+  await owner.attachment.update({ where: { id: anotherId }, data: {
+    scanState: "infected", bucket: "quarantine" } });
+  assert.equal(await qr.publicPassport(token), null);
+  await publication.rebuild(admin, batches[1], randomUUID());
+  const investigated = await qr.publicPassport(token);
+  assert.ok(investigated);
+  assert.ok(investigated.gaps.includes("evidence_investigation"));
+  assert.equal(investigated.timeline.flatMap((item) => item.evidence).length, 0);
+  assert.ok(await app.auditLog.count({ where: { targetType: "trace_evidence" } }) >= 3);
 });
