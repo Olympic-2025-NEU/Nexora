@@ -10,14 +10,14 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 # Nexora Agent Instructions
 
-## Read first
+## Read project context
 
-1. `documents/referents/SOURCE_OF_TRUTH.md`
-2. `ARCHITECTURE.md`
-3. Module plan in `documents/plans/` for the feature you touch
-4. `documents/referents/CODING_RULES.md`, `FOLDER_STRUCTURE.md`, `MVC_DDD_LAYERING.md`, `PLATFORM_CAPABILITIES.md`
-5. `documents/referents/OLP_2026_ALIGNMENT.md` when planning contest readiness
-6. `documents/phase-plan/README.md`, the relevant `phase-xx-*.md` **TASK_ID**, and contracts (`api-contracts`, `database-schema-v1`, `prisma-migration-spec`, `security`) when implementing
+Read only the sections needed for the task; search for headings or terms before opening long documents.
+
+1. For behavior or architecture changes, consult the relevant sections of `documents/referents/SOURCE_OF_TRUTH.md` and `ARCHITECTURE.md`.
+2. For a feature, read its module plan in `documents/plans/`. For implementation, read the matching **TASK_ID** in `documents/phase-plan/`, plus only the contracts it touches (`api-contracts`, `database-schema-v1`, `prisma-migration-spec`, `security`).
+3. Consult `CODING_RULES.md`, `FOLDER_STRUCTURE.md`, `MVC_DDD_LAYERING.md`, or `PLATFORM_CAPABILITIES.md` under `documents/referents/` when the affected layer or capability needs them.
+4. Read `documents/referents/OLP_2026_ALIGNMENT.md` for contest-readiness work.
 
 ## MVP modules (Chapter 6)
 
@@ -32,6 +32,13 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 Build order and edges: `documents/plans/DEPENDENCIES.md`.
 Detailed tasks and gates: `documents/phase-plan/README.md`.
+
+## Token-efficient tool use
+
+- Start code searches with file paths and narrow patterns (`rg --files`, then `rg -n` in likely directories). Read the needed range or symbol instead of dumping whole files, logs, or repository trees.
+- The repo-local RTK hook in `.codex/hooks.json` condenses supported terminal output after Codex restarts and trusts the hook. Prefer its compact output for verbose status, diff, build, lint, and test commands. Use `rtk bypass <command>` if a filtered result lacks details needed to diagnose a failure or review a change. Check estimated command-output savings with `rtk gain`; do not treat that percentage as total conversation savings.
+- When Serena MCP is available, activate `Nexora` (or the current repository path) and read Serena's initial instructions before semantic code work. Use symbol lookup, references, and symbol edits for multi-file code navigation or refactors. Keep ordinary `rg` and direct reads for documentation, configuration, or small exact-text tasks. Request only the symbol bodies and references needed for the change.
+- Run the narrowest useful validation first. Expand tests or output only to resolve a concrete remaining risk. Keep final summaries brief and cite changed paths and verification results.
 
 ## Skills
 
@@ -84,3 +91,5 @@ Retain qualifying friction even if it is later fixed or worked around; record th
 Before the final response, run one reporting pass. If candidates remain, from this file's directory run `npx --no-install next internal agent-feedback-instructions` once without piping or truncating its output. Follow its output or error guidance. If a network sandbox blocks it, retry with network access; if it still returns no output, continue normally.
 
 <!-- END:nextjs-agent-feedback -->
+
+@RTK.md
