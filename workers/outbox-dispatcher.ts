@@ -4,23 +4,26 @@ import type { PrismaClient } from "@prisma/client";
 import { createOutboxDispatcher } from "../platform/outbox/dispatcher";
 import { buildHandlerMap } from "../composition/event-handlers";
 import { membershipActorResolver, applyApprovalResult } from "../composition/workflow";
-import { WORKFLOW_EVENT_TYPES } from "../contracts/events/registry";
+import { EVENT_DESTINATIONS, WORKFLOW_EVENT_TYPES } from "../contracts/events/registry";
 import { FlowableClient } from "../platform/workflow/flowable-client";
 import { createFlowableStarter } from "../platform/workflow/flowable-starter";
 import { createFlowableDecider } from "../platform/workflow/flowable-decider";
 import { createReconciler } from "../platform/workflow/reconciler";
 import { scanStuckWork } from "../platform/observability/alerts";
 import { traceConsumers, traceLag } from "./trace-projector";
+import { createFederationOutboundHandler } from "./federation-outbound";
 
 export function main(client: PrismaClient, core: PrismaClient, issuerInstanceId: string) {
   const engine = FlowableClient.fromEnv();
   const reconciler = createReconciler(client, engine, applyApprovalResult);
-  const dispatcher = createOutboxDispatcher({ client, workerId: `worker-${randomUUID()}`,
-    handlers: buildHandlerMap({ traceability: traceConsumers(client, core, issuerInstanceId),
-      workflow: new Map([
+  const handlers = buildHandlerMap({ traceability: traceConsumers(client, core, issuerInstanceId),
+    workflow: new Map([
       [WORKFLOW_EVENT_TYPES.requested, createFlowableStarter(client, engine)],
       [WORKFLOW_EVENT_TYPES.decisionRequested, createFlowableDecider(client, engine, membershipActorResolver(client))],
-    ]) }) });
+    ]) });
+  handlers.set(EVENT_DESTINATIONS.federation, createFederationOutboundHandler(client, issuerInstanceId));
+  const dispatcher = createOutboxDispatcher({ client, workerId: `worker-${randomUUID()}`,
+    handlers });
   let stopped = false;
   const poll = async () => {
     if (stopped) return;

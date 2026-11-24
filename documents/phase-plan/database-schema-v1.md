@@ -239,6 +239,8 @@ Correction phải cùng type, trỏ chứng từ confirmed liền trước, có 
 
 `id`, `created_at`; `outbox_id uuid!→platform.outbox_message.id`, `attempt_no integer! CHECK(attempt_no>0)`, `endpoint_host text!`, `http_status smallint?`, `result text! CHECK IN ('ack','retry','permanent_failure')`, `error_code text?`, `duration_ms integer? CHECK(duration_ms>=0)`, `ack_message_id text?`, `ack_id text?`, `ack_status text? CHECK IN ('validated','pending_dependency')`; unique `(outbox_id,attempt_no)`, index `(outbox_id,created_at DESC)`. Worker chỉ ghi `result='ack'` khi HTTP 202, ACK message ID đúng, recipient/endpoint đúng và schema ACK hợp lệ; không lưu bearer token/request secret.
 
+Migration T03: `prisma/migrations/20261124040000_federation_delivery_attempt/migration.sql`. `attempt_no` tăng liên tục theo từng outbox message kể cả khi quản trị viên retry dead-letter đặt lại `outbox_message.attempt_count`; worker khóa outbox row, đọc max attempt rồi ghi bản mới. `app_runtime` chỉ có SELECT/INSERT bảng attempt, `core_data` không đọc được. `result='ack'` buộc các ACK field và `http_status=202`; lỗi không được chứa ACK field.
+
 ### `federation.identity_mapping`
 
 `id`, `created_at`; `origin_issuer_instance_id text!`, `origin_lot_id text!`, `sender_instance_id text!`, `sender_batch_id text!`, `local_batch_id uuid!→catalog.batch.id`, `source_message_id uuid!→federation.inbox_message.id`, `verification_state text! CHECK IN ('partner_asserted','verified')`; unique `(sender_instance_id,sender_batch_id,origin_issuer_instance_id,origin_lot_id)`; index `(local_batch_id)`. Không map theo tên/SKU. Một local batch có thể có nhiều upstream evidence nếu policy cho phép; unique không cấm.

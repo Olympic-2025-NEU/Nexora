@@ -8,7 +8,7 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
-  schemas  = ["platform", "system", "catalog", "inventory", "trading", "traceability"]
+  schemas  = ["platform", "system", "catalog", "inventory", "trading", "traceability", "federation"]
 }
 
 model AuditLog {
@@ -124,11 +124,33 @@ model OutboxMessage {
   leaseUntil       DateTime? @map("lease_until") @db.Timestamptz(6)
   lastErrorCode    String?   @map("last_error_code")
   deliveredAt      DateTime? @map("delivered_at") @db.Timestamptz(6)
+  deliveryAttempts DeliveryAttempt[]
 
   @@unique([aggregateType, aggregateId, aggregateVersion, eventType, destination])
   @@index([correlationId])
   @@map("outbox_message")
   @@schema("platform")
+}
+
+model DeliveryAttempt {
+  id            String   @id @db.Uuid
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  outboxId      String   @map("outbox_id") @db.Uuid
+  attemptNo     Int      @map("attempt_no")
+  endpointHost  String   @map("endpoint_host")
+  httpStatus    Int?     @map("http_status") @db.SmallInt
+  result        String
+  errorCode     String?  @map("error_code")
+  durationMs    Int?     @map("duration_ms")
+  ackMessageId  String?  @map("ack_message_id")
+  ackId         String?  @map("ack_id")
+  ackStatus     String?  @map("ack_status")
+  outbox        OutboxMessage @relation(fields: [outboxId], references: [id])
+
+  @@unique([outboxId, attemptNo], map: "uq_delivery_outbox_attempt")
+  @@index([outboxId, createdAt(sort: Desc)], map: "idx_delivery_outbox_created")
+  @@map("delivery_attempt")
+  @@schema("federation")
 }
 
 enum ApprovalRequestState {

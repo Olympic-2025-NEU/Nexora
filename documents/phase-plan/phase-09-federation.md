@@ -20,9 +20,9 @@
 
 ## P09-T03 — Outbound delivery
 
-- [ ] Từ transfer Confirmed tạo outbox destination B; worker lấy token của receiver, gọi gateway B, timeout/retry/backoff, lưu attempt/response đã redacted. Không giữ app DB transaction khi HTTP.
-- [ ] Mark delivered chỉ sau technical ACK hợp lệ cho đúng message/receiver; ACK mất → retry an toàn. Token hết hạn → refresh theo client credentials, credential revoke → dead-letter/alert.
-- [ ] UI sender hiện trạng thái pending/retry/ack/rejected, thao tác admin retry có audit.
+- [x] Từ transfer Confirmed tạo outbox destination B; worker lấy token của receiver, gọi gateway B, timeout/retry/backoff, lưu attempt/response đã redacted. Không giữ app DB transaction khi HTTP. [Bằng chứng T03](evidence/p09-t03.md).
+- [x] Mark delivered chỉ sau technical ACK hợp lệ cho đúng message/receiver; ACK mất → retry an toàn. Token hết hạn → refresh theo client credentials, credential revoke → dead-letter/alert. [Bằng chứng T03](evidence/p09-t03.md).
+- [x] UI sender hiện trạng thái pending/retry/ack/rejected, thao tác admin retry có audit. [Bằng chứng T03](evidence/p09-t03.md).
 - **Đầu ra:** outbound adapter; **kiểm chứng:** B offline/ACK lost/restart worker không làm mất thông điệp.
 
 ## P09-T04 — Inbound trust, inbox và dedupe

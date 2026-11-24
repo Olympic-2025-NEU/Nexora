@@ -16,6 +16,7 @@ export type FederationEventType = (typeof FEDERATION_EVENT_TYPES)[number];
 export type FederationEnvelope = Record<string, unknown> & {
   schemaVersion: "1.0"; messageId: string; eventId: string; eventType: FederationEventType;
   issuerInstanceId: string; recipientInstanceId: string; occurredAt: string; publishedAt: string;
+  correlationId: string;
 };
 
 export class FederationContractError extends Error {

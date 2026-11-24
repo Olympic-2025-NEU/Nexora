@@ -9,7 +9,8 @@ import { adminApi } from "@/app/lib/admin-api";
 type Transfer = { id: string; documentNumber: string; status: string; version: number; deliveryState: string;
   linkedIssueId: string; linkedIssueNumber?: string; destinationPartnerId: string; recipientInstanceId?: string;
   lines: { id: string; sourceIssueLineId: string; batchId: string; productId: string; quantity: string; uomId: string }[];
-  announcement: { messageId: string; status: string; attempts: number; nextAttemptAt: string; lastError: string | null } | null };
+  announcement: { id: string; messageId: string; status: string; attempts: number; nextAttemptAt: string;
+    technicalAckAt: string | null; lastError: string | null } | null };
 type Options = { issues: { id: string; documentNumber: string }[];
   partners: { id: string; displayName: string; issuerInstanceId: string }[] };
 
@@ -74,6 +75,24 @@ export function TransfersClient({ id, creating = false }: { id?: string; creatin
     } catch (err) { setError(err instanceof Error ? err.message : "Lỗi xác nhận."); }
     finally { setBusy(false); }
   }
+  async function retryAnnouncement() {
+    if (!selected?.announcement || selected.announcement.status !== "dead_letter") return;
+    setBusy(true); setError("");
+    try {
+      const response = await adminApi("/api/v1/admin/retries", { method: "POST",
+        headers: { "idempotency-key": crypto.randomUUID() },
+        body: JSON.stringify({ messageId: selected.announcement.id }) });
+      if (!response.ok) throw new Error(response.status === 403
+        ? "Chỉ quản trị viên được gửi lại message." : "Không gửi lại được message.");
+      await load();
+    } catch (err) { setError(err instanceof Error ? err.message : "Không gửi lại được message."); }
+    finally { setBusy(false); }
+  }
+  const deliveryLabel = (row: Transfer) => ["received", "partial", "disputed"].includes(row.deliveryState)
+    ? row.deliveryState : row.announcement?.status === "dead_letter" ? "Gửi thất bại / bị từ chối" :
+    row.announcement?.status === "retry_due" ? "Đang chờ thử lại" :
+      row.deliveryState === "technical_ack" || row.announcement?.status === "delivered"
+        ? "Đã ACK kỹ thuật · chờ nhận hàng" : row.status === "confirmed" ? "Đang chờ gửi" : "Chưa gửi";
   return <main className="mx-auto max-w-5xl space-y-6 p-6">
     <h1 className="text-2xl font-semibold">Chuyển hàng cho đối tác</h1>
     <nav className="flex gap-4"><Link href="/trading/issues">Issue</Link><Link href="/trading/transfers">Transfers</Link>
@@ -98,14 +117,14 @@ export function TransfersClient({ id, creating = false }: { id?: string; creatin
     </form>}
     {!creating && !id && <ul className="space-y-2">{items.map((row) => <li key={row.id}>
       <Link href={`/trading/transfers/${row.id}`} className="underline">{row.documentNumber}</Link> · {row.status} ·
-      <span className="rounded border px-2">{row.deliveryState}</span>
+      <span className="rounded border px-2">{deliveryLabel(row)}</span>
     </li>)}</ul>}
     {selected && <section className="space-y-4 rounded border p-4">
       <h2 className="text-xl font-medium">{selected.documentNumber} · {selected.status}</h2>
       <p>Transfer: {selected.id}</p><p>Issue: {selected.linkedIssueNumber} · {selected.linkedIssueId}</p>
       <p>Partner: {selected.destinationPartnerId} · {selected.recipientInstanceId}</p>
-      <p>Delivery: <span className="rounded border px-2">{selected.deliveryState}</span></p>
-      <p>technical_ack / awaiting_receipt / received / partial / disputed: chờ federation (Phase 08/09).</p>
+      <p>Delivery: <span className="rounded border px-2">{deliveryLabel(selected)}</span></p>
+      {selected.announcement?.technicalAckAt && <p>ACK lúc: {selected.announcement.technicalAckAt}</p>}
       <ul>{selected.lines.map((line) => <li key={line.id}>
         {line.batchId} · {line.productId} · {line.quantity} · UOM {line.uomId} · transfer line {line.id} · issue line {line.sourceIssueLineId}
       </li>)}</ul>
@@ -117,6 +136,8 @@ export function TransfersClient({ id, creating = false }: { id?: string; creatin
         <dt>Next attempt</dt><dd>{selected.announcement.nextAttemptAt}</dd>
         <dt>Last error</dt><dd>{selected.announcement.lastError ?? "—"}</dd>
       </dl> : <p>Chưa confirm.</p>}
+      {selected.announcement?.status === "dead_letter" && <button type="button" disabled={busy}
+        onClick={() => void retryAnnouncement()} className="rounded border p-2">Quản trị viên gửi lại</button>}
       {selected.status === "draft" && <div className="flex gap-4">
         <button disabled={busy} onClick={() => void act("confirm")}>Confirm</button>
         <button disabled={busy} onClick={() => void act("cancel")}>Huỷ</button>

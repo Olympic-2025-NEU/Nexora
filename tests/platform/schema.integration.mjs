@@ -82,6 +82,22 @@ test("versioned schema contains platform tables, expected constraints and migrat
   assert.ok(migrations.some((row) => row.migration_name === "20261119010000_file_scan_retry"));
   assert.ok(migrations.some((row) => row.migration_name === "20261120000000_platform_delivery_idempotency"));
   assert.ok(migrations.some((row) => row.migration_name === "20261120010000_platform_delivery_outbox"));
+  assert.ok(migrations.some((row) => row.migration_name === "20261124040000_federation_delivery_attempt"));
+  const delivery = await migrator.$queryRaw`
+    SELECT column_name FROM information_schema.columns
+    WHERE table_schema = 'federation' AND table_name = 'delivery_attempt'
+    ORDER BY ordinal_position`;
+  assert.deepEqual(delivery.map((row) => row.column_name), ["id", "created_at", "outbox_id",
+    "attempt_no", "endpoint_host", "http_status", "result", "error_code", "duration_ms",
+    "ack_message_id", "ack_id", "ack_status"]);
+  const deliveryConstraints = await migrator.$queryRaw`
+    SELECT conname FROM pg_constraint WHERE conrelid = 'federation.delivery_attempt'::regclass`;
+  for (const name of ["ck_delivery_attempt_no", "ck_delivery_result", "ck_delivery_ack_fields",
+    "uq_delivery_outbox_attempt"]) assert.ok(deliveryConstraints.some((row) => row.conname === name));
+  const deliveryGrants = await migrator.$queryRaw`
+    SELECT has_table_privilege('app_runtime','federation.delivery_attempt','INSERT') AS app_insert,
+      has_table_privilege('core_data','federation.delivery_attempt','SELECT') AS core_read`;
+  assert.deepEqual(deliveryGrants[0], { app_insert: true, core_read: false });
   const indexes = await migrator.$queryRaw`
     SELECT indexname, indexdef FROM pg_indexes WHERE schemaname = 'platform' AND tablename = 'outbox_message'`;
   assert.match(indexes.find((row) => row.indexname === "outbox_message_due_idx").indexdef,

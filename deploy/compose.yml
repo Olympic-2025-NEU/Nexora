@@ -311,6 +311,9 @@ services:
       REDIS_URL: ${REDIS_URL}
       FLOWABLE_ADMIN_USER: ${FLOWABLE_ADMIN_USER}
       FLOWABLE_ADMIN_PASSWORD: ${FLOWABLE_ADMIN_PASSWORD}
+      # Local demo only: resolve env:PARTNER_OUTBOUND_CLIENT_SECRET in worker.
+      # Production may mount secret:name at /run/secrets/name via an override.
+      PARTNER_OUTBOUND_CLIENT_SECRET: ${PARTNER_OUTBOUND_CLIENT_SECRET:-}
     depends_on:
       db-migrate:
         condition: service_completed_successfully

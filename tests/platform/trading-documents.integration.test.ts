@@ -28,6 +28,7 @@ import { readFileSync } from "node:fs";
 import envelopeSchema from "../../contracts/events/envelope-v1.schema.json";
 import { createOutboxDispatcher } from "../../platform/outbox/dispatcher";
 import { buildHandlerMap } from "../../composition/event-handlers";
+import { createFederationOutboundHandler } from "../../workers/federation-outbound";
 import { approvalInbox } from "../../composition/approvals";
 
 if (process.env.NEXORA_TEST_DB !== "1") throw new Error("Disposable PostgreSQL required");
@@ -858,7 +859,7 @@ test("transfer copies all issue lines; cancellation frees issue without deleting
   const announcement = await db.outboxMessage.findFirstOrThrow({ where: { aggregateId: next.id } });
   assert.equal(announcement.eventType, "transfer.announced.v1");
   assert.equal(announcement.status, "pending");
-  assert.equal(announcement.nextAttemptAt.getUTCFullYear(), 9999);
+  assert.ok(announcement.nextAttemptAt.getTime() <= Date.now());
 });
 
 test("offline dispatcher retains frozen envelope; replay and concurrency never duplicate", { timeout: 120_000 }, async () => {
@@ -907,13 +908,40 @@ test("offline dispatcher retains frozen envelope; replay and concurrency never d
   assert.equal(shown.deliveryState, "pending");
   await db.outboxMessage.updateMany({ where: { id: { not: row.id }, status: { in: ["pending", "retry_due"] } },
     data: { nextAttemptAt: new Date("9999-12-31T00:00:00.000Z") } });
-  const dispatcher = createOutboxDispatcher({ client: db, workerId: randomUUID(), handlers: buildHandlerMap(), batchSize: 100 });
-  assert.equal((await dispatcher.tick()).claimed, 0);
+  const handlers = buildHandlerMap();
+  handlers.set("federation", async () => { throw Object.assign(new Error("offline"), { code: "OFFLINE" }); });
+  const dispatcher = createOutboxDispatcher({ client: db, workerId: randomUUID(), handlers, batchSize: 100 });
+  assert.deepEqual(await dispatcher.tick(), { claimed: 1, delivered: 0, retried: 1,
+    deadLettered: 0, leaseLost: 0 });
   const held = await db.outboxMessage.findUniqueOrThrow({ where: { id: row.id } });
-  assert.equal(held.status, "pending");
-  assert.equal(held.attemptCount, 0);
+  assert.equal(held.status, "retry_due");
+  assert.equal(held.attemptCount, 1);
   assert.deepEqual(held.payload, row.payload);
   assert.equal(await db.outboxMessage.count({ where: { aggregateId: doc.id } }), 2);
+  await db.partnerConnection.create({ data: { id: randomUUID(), partnerId,
+    endpointUrl: "https://partner.example/api/v1/federation/events",
+    outboundTokenUrl: "https://identity.example/token", outboundClientId: "client-a",
+    outboundSecretRef: "env:PARTNER_SECRET", outboundAudience: "partner-b",
+    inboundClientId: randomUUID(), status: "active" } });
+  await db.$executeRaw`UPDATE platform.outbox_message SET next_attempt_at = now() - interval '1 second'
+    WHERE id = ${row.id}::uuid`;
+  const send = createFederationOutboundHandler(db, "local-instance", {
+    resolveSecret: async () => "fixture-secret",
+    fetcher: async (url) => String(url).includes("identity")
+      ? new Response(JSON.stringify({ access_token: "fixture-token", token_type: "Bearer" }), { status: 200 })
+      : new Response(JSON.stringify({ messageId: envelope.messageId, ackId: randomUUID(),
+        acceptedAt: new Date().toISOString(), status: "validated" }), { status: 202 }),
+  });
+  const delivered = createOutboxDispatcher({ client: db, workerId: randomUUID(),
+    handlers: new Map([["federation", send]]) });
+  assert.equal((await delivered.tick()).delivered, 1);
+  const acknowledged = await db.$transaction((tx) => service.view({ tx, actor,
+    requestId: randomUUID(), emit: () => {} }, doc.id));
+  assert.equal(acknowledged.deliveryState, "technical_ack");
+  assert.equal(acknowledged.announcement?.status, "delivered");
+  assert.ok(acknowledged.announcement?.technicalAckAt);
+  assert.deepEqual((await db.deliveryAttempt.findMany({ where: { outboxId: row.id },
+    orderBy: { attemptNo: "asc" } })).map((item) => item.result), ["ack"]);
 });
 
 test("transfer validation and confirm recheck partner, scope and line snapshot", { timeout: 120_000 }, async () => {

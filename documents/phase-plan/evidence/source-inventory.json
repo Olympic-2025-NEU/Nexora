@@ -396,6 +396,8 @@
     "tests/platform/workflow.integration.test.ts",
     "tests/system/m01-policy.test.mjs",
     "worker/entrypoint.js",
+    "workers/federation-outbound.test.ts",
+    "workers/federation-outbound.ts",
     "workers/outbox-dispatcher.ts",
     "workers/trace-projector.ts"
   ]

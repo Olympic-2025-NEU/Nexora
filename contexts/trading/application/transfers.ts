@@ -5,6 +5,7 @@ import type { Prisma } from "@prisma/client";
 import type { Actor } from "@/platform/identity/actor";
 import type { OutboxEventInput } from "@/platform/outbox/message";
 import { DomainError } from "@/platform/kernel/errors";
+import { safeErrorCode } from "@/platform/observability/diagnostics";
 import { applyDocumentAction, InvalidTransitionError } from "../domain/document";
 import { createTradingRepos } from "../infrastructure/prisma-repos";
 
@@ -50,9 +51,12 @@ export function createTransferService(ports: TransferPorts, instanceId: string) 
       note: doc.note, linkedIssueId: doc.transferDetail.linkedIssueId, linkedIssueNumber: issue?.documentNumber,
       destinationPartnerId: doc.transferDetail.destinationPartnerId, recipientInstanceId: destination?.issuerInstanceId,
       deliveryState: doc.transferDetail.deliveryState,
-      announcement: announcement ? { messageId: (announcement.payload as { messageId: string }).messageId,
+      announcement: announcement ? { id: announcement.id,
+        messageId: (announcement.payload as { messageId: string }).messageId,
         status: announcement.status, attempts: announcement.attemptCount,
-        nextAttemptAt: announcement.nextAttemptAt.toISOString(), lastError: announcement.lastErrorCode } : null,
+        nextAttemptAt: announcement.nextAttemptAt.toISOString(),
+        technicalAckAt: doc.transferDetail.technicalAckAt?.toISOString() ?? null,
+        lastError: safeErrorCode(announcement.lastErrorCode) } : null,
       lines: doc.lines.map((line) => ({ id: line.id, lineNo: line.lineNo, warehouseId: line.warehouseId,
         batchId: line.batchId, productVariantId: line.productVariantId, productId: line.productId,
         quantity: line.quantity?.toFixed(3), uomId: line.uomId, sourceIssueLineId: line.sourceIssueLineId })) };
@@ -157,8 +161,7 @@ export function createTransferService(ports: TransferPorts, instanceId: string) 
         linkedIssueId: issue.id, sentQuantity: doc.lines.reduce((sum, line) => sum.add(line.quantity!), new Decimal(0)).toFixed() };
       ctx.emit({ aggregateType: "document", aggregateId: id, aggregateVersion: updated.version,
         eventType: "transfer.announced.v1", schemaVersion: "1", payload,
-        destination: "federation", correlationId: doc.correlationId,
-        nextAttemptAt: new Date("9999-12-31T00:00:00.000Z") });
+        destination: "federation", correlationId: doc.correlationId });
       for (const event of ports.transferEvent({ id, linkedIssueId: issue.id,
         destinationPartnerId: destination.id, version: updated.version,
         correlationId: doc.correlationId, occurredAt,
