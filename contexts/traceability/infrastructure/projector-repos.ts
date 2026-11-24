@@ -29,7 +29,9 @@ const invalid = (code: string): never => { throw new PermanentDeliveryError(code
 async function append(app: PrismaClient, issuerInstanceId: string, source: TraceSource, outboxId: string) {
   await app.$transaction(async (tx) => {
     const document = await tx.document.findUnique({ where: { id: source.documentId },
-      include: { lines: true, receivingDetail: true } });
+      include: { lines: { include: { sourceAllocations: { include: {
+        sourceLine: { include: { document: true } },
+      } } } }, receivingDetail: true } });
     if (!document || document.documentType !== docTypes[source.eventType] ||
         document.status !== "confirmed" || document.version !== source.documentVersion) {
       throw new PermanentDeliveryError("TRACE_DOCUMENT_MISMATCH");
@@ -48,8 +50,16 @@ async function append(app: PrismaClient, issuerInstanceId: string, source: Trace
       if (!line || !quantity || !quantity.eq(new Decimal(item.quantity))) invalid("TRACE_LINES_MISMATCH");
     }
     const eventId = localEventId(source.sourceEventId, source.batchId);
+    const allocations = source.eventType === "trading.issue.confirmed.v1"
+      ? lines.flatMap((line) => line.sourceAllocations.map((row) => ({
+        issueLineId: line.id, sourceLineId: row.sourceLineId,
+        sourceDocumentId: row.sourceLine.documentId, quantity: row.quantity.toFixed(3),
+        sourceType: row.sourceLine.document.documentType,
+      }))).sort((a, b) => a.issueLineId.localeCompare(b.issueLineId) ||
+        a.sourceLineId.localeCompare(b.sourceLineId)) : [];
     const summary = { schemaVersion: 1, sourceEventId: source.sourceEventId, sourceOutboxId: outboxId,
       documentVersion: source.documentVersion, lines: source.lines,
+      ...(allocations.length ? { sourceAllocations: allocations } : {}),
       ...(source.linkedIssueId ? { linkedIssueId: source.linkedIssueId } : {}),
       ...(source.remoteSource ? { remoteSource: source.remoteSource } : {}) };
     const input = { issuerInstanceId, externalEventId: eventId, eventType: source.eventType,
@@ -61,6 +71,23 @@ async function append(app: PrismaClient, issuerInstanceId: string, source: Trace
     const event = existing ?? await repo.appendLocalEvent(input);
     if (existing && (existing.externalEventId !== eventId ||
         existing.checksumHex !== makeLocalTraceEvent(input).checksumHex)) invalid("TRACE_REPLAY_CONFLICT");
+    if (allocations.length) {
+      for (const upstreamDocumentId of [...new Set(allocations.map((row) => row.sourceDocumentId))].sort()) {
+        const rows = allocations.filter((row) => row.sourceDocumentId === upstreamDocumentId);
+        const sourceType = rows[0]!.sourceType === "goods_receipt"
+          ? "trading.receipt.confirmed.v1" : "trading.receiving.confirmed.v1";
+        if (rows.some((row) => row.sourceType !== rows[0]!.sourceType ||
+            !["goods_receipt", "receiving_confirmation"].includes(row.sourceType)))
+          invalid("TRACE_ALLOCATION_SOURCE_INVALID");
+        const upstream = await repo.findLocalSource(upstreamDocumentId, source.batchId, sourceType);
+        if (!upstream) throw new Error("TRACE_SOURCE_PENDING");
+        await tx.traceLink.createMany({ data: [{ id: randomUUID(), fromEventId: event.id,
+          toEventId: upstream.id, relation: "derived_from", verificationState: "local_verified",
+          allocationDetail: rows.map(({ issueLineId, sourceLineId, quantity }) =>
+            ({ issueLineId, sourceLineId, quantity })) as Prisma.InputJsonValue }],
+          skipDuplicates: true });
+      }
+    }
     if (source.linkedIssueId) {
       const upstream = await repo.findLocalSource(source.linkedIssueId, source.batchId,
         "trading.issue.confirmed.v1");
@@ -100,6 +127,7 @@ async function rebuild(app: PrismaClient, core: PrismaClient, batchId: string) {
       fromEventId: event.id, relation: link.relation,
       ...(link.toEventId ? { toEventId: link.toEventId }
         : { missingRef: link.missingRef as { issuerInstanceId: string; eventId: string } }),
+      ...(link.allocationDetail ? { allocationDetail: link.allocationDetail } : {}),
     }))).sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
     const asOf = new Date(Math.max(...events.map((event) => event.createdAt.getTime()))).toISOString();
     const payload = { schemaVersion: 1,

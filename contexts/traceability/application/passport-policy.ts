@@ -69,6 +69,8 @@ export function buildPassportPayload(access: PassportAccess, source: PassportSou
     recordedAt: event.recordedAt.toISOString(), issuer: event.issuer,
     sourceId: event.sourceId,
     verificationState: event.links.some((link) => link.missingRef) ||
+      (event.type === "trading.issue.confirmed.v1" &&
+        !event.links.some((link) => link.toEventId)) ||
       (event.sentQuantity !== undefined && event.actualQuantity !== undefined &&
         event.sentQuantity !== event.actualQuantity) ? "partial" : "confirmed",
     ...(event.sentQuantity !== undefined ? { sentQuantity: event.sentQuantity } : {}),

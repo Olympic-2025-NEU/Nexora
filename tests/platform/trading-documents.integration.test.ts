@@ -9,6 +9,7 @@ import { runCommand } from "../../platform/http/pipeline";
 import { tradingService, tradingUnitOfWork, tradingPorts, transferService, stocktakeService, saleService } from "../../composition/trading";
 import { applyApprovalResult } from "../../composition/workflow";
 import { createReceivingService, type ActualInput } from "../../contexts/trading/application/receivings";
+import { listIssueSources } from "../../contexts/trading/application/issue-sources";
 import { createCatalogRepos } from "../../contexts/catalog/infrastructure/prisma-repos";
 import { createDocumentService } from "../../contexts/trading/application/documents";
 import type { Actor } from "../../platform/identity/actor";
@@ -386,6 +387,67 @@ async function issue(quantity: string, count = 1, purpose: "other" | "partner_tr
   await approve(doc.id);
   return { ...doc, version: doc.version + 2 };
 }
+
+test("P08 explicit issue allocation keeps two confirmed receipt sources and rejects overclaim", {
+  timeout: 120_000,
+}, async () => {
+  const lot = randomUUID();
+  await owner.batch.create({ data: { id: lot, productId, productVariantId: variantId,
+    localCode: randomUUID(), originIssuerInstanceId: "issuer", originLotId: randomUUID(),
+    qualityStatus: "available", createdBySub: "fixture" } });
+  const receipts: { id: string; version: number; lines: { id: string }[] }[] = [];
+  for (let index = 0; index < 2; index++) {
+    const receipt = await command("create", {}, (ctx) => tradingService.create(ctx,
+      "goods_receipt", { lines: [{ ...line("5"), batchId: lot }] }));
+    await command("confirm", { id: receipt.id }, (ctx) => tradingService.action(ctx,
+      "goods_receipt", receipt.id, "confirm", receipt.version), randomUUID());
+    receipts.push(receipt);
+  }
+  const sources = [{ sourceLineId: receipts[0]!.lines[0]!.id, quantity: "2" },
+    { sourceLineId: receipts[1]!.lines[0]!.id, quantity: "4" }];
+  await assert.rejects(command("create", {}, (ctx) => tradingService.create(ctx,
+    "goods_issue", { purpose: "other", lines: [{ ...line("6"), batchId: lot,
+      sources: [{ ...sources[0], quantity: "1" }] }] }), undefined, "goods_issue"),
+  { code: "ISSUE_SOURCE_INCOMPLETE" });
+  await assert.rejects(command("create", {}, (ctx) => tradingService.create(ctx,
+    "goods_issue", { purpose: "other", lines: [{ ...line("1"), batchId,
+      sources: [{ sourceLineId: receipts[0]!.lines[0]!.id, quantity: "1" }] }] }),
+  undefined, "goods_issue"), { code: "ISSUE_SOURCE_INVALID" });
+  const draft = await command("create", {}, (ctx) => tradingService.create(ctx,
+    "goods_issue", { purpose: "other", lines: [{ ...line("6"), batchId: lot,
+      sources }] }), undefined, "goods_issue");
+  const issue = await command("edit", { id: draft.id }, (ctx) => tradingService.edit(ctx,
+    "goods_issue", draft.id, draft.version, { lines: [{ ...line("6"), batchId: lot,
+      sources }] }), undefined, "goods_issue");
+  assert.equal(await db.issueSourceAllocation.count({ where: { issueLineId: draft.lines[0]!.id } }), 0);
+  assert.deepEqual(issue.lines[0]!.sources.map((row) => row.quantity), ["2.000", "4.000"]);
+  await command("submit", { id: issue.id }, (ctx) => tradingService.action(ctx,
+    "goods_issue", issue.id, "submit", issue.version), undefined, "goods_issue");
+  await approve(issue.id);
+  await command("confirm", { id: issue.id }, (ctx) => tradingService.action(ctx,
+    "goods_issue", issue.id, "confirm", issue.version + 2), randomUUID(), "goods_issue");
+  assert.equal((await db.stockBalance.findUniqueOrThrow({ where: { warehouseId_batchId: {
+    warehouseId, batchId: lot } } })).quantity.toFixed(3), "4.000");
+  assert.equal(await db.issueSourceAllocation.count({ where: { issueLineId: issue.lines[0]!.id } }), 2);
+  const options = await listIssueSources(db, actor, lot, warehouseId);
+  assert.equal(options.items.find((row) => row.sourceLineId === receipts[0]!.lines[0]!.id)?.availableQuantity,
+    "3.000");
+  assert.equal(options.items.find((row) => row.sourceLineId === receipts[1]!.lines[0]!.id)?.availableQuantity,
+    "1.000");
+  await assert.rejects(listIssueSources(db, { ...actor, unitIds: [] }, lot, warehouseId),
+    { code: "WAREHOUSE_SCOPE_REQUIRED" });
+  const over = await command("create", {}, (ctx) => tradingService.create(ctx,
+    "goods_issue", { purpose: "other", lines: [{ ...line("4"), batchId: lot,
+      sources: [{ sourceLineId: receipts[0]!.lines[0]!.id, quantity: "4" }] }] }),
+  undefined, "goods_issue");
+  await command("submit", { id: over.id }, (ctx) => tradingService.action(ctx,
+    "goods_issue", over.id, "submit", over.version), undefined, "goods_issue");
+  await approve(over.id);
+  await assert.rejects(command("confirm", { id: over.id }, (ctx) => tradingService.action(ctx,
+    "goods_issue", over.id, "confirm", over.version + 2), randomUUID(), "goods_issue"),
+  { code: "ISSUE_SOURCE_OVERALLOCATED", httpStatus: 409 });
+  assert.equal((await db.document.findUniqueOrThrow({ where: { id: over.id } })).status, "approved");
+});
 
 test("approved issue 12 posts once; two issues race for remaining stock with real bridge decisions",
   { timeout: 120_000 }, async () => {

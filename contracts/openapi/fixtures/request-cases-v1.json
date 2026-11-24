@@ -165,7 +165,11 @@
             "productVariantId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
             "batchId": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
             "quantity": "12",
-            "uomId": "dddddddd-dddd-4ddd-8ddd-dddddddddddd"
+            "uomId": "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+            "sources": [
+              { "sourceLineId": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee", "quantity": "7" },
+              { "sourceLineId": "ffffffff-ffff-4fff-8fff-ffffffffffff", "quantity": "5" }
+            ]
           }
         ]
       },

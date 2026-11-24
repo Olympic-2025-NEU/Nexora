@@ -11,12 +11,14 @@ function projection(row: {
   documentId: string | null; externalEventId: string; payloadVersion: string;
   summary: unknown; occurredAt: Date; createdAt: Date; verificationState: string;
   outgoing: { toEventId: string | null; missingRef: unknown; relation: string;
-    verificationState: string }[];
+    verificationState: string; allocationDetail: unknown }[];
 }): BackwardEvent {
   return { ...row, outgoing: row.outgoing.map((link) => ({
     toEventId: link.toEventId,
     missingRef: link.missingRef as { issuerInstanceId: string; eventId: string } | null,
     relation: link.relation, verificationState: link.verificationState,
+    ...(Array.isArray(link.allocationDetail) ? { allocationDetail: link.allocationDetail as
+      { issueLineId: string; sourceLineId: string; quantity: string }[] } : {}),
   })) };
 }
 

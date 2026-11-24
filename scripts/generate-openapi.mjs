@@ -201,6 +201,12 @@ for (const [name, createBody, patchBody] of documentTypes) {
   action(`${base}/{id}/cancel`, "M03", `Cancel ${name}`, "Document", { idempotent: false });
 }
 action("/api/v1/issues/{id}/submit", "M03", "Submit issue for approval", "Document", { status: 202 });
+add("get", "/api/v1/lots/{id}/issue-sources", "M03", "Available confirmed receipt sources",
+  "IssueSourceAvailable", { list: true, roles: EVERY_USER, query: ["warehouseId"],
+    errors: [401, 403, 404, 422, 429, 503],
+    description: "Warehouse-scoped confirmed receipt/receiving lines with remaining declarable quantity in stock UOM. Draft issues do not reserve a source. Cursor pages default to 20 and cap at 100 source lines." });
+doc.paths["/api/v1/lots/{id}/issue-sources"].get.parameters
+  .find((parameter) => parameter.name === "warehouseId").required = true;
 list("/api/v1/documents", "M03", "List documents", "Document", EVERY_USER, ["type", "status", "batchId", "partnerId", "from", "to"]);
 add("get", "/api/v1/approvals/inbox", "M03", "List actionable approval tasks", "ApprovalTask", { roles: ["approver"], description: "Candidate-group tasks in current warehouse scope, excluding creator. Age reflects submission time." });
 doc.paths["/api/v1/approvals/inbox"].get.responses["200"].content["application/json"].schema = envelope(arr(ref("ApprovalTask")));

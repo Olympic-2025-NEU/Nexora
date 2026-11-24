@@ -7,7 +7,7 @@
 ## P08-T01 — Mô hình provenance và liên kết lô
 
 - [x] Migration `trace_event`, `trace_link`, `passport_projection`, `qr_token`; mỗi event có issuer-qualified batch ID, source document/event, occurred/recorded time, event version, evidence refs, verification status. [Bằng chứng T01](evidence/p08-t01.md).
-- [ ] Link goods receipt/issue/transfer/receiving/stocktake/sale bằng quan hệ có hướng; phân biệt nguồn local verified với partner-asserted và missing/pending.
+- [x] Link goods receipt/issue có phân bổ nguồn tường minh và lượng theo dòng; transfer/receiving/stocktake/sale giữ provenance nguồn đã xác nhận. Dữ liệu issue không khai báo phân bổ vẫn hiện `local_allocation_unknown`, remote vẫn `missing/pending`, không tự suy diễn. [Bằng chứng đóng T01](evidence/p08-t01-allocation.md).
 - [x] Chốt uniqueness `(issuer, eventId)` và source action để retry handler không tạo event trùng; không tạo event từ Draft/rollback. [Bằng chứng T01](evidence/p08-t01.md).
 - **Đầu ra:** schema và trace port; **kiểm chứng:** movement/event truy được tới chứng từ nguồn.
 

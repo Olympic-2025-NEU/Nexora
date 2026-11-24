@@ -7,7 +7,8 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const BACKWARD_MAX_NODES = 2000;
 type Ref = { issuerInstanceId: string; eventId: string };
 export type BackwardLink = { toEventId: string | null; missingRef: Ref | null;
-  relation: string; verificationState: string };
+  relation: string; verificationState: string;
+  allocationDetail?: { issueLineId: string; sourceLineId: string; quantity: string }[] };
 export type BackwardEvent = { id: string; issuerInstanceId: string; batchId: string | null;
   originIssuerInstanceId: string; originLotId: string; eventType: string;
   documentId: string | null; externalEventId: string; payloadVersion: string;
@@ -106,6 +107,7 @@ export async function backwardTrace(port: BackwardPort, actor: Actor, input: Bac
     fromEventId: event.id, ...(link.toEventId ? { toEventId: link.toEventId } : {}),
     ...(link.missingRef ? { missingRef: link.missingRef } : {}),
     relation: link.relation, verificationState: link.verificationState,
+    ...(link.allocationDetail ? { allocationDetail: link.allocationDetail } : {}),
   })));
   const nextOffset = offset + page.length;
   const nextCursor = nextOffset < ordered.length ? Buffer.from(JSON.stringify({

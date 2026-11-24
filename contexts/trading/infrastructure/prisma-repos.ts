@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { randomUUID } from "node:crypto";
 import type { Prisma } from "@prisma/client";
+import { Decimal } from "@prisma/client/runtime/library";
+import { DomainError } from "../../../platform/kernel/errors";
 import type { DocumentType, DocumentStatus } from "../domain/document";
 
 export class TradingUniqueViolation extends Error {
@@ -54,6 +56,7 @@ export function createTradingRepos(tx: Prisma.TransactionClient) {
         data: { version: { increment: 1 }, updatedAt: new Date(), ...(note !== undefined ? { note } : {}) },
       });
       if (!result.count) return null;
+      await tx.issueSourceAllocation.deleteMany({ where: { issueLine: { documentId } } });
       await tx.documentLine.deleteMany({ where: { documentId } });
       if (lines.length) await tx.documentLine.createMany({ data: lines.map((line) => ({ ...line, documentId })) });
       return tx.document.findUniqueOrThrow({ where: { id: documentId } });
@@ -72,7 +75,7 @@ export function createTradingRepos(tx: Prisma.TransactionClient) {
 
     getAggregate(id: string) {
       return tx.document.findUnique({ where: { id }, include: {
-        lines: { orderBy: { lineNo: "asc" } }, transferDetail: true,
+        lines: { orderBy: { lineNo: "asc" }, include: { sourceAllocations: true } }, transferDetail: true,
         receivingDetail: true, saleDetail: true,
       } });
     },
@@ -107,6 +110,26 @@ export function createTradingRepos(tx: Prisma.TransactionClient) {
     createLines(documentId: string, lines: Omit<Prisma.DocumentLineUncheckedCreateInput, "documentId">[]) {
       return tx.documentLine.createMany({ data: lines.map((line) => ({ ...line, documentId })) });
     },
+    async checkSourceReferences(lines: readonly { warehouseId: string; batchId: string;
+      productVariantId: string; sources?: { sourceLineId: string }[] }[],
+    stockUomIds: readonly string[]) {
+      const ids = [...new Set(lines.flatMap((line) => line.sources?.map((row) => row.sourceLineId) ?? []))];
+      if (!ids.length) return;
+      const sources = await tx.documentLine.findMany({ where: { id: { in: ids } },
+        include: { document: { select: { status: true, documentType: true } } } });
+      const byId = new Map(sources.map((row) => [row.id, row]));
+      for (const [index, line] of lines.entries()) for (const reference of line.sources ?? []) {
+        const source = byId.get(reference.sourceLineId);
+        if (!source || source.document.status !== "confirmed" ||
+            !["goods_receipt", "receiving_confirmation"].includes(source.document.documentType) ||
+            source.warehouseId !== line.warehouseId || source.batchId !== line.batchId ||
+            source.productVariantId !== line.productVariantId || source.uomId !== stockUomIds[index] ||
+            (source.document.documentType === "receiving_confirmation"
+              ? !source.actualQuantity || source.actualQuantity.lte(0)
+              : !source.quantity || source.quantity.lte(0)))
+          throw new DomainError("ISSUE_SOURCE_INVALID", 422);
+      }
+    },
     normalizeLine(id: string, quantity: string, uomId: string) {
       return tx.documentLine.update({ where: { id }, data: { quantity, uomId } });
     },
@@ -125,6 +148,44 @@ export function createTradingRepos(tx: Prisma.TransactionClient) {
       return tx.stockBalance.findMany({ where: { OR: keys.map((key) => ({
         warehouseId: key.warehouseId, batchId: key.batchId,
       })) } });
+    },
+
+    async validateIssueSources(lines: readonly { id: string; warehouseId: string; batchId: string;
+      productId: string; productVariantId: string; uomId: string; quantity: Decimal | null;
+      sourceAllocations: { sourceLineId: string; quantity: Decimal }[] }[]) {
+      const allocations = lines.flatMap((line) => line.sourceAllocations);
+      if (!allocations.length) return; // Legacy issues stay explicitly unallocated in trace.
+      if (lines.some((line) => !line.quantity || !line.sourceAllocations.length ||
+        !line.sourceAllocations.reduce((sum, row) => sum.plus(row.quantity), new Decimal(0))
+          .eq(line.quantity!))) throw new DomainError("ISSUE_SOURCE_INCOMPLETE", 422);
+      const ids = [...new Set(allocations.map((row) => row.sourceLineId))].sort();
+      for (const id of ids) {
+        await tx.$queryRaw`SELECT id FROM trading.document_line WHERE id = ${id}::uuid FOR UPDATE`;
+        const source = await tx.documentLine.findUnique({ where: { id },
+          include: { document: { select: { status: true, documentType: true } },
+            uom: { select: { kind: true } } } });
+        if (!source || source.document.status !== "confirmed" ||
+            !["goods_receipt", "receiving_confirmation"].includes(source.document.documentType))
+          throw new DomainError("ISSUE_SOURCE_INVALID", 422);
+        const sourceQuantity = source.document.documentType === "receiving_confirmation"
+          ? source.actualQuantity : source.quantity;
+        if (!sourceQuantity || sourceQuantity.lte(0)) throw new DomainError("ISSUE_SOURCE_INVALID", 422);
+        for (const line of lines.filter((item) => item.sourceAllocations.some((row) => row.sourceLineId === id))) {
+          if (line.warehouseId !== source.warehouseId || line.batchId !== source.batchId ||
+              line.productId !== source.productId || line.productVariantId !== source.productVariantId ||
+              line.uomId !== source.uomId) throw new DomainError("ISSUE_SOURCE_INVALID", 422);
+        }
+        const prior = await tx.issueSourceAllocation.aggregate({ where: { sourceLineId: id,
+          issueLineId: { notIn: lines.map((line) => line.id) },
+          issueLine: { document: { status: "confirmed" } } }, _sum: { quantity: true } });
+        const current = allocations.filter((row) => row.sourceLineId === id)
+          .reduce((sum, row) => sum.plus(row.quantity), new Decimal(0));
+        if (source.uom.kind === "count" && allocations.some((row) =>
+          row.sourceLineId === id && !row.quantity.isInteger()))
+          throw new DomainError("ISSUE_SOURCE_INVALID", 422);
+        if ((prior._sum.quantity ?? new Decimal(0)).plus(current).gt(sourceQuantity))
+          throw new DomainError("ISSUE_SOURCE_OVERALLOCATED", 409);
+      }
     },
 
     async list(filters: {

@@ -6,7 +6,8 @@ import { BACKWARD_MAX_NODES, type BackwardEvent } from "./backward";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export type ForwardEvent = Omit<BackwardEvent, "outgoing"> & {
-  incoming: { fromEventId: string; relation: string; verificationState: string }[];
+  incoming: { fromEventId: string; relation: string; verificationState: string;
+    allocationDetail?: { issueLineId: string; sourceLineId: string; quantity: string }[] }[];
 };
 export type ImpactLine = { eventId: string; sourceDocumentId: string; sourceLineId: string;
   kind: "issue" | "transfer" | "receiving" | "sale"; quantity: string; uomId: string;
@@ -104,6 +105,7 @@ export async function forwardTrace(port: ForwardPort, actor: Actor, input: Forwa
     fromEventId: event.id, toEventId: link.fromEventId,
     relation: "source_of", sourceRelation: link.relation,
     verificationState: link.verificationState,
+    ...(link.allocationDetail ? { allocationDetail: link.allocationDetail } : {}),
   })));
   const nextOffset = offset + page.length;
   const nextCursor = nextOffset < ordered.length ? Buffer.from(JSON.stringify({

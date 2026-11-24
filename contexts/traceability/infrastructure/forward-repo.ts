@@ -16,7 +16,8 @@ type Row = { id: string; issuerInstanceId: string; batchId: string | null;
   originIssuerInstanceId: string; originLotId: string; eventType: string;
   documentId: string | null; externalEventId: string; payloadVersion: string;
   summary: unknown; occurredAt: Date; createdAt: Date; verificationState: string;
-  incoming: { fromEventId: string; relation: string; verificationState: string }[] };
+  incoming: { fromEventId: string; relation: string; verificationState: string;
+    allocationDetail: unknown }[] };
 
 export function createPrismaForwardPort(db: PrismaClient, actor: Actor): ForwardPort {
   const allWarehouses = actor.roles.some((role) => role.toLowerCase() === "administrator");
@@ -24,14 +25,19 @@ export function createPrismaForwardPort(db: PrismaClient, actor: Actor): Forward
   async function scoped(rows: Row[]): Promise<ForwardEvent[]> {
     const rootIds = await visibleTraceEventIds(db, actor, rows);
     const visibleRows = rows.filter((row) => rootIds.has(row.id));
-    if (allWarehouses || !visibleRows.length) return visibleRows;
+    if (allWarehouses || !visibleRows.length) return visibleRows.map((row) => ({ ...row,
+      incoming: row.incoming.map((link) => ({ ...link,
+        allocationDetail: Array.isArray(link.allocationDetail)
+          ? link.allocationDetail : undefined })) })) as ForwardEvent[];
     const childIds = [...new Set(visibleRows.flatMap((row) =>
       row.incoming.map((link) => link.fromEventId)))];
     const children = await db.traceEvent.findMany({ where: { id: { in: childIds } },
       select: { id: true, documentId: true, batchId: true } });
     const allowedChildren = await visibleTraceEventIds(db, actor, children);
     return visibleRows.map((row) => ({ ...row, incoming: row.incoming.filter((link) =>
-      allowedChildren.has(link.fromEventId)) }));
+      allowedChildren.has(link.fromEventId)).map((link) => ({ ...link,
+        allocationDetail: Array.isArray(link.allocationDetail)
+          ? link.allocationDetail : undefined })) })) as ForwardEvent[];
   }
   const withIncoming = (asOf: Date) => ({ incoming: { where: { createdAt: { lte: asOf } },
     orderBy: { id: "asc" as const } } });

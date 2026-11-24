@@ -37,8 +37,8 @@ const issuer = "trace-local";
 const productId = randomUUID();
 const variantId = randomUUID();
 const warehouseId = randomUUID();
-const batches: string[] = [randomUUID(), randomUUID()];
-const origins = [randomUUID(), randomUUID()];
+const batches: string[] = [randomUUID(), randomUUID(), randomUUID()];
+const origins = [randomUUID(), randomUUID(), randomUUID()];
 const uom = "aaaaaaaa-0001-4000-8000-000000000001";
 const sha = (value: unknown) => createHash("sha256").update(canonicalize(value)!).digest("hex");
 
@@ -82,7 +82,7 @@ test("P08 projector handles worker lag, multi-batch replay and deterministic reb
       VALUES (${batches[index]}::uuid,${productId}::uuid,${variantId}::uuid,${randomUUID()},
         ${issuer},${origins[index]},'available','fixture')`;
   }
-  const later = await receipt(batches, new Date().toISOString());
+  const later = await receipt(batches.slice(0, 2), new Date().toISOString());
   assert.equal((await app.document.findUniqueOrThrow({ where: { id: later.documentId } })).status, "confirmed");
   assert.equal(await app.traceEvent.count({ where: { documentId: later.documentId } }), 0);
   const lag = await traceLag(app);
@@ -92,7 +92,7 @@ test("P08 projector handles worker lag, multi-batch replay and deterministic reb
     handlers: buildHandlerMap({ traceability: traceConsumers(app, core, issuer) }) });
   assert.equal((await dispatcher.tick()).delivered, 1);
   assert.equal(await app.traceEvent.count({ where: { documentId: later.documentId } }), 2);
-  for (const batchId of batches) {
+  for (const batchId of batches.slice(0, 2)) {
     const row = await core.coreRecord.findUniqueOrThrow({ where: { kind_sourceType_sourceId: {
       kind: "trace_projection", sourceType: "lot", sourceId: batchId } } });
     assert.equal(row.version, 1);
@@ -759,4 +759,87 @@ test("P08-T08 M03 confirm flows through outbox to local trace and public QR", as
   assert.equal(await app.traceEvent.count({ where: { documentId: create.id } }), 1);
   await qr.revoke(ownerActor, batchId, issued.tokenId, "gate revoke", randomUUID());
   assert.equal(await qr.publicPassport(token), null);
+});
+
+test("P08-T01 explicit issue sources produce two quantity-backed local provenance links", async () => {
+  const first = await receipt([batches[2]], new Date(Date.now() - 120_000).toISOString());
+  const second = await receipt([batches[2]], new Date(Date.now() - 60_000).toISOString());
+  const dispatcher = createOutboxDispatcher({ client: app, workerId: `allocation-${randomUUID()}`,
+    handlers: buildHandlerMap({ traceability: traceConsumers(app, core, issuer) }) });
+  assert.equal((await dispatcher.tick()).delivered, 2);
+  const issueId = randomUUID();
+  const issueLineId = randomUUID();
+  await app.document.create({ data: { id: issueId, documentType: "goods_issue", issuePurpose: "other",
+    documentNumber: randomUUID(), status: "draft", createdBySub: "fixture",
+    correlationId: randomUUID() } });
+  await app.documentLine.create({ data: { id: issueLineId, documentId: issueId, lineNo: 1,
+    warehouseId, batchId: batches[2], productVariantId: variantId, productId,
+    uomId: uom, quantity: "6" } });
+  const sources = [{ sourceLineId: first.payload.lines[0]!.lineId, quantity: "2" },
+    { sourceLineId: second.payload.lines[0]!.lineId, quantity: "4" }];
+  await app.issueSourceAllocation.createMany({ data: sources.map((row) => ({ id: randomUUID(),
+    issueLineId, ...row })) });
+  const issue = await app.document.update({ where: { id: issueId }, data: {
+    status: "confirmed", confirmedAt: new Date(), confirmedBySub: "fixture" } });
+  const [serialized] = serializeDomainEvent({ type: TRADING_EVENT_TYPES.issue,
+    aggregateType: "document", aggregateId: issueId, aggregateVersion: issue.version,
+    correlationId: randomUUID(), payload: { eventId: randomUUID(), documentId: issueId,
+      documentVersion: issue.version, lines: [{ lineId: issueLineId, batchId: batches[2],
+        warehouseId, originLot: { issuerInstanceId: issuer, lotId: origins[2] },
+        quantity: "6", unit: "EA" }], movementIds: [randomUUID()],
+      actorSub: "fixture", occurredAt: new Date().toISOString() } });
+  const message = await app.outboxMessage.create({ data: { ...serialized, id: randomUUID(),
+    nextAttemptAt: new Date(Date.now() - 1000) } });
+  assert.equal((await dispatcher.tick()).delivered, 1);
+  const graph = await backwardTrace(createPrismaBackwardPort(app, {
+    userId: "fixture", organizationId: "fixture", roles: ["administrator"], unitIds: [] }),
+  { userId: "fixture", organizationId: "fixture", roles: ["administrator"], unitIds: [] },
+  { batchId: batches[2], documentId: issueId });
+  assert.equal(graph.nodes.length, 3);
+  assert.equal(graph.edges.length, 2);
+  assert.deepEqual(graph.edges.flatMap((edge) => edge.allocationDetail ?? [])
+    .map((row) => row.quantity).sort(), ["2.000", "4.000"]);
+  assert.deepEqual(new Set(graph.nodes.map((node) => node.source.documentId)),
+    new Set([issueId, first.documentId, second.documentId]));
+  assert.equal(graph.gaps.some((gap) => gap.reason === "local_allocation_unknown"), false);
+  const forward = await forwardTrace(createPrismaForwardPort(app, {
+    userId: "fixture", organizationId: "fixture", roles: ["administrator"], unitIds: [] }),
+  { userId: "fixture", organizationId: "fixture", roles: ["administrator"], unitIds: [] },
+  { batchId: batches[2] });
+  assert.equal(forward.edges.filter((edge) => edge.sourceRelation === "derived_from").length, 2);
+  const projection = await core.coreRecord.findUniqueOrThrow({ where: { kind_sourceType_sourceId: {
+    kind: "trace_projection", sourceType: "lot", sourceId: batches[2] } } });
+  assert.equal((projection.payload as { edges: unknown[] }).edges.length, 2);
+  const admin: Actor = { userId: "fixture", organizationId: "fixture",
+    roles: ["administrator"], unitIds: [] };
+  const publication = createPassportService(app);
+  const policy = await publication.createDraft(admin, batches[2], {
+    organization: "public", product: "public", batch: "public",
+    timeline: "public", evidence: "private",
+  }, randomUUID());
+  assert.equal((await publication.approve(admin, batches[2], policy.policyVersion,
+    randomUUID())).projectionState, "active");
+  const qr = createQrService(app, "https://passport.example");
+  const issued = await qr.issue(admin, batches[2], `v${policy.policyVersion}`,
+    randomUUID(), randomUUID());
+  const publicView = await qr.publicPassport(new URL(issued.qrUrl).pathname.split("/").at(-1)!);
+  assert.ok(publicView);
+  assert.equal(publicView.gaps.includes("local_allocation_unknown"), false);
+  await app.outboxMessage.update({ where: { id: message.id }, data: {
+    status: "retry_due", nextAttemptAt: new Date(Date.now() - 1000), deliveredAt: null } });
+  assert.equal((await dispatcher.tick()).delivered, 1);
+  assert.equal(await app.traceLink.count({ where: { fromEvent: { documentId: issueId } } }), 2);
+  const invalidId = randomUUID();
+  const invalidLineId = randomUUID();
+  await app.document.create({ data: { id: invalidId, documentType: "goods_issue", issuePurpose: "other",
+    documentNumber: randomUUID(), status: "draft", createdBySub: "fixture",
+    correlationId: randomUUID() } });
+  await app.documentLine.create({ data: { id: invalidLineId, documentId: invalidId,
+    lineNo: 1, warehouseId, batchId: batches[2], productVariantId: variantId,
+    productId, uomId: uom, quantity: "5" } });
+  await app.issueSourceAllocation.create({ data: { id: randomUUID(), issueLineId: invalidLineId,
+    sourceLineId: first.payload.lines[0]!.lineId, quantity: "5" } });
+  await assert.rejects(app.document.update({ where: { id: invalidId }, data: {
+    status: "confirmed", confirmedAt: new Date(), confirmedBySub: "fixture" } }));
+  assert.equal((await app.document.findUniqueOrThrow({ where: { id: invalidId } })).status, "draft");
 });

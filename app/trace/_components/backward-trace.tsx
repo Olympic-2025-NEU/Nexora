@@ -10,7 +10,8 @@ type Node = { eventId: string; issuerInstanceId: string; batchId: string | null;
   source: { documentId: string | null; eventId: string; payloadVersion: string } };
 type Edge = { fromEventId: string; toEventId?: string;
   missingRef?: { issuerInstanceId: string; eventId: string }; relation: string;
-  verificationState: string };
+  verificationState: string;
+  allocationDetail?: { issueLineId: string; sourceLineId: string; quantity: string }[] };
 type Gap = { fromEventId?: string; missingRef?: { issuerInstanceId: string; eventId: string };
   state: string; reason: string };
 type Graph = { nodes: Node[]; edges: Edge[]; gaps: Gap[]; asOf: string;
@@ -91,7 +92,10 @@ export function BackwardTrace() {
         <ul className="list-inside list-disc text-sm">{graph.edges.map((edge, index) =>
           <li key={`${edge.fromEventId}-${edge.relation}-${index}`} className="break-all">
             {edge.fromEventId} → {edge.toEventId ?? `${edge.missingRef?.issuerInstanceId}/${edge.missingRef?.eventId}`}
-            {` (${edge.relation}, ${edge.verificationState})`}</li>)}</ul></section>}
+            {` (${edge.relation}, ${edge.verificationState})`}
+            {edge.allocationDetail?.map((row) => <span key={`${row.issueLineId}-${row.sourceLineId}`}
+              className="block pl-4">Dòng xuất {row.issueLineId} ← dòng nguồn {row.sourceLineId}: {row.quantity} đơn vị tồn</span>)}
+          </li>)}</ul></section>}
       {graph.gaps.length > 0 && <section><h3 className="font-semibold">Khoảng thiếu / đang chờ</h3>
         <ul className="list-inside list-disc text-sm">{graph.gaps.map((gap, index) =>
           <li key={`${gap.fromEventId}-${gap.reason}-${index}`}>

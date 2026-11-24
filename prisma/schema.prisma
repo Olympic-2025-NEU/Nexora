@@ -649,11 +649,28 @@ model DocumentLine {
   sourceIssueLine DocumentLine? @relation("IssueLine", fields: [sourceIssueLineId], references: [id])
   linkedLines DocumentLine[] @relation("IssueLine")
   movements StockMovement[]
+  sourceAllocations IssueSourceAllocation[] @relation("IssueAllocationLine")
+  allocatedToIssues IssueSourceAllocation[] @relation("AllocationSourceLine")
 
   @@unique([documentId, lineNo], map: "uq_trading_line_number")
   @@unique([id, documentId], map: "uq_trading_line_document")
   @@index([batchId, documentId], map: "idx_trading_line_batch_document")
   @@map("document_line")
+  @@schema("trading")
+}
+
+model IssueSourceAllocation {
+  id           String  @id @db.Uuid
+  issueLineId  String  @map("issue_line_id") @db.Uuid
+  sourceLineId String  @map("source_line_id") @db.Uuid
+  quantity     Decimal @db.Decimal(20, 3)
+
+  issueLine  DocumentLine @relation("IssueAllocationLine", fields: [issueLineId], references: [id])
+  sourceLine DocumentLine @relation("AllocationSourceLine", fields: [sourceLineId], references: [id])
+
+  @@unique([issueLineId, sourceLineId], map: "uq_issue_source_pair")
+  @@index([sourceLineId], map: "idx_issue_source_line")
+  @@map("issue_source_allocation")
   @@schema("trading")
 }
 
@@ -796,6 +813,7 @@ model TraceLink {
   missingRef        Json?    @map("missing_ref") @db.JsonB
   relation          String
   verificationState String   @map("verification_state")
+  allocationDetail  Json?    @map("allocation_detail") @db.JsonB
 
   fromEvent TraceEvent  @relation("TraceLinkFrom", fields: [fromEventId], references: [id])
   toEvent   TraceEvent? @relation("TraceLinkTo", fields: [toEventId], references: [id])

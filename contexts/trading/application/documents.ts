@@ -12,7 +12,7 @@ import { convertToStock } from "./uom-conversion";
 
 export type TradingKind = "goods_receipt" | "goods_issue";
 export type LineInput = { warehouseId: string; productVariantId: string; batchId: string;
-  quantity: string; uomId: string };
+  quantity: string; uomId: string; sources?: { sourceLineId: string; quantity: string }[] };
 export type DocumentInput = { lines: LineInput[]; note?: string; purpose?: "partner_transfer" | "sale" | "other";
   correctionOfDocumentId?: string; correctionReason?: string };
 type Context = { tx: Prisma.TransactionClient; actor: Actor; requestId: string; emit(event: OutboxEventInput): void };
@@ -44,6 +44,30 @@ function inScope(actor: Actor, warehouseId: string) {
 function normalizeTransition(error: unknown): never {
   if (error instanceof InvalidTransitionError) throw new DomainError(error.code, error.httpStatus);
   throw error;
+}
+
+function allocationsFor(kind: TradingKind, lines: LineInput[], ids: string[],
+  prepared: { stockQuantity: string; unit: "EA" | "KG" | "L" }[]) {
+  if (kind === "goods_receipt") {
+    if (lines.some((line) => line.sources !== undefined)) throw new DomainError("FIELD_NOT_ALLOWED", 422);
+    return [];
+  }
+  const count = lines.filter((line) => line.sources !== undefined).length;
+  if (count && count !== lines.length) throw new DomainError("ISSUE_SOURCE_INCOMPLETE", 422);
+  const allocations = lines.flatMap((line, index) => {
+    if (!line.sources) return [];
+    if (!line.sources.length || line.sources.length > 100 ||
+        new Set(line.sources.map((item) => item.sourceLineId)).size !== line.sources.length ||
+        line.sources.some((item) => !/^(?:0|[1-9]\d{0,16})(?:\.\d{1,3})?$/.test(item.quantity) ||
+          new Decimal(item.quantity).lte(0) ||
+          (prepared[index]!.unit === "EA" && !new Decimal(item.quantity).isInteger())) ||
+        !line.sources.reduce((sum, item) => sum.plus(item.quantity), new Decimal(0))
+          .eq(prepared[index]!.stockQuantity)) throw new DomainError("ISSUE_SOURCE_INCOMPLETE", 422);
+    return line.sources.map((item) => ({ id: randomUUID(), issueLineId: ids[index]!,
+      sourceLineId: item.sourceLineId, quantity: item.quantity }));
+  });
+  if (allocations.length > 1000) throw new DomainError("ISSUE_SOURCE_LIMIT", 422);
+  return allocations;
 }
 
 export function createDocumentService(ports: TradingPorts) {
@@ -93,6 +117,8 @@ export function createDocumentService(ports: TradingPorts) {
       return { id: line.id, lineNo: line.lineNo, warehouseId: line.warehouseId,
         productVariantId: line.productVariantId, productId: line.productId, batchId: line.batchId,
         quantity: line.quantity?.toFixed(3) ?? null, uomId: line.uomId,
+        sources: line.sourceAllocations.map((row) => ({ sourceLineId: row.sourceLineId,
+          quantity: row.quantity.toFixed(3) })),
         ...(converted ? { stockQuantity: converted.stockQuantity, stockUomId: converted.stockUomId } : {}) };
     }));
     const approval = kind === "goods_issue" ? await repo.findApproval(id) : null;
@@ -127,13 +153,18 @@ export function createDocumentService(ports: TradingPorts) {
       await correction(ctx, id, kind, input);
       if (input.lines.length > 100) throw new DomainError("TOO_MANY_LINES", 422);
       const prepared = await Promise.all(input.lines.map((line) => validateLine(ctx, line)));
+      const lineIds = input.lines.map(() => randomUUID());
+      const allocations = allocationsFor(kind, input.lines, lineIds, prepared);
       const repo = createTradingRepos(ctx.tx);
+      if (allocations.length) await repo.checkSourceReferences(input.lines,
+        prepared.map((item) => item.stockUomId));
       await repo.createDocument({ id, documentType: kind, createdBySub: ctx.actor.userId,
         correlationId: ctx.requestId, note: input.note, issuePurpose: kind === "goods_issue" ? input.purpose : null,
         correctionOfDocumentId: input.correctionOfDocumentId, correctionReason: input.correctionReason });
-      await repo.createLines(id, input.lines.map((line, i) => ({ id: randomUUID(), lineNo: i + 1,
+      await repo.createLines(id, input.lines.map((line, i) => ({ id: lineIds[i]!, lineNo: i + 1,
         warehouseId: line.warehouseId, batchId: line.batchId, productVariantId: line.productVariantId,
         productId: prepared[i]!.productId, uomId: line.uomId, quantity: line.quantity })));
+      if (allocations.length) await ctx.tx.issueSourceAllocation.createMany({ data: allocations });
       await ports.audit(ctx.tx, { actorSub: ctx.actor.userId, action: "trading.document.create",
         id, requestId: ctx.requestId, after: "draft", version: 1 });
       return view(ctx, id, kind);
@@ -156,10 +187,15 @@ export function createDocumentService(ports: TradingPorts) {
       if (input.lines && input.lines.length > 100) throw new DomainError("TOO_MANY_LINES", 422);
       const prepared = await Promise.all((input.lines ?? []).map((line) => validateLine(ctx, line)));
       if (input.lines) {
-        const lines = input.lines.map((line, i) => ({ id: randomUUID(), lineNo: i + 1,
+        const lineIds = input.lines.map(() => randomUUID());
+        const allocations = allocationsFor(kind, input.lines, lineIds, prepared);
+        if (allocations.length) await repo.checkSourceReferences(input.lines,
+          prepared.map((item) => item.stockUomId));
+        const lines = input.lines.map((line, i) => ({ id: lineIds[i]!, lineNo: i + 1,
           warehouseId: line.warehouseId, batchId: line.batchId, productVariantId: line.productVariantId,
           productId: prepared[i]!.productId, uomId: line.uomId, quantity: line.quantity }));
         if (!await repo.replaceLines(id, expectedVersion, lines, input.note)) throw new DomainError("VERSION_CONFLICT", 409);
+        if (allocations.length) await ctx.tx.issueSourceAllocation.createMany({ data: allocations });
       } else if (!await repo.updateDraft(id, expectedVersion, { note: input.note })) {
         throw new DomainError("VERSION_CONFLICT", 409);
       }
@@ -233,6 +269,7 @@ export function createDocumentService(ports: TradingPorts) {
               throw new StockShortage(key.batchId, key.requested.toFixed(3), available.toFixed(3));
             }
           }
+          await repo.validateIssueSources(lines);
         }
         for (const line of lines) {
           try {

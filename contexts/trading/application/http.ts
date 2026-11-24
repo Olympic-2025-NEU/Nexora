@@ -13,14 +13,25 @@ import type { DocumentStatus } from "../domain/document";
 const actions = ["submit", "confirm", "cancel"] as const;
 const statuses = ["draft", "pending_approval", "approved", "confirmed", "cancelled", "rejected"];
 
-function parseLines(raw: unknown): LineInput[] {
+function parseLines(raw: unknown, kind: TradingKind): LineInput[] {
   if (!Array.isArray(raw) || raw.length > 100) throw new DomainError("LINES_INVALID", 422);
   return raw.map((value) => {
-    const line = assertBody(value, ["warehouseId", "productVariantId", "batchId", "quantity", "uomId"]);
+    const line = assertBody(value, ["warehouseId", "productVariantId", "batchId", "quantity", "uomId",
+      ...(kind === "goods_issue" ? ["sources"] : [])]);
     for (const key of ["warehouseId", "productVariantId", "batchId", "uomId"]) {
       if (!isUuid(line[key])) throw new DomainError(`${key.toUpperCase()}_INVALID`, 422);
     }
     if (typeof line.quantity !== "string") throw new DomainError("QUANTITY_INVALID", 422);
+    if (line.sources !== undefined) {
+      if (!Array.isArray(line.sources) || !line.sources.length || line.sources.length > 100)
+        throw new DomainError("ISSUE_SOURCE_INVALID", 422);
+      line.sources = line.sources.map((rawSource) => {
+        const source = assertBody(rawSource, ["sourceLineId", "quantity"]);
+        if (!isUuid(source.sourceLineId) || typeof source.quantity !== "string")
+          throw new DomainError("ISSUE_SOURCE_INVALID", 422);
+        return source;
+      });
+    }
     return line as LineInput;
   });
 }
@@ -42,7 +53,7 @@ function parseInput(raw: unknown, kind: TradingKind, edit = false) {
       throw new DomainError("ISSUE_PURPOSE_REQUIRED", 422);
     }
   }
-  return { ...body, ...(body.lines !== undefined ? { lines: parseLines(body.lines) } : {}) } as DocumentInput;
+  return { ...body, ...(body.lines !== undefined ? { lines: parseLines(body.lines, kind) } : {}) } as DocumentInput;
 }
 
 function mapError(err: unknown, requestId: string): Response {
