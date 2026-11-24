@@ -178,6 +178,71 @@ async function main() {
     }
   }
 
+  // Receiver-issued M2M clients are supplied only by the ignored A/B/C env files.
+  // The dedicated scope and audience are both required by the ERP inbound route.
+  const inbound = [1, 2].flatMap((slot) => {
+    const id = process.env[`FEDERATION_INBOUND_CLIENT_${slot}_ID`];
+    const secret = process.env[`FEDERATION_INBOUND_CLIENT_${slot}_SECRET`];
+    if (!id && !secret) return [];
+    if (!id || !secret) throw new Error(`Incomplete federation inbound client ${slot}`);
+    return [{ id, secret }];
+  });
+  if (inbound.length) {
+    const scopeName = 'federation:write';
+    let scopes = await request(`/admin/realms/${realm.realm}/client-scopes`, token);
+    let scope = scopes.find((item) => item.name === scopeName);
+    if (!scope) {
+      await request(`/admin/realms/${realm.realm}/client-scopes`, token, 'POST', {
+        name: scopeName, protocol: 'openid-connect',
+        attributes: { 'include.in.token.scope': 'true', 'display.on.consent.screen': 'false' },
+      });
+      changes++;
+      scopes = await request(`/admin/realms/${realm.realm}/client-scopes`, token);
+      scope = scopes.find((item) => item.name === scopeName);
+      if (!scope) throw new Error('Federation scope creation failed');
+    }
+    for (const entry of inbound) {
+      const path = `/admin/realms/${realm.realm}/clients`;
+      let found = await request(`${path}?clientId=${encodeURIComponent(entry.id)}`, token);
+      const client = { clientId: entry.id, name: `Federation inbound ${entry.id}`,
+        enabled: true, protocol: 'openid-connect', publicClient: false,
+        standardFlowEnabled: false, directAccessGrantsEnabled: false,
+        serviceAccountsEnabled: true, secret: entry.secret };
+      if (!found.length) {
+        await request(path, token, 'POST', client);
+        changes++;
+        found = await request(`${path}?clientId=${encodeURIComponent(entry.id)}`, token);
+      } else {
+        const current = await request(`${path}/${found[0].id}`, token);
+        const currentSecret = await request(`${path}/${found[0].id}/client-secret`, token);
+        if (!current.enabled || !current.serviceAccountsEnabled || current.publicClient ||
+            current.standardFlowEnabled || current.directAccessGrantsEnabled ||
+            currentSecret.value !== entry.secret) {
+          await request(`${path}/${found[0].id}`, token, 'PUT', { ...current, ...client });
+          changes++;
+        }
+      }
+      const clientId = found[0].id;
+      const attached = await request(`${path}/${clientId}/default-client-scopes`, token);
+      if (!attached.some((item) => item.id === scope.id)) {
+        await request(`${path}/${clientId}/default-client-scopes/${scope.id}`, token, 'PUT');
+        changes++;
+      }
+      const mappersPath = `${path}/${clientId}/protocol-mappers/models`;
+      const mappers = await request(mappersPath, token);
+      if (!mappers.some((item) => item.name === 'nexora-erp-audience')) {
+        await request(mappersPath, token, 'POST', {
+          name: 'nexora-erp-audience', protocol: 'openid-connect',
+          protocolMapper: 'oidc-audience-mapper',
+          config: { 'included.custom.audience': required('OIDC_CLIENT_ID_ERP'),
+            'access.token.claim': 'true', 'id.token.claim': 'false',
+            'introspection.token.claim': 'true' },
+        });
+        changes++;
+      }
+    }
+  }
+
   // -------------------------------------------------------------------------
   // Optional dev staff user (KC_DEV_USER_PASSWORD) — no MFA required.
   // -------------------------------------------------------------------------

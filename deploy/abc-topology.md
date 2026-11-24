@@ -69,6 +69,64 @@ For remote access, configure per-instance HTTPS certificates and issuer URLs
 before starting a stack. Never publish PostgreSQL, Keycloak admin or Flowable
 admin to an external interface.
 
+## Local Phase 9 federation transport (A↔B↔C)
+
+The optional `compose.federation-demo.yml` adds one Docker network shared by
+**gateways and workers only**. Each gateway has a distinct HTTPS DNS name on
+that network. PostgreSQL and Keycloak stay on their own instance's internal
+network. The receiving gateway exposes only the exact Keycloak client-token
+POST route needed for M2M; no Keycloak admin route is exposed. This is a local
+demo topology with a mkcert CA, not a production trust or secret deployment.
+
+Run these commands from the repository root in PowerShell. They require the
+three ignored env files prepared above, `mkcert` installed, and Docker Desktop.
+The federation secret preparer writes matching sender/receiver credentials to
+those ignored files and can be rerun without rotating them. Keep the generated
+CA private key and instance env files off Git and out of logs.
+
+```powershell
+$env:DEMO_ONLY = "true"
+node deploy/scripts/prepare-abc-federation.mjs
+.\deploy\scripts\gen-local-certs.ps1
+docker network inspect nexora-federation *> $null
+if ($LASTEXITCODE -ne 0) { docker network create nexora-federation }
+foreach ($i in @("a", "b", "c")) {
+  node deploy/scripts/render-apisix-routes.mjs "deploy/instances/$i.env"
+  docker compose -f deploy/compose.yml -f deploy/compose.local-admin.yml -f deploy/compose.federation-demo.yml --env-file "deploy/instances/$i.env" -p "nexora-$i" --profile apps config -q
+}
+docker compose -f deploy/compose.yml -f deploy/compose.local-admin.yml -f deploy/compose.federation-demo.yml --env-file deploy/instances/a.env -p nexora-a --profile apps up -d --build erp gateway worker seaweedfs
+docker compose -f deploy/compose.yml -f deploy/compose.local-admin.yml -f deploy/compose.federation-demo.yml --env-file deploy/instances/b.env -p nexora-b --profile apps up -d erp gateway worker seaweedfs
+docker compose -f deploy/compose.yml -f deploy/compose.local-admin.yml -f deploy/compose.federation-demo.yml --env-file deploy/instances/c.env -p nexora-c --profile apps up -d erp gateway worker seaweedfs
+foreach ($i in @("a", "b", "c")) { node deploy/scripts/seed-abc.mjs $i }
+node deploy/scripts/configure-abc-federation.mjs
+```
+
+Always rebuild the `db-migrate` image after pulling new Prisma migrations.
+Check `docker compose ... logs db-migrate` for its exit code and compare the
+image's migration list with `prisma/migrations/` if the ERP reports a missing
+table. Re-run the migrator against each existing instance before testing a new
+inbound contract. `configure-abc-federation.mjs` verifies project and database
+identity, then upserts only adjacent partner connections with HTTPS endpoint,
+token URL, M2M client ID, audience and `env:` secret reference. It never writes
+the secret value to PostgreSQL.
+
+To verify all four directions from the actual sending worker, copy the
+disposable smoke script into the containers and run it with `DEMO_ONLY=true`.
+It requests a receiver-issued token, sends a unique synthetic envelope, and
+replays the same envelope to check ACK idempotency. Each test leaves one
+`pending_dependency` inbox record and no stock movement.
+
+```powershell
+foreach ($i in @("a", "b", "c")) { docker cp deploy/scripts/smoke-abc-federation.mjs "nexora-$i-worker-1:/tmp/smoke-abc-federation.mjs" }
+docker exec -e DEMO_ONLY=true nexora-a-worker-1 node /tmp/smoke-abc-federation.mjs a b 1
+docker exec -e DEMO_ONLY=true nexora-b-worker-1 node /tmp/smoke-abc-federation.mjs b a 1
+docker exec -e DEMO_ONLY=true nexora-b-worker-1 node /tmp/smoke-abc-federation.mjs b c 2
+docker exec -e DEMO_ONLY=true nexora-c-worker-1 node /tmp/smoke-abc-federation.mjs c b 1
+```
+
+This checks federation transport and technical ACK. It does not complete a
+business transfer, local lot mapping, or the full G09 demo journey.
+
 ## Reset a designated demo project
 
 `abc-reset.mjs` requires `DEMO_ONLY=true`, an explicit `a|b|c` and a

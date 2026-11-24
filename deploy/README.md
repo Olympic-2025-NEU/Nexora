@@ -4,8 +4,9 @@ Single Compose entrypoint: [`compose.yml`](./compose.yml).
 Legacy `docker-compose.yml` (Postgres-only) is removed; do not reintroduce a second entrypoint.
 
 For the P09 A/B/C independent-instance topology, fixture bootstrap, failure
-drill and guarded reset, use [abc-topology.md](./abc-topology.md). Each demo
-project has its own container names, routes, issuer, credentials and volumes.
+drill, guarded reset and optional HTTPS federation transport, use
+[abc-topology.md](./abc-topology.md). Each demo project has its own container
+names, routes, issuer, credentials and volumes.
 
 ## Topology
 

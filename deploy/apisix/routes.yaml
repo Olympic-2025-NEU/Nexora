@@ -27,6 +27,23 @@ x-strip-identity-headers: &strip-identity-headers
         end
 
 routes:
+  # The local federation network reaches Keycloak only through this exact
+  # token route on the receiver gateway. Keycloak itself stays on internal.
+  - id: federation-client-token-v1
+    uri: /realms/nexora/protocol/openid-connect/token
+    methods: [POST]
+    upstream:
+      type: roundrobin
+      nodes:
+        "keycloak:8080": 1
+    plugins:
+      request-id: {}
+      limit-req:
+        rate: 10
+        burst: 5
+        key: remote_addr
+        rejected_code: 429
+
   # -------------------------------------------------------------------------
   # 0. Gateway liveness ping (public, no upstream)
   # -------------------------------------------------------------------------

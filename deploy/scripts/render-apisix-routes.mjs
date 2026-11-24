@@ -54,6 +54,7 @@ ssls:
     snis:
       - "127.0.0.1"
       - "localhost"
+      - "gateway-${env.INSTANCE_ID}.nexora.test"
     cert: |
 ${cert}
     key: |

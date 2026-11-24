@@ -16,7 +16,7 @@ jobs:
         with:
           node-version: "24"
       - name: Validate independent A/B/C Compose topology
-        run: node --test deploy/config.test.mjs tests/e2e/abc-topology.test.mjs
+        run: node --test deploy/config.test.mjs tests/e2e/abc-topology.test.mjs tests/e2e/abc-federation-topology.test.mjs
 
   platform-trace:
     runs-on: ubuntu-latest
