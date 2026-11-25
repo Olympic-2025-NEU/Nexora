@@ -40,7 +40,7 @@ Không commit `.env`, realm export có secret, token, DB dump thật, private fi
 | `seaweedfs` S3 | `internal`, volume object riêng | S3 HEAD bucket/upload probe | không console public |
 | `clamav` | `internal`, signature volume | daemon + signature age check | không |
 | `redis` | `internal`, volume tùy use case | PING; mất Redis không mất outbox PG | không |
-| `ai` Python | `internal`, optional profile | `/health`, provider check có timeout | không |
+| `ai` Python + `ollama` | `internal`, optional `ai` profile; model cache volume riêng | adapter `/health` độc lập, `/ready` chỉ pass khi model đã pull; timeout 30 giây | không |
 
 APISIX, Keycloak, Flowable, SeaweedFS, ClamAV có admin/management API chỉ internal. Không publish PG/Redis/etcd/storage/Flowable lên `0.0.0.0`. Test `docker compose config` và inspect `ports`/network; app và core tự verify token, không dựa mỗi gateway.
 
@@ -54,7 +54,7 @@ APISIX, Keycloak, Flowable, SeaweedFS, ClamAV có admin/management API chỉ int
 | `PARTNER_OUTBOUND_CLIENT_ID`, `PARTNER_OUTBOUND_SECRET_REF`, `PARTNER_OUTBOUND_TOKEN_URL`, `PARTNER_OUTBOUND_AUDIENCE`, `PARTNER_INBOUND_CLIENT_ID` | từng connection/bootstrap; mapping ở `system.partner_connection` | chiều outbound lấy token từ realm receiver, chiều inbound map client do realm local cấp; secret external, scope tối thiểu; không đưa secret vào env example |
 | `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET_QUARANTINE`, `S3_BUCKET_PRIVATE`, `S3_BUCKET_PUBLIC`, `S3_SECRET_REF` | core API | bucket/namespace riêng, least privilege |
 | `FLOWABLE_BASE_URL`, `FLOWABLE_AUTH_REF`, `FLOWABLE_PROCESS_KEY` | worker/app | URL nội bộ, process definition tồn tại |
-| `REDIS_URL`, `AI_BASE_URL`, `AI_PROVIDER`, `AI_KEY_REF` | theo profile | Redis không là source of truth, AI optional/fail isolated |
+| `REDIS_URL`, `AI_BASE_URL`, `AI_PROVIDER`, `AI_MODEL`, `AI_MODEL_BASE_URL`, `AI_INTERNAL_TOKEN`, `AI_REQUEST_TIMEOUT_SECONDS`, `AI_MAX_OUTPUT_TOKENS` | theo profile | Redis không là source of truth; AI mặc định `none`, provider `ollama` chỉ nội bộ, token ngoài Git, ERP/trace hoạt động khi AI tắt; D09 quy định quota và fallback |
 
 Biến thực tế có thể được nhóm đặt tên khác theo code, nhưng bảng mapping trong `.env.example` phải đầy đủ. Config parser fail-fast nếu thiếu URL/issuer/secret ref; output lỗi chỉ tên biến, không giá trị. Test một trường hợp thiếu/sai cho mỗi nhóm.
 

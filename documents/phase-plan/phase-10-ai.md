@@ -4,9 +4,9 @@
 
 ## P10-T01 — Provider, dữ liệu và fail mode
 
-- [ ] ADR D09 chốt model/provider self-host hoặc external, license/model terms, dữ liệu được gửi, retention, vùng xử lý, timeout/quota/cost và fallback khi provider lỗi.
-- [ ] Tách Python AI service khỏi DB: chỉ gọi API/tool đã xác thực qua gateway hoặc internal service boundary; secret ngoài repo, outbound allowlist.
-- [ ] Mặc định không gửi PII, credential, file private hoặc toàn bộ DB sang provider; redaction và data minimization test.
+- [x] ADR D09 chốt model/provider self-host hoặc external, license/model terms, dữ liệu được gửi, retention, vùng xử lý, timeout/quota/cost và fallback khi provider lỗi.
+- [x] Tách Python AI service khỏi DB: chỉ gọi API/tool đã xác thực qua gateway hoặc internal service boundary; secret ngoài repo, outbound allowlist.
+- [x] Mặc định không gửi PII, credential, file private hoặc toàn bộ DB sang provider; redaction và data minimization test. [Bằng chứng T01](evidence/p10-t01.md).
 - **Đầu ra:** AI config/data policy; **kiểm chứng:** provider down không làm hỏng M03/M04 và không làm lộ secret.
 
 ## P10-T02 — Tool registry và quyền theo actor

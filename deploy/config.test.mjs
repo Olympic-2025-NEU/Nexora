@@ -118,9 +118,11 @@ test("Flowable port and REST contract are fixed", () => {
   assert.throws(() => validateConfig({ ...examples[0], FLOWABLE_ADMIN_USER: "rest-admin", FLOWABLE_ADMIN_PASSWORD: "test" }), { message: "Invalid or missing FLOWABLE_ADMIN_PASSWORD" });
 });
 
-test("optional AI reference is checked when supplied or when provider enabled", () => {
+test("optional local AI requires its own internal secret and forbids unknown providers", () => {
   assert.throws(() => validateConfig({ ...examples[0], AI_KEY_REF: "invalid" }), { message: "Invalid or missing AI_KEY_REF" });
-  assert.throws(() => validateConfig({ ...examples[0], AI_PROVIDER: "local" }), { message: "Invalid or missing AI_KEY_REF" });
+  assert.throws(() => validateConfig({ ...examples[0], AI_PROVIDER: "external" }), { message: "Invalid or missing AI_PROVIDER" });
+  assert.throws(() => validateConfig({ ...examples[0], AI_PROVIDER: "ollama" }), { message: "Invalid or missing AI_INTERNAL_TOKEN" });
+  assert.doesNotThrow(() => validateConfig({ ...examples[0], AI_PROVIDER: "ollama", AI_INTERNAL_TOKEN: "a".repeat(32) }));
 });
 
 test("CLI rejects unfilled example without displaying its placeholder", () => {

@@ -17,7 +17,7 @@ Internet chỉ đến Gateway HTTPS. User token từ Keycloak, partner token t�
 | Approver | OIDC user (Bearer) | **Bắt buộc TOTP** | Approve/reject task; không đồng nghĩa tự confirm document |
 | Partner client | Client credentials cấp ở receiver | N/A | Chỉ federation endpoints/phạm vi partner, không xem ERP private |
 | Public consumer | Không đăng nhập | N/A | Chỉ Passport projection theo QR/policy/rate limit |
-| AI service | Internal service identity | N/A | Chỉ inference/tool request allowlist, không có DB credential ghi |
+| AI service | Internal secret, không có user/Admin/DB credential | N/A | Chỉ inference từ fact allowlist; ERP kiểm quyền từng tool theo actor, không chuyển raw token/PII cho model |
 
 M01 quản lý mapping `Keycloak sub -> membership/role/scope` qua **admin invite** (không open JIT). Invite nhận `username` (không nhận `keycloakSub` từ client): ERP dùng Keycloak Admin API tạo/tái sử dụng user, gán realm role, ghi membership; mật khẩu tạm chỉ trả một lần trên response tạo mới, không lưu app DB. Vai membership v1: `administrator`, `staff`, `approver`, `viewer` (DB authoritative; không dùng alias `admin`). Approver gắn Flowable task; không đồng nghĩa quyền confirm document.
 

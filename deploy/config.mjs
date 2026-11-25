@@ -178,7 +178,12 @@ export function validateConfig(env, service) {
     const key = env[name].slice(4);
     if (env[name].startsWith("env:") && (!env[key] || env[key].startsWith("CHANGE_ME_"))) fail(name);
   }
-  if (env.AI_KEY_REF || env.AI_PROVIDER !== "none") check("AI_KEY_REF", env.AI_KEY_REF, "ref");
+  if (!["none", "ollama"].includes(env.AI_PROVIDER)) fail("AI_PROVIDER");
+  if (env.AI_KEY_REF) check("AI_KEY_REF", env.AI_KEY_REF, "ref");
+  if (env.AI_PROVIDER === "ollama" && (!env.AI_INTERNAL_TOKEN ||
+      env.AI_INTERNAL_TOKEN.length < 32 || env.AI_INTERNAL_TOKEN.startsWith("CHANGE_ME_"))) {
+    fail("AI_INTERNAL_TOKEN");
+  }
   if (env.KC_DEV_USER_PASSWORD) check("KC_DEV_USER_PASSWORD", env.KC_DEV_USER_PASSWORD, "secret");
   if (env.KC_DEV_USERNAME) check("KC_DEV_USERNAME", env.KC_DEV_USERNAME, "id");
   return config;

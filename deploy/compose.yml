@@ -15,6 +15,7 @@ volumes:
   seaweed_data:
   seaweed_config:
   clamav_data:
+  ollama_models:
 
 services:
   postgres:
@@ -432,18 +433,38 @@ services:
 
   ai:
     profiles: ["ai"]
-    image: python:3.12-slim@sha256:78387bc3881b8273120a12ebe6c1ab22b018ccc2c9adf565ae1ac9b536e184ea
-    command:
-      [
-        "python",
-        "-c",
-        "import http.server; http.server.HTTPServer(('0.0.0.0', 8080), type('H', (http.server.BaseHTTPRequestHandler,), {'do_GET': lambda s: (s.send_response(200), s.end_headers(), s.wfile.write(b'ok'))})).serve_forever()",
-      ]
+    image: nexora-ai:${NEXORA_IMAGE_TAG:-p10-local}
+    build:
+      context: ..
+      dockerfile: services/ai/Dockerfile
+    environment:
+      AI_PROVIDER: ${AI_PROVIDER:-none}
+      AI_MODEL: ${AI_MODEL:-qwen3:0.6b}
+      AI_MODEL_BASE_URL: ${AI_MODEL_BASE_URL:-http://ollama:11434}
+      AI_INTERNAL_TOKEN: ${AI_INTERNAL_TOKEN:-}
+      AI_REQUEST_TIMEOUT_SECONDS: ${AI_REQUEST_TIMEOUT_SECONDS:-30}
+      AI_MAX_OUTPUT_TOKENS: ${AI_MAX_OUTPUT_TOKENS:-256}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
     networks: [internal]
     deploy:
       resources:
         limits:
           memory: 256m
+
+  ollama:
+    profiles: ["ai"]
+    image: ollama/ollama:0.40.18@sha256:1cabd20e1762a7a8444bf4a7110b346d923cd77ab6c97c984434140638c913ec
+    volumes:
+      - ollama_models:/root/.ollama
+    networks: [internal]
+    deploy:
+      resources:
+        limits:
+          memory: 2g
 
   # local-admin host publishes: use overlay deploy/compose.local-admin.yml
   # (Compose v5 rejects ports on network_mode: service:* sidecars).

@@ -8,6 +8,8 @@ node_modules
 deploy/instances/*.env
 documents/phase-plan/evidence/spikes
 **/.venv
+**/__pycache__/
+*.pyc
 **/generated
 *.md
 !README.md
