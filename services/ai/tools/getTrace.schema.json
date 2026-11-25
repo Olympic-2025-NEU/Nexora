@@ -1,0 +1,12 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:nexora:ai:getTrace:v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["batchId", "direction"],
+  "properties": {
+    "batchId": { "type": "string", "format": "uuid" },
+    "direction": { "enum": ["backward", "forward"] },
+    "depth": { "type": "integer", "minimum": 1, "maximum": 5 }
+  }
+}

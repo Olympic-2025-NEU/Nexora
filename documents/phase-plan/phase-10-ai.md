@@ -11,9 +11,9 @@
 
 ## P10-T02 — Tool registry và quyền theo actor
 
-- [ ] Allowlist tools ví dụ `getBatch`, `getStock`, `getTrace`, `createDraftReceipt`; mỗi tool có JSON schema, input limits, authorization của user ở app, rate limit và audit.
-- [ ] AI service nhận delegated identity scoped hoặc app kiểm quyền từng call; không dùng service token quyền Admin để lách role user. Tool output có source IDs, timestamp, verification/gap status.
-- [ ] Không đăng ký `confirm`, `approve`, `changePolicy`, `sendTransfer`, `delete` làm AI tool.
+- [x] Allowlist tools `getLot`, `getStock`, `getTrace`, `createReceiptDraft`, `createIssueDraft`; mỗi tool có JSON schema, input limits, authorization của user ở app, rate limit và audit.
+- [x] App kiểm quyền từng call bằng Bearer user và membership hiện tại; không dùng service token quyền Admin để lách role user. Tool output có source IDs, timestamp, verification/gap status.
+- [x] Không đăng ký `confirm`, `approve`, `changePolicy`, `sendTransfer`, `delete` làm AI tool. [Bằng chứng T02](evidence/p10-t02.md).
 - **Đầu ra:** tool API/contracts; **kiểm chứng:** user thiếu quyền bị 403 dù prompt yêu cầu vượt quyền.
 
 ## P10-T03 — Tra cứu lô có dẫn nguồn

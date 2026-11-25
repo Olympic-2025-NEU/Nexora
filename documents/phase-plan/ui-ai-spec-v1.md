@@ -28,7 +28,7 @@ ERP canonical surfaces (ADR 0016): `/admin` (org/members only), `/partners`, `/c
 
 ## AI tool registry và dữ liệu
 
-`services/ai/` nhận `{actorDelegation,requestId,message}` từ backend; `actorDelegation` scoped, short-lived, không phải Admin token chung. Tools có JSON Schema `additionalProperties:false`, tối đa 1–20 records/response, timeout và ghi mỗi tool call vào `platform.audit_log` với action `ai.tool.<name>`/source IDs/outcome đã redacted; không đòi bảng `ai_tool_call` ngoài `database-schema-v1.md`.
+P10-T02 chọn nhánh **app kiểm quyền từng call**: ERP xác minh Bearer user và membership DB, sau đó gọi API M02/M03/M04 nội bộ bằng chính Bearer đó; mỗi API kiểm lại role và warehouse scope. Python AI chỉ nhận facts đã lọc, không nhận user/Admin token. Registry nội bộ nằm tại `contexts/ai/application/` với năm JSON Schema ở `services/ai/tools/`; không mở public `/ai/tools` route. Mỗi kết quả tối đa 20 record, mỗi call có timeout và ghi `platform.audit_log` action `ai.tool.<name>`/UUID source IDs/outcome đã redacted; quota được giữ bằng audit reservation có PG advisory lock, không tạo bảng `ai_tool_call` mới. P10-T03/T04 sẽ nối chat/Draft route vào registry này.
 
 | Tool | Input | Output | Side effect/quyền |
 | --- | --- | --- | --- |

@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:nexora:ai:getLot:v1",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "batchId": { "type": "string", "format": "uuid" },
+    "originIssuerId": { "type": "string", "minLength": 1, "maxLength": 80, "pattern": "^[A-Za-z0-9._:-]+$" },
+    "originLotId": { "type": "string", "minLength": 1, "maxLength": 100, "pattern": "^[A-Za-z0-9._:-]+$" }
+  },
+  "oneOf": [
+    { "required": ["batchId"], "not": { "anyOf": [
+      { "required": ["originIssuerId"] }, { "required": ["originLotId"] }
+    ] } },
+    { "required": ["originIssuerId", "originLotId"], "not": { "required": ["batchId"] } }
+  ]
+}

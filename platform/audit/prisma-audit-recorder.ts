@@ -31,6 +31,11 @@ export function sanitizeAuditSummary(input: unknown): Prisma.InputJsonObject {
   if (typeof value.visibility === "string" && visibilities.has(value.visibility)) safe.visibility = value.visibility;
   if (typeof value.scanState === "string" && scanStates.has(value.scanState)) safe.scanState = value.scanState;
   if (typeof value.tool === "string" && tools.has(value.tool)) safe.tool = value.tool;
+  if (Array.isArray(value.sourceIds)) {
+    safe.sourceIds = [...new Set(value.sourceIds.filter(
+      (id): id is string => typeof id === "string" && UUID_RE.test(id),
+    ))].slice(0, 20);
+  }
   if (Number.isSafeInteger(value.version) && (value.version as number) > 0) safe.version = value.version as number;
   if (Number.isSafeInteger(value.count) && (value.count as number) >= 0) safe.count = value.count as number;
   if (Number.isSafeInteger(value.warehouseCount) && (value.warehouseCount as number) >= 0) {
@@ -84,7 +89,7 @@ export const prismaAuditRecorder: AuditRecorder<Prisma.TransactionClient> = {
       action: bounded(entry.action, "action", 100),
       targetType: bounded(entry.targetType, "targetType", 80),
       targetId: bounded(entry.targetId, "targetId", 128),
-      outcome: "success",
+      outcome: entry.outcome ?? "success",
       requestId: requestKey(entry.requestId, "requestId"),
       correlationId: entry.correlationId ? requestKey(entry.correlationId, "correlationId") : null,
       beforeSummary: sanitizeAuditSummary(entry.before),
