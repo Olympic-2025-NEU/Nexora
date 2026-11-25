@@ -7,11 +7,12 @@ import envelopeSchema from "./envelope-v1.schema.json";
 import transferSchema from "./transfer.schema.json";
 import receiptSchema from "./receipt.schema.json";
 import impactSchema from "./downstream-impact.schema.json";
+import traceSummarySchema from "./trace-summary.schema.json";
 
 export const FEDERATION_MAX_BYTES = 256 * 1024;
 export const FEDERATION_CLOCK_TOLERANCE_MS = 5 * 60 * 1000;
 export const FEDERATION_EVENT_TYPES = ["transfer.announced.v1", "receipt.confirmed.v1",
-  "downstream.impact.v1"] as const;
+  "downstream.impact.v1", "trace.summary.v1"] as const;
 export type FederationEventType = (typeof FEDERATION_EVENT_TYPES)[number];
 export type FederationEnvelope = Record<string, unknown> & {
   schemaVersion: "1.0"; messageId: string; eventId: string; eventType: FederationEventType;
@@ -30,6 +31,7 @@ const schemas = new Map<FederationEventType, ReturnType<typeof ajv.compile>>([
   [FEDERATION_EVENT_TYPES[0], ajv.compile(transferSchema)],
   [FEDERATION_EVENT_TYPES[1], ajv.compile(receiptSchema)],
   [FEDERATION_EVENT_TYPES[2], ajv.compile(impactSchema)],
+  [FEDERATION_EVENT_TYPES[3], ajv.compile(traceSummarySchema)],
 ]);
 
 // JSON.parse silently accepts duplicate keys. Reject them before parsing so the
@@ -96,10 +98,19 @@ function checkBusiness(value: FederationEnvelope): void {
       milli(value.discrepancyQuantity as string) === sent - actual &&
       sum(lots, "quantity") === actual && (actual > BigInt(0) || lots.length === 0) &&
       (sent === actual || Boolean(value.discrepancyReason)));
-  } else {
+  } else if (value.eventType === "downstream.impact.v1") {
     const origin = value.originLot as { issuerInstanceId: string; lotId: string };
     requireBusiness(lots.length > 0 && lots.every((lot) =>
       lot.originLot.issuerInstanceId === origin.issuerInstanceId && lot.originLot.lotId === origin.lotId));
+  } else {
+    const target = value.targetLot as { originLot: { issuerInstanceId: string; lotId: string };
+      senderBatch: { instanceId: string; batchId: string } };
+    const summaries = value.traceSummaries as Array<{ issuerInstanceId: string;
+      externalEventId: string; disclosureScope: string; parents: unknown[] }>;
+    requireBusiness(lots.length === 0 && target.senderBatch.instanceId === value.issuerInstanceId &&
+      summaries.length > 0 && summaries.some((row) => row.issuerInstanceId === value.issuerInstanceId));
+    const keys = summaries.map((row) => `${row.issuerInstanceId}:${row.externalEventId}`);
+    requireBusiness(new Set(keys).size === keys.length);
   }
 }
 

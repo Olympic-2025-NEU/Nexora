@@ -892,6 +892,26 @@ model TraceEvent {
   @@schema("traceability")
 }
 
+// Mutable policy/status cache for an immutable partner-asserted trace event.
+// A newer issuer policy version can revoke disclosure without rewriting provenance.
+model FederatedTraceSummary {
+  id                 String   @id @db.Uuid
+  issuerInstanceId   String   @map("issuer_instance_id")
+  externalEventId    String   @map("external_event_id")
+  policyVersion      Int      @map("policy_version")
+  disclosureScope    String   @map("disclosure_scope")
+  state              String
+  sourceInboxId      String   @map("source_inbox_id") @db.Uuid
+  observedAt         DateTime @map("observed_at") @db.Timestamptz(6)
+  refreshedAt        DateTime @default(now()) @map("refreshed_at") @db.Timestamptz(6)
+  batchId            String   @map("batch_id") @db.Uuid
+
+  @@unique([issuerInstanceId, externalEventId], map: "uq_federated_trace_source")
+  @@index([batchId, state], map: "idx_federated_trace_batch_state")
+  @@map("federated_trace_summary")
+  @@schema("federation")
+}
+
 model TraceEvidence {
   id            String    @id @db.Uuid
   createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)

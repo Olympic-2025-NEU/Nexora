@@ -1,6 +1,15 @@
 {
   "schemaVersion": 1,
   "cases": {
+    "FederationSummaryPublishInput": {
+      "valid": { "recipientInstanceId": "nexora-c" },
+      "invalid": { "recipientInstanceId": "" }
+    },
+    "FederationImpactPublishInput": {
+      "valid": { "recipientInstanceId": "nexora-b",
+        "sourceDocumentId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" },
+      "invalid": { "recipientInstanceId": "nexora-b" }
+    },
     "AiChatInput": {
       "valid": {
         "message": "Show lot trace",

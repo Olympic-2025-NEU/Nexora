@@ -4155,6 +4155,120 @@ paths:
           $ref: "#/components/responses/Error"
         "503":
           $ref: "#/components/responses/Error"
+  /api/v1/lots/{id}/federation-summary:
+    post:
+      tags:
+        - M04
+      operationId: postLotsByIdFederationSummary
+      summary: Queue allowlisted partner trace summary
+      description: Approved timeline policy limits direct sharing; only public remote assertions may be relayed. Queues an immutable outbox envelope and audits the recipient.
+      security:
+        - oidc: []
+      x-nexora-roles:
+        - administrator
+      x-nexora-scope: organization-admin
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FederationSummaryPublishInput"
+      responses:
+        "202":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - data
+                  - requestId
+                properties:
+                  data:
+                    $ref: "#/components/schemas/FederationSummaryQueued"
+                  requestId:
+                    type: string
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "422":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
+  /api/v1/lots/{id}/downstream-impact:
+    post:
+      tags:
+        - M04
+      operationId: postLotsByIdDownstreamImpact
+      summary: Queue downstream impact
+      description: Confirmed sale or verified public inbound impact from a known receiver batch; queues C to B or B to A assertion without stock change or buyer PII.
+      security:
+        - oidc: []
+      x-nexora-roles:
+        - administrator
+      x-nexora-scope: organization-admin
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FederationImpactPublishInput"
+      responses:
+        "202":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - data
+                  - requestId
+                properties:
+                  data:
+                    $ref: "#/components/schemas/FederationImpactQueued"
+                  requestId:
+                    type: string
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "422":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
   /api/v1/lots/{id}/passport-policy:
     get:
       tags:
@@ -8089,6 +8203,69 @@ components:
           enum:
             - validated
             - pending_dependency
+    FederationSummaryPublishInput:
+      type: object
+      additionalProperties: false
+      required:
+        - recipientInstanceId
+      properties:
+        recipientInstanceId:
+          type: string
+          minLength: 1
+          maxLength: 64
+    FederationSummaryQueued:
+      type: object
+      additionalProperties: false
+      required:
+        - messageId
+        - eventCount
+        - policyVersion
+        - state
+      properties:
+        messageId:
+          type: string
+          format: uuid
+        eventCount:
+          type: integer
+          minimum: 1
+        policyVersion:
+          type: integer
+          minimum: 1
+        state:
+          type: string
+          enum:
+            - pending
+    FederationImpactPublishInput:
+      type: object
+      additionalProperties: false
+      required:
+        - recipientInstanceId
+        - sourceDocumentId
+      properties:
+        recipientInstanceId:
+          type: string
+          minLength: 1
+          maxLength: 64
+        sourceDocumentId:
+          type: string
+          format: uuid
+        sourceInboxMessageId:
+          type: string
+          format: uuid
+    FederationImpactQueued:
+      type: object
+      additionalProperties: false
+      required:
+        - messageId
+        - state
+      properties:
+        messageId:
+          type: string
+          format: uuid
+        state:
+          type: string
+          enum:
+            - pending
     FederationDelivery:
       type: object
       additionalProperties: false
@@ -8888,6 +9065,7 @@ components:
             - transfer.announced.v1
             - receipt.confirmed.v1
             - downstream.impact.v1
+            - trace.summary.v1
         issuerInstanceId:
           type: string
           minLength: 1
@@ -8922,6 +9100,7 @@ components:
                 - partner_transfer
                 - receiving_confirmation
                 - sale_record
+                - trace_summary
             id:
               type: string
               format: uuid
@@ -9148,4 +9327,118 @@ components:
           enum:
             - partner
             - public
+        targetLot:
+          type: object
+          additionalProperties: false
+          required:
+            - originLot
+            - senderBatch
+          properties:
+            originLot:
+              type: object
+              additionalProperties: false
+              required:
+                - issuerInstanceId
+                - lotId
+              properties:
+                issuerInstanceId:
+                  type: string
+                  minLength: 1
+                  maxLength: 64
+                lotId:
+                  type: string
+                  format: uuid
+            senderBatch:
+              type: object
+              additionalProperties: false
+              required:
+                - instanceId
+                - batchId
+              properties:
+                instanceId:
+                  type: string
+                  minLength: 1
+                  maxLength: 64
+                batchId:
+                  type: string
+                  format: uuid
+        traceSummaries:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items:
+            type: object
+            additionalProperties: false
+            required:
+              - issuerInstanceId
+              - externalEventId
+              - eventType
+              - occurredAt
+              - disclosureScope
+              - policyVersion
+              - state
+              - parents
+            properties:
+              issuerInstanceId:
+                type: string
+                minLength: 1
+                maxLength: 64
+              externalEventId:
+                type: string
+                minLength: 1
+                maxLength: 200
+              eventType:
+                type: string
+                minLength: 1
+                maxLength: 80
+              occurredAt:
+                type: string
+                format: date-time
+              disclosureScope:
+                enum:
+                  - partner
+                  - public
+              policyVersion:
+                type: integer
+                minimum: 1
+              state:
+                enum:
+                  - active
+                  - revoked
+              sourceMessageRef:
+                type: object
+                additionalProperties: false
+                required:
+                  - issuerInstanceId
+                  - messageId
+                  - eventId
+                properties:
+                  issuerInstanceId:
+                    type: string
+                    minLength: 1
+                    maxLength: 64
+                  messageId:
+                    type: string
+                    format: uuid
+                  eventId:
+                    type: string
+                    format: uuid
+              parents:
+                type: array
+                maxItems: 20
+                items:
+                  type: object
+                  additionalProperties: false
+                  required:
+                    - issuerInstanceId
+                    - externalEventId
+                  properties:
+                    issuerInstanceId:
+                      type: string
+                      minLength: 1
+                      maxLength: 64
+                    externalEventId:
+                      type: string
+                      minLength: 1
+                      maxLength: 200
       description: Cross-field event rules are enforced by contracts/events/envelope-v1.schema.json.

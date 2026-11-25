@@ -11,7 +11,9 @@ type Impact = { eventId: string; sourceDocumentId: string; sourceLineId: string;
   partner?: { id?: string; issuerInstanceId: string } };
 type Gap = { fromEventId?: string; state: string; reason: string;
   partnerIssuerInstanceId?: string };
-type Graph = { nodes: { eventId: string }[]; impact: Impact[]; gaps: Gap[];
+type Graph = { nodes: { eventId: string; issuerInstanceId: string;
+  verificationState: string; syncState?: "cached" | "stale" }[];
+  impact: Impact[]; gaps: Gap[];
   asOf: string; nextCursor?: string; truncated: boolean;
   localProjection: { state: string; pendingEvents: number } };
 const labels: Record<string, string> = { issue: "Xuất kho", transfer: "Chuyển đối tác",
@@ -68,6 +70,11 @@ export function ForwardImpact() {
       <p className="text-sm text-muted-foreground">Số lượng của phiếu xuất, chuyển và bán là các bước
         của cùng dòng hàng; không cộng các dòng này thành tổng. Bên nhận chỉ được xác nhận khi có
         sự kiện nguồn hợp lệ.</p>
+      {graph.nodes.some((node) => node.verificationState === "partner_asserted") &&
+        <p className="text-sm">Có dữ liệu đối tác đã lưu tại instance này; trạng thái là
+          partner_asserted, chưa được xác minh như chứng từ local.
+          {graph.nodes.some((node) => node.syncState === "stale") &&
+            " Một số bản tóm tắt đã quá 24 giờ và cần đồng bộ."}</p>}
       {graph.impact.length ? <div className="overflow-x-auto"><table className="w-full border-collapse text-left text-sm">
         <thead><tr><th className="border p-2">Bước</th><th className="border p-2">Số lượng</th>
           <th className="border p-2">Đối tác</th><th className="border p-2">Trạng thái</th>
@@ -84,7 +91,11 @@ export function ForwardImpact() {
         <ul className="list-inside list-disc text-sm">{graph.gaps.map((gap, index) =>
           <li key={`${gap.fromEventId}-${gap.reason}-${index}`}>
             {gap.reason === "downstream_unreported" ?
-              `Chưa có xác nhận downstream từ ${gap.partnerIssuerInstanceId ?? "đối tác"}` : gap.reason}
+              `Chưa có xác nhận downstream từ ${gap.partnerIssuerInstanceId ?? "đối tác"}` :
+              gap.reason === "downstream_completeness_unknown" ?
+                "Đã nhận một tóm tắt downstream; chưa thể khẳng định danh sách đầy đủ" :
+                gap.reason === "partner_summary_stale" ?
+                  "Bản tóm tắt đối tác đã quá 24 giờ; cần đồng bộ lại" : gap.reason}
             {` (${gap.state})`}</li>)}</ul></section>}
       {graph.nextCursor && <button type="button" disabled={loading}
         className="rounded border px-4 py-2 disabled:opacity-50"

@@ -117,6 +117,7 @@ const ACTION_POLICIES: Record<string, ActionPolicy> = {
 
   // --- Traceability ---
   "trace:read": { roles: ["staff", "approver", "viewer"], adminAlwaysAllowed: true },
+  "trace:federation:publish": { roles: ["administrator"], adminAlwaysAllowed: true },
   "trace:passport-policy:manage": { roles: ["administrator"], adminAlwaysAllowed: true },
   "trace:qr:manage": { roles: ["administrator", "staff"], adminAlwaysAllowed: true },
   "trace:evidence:manage": { roles: ["administrator", "staff"], adminAlwaysAllowed: true },

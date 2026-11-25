@@ -7,6 +7,7 @@ import { adminApi } from "@/app/lib/admin-api";
 type Node = { eventId: string; issuerInstanceId: string; batchId: string | null;
   originLot: { issuerInstanceId: string; lotId: string }; eventType: string;
   occurredAt: string; recordedAt: string; verificationState: string; depth: number;
+  partnerObservedAt?: string; syncState?: "cached" | "stale";
   source: { documentId: string | null; eventId: string; payloadVersion: string } };
 type Edge = { fromEventId: string; toEventId?: string;
   missingRef?: { issuerInstanceId: string; eventId: string }; relation: string;
@@ -24,6 +25,7 @@ const reasons: Record<string, string> = {
   projection_pending: "Worker trace còn sự kiện chưa xử lý",
   depth_limit: "Đã tới giới hạn độ sâu truy vấn",
   node_limit: "Đã tới giới hạn nút của truy vấn; hãy lọc theo chứng từ",
+  partner_summary_stale: "Bản tóm tắt đối tác đã quá 24 giờ; cần đồng bộ lại",
 };
 
 export function BackwardTrace() {
@@ -85,7 +87,9 @@ export function BackwardTrace() {
         className="rounded border p-3 text-sm">
         <strong>{node.eventType}</strong> · {new Date(node.occurredAt).toLocaleString("vi-VN")}
         <p>Issuer: {node.issuerInstanceId} · lô nguồn: {node.originLot.issuerInstanceId}/{node.originLot.lotId}</p>
-        <p>Chứng từ: {node.source.documentId ?? "chưa có"} · xác minh: {node.verificationState}</p>
+        <p>Chứng từ: {node.source.documentId ?? "chưa có"} · xác minh: {node.verificationState}
+          {node.syncState && ` · bản đối tác ${node.syncState === "stale" ? "cũ" : "đã lưu local"}`}</p>
+        {node.partnerObservedAt && <p>Đối tác cập nhật: {new Date(node.partnerObservedAt).toLocaleString("vi-VN")}</p>}
         <p className="break-all text-muted-foreground">Event: {node.eventId} · source: {node.source.eventId}</p>
       </li>)}</ol>
       {graph.edges.length > 0 && <section><h3 className="font-semibold">Liên kết có nguồn</h3>

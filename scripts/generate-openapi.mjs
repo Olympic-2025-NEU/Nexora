@@ -221,6 +221,14 @@ add("get", "/api/v1/lots/{id}/trace/backward", "M04", "Trace backward", "TraceGr
 add("get", "/api/v1/lots/{id}/trace/forward", "M04", "Trace forward", "TraceGraph", {
   query: ["depth", "cursor", "limit"],
   description: "Authenticated local forward graph and per-document-line impact. Stored child-to-source links are traversed in reverse; sourceRelation preserves the original relationship. Confirmed local quantities are not additive across issue, transfer and sale. Partner downstream remains unknown until a verified report arrives in P09. No buyer reference or private partner contact is returned." });
+add("post", "/api/v1/lots/{id}/federation-summary", "M04", "Queue allowlisted partner trace summary",
+  "FederationSummaryQueued", { roles: ADMIN, scope: "organization-admin",
+    body: "FederationSummaryPublishInput", status: 202,
+    description: "Approved timeline policy limits direct sharing; only public remote assertions may be relayed. Queues an immutable outbox envelope and audits the recipient." });
+add("post", "/api/v1/lots/{id}/downstream-impact", "M04", "Queue downstream impact",
+  "FederationImpactQueued", { roles: ADMIN, scope: "organization-admin",
+    body: "FederationImpactPublishInput", status: 202,
+    description: "Confirmed sale or verified public inbound impact from a known receiver batch; queues C to B or B to A assertion without stock change or buyer PII." });
 add("get", "/api/v1/lots/{id}/passport-policy", "M04", "Read passport policy", "PassportPolicyRead", {
   roles: ADMIN, scope: "organization-admin", description: "Owner administrator reads versioned policy and projection status; default is no public policy." });
 add("post", "/api/v1/lots/{id}/passport-policy", "M04", "Draft passport policy", "PassportPolicyView", {

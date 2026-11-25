@@ -84,9 +84,21 @@ export async function forwardTrace(port: ForwardPort, actor: Actor, input: Forwa
   const impact = await port.impact(page.map(({ event }) => event));
   for (const row of impact) {
     if (row.kind === "transfer" && row.partner &&
-        !gaps.some((gap) => gap.fromEventId === row.eventId && gap.reason === "downstream_unreported"))
+        !gaps.some((gap) => gap.fromEventId === row.eventId && gap.reason === "downstream_unreported")) {
+      const parent = page.find(({ event }) => event.id === row.eventId)?.event;
+      const reported = parent?.incoming.some((link) => impact.some((candidate) =>
+        candidate.eventId === link.fromEventId && candidate.verificationState === "partner_asserted"));
       gaps.push({ fromEventId: row.eventId, state: "unknown",
-        reason: "downstream_unreported", partnerIssuerInstanceId: row.partner.issuerInstanceId });
+        reason: reported ? "downstream_completeness_unknown" : "downstream_unreported",
+        partnerIssuerInstanceId: row.partner.issuerInstanceId });
+    }
+  }
+  for (const { event } of page) {
+    const safe = event.summary && typeof event.summary === "object" &&
+      !Array.isArray(event.summary) ? event.summary as Record<string, unknown> : {};
+    if (typeof safe.observedAt === "string" &&
+        asOf.getTime() - Date.parse(safe.observedAt) > 24 * 60 * 60 * 1000)
+      gaps.push({ fromEventId: event.id, state: "pending", reason: "partner_summary_stale" });
   }
   const lag = await port.pending();
   if (lag.pending) gaps.push({ state: "pending", reason: "projection_pending" });
@@ -98,6 +110,9 @@ export async function forwardTrace(port: ForwardPort, actor: Actor, input: Forwa
         lotId: event.originLotId }, eventType: event.eventType,
       occurredAt: event.occurredAt.toISOString(), recordedAt: event.createdAt.toISOString(),
       verificationState: event.verificationState, depth: hop,
+      ...(typeof summary.observedAt === "string" ? { partnerObservedAt: summary.observedAt,
+        syncState: asOf.getTime() - Date.parse(summary.observedAt) > 24 * 60 * 60 * 1000
+          ? "stale" : "cached" } : {}),
       source: { documentId: event.documentId, eventId: String(summary.sourceEventId ??
         event.externalEventId), payloadVersion: event.payloadVersion } };
   });

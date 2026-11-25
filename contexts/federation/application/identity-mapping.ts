@@ -3,17 +3,18 @@ import { createHash, randomUUID } from "node:crypto";
 import canonicalize from "canonicalize";
 import { Prisma, type PrismaClient } from "@prisma/client";
 import type { FederationEnvelope } from "../../../contracts/events/federation";
+import { applyTraceSummary, type TraceSummaryEnvelope } from "./trace-summary";
+import { MappingError } from "./mapping-error";
+export { MappingError } from "./mapping-error";
 
 type Tx = Prisma.TransactionClient;
 type Lot = { sourceLineId: string; originLot: { issuerInstanceId: string; lotId: string };
   senderBatch: { instanceId: string; batchId: string }; quantity: string; unit: string };
 type Ref = { issuerInstanceId: string; messageId: string; eventId: string };
 type Payload = FederationEnvelope & { lots: Lot[]; upstreamReferences: Ref[];
-  sharingPolicyVersion: string; sourceDocument: { type: string; id: string; version: number } };
-
-export class MappingError extends Error {
-  constructor(readonly code: string, readonly status = 409) { super(code); }
-}
+  sharingPolicyVersion: string; sourceDocument: { type: string; id: string; version: number };
+  impactType?: string; downstreamPartnerRef?: string; disclosureScope?: string;
+  sourceEventRefs?: { issuerInstanceId: string; eventId: string }[] };
 
 function payloadOf(value: Prisma.JsonValue): Payload { return value as unknown as Payload; }
 function traceId(envelope: Payload, lot: Lot): string {
@@ -26,7 +27,11 @@ function summary(envelope: Payload, lot: Lot) {
     senderBatch: lot.senderBatch, sourceLineId: lot.sourceLineId,
     quantity: lot.quantity, unit: lot.unit,
     sourceDocument: envelope.sourceDocument,
-    upstreamReferences: envelope.upstreamReferences };
+    upstreamReferences: envelope.upstreamReferences,
+    ...(envelope.eventType === "downstream.impact.v1" ? {
+      impactType: envelope.impactType, downstreamPartnerRef: envelope.downstreamPartnerRef,
+      disclosureScope: envelope.disclosureScope, sourceEventRefs: envelope.sourceEventRefs,
+    } : {}) };
 }
 function checksum(value: object): string {
   const bytes = canonicalize(value);
@@ -59,7 +64,34 @@ export async function assertAcyclic(tx: Tx, envelope: Payload): Promise<void> {
 async function upstream(tx: Tx, ref: Ref, lot: Lot): Promise<string | null> {
   const parent = await tx.inboxMessage.findUnique({ where: { issuerInstanceId_messageId:
     { issuerInstanceId: ref.issuerInstanceId, messageId: ref.messageId } } });
-  if (!parent) return null;
+  if (!parent) {
+    const local = await tx.outboxMessage.findFirst({ where: {
+      eventType: "transfer.announced.v1",
+      payload: { path: ["messageId"], equals: ref.messageId } } });
+    const localPayload = local?.payload as { eventId?: string } | undefined;
+    if (localPayload?.eventId === ref.eventId) {
+      const event = await tx.traceEvent.findFirst({ where: {
+        documentId: local!.aggregateId,
+        originIssuerInstanceId: lot.originLot.issuerInstanceId,
+        originLotId: lot.originLot.lotId,
+        issuerInstanceId: ref.issuerInstanceId,
+        eventType: "trading.transfer.confirmed.v1" }, select: { id: true } });
+      if (event) return event.id;
+    }
+    const candidates = await tx.traceEvent.findMany({ where: {
+      issuerInstanceId: ref.issuerInstanceId,
+      originIssuerInstanceId: lot.originLot.issuerInstanceId,
+      originLotId: lot.originLot.lotId, eventType: "transfer.announced.v1" }, take: 100 });
+    for (const event of candidates) {
+      const safe = event.summary as { sourceMessageRef?: Ref } | null;
+      if (safe?.sourceMessageRef?.messageId === ref.messageId &&
+          safe.sourceMessageRef.eventId === ref.eventId &&
+          await tx.federatedTraceSummary.findFirst({ where: {
+            issuerInstanceId: event.issuerInstanceId,
+            externalEventId: event.externalEventId, state: "active" } })) return event.id;
+    }
+    return null;
+  }
   if (parent.eventId !== ref.eventId) throw new MappingError("UPSTREAM_EVENT_MISMATCH");
   const parentLots = payloadOf(parent.payload).lots;
   if (!parentLots.some((candidate) => sameLot(candidate.originLot, lot.originLot)))
@@ -75,17 +107,33 @@ export async function resolveInbox(tx: Tx, inboxId: string): Promise<"validated"
   const inbox = await tx.inboxMessage.findUniqueOrThrow({ where: { id: inboxId } });
   if (inbox.state === "applied_to_trace") return "applied_to_trace";
   const envelope = payloadOf(inbox.payload);
+  if (envelope.eventType === "trace.summary.v1")
+    return applyTraceSummary(tx, inboxId, envelope as unknown as TraceSummaryEnvelope);
   if (!envelope.lots.length) return "validated"; // zero actual receipt, T06 business handling
   let missingMapping = false;
   let missingParent = false;
   for (const lot of envelope.lots) {
     if (lot.senderBatch.instanceId !== envelope.issuerInstanceId)
       throw new MappingError("SENDER_BATCH_ISSUER_MISMATCH", 422);
-    const mapping = await tx.identityMapping.findUnique({ where: {
+    let mapping = await tx.identityMapping.findUnique({ where: {
       senderInstanceId_senderBatchId_originIssuerInstanceId_originLotId: {
         senderInstanceId: lot.senderBatch.instanceId, senderBatchId: lot.senderBatch.batchId,
         originIssuerInstanceId: lot.originLot.issuerInstanceId, originLotId: lot.originLot.lotId,
       } } });
+    if (!mapping && envelope.eventType === "downstream.impact.v1") {
+      const receivedLine = await tx.businessReceiptLine.findFirst({ where: {
+        receiverBatchId: lot.senderBatch.batchId,
+        receipt: { issuerInstanceId: envelope.issuerInstanceId },
+        sourceLine: { batch: { originIssuerInstanceId: lot.originLot.issuerInstanceId,
+          originLotId: lot.originLot.lotId } } },
+        include: { sourceLine: { select: { batchId: true } } } });
+      if (receivedLine) mapping = await tx.identityMapping.create({ data: {
+        id: randomUUID(), senderInstanceId: lot.senderBatch.instanceId,
+        senderBatchId: lot.senderBatch.batchId,
+        originIssuerInstanceId: lot.originLot.issuerInstanceId,
+        originLotId: lot.originLot.lotId, localBatchId: receivedLine.sourceLine.batchId,
+        sourceMessageId: inbox.id, verificationState: "partner_asserted" } });
+    }
     if (!mapping) { missingMapping = true; continue; }
     const safe = summary(envelope, lot);
     const externalEventId = traceId(envelope, lot);
@@ -97,6 +145,14 @@ export async function resolveInbox(tx: Tx, inboxId: string): Promise<"validated"
         originLotId: lot.originLot.lotId, occurredAt: new Date(envelope.occurredAt),
         verificationState: "partner_asserted", payloadVersion: envelope.schemaVersion,
         summary: safe, checksumHex: checksum(safe) } });
+    const waiting = await tx.traceLink.findMany({ where: { verificationState: "missing",
+      missingRef: { equals: { issuerInstanceId: envelope.issuerInstanceId,
+        eventId: envelope.eventId } },
+      fromEvent: { originIssuerInstanceId: lot.originLot.issuerInstanceId,
+        originLotId: lot.originLot.lotId } } });
+    for (const link of waiting) await tx.traceLink.update({ where: { id: link.id },
+      data: { toEventId: event.id, missingRef: Prisma.DbNull,
+        verificationState: "partner_asserted" } });
     for (const ref of envelope.upstreamReferences) {
       const parentId = await upstream(tx, ref, lot);
       const missingRef = { issuerInstanceId: ref.issuerInstanceId, eventId: ref.eventId };
@@ -111,7 +167,17 @@ export async function resolveInbox(tx: Tx, inboxId: string): Promise<"validated"
         else await tx.traceLink.create({ data: { id: randomUUID(), fromEventId: event.id,
           toEventId: parentId, relation: "received_from", verificationState: "partner_asserted" } });
       } else {
-        missingParent = true;
+        // A relayed public impact keeps C's issuer-qualified source as an
+        // explicit graph gap. C is not expected to deliver directly to A, so
+        // that third-party reference must not leave the inbox pending forever.
+        const assertedExternalImpact = envelope.eventType === "downstream.impact.v1" &&
+          envelope.sourceDocument.type === "partner_transfer" &&
+          envelope.disclosureScope === "public" &&
+          ref.issuerInstanceId !== envelope.issuerInstanceId &&
+          ref.issuerInstanceId !== envelope.recipientInstanceId &&
+          envelope.sourceEventRefs?.some((source) =>
+            source.issuerInstanceId === ref.issuerInstanceId && source.eventId === ref.eventId);
+        if (!assertedExternalImpact) missingParent = true;
         if (!existing) await tx.traceLink.create({ data: { id: randomUUID(), fromEventId: event.id,
           missingRef, relation: "received_from", verificationState: "missing" } });
       }

@@ -460,6 +460,22 @@
     },
     {
       "method": "POST",
+      "path": "/api/v1/lots/{id}/federation-summary",
+      "auth": "protected",
+      "roles": ["administrator"],
+      "scope": "organization-admin",
+      "success": ["202"]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/lots/{id}/downstream-impact",
+      "auth": "protected",
+      "roles": ["administrator"],
+      "scope": "organization-admin",
+      "success": ["202"]
+    },
+    {
+      "method": "POST",
       "path": "/api/v1/lots/{id}/passport-policy",
       "auth": "protected",
       "roles": ["administrator"],

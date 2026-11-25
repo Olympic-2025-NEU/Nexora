@@ -42,6 +42,12 @@
       "receiver": "A",
       "partnerIssuer": "B",
       "sha256": "c8feda398451401113d7e6bad2dd5a1a3d45c75e417e0408530895eaf67b69ae"
+    },
+    {
+      "file": "b-to-c-trace-summary.json",
+      "receiver": "C",
+      "partnerIssuer": "B",
+      "sha256": "3f98b8bd2ba7506adae61aed101c26bfc8e9f2d9558644861ff3bd4c328df38d"
     }
   ],
   "invalid": [

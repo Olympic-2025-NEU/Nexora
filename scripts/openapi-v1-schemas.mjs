@@ -27,9 +27,12 @@ function jsonSchemaAsOpenApi(file) {
     if (!value || typeof value !== "object") return value;
     const result = {};
     for (const [key, child] of Object.entries(value)) {
-      if (key === "$schema" || key === "$id" || key === "if" || key === "then" || key === "else") continue;
+      if (key === "$schema" || key === "$id" || key === "$defs" ||
+          key === "if" || key === "then" || key === "else") continue;
       if (key === "allOf" && file.includes("envelope-v1.schema.json")) continue;
       if (key === "const") result.enum = [child];
+      else if (key === "$ref" && typeof child === "string" && child.startsWith("#/$defs/"))
+        return convert(source.$defs[child.slice(8)]);
       else result[key] = convert(child);
     }
     return result;
@@ -205,6 +208,16 @@ export const schemas = {
     gaps: arr(str()), asOf: time },
   ["productName", "publicLotCode", "originIssuer", "timeline", "verificationState", "gaps", "asOf"]),
   FederationAck: obj({ messageId: uuid, ackId: uuid, acceptedAt: time, status: enumeration("validated", "pending_dependency") }, ["messageId", "ackId", "acceptedAt", "status"]),
+  FederationSummaryPublishInput: obj({ recipientInstanceId: str({ minLength: 1, maxLength: 64 }) },
+    ["recipientInstanceId"]),
+  FederationSummaryQueued: obj({ messageId: uuid, eventCount: integer,
+    policyVersion: integer, state: enumeration("pending") },
+  ["messageId", "eventCount", "policyVersion", "state"]),
+  FederationImpactPublishInput: obj({ recipientInstanceId: str({ minLength: 1, maxLength: 64 }),
+    sourceDocumentId: uuid, sourceInboxMessageId: uuid },
+  ["recipientInstanceId", "sourceDocumentId"]),
+  FederationImpactQueued: obj({ messageId: uuid, state: enumeration("pending") },
+  ["messageId", "state"]),
   FederationDelivery: obj({ id: uuid, messageId: uuid, status: str(), attemptCount: { type: "integer", minimum: 0 }, nextAttemptAt: time, lastErrorCode: str() }, ["id", "messageId", "status", "attemptCount"]),
   FederationRetryResult: obj({ id: uuid, status: enumeration("retry_due") }, ["id", "status"]),
   AiChatInput: obj({ message: str({ minLength: 1 }), conversationId: uuid, lotRef: str() }, ["message"]),

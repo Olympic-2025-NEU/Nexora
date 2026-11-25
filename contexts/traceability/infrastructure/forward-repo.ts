@@ -4,7 +4,7 @@ import type { Actor } from "../../../platform/identity/actor";
 import { BACKWARD_MAX_NODES } from "../application/backward";
 import type { ForwardEvent, ForwardPort, ImpactLine } from "../application/forward";
 import { traceLag } from "./lag";
-import { visibleTraceEventIds } from "./read-scope";
+import { traceSummaryRefreshes, visibleTraceEventIds } from "./read-scope";
 
 const kinds: Record<string, ImpactLine["kind"]> = {
   "trading.issue.confirmed.v1": "issue",
@@ -12,6 +12,7 @@ const kinds: Record<string, ImpactLine["kind"]> = {
   "trading.receiving.confirmed.v1": "receiving",
   "trading.sale.recorded.v1": "sale",
 };
+const federationUnitKinds: Record<string, string> = { EA: "count", KG: "mass", L: "volume" };
 type Row = { id: string; issuerInstanceId: string; batchId: string | null;
   originIssuerInstanceId: string; originLotId: string; eventType: string;
   documentId: string | null; externalEventId: string; payloadVersion: string;
@@ -25,16 +26,23 @@ export function createPrismaForwardPort(db: PrismaClient, actor: Actor): Forward
   async function scoped(rows: Row[]): Promise<ForwardEvent[]> {
     const rootIds = await visibleTraceEventIds(db, actor, rows);
     const visibleRows = rows.filter((row) => rootIds.has(row.id));
-    if (allWarehouses || !visibleRows.length) return visibleRows.map((row) => ({ ...row,
+    if (!visibleRows.length) return visibleRows.map((row) => ({ ...row,
       incoming: row.incoming.map((link) => ({ ...link,
         allocationDetail: Array.isArray(link.allocationDetail)
           ? link.allocationDetail : undefined })) })) as ForwardEvent[];
+    const refreshes = await traceSummaryRefreshes(db, visibleRows);
     const childIds = [...new Set(visibleRows.flatMap((row) =>
       row.incoming.map((link) => link.fromEventId)))];
     const children = await db.traceEvent.findMany({ where: { id: { in: childIds } },
-      select: { id: true, documentId: true, batchId: true } });
+      select: { id: true, documentId: true, batchId: true,
+        issuerInstanceId: true, externalEventId: true } });
     const allowedChildren = await visibleTraceEventIds(db, actor, children);
-    return visibleRows.map((row) => ({ ...row, incoming: row.incoming.filter((link) =>
+    return visibleRows.map((row) => ({ ...row,
+      summary: refreshes.has(`${row.issuerInstanceId}:${row.externalEventId}`)
+        ? { ...(row.summary && typeof row.summary === "object" && !Array.isArray(row.summary)
+          ? row.summary : {}), observedAt: refreshes.get(`${row.issuerInstanceId}:${row.externalEventId}`) }
+        : row.summary,
+      incoming: row.incoming.filter((link) =>
       allowedChildren.has(link.fromEventId)).map((link) => ({ ...link,
         allocationDetail: Array.isArray(link.allocationDetail)
           ? link.allocationDetail : undefined })) })) as ForwardEvent[];
@@ -58,7 +66,22 @@ export function createPrismaForwardPort(db: PrismaClient, actor: Actor): Forward
     },
     async impact(events) {
       const documentIds = [...new Set(events.flatMap((event) => event.documentId ? [event.documentId] : []))];
-      if (!documentIds.length) return [];
+      const remoteBatchIds = [...new Set(events.flatMap((event) =>
+        event.eventType === "downstream.impact.v1" && !event.documentId && event.batchId
+          ? [event.batchId] : []))];
+      const remoteBatches = await db.batch.findMany({ where: { id: { in: remoteBatchIds } },
+        select: { id: true, productVariantId: true } });
+      const variantIds = [...new Set(remoteBatches.map((batch) => batch.productVariantId))];
+      const stockUnits = await db.productVariantUom.findMany({ where: {
+        productVariantId: { in: variantIds }, isStockKeeping: true,
+        factorToStockUom: 1 }, include: { uom: { select: { id: true, kind: true } } } });
+      const byVariantKind = new Map(stockUnits.map((entry) =>
+        [`${entry.productVariantId}:${entry.uom.kind}`, entry.uom.id]));
+      const localUnitByBatchKind = new Map(remoteBatches.flatMap((batch) =>
+        ["count", "mass", "volume"].flatMap((kind) => {
+          const id = byVariantKind.get(`${batch.productVariantId}:${kind}`);
+          return id ? [[`${batch.id}:${kind}`, id] as const] : [];
+        })));
       const documents = await db.document.findMany({ where: { id: { in: documentIds }, status: "confirmed" },
         include: { lines: { include: { uom: { select: { code: true } } },
           orderBy: { lineNo: "asc" } }, transferDetail: {
@@ -68,6 +91,23 @@ export function createPrismaForwardPort(db: PrismaClient, actor: Actor): Forward
       const result: ImpactLine[] = [];
       const seen = new Set<string>();
       for (const event of events) {
+        if (event.eventType === "downstream.impact.v1" && !event.documentId &&
+            event.verificationState === "partner_asserted") {
+          const safe = event.summary as { quantity?: string; unit?: string;
+            sourceLineId?: string; sourceDocument?: { id?: string };
+            downstreamPartnerRef?: string } | null;
+          if (safe?.quantity && safe.unit && safe.sourceLineId && safe.sourceDocument?.id &&
+              safe.downstreamPartnerRef) {
+            const unitKind = federationUnitKinds[safe.unit];
+            const uomId = event.batchId && unitKind
+              ? localUnitByBatchKind.get(`${event.batchId}:${unitKind}`) : undefined;
+            if (uomId) result.push({ eventId: event.id,
+              sourceDocumentId: safe.sourceDocument.id, sourceLineId: safe.sourceLineId,
+              kind: "sale", quantity: safe.quantity, uomId, uomCode: safe.unit,
+              verificationState: "partner_asserted",
+              partner: { issuerInstanceId: safe.downstreamPartnerRef } });
+          }
+        }
         const kind = kinds[event.eventType];
         const document = event.documentId ? byId.get(event.documentId) : undefined;
         if (!kind || !document || !event.batchId || event.verificationState === "missing") continue;

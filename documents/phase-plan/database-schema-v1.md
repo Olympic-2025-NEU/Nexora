@@ -255,6 +255,10 @@ Migration T03: `prisma/migrations/20261124040000_federation_delivery_attempt/mig
 
 `business_receipt_line`: khóa `(receipt_id,source_line_id)`, FK `receipt_id→business_receipt.id`, `source_line_id→trading.document_line.id`, `receiver_batch_id uuid!` là batch remote (không FK local), `sent_quantity`, `actual_quantity numeric(20,3)!` với `0<=actual<=sent`, `unit text! IN (EA,KG,L)`. Đủ mọi transfer source line, gồm line actual bằng 0. Hai bảng append-only đối với app runtime (`SELECT,INSERT`), dùng inbox replay và unique transfer để chống áp business event hai lần.
 
+### `federation.federated_trace_summary` (P09-T07)
+
+`id uuid PK`, `issuer_instance_id text!`, `external_event_id text!`, `policy_version integer! >0`, `disclosure_scope text! IN ('partner','public')`, `state text! IN ('active','revoked')`, `source_inbox_id uuid!→federation.inbox_message.id`, `observed_at timestamptz!`, `refreshed_at timestamptz!`, `batch_id uuid!→catalog.batch.id`. Unique `(issuer_instance_id,external_event_id)`, index `(batch_id,state)`. Đây là cache quyền mutable cho trace event immutable: version thấp hơn bị từ chối, cùng version chỉ cho active→revoked, remote relay cần scope `public`. `app_runtime` SELECT/INSERT/UPDATE, không DELETE; source event vẫn `partner_asserted`, graph ẩn cache revoked và nêu stale sau 24 giờ. Không tạo FK cross-instance hoặc lưu raw document.
+
 ## P12 — data quality vận hành
 
 ### `traceability.quality_issue`

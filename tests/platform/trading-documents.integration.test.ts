@@ -1095,6 +1095,38 @@ test("G07 seeded real announcement: receipt20, approved issue12, transfer, actua
   assert.equal(await db.stockMovement.count(), movementCount);
   await assert.rejects(receivingCommand("create", input, (ctx) => receiving.create(ctx, input)),
     { code: "RECEIVING_ALREADY_EXISTS", httpStatus: 409 });
+  const impactMessageId = randomUUID();
+  const impact = { schemaVersion: "1.0", messageId: impactMessageId, eventId: randomUUID(),
+    eventType: "downstream.impact.v1", issuerInstanceId: "remote-instance",
+    recipientInstanceId: "local-instance", occurredAt: new Date().toISOString(),
+    publishedAt: new Date().toISOString(), correlationId: randomUUID(),
+    causationId: randomUUID(), sourceDocument: { type: "sale_record", id: randomUUID(), version: 2 },
+    lots: [{ sourceLineId: randomUUID(), originLot: sourceLot.originLot,
+      senderBatch: { instanceId: "remote-instance", batchId: business.lines[0]!.receiverBatchId },
+      product: { instanceId: "remote-instance", productId: randomUUID() },
+      quantity: "2", unit: "EA" }],
+    upstreamReferences: [{ issuerInstanceId: "local-instance",
+      messageId: envelope.messageId, eventId: envelope.eventId }],
+    evidence: [], sharingPolicyVersion: "v1", originLot: sourceLot.originLot,
+    downstreamPartnerRef: "consumer", impactType: "sale",
+    sourceEventRefs: [{ issuerInstanceId: "local-instance", eventId: envelope.eventId }],
+    disclosureScope: "public" };
+  const impactAck = await receiveFederationEvent(db, JSON.stringify(impact), partnerActor, "local-instance");
+  assert.equal(impactAck.messageId, impactMessageId);
+  assert.deepEqual(await receiveFederationEvent(db, JSON.stringify(impact), partnerActor,
+    "local-instance"), impactAck);
+  const asserted = await db.traceEvent.findFirstOrThrow({ where: {
+    eventType: "downstream.impact.v1", issuerInstanceId: "remote-instance",
+    externalEventId: `${impact.eventId}:${impact.lots[0]!.sourceLineId}` } });
+  assert.equal(asserted.batchId, batchId);
+  assert.equal(asserted.verificationState, "partner_asserted");
+  assert.equal((asserted.summary as { downstreamPartnerRef: string }).downstreamPartnerRef,
+    "consumer");
+  assert.equal(await db.identityMapping.count({ where: { senderInstanceId: "remote-instance",
+    senderBatchId: business.lines[0]!.receiverBatchId,
+    originIssuerInstanceId: sourceLot.originLot.issuerInstanceId,
+    originLotId: sourceLot.originLot.lotId } }), 1);
+  assert.equal(await db.stockMovement.count(), movementCount);
   await db.outboxMessage.update({ where: { id: announced.id }, data: { payload: { modified: true } } });
   assert.equal((await db.$transaction((tx) => receiving.source({ tx, actor, requestId: randomUUID(), emit: () => {} })
     .resolveVerifiedAnnouncement(input.inboundMessageId))).sentQuantity, "12");

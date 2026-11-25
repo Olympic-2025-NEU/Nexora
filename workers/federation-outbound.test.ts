@@ -9,6 +9,7 @@ import type { OutboxMessage } from "../platform/outbox/message";
 
 const payload = JSON.parse(readFileSync("contracts/events/fixtures/a-to-b-transfer-announced.json", "utf8"));
 const receiptPayload = JSON.parse(readFileSync("contracts/events/fixtures/b-to-a-receipt-confirmed.json", "utf8"));
+const impactPayload = JSON.parse(readFileSync("contracts/events/fixtures/c-to-b-downstream-impact.json", "utf8"));
 const ack = () => ({ messageId: payload.messageId, ackId: randomUUID(),
   acceptedAt: "2026-11-14T08:00:02Z", status: "validated" });
 const connection = { endpointUrl: "https://partner.example/api/v1/federation/events",
@@ -75,6 +76,29 @@ test("business receipt delivers with ACK but does not mark a transfer technical 
   })(f.message);
   assert.equal(f.attempts[0].result, "ack");
   assert.equal(f.states.length, 0);
+});
+
+test("summary and downstream impact use the same ACK and attempt path", async () => {
+  const { linkedIssueId: _linkedIssueId, sentQuantity: _sentQuantity, ...base } = payload;
+  void _linkedIssueId; void _sentQuantity;
+  const summary = { ...base, eventType: "trace.summary.v1", lots: [],
+    sourceDocument: { type: "trace_summary", id: randomUUID(), version: 1 },
+    targetLot: { originLot: payload.lots[0].originLot,
+      senderBatch: payload.lots[0].senderBatch },
+    traceSummaries: [{ issuerInstanceId: "A", externalEventId: randomUUID(),
+      eventType: "trading.transfer.confirmed.v1", occurredAt: payload.occurredAt,
+      disclosureScope: "partner", policyVersion: 1, state: "active", parents: [] }] };
+  for (const [issuer, event] of [["A", summary], ["C", impactPayload]] as const) {
+    const f = fixture(connection, event);
+    await createFederationOutboundHandler(f.db, issuer, {
+      resolveSecret: async () => "test-secret",
+      fetcher: async (url) => String(url).includes("identity") ? tokenResponse() :
+        ackResponse({ messageId: event.messageId, ackId: randomUUID(),
+          acceptedAt: new Date().toISOString(), status: "validated" }),
+    })(f.message);
+    assert.equal(f.attempts[0].result, "ack");
+    assert.equal(f.states.length, 0);
+  }
 });
 
 test("B offline and lost ACK keep same payload for a restarted worker retry", async () => {

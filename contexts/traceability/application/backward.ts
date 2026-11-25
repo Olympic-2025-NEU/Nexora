@@ -91,6 +91,13 @@ export async function backwardTrace(port: BackwardPort, actor: Actor, input: Bac
     throw new DomainError("CURSOR_INVALID", 422);
   const page = ordered.slice(offset, offset + limit);
   const ids = new Set(page.map(({ event }) => event.id));
+  for (const { event } of page) {
+    const safe = event.summary && typeof event.summary === "object" &&
+      !Array.isArray(event.summary) ? event.summary as Record<string, unknown> : {};
+    if (typeof safe.observedAt === "string" &&
+        asOf.getTime() - Date.parse(safe.observedAt) > 24 * 60 * 60 * 1000)
+      gaps.push({ fromEventId: event.id, state: "pending", reason: "partner_summary_stale" });
+  }
   const pageGaps = gaps.filter((gap) => !gap.fromEventId || ids.has(gap.fromEventId));
   const nodes = page.map(({ event, depth: hop }) => {
     const summary = event.summary && typeof event.summary === "object" &&
@@ -100,6 +107,9 @@ export async function backwardTrace(port: BackwardPort, actor: Actor, input: Bac
         lotId: event.originLotId }, eventType: event.eventType,
       occurredAt: event.occurredAt.toISOString(), recordedAt: event.createdAt.toISOString(),
       verificationState: event.verificationState, depth: hop,
+      ...(typeof summary.observedAt === "string" ? { partnerObservedAt: summary.observedAt,
+        syncState: asOf.getTime() - Date.parse(summary.observedAt) > 24 * 60 * 60 * 1000
+          ? "stale" : "cached" } : {}),
       source: { documentId: event.documentId, eventId: String(summary.sourceEventId ??
         event.externalEventId), payloadVersion: event.payloadVersion } };
   });

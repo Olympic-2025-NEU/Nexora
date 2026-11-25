@@ -11,6 +11,11 @@ import { bindExternalLot, MappingError, resolvePendingDependencies } from
 import type { PartnerActor } from "../../platform/identity/partner-actor";
 import { createAnnouncementService } from "../../contexts/trading/application/inbound-announcements";
 import { createPrismaAnnouncementSource } from "../../contexts/trading/infrastructure/inbound-announcements";
+import { publishTraceSummary } from "../../contexts/federation/application/publish-trace-summary";
+import { backwardTrace } from "../../contexts/traceability/application/backward";
+import { createPrismaBackwardPort } from "../../contexts/traceability/infrastructure/backward-repo";
+import { forwardTrace } from "../../contexts/traceability/application/forward";
+import { createPrismaForwardPort } from "../../contexts/traceability/infrastructure/forward-repo";
 
 if (process.env.NEXORA_TEST_DB !== "1" || !process.env.APP_DATABASE_URL)
   throw Error("Isolated database required");
@@ -200,4 +205,214 @@ test("late parent with a different origin marks the child rejected", async () =>
   const updated = await db.inboxMessage.findUniqueOrThrow({ where: { id: childInbox.id } });
   assert.equal(updated.state, "rejected");
   assert.equal(updated.errorCode, "UNKNOWN_LOT_MAPPING");
+});
+
+test("C caches B's public A summary, resolves an offline upstream gap and honors revocation", async () => {
+  const bPartner = await db.partner.findUniqueOrThrow({ where: { issuerInstanceId: "B" } });
+  const bActor: PartnerActor = { ...actor, clientId: "sender-b", partnerId: bPartner.id,
+    partnerCode: "B", issuerInstanceId: "B" };
+  const child = JSON.parse(readFileSync("contracts/events/fixtures/b-to-c-transfer-announced.json", "utf8"));
+  child.messageId = randomUUID(); child.eventId = randomUUID();
+  child.lots[0].originLot.lotId = randomUUID();
+  child.upstreamReferences = [{ issuerInstanceId: "A", messageId: randomUUID(), eventId: randomUUID() }];
+  await receiveFederationEvent(db, JSON.stringify(child), bActor, "C");
+  const inbox = await db.inboxMessage.findFirstOrThrow({ where: { messageId: child.messageId } });
+  const batchId = await makeBatch("A", child.lots[0].originLot.lotId);
+  await bindExternalLot(db, { inboxId: inbox.id,
+    sourceLineId: child.lots[0].sourceLineId, localBatchId: batchId }, ["staff"]);
+  const childTrace = await db.traceEvent.findFirstOrThrow({ where: { sourceMessageId: inbox.id } });
+  assert.equal((await db.traceLink.findFirstOrThrow({ where: { fromEventId: childTrace.id } })).toEventId, null);
+  const remoteEventId = `${child.upstreamReferences[0].eventId}:${randomUUID()}`;
+  const item = { issuerInstanceId: "A", externalEventId: remoteEventId,
+    eventType: "transfer.announced.v1", occurredAt: new Date().toISOString(),
+    disclosureScope: "public", policyVersion: 1, state: "active", parents: [],
+    sourceMessageRef: child.upstreamReferences[0] };
+  const own = { issuerInstanceId: "B", externalEventId: `${child.eventId}:${child.lots[0].sourceLineId}`,
+    eventType: "transfer.announced.v1", occurredAt: new Date().toISOString(),
+    disclosureScope: "partner", policyVersion: 1, state: "active", parents: [] };
+  const summary = { schemaVersion: "1.0", messageId: randomUUID(), eventId: randomUUID(),
+    eventType: "trace.summary.v1", issuerInstanceId: "B", recipientInstanceId: "C",
+    occurredAt: new Date().toISOString(), publishedAt: new Date().toISOString(),
+    correlationId: randomUUID(), causationId: randomUUID(),
+    sourceDocument: { type: "trace_summary", id: randomUUID(), version: 1 },
+    lots: [], upstreamReferences: [], evidence: [], sharingPolicyVersion: "v1",
+    targetLot: { originLot: child.lots[0].originLot, senderBatch: child.lots[0].senderBatch },
+    traceSummaries: [item, own] };
+  const forbidden = structuredClone(summary);
+  forbidden.messageId = randomUUID(); forbidden.eventId = randomUUID();
+  forbidden.traceSummaries[0].disclosureScope = "partner";
+  await assert.rejects(() => receiveFederationEvent(db, JSON.stringify(forbidden), bActor, "C"),
+    (error: unknown) => error instanceof MappingError && error.code === "RELAY_NOT_ALLOWED");
+  await receiveFederationEvent(db, JSON.stringify(summary), bActor, "C");
+  const remote = await db.traceEvent.findUniqueOrThrow({ where: {
+    issuerInstanceId_externalEventId: { issuerInstanceId: "A", externalEventId: remoteEventId } } });
+  assert.equal(remote.verificationState, "partner_asserted");
+  assert.equal(remote.batchId, batchId);
+  const linked = await db.traceLink.findFirstOrThrow({ where: { fromEventId: childTrace.id } });
+  assert.equal(linked.toEventId, remote.id);
+  assert.equal(await db.stockMovement.count(), 0);
+  const reader = { userId: "fixture", organizationId: "fixture", unitIds: [],
+    roles: ["administrator"] };
+  const graph = () => backwardTrace(createPrismaBackwardPort(db, reader), reader,
+    { batchId, depth: 10, limit: 100 });
+  assert.equal((await graph()).nodes.find((node) => node.eventId === childTrace.id)?.syncState,
+    "cached");
+  await db.federatedTraceSummary.update({ where: { issuerInstanceId_externalEventId: {
+    issuerInstanceId: "B", externalEventId: own.externalEventId } }, data: {
+    refreshedAt: new Date(Date.now() - 25 * 60 * 60 * 1000) } });
+  assert.equal((await graph()).nodes.find((node) => node.eventId === childTrace.id)?.syncState,
+    "stale");
+  const revoked = structuredClone(summary);
+  revoked.messageId = randomUUID(); revoked.eventId = randomUUID();
+  revoked.traceSummaries[0].state = "revoked";
+  await receiveFederationEvent(db, JSON.stringify(revoked), bActor, "C");
+  assert.equal((await db.federatedTraceSummary.findUniqueOrThrow({ where: {
+    issuerInstanceId_externalEventId: { issuerInstanceId: "A", externalEventId: remoteEventId } } })).state,
+  "revoked");
+  const wrongLot = structuredClone(summary);
+  wrongLot.messageId = randomUUID(); wrongLot.eventId = randomUUID();
+  wrongLot.targetLot.originLot.lotId = randomUUID();
+  wrongLot.targetLot.senderBatch.batchId = randomUUID();
+  const unrelatedBatchId = await makeBatch("A", wrongLot.targetLot.originLot.lotId);
+  await db.identityMapping.create({ data: { id: randomUUID(),
+    senderInstanceId: "B", senderBatchId: wrongLot.targetLot.senderBatch.batchId,
+    originIssuerInstanceId: "A", originLotId: wrongLot.targetLot.originLot.lotId,
+    localBatchId: unrelatedBatchId, sourceMessageId: inbox.id,
+    verificationState: "partner_asserted" } });
+  await assert.rejects(() => receiveFederationEvent(db, JSON.stringify(wrongLot), bActor, "C"),
+    (error: unknown) => error instanceof MappingError && error.code === "TRACE_SOURCE_CONFLICT");
+});
+
+test("publisher relays only approved allowlisted timeline events", async () => {
+  const batchId = await makeBatch("A", randomUUID());
+  const cPartnerId = randomUUID();
+  await owner.partner.create({ data: { id: cPartnerId, issuerInstanceId: "C",
+    code: "C", displayName: "Receiver C", createdBySub: "fixture" } });
+  await owner.partnerConnection.create({ data: { id: randomUUID(), partnerId: cPartnerId,
+    endpointUrl: "https://receiver-c.invalid/events", outboundTokenUrl: "https://receiver-c.invalid/token",
+    outboundClientId: "sender-b-to-c", outboundSecretRef: "fixture", outboundAudience: "nexora",
+    inboundClientId: "receiver-c", allowedInboundScope: "federation:write" } });
+  await owner.passportPolicy.create({ data: { id: randomUUID(), batchId,
+    policyVersion: 1, state: "approved", timelineVisibility: "partner",
+    createdBySub: "fixture", approvedBySub: "fixture", approvedAt: new Date() } });
+  const batch = await db.batch.findUniqueOrThrow({ where: { id: batchId } });
+  const warehouseId = randomUUID();
+  await owner.warehouse.create({ data: { id: warehouseId, code: `TEST-${randomUUID().slice(0, 8)}`,
+    name: "Fixture", status: "active", createdBySub: "fixture" } });
+  const uom = await owner.uom.create({ data: { id: randomUUID(), code: "EA",
+    name: "Each", nameKey: `each-${randomUUID()}`, kind: "count" } });
+  await owner.productVariantUom.create({ data: { id: randomUUID(),
+    productVariantId: batch.productVariantId, uomId: uom.id,
+    factorToStockUom: 1, isStockKeeping: true } });
+  const documentId = randomUUID();
+  await owner.document.create({ data: { id: documentId, documentType: "goods_receipt",
+    documentNumber: `TEST-${randomUUID()}`, status: "draft", createdBySub: "fixture",
+    correlationId: randomUUID() } });
+  await owner.documentLine.create({ data: { id: randomUUID(), documentId,
+    lineNo: 1, warehouseId, batchId, productId: batch.productId,
+    productVariantId: batch.productVariantId, uomId: uom.id, quantity: 1 } });
+  await owner.document.update({ where: { id: documentId }, data: { status: "confirmed",
+    confirmedBySub: "fixture", confirmedAt: new Date() } });
+  const localId = randomUUID();
+  await owner.traceEvent.create({ data: { id: randomUUID(), issuerInstanceId: "B",
+    externalEventId: localId, eventType: "trading.receipt.confirmed.v1",
+    batchId, documentId, originIssuerInstanceId: "A", originLotId: batch.originLotId,
+    occurredAt: new Date(),
+    verificationState: "local_verified", payloadVersion: "1.0", summary: {},
+    checksumHex: "a".repeat(64) } });
+  const sourceInbox = await db.inboxMessage.findFirstOrThrow({ where: { issuerInstanceId: "A" } });
+  const publicId = randomUUID();
+  const privateId = randomUUID();
+  for (const [externalEventId, disclosureScope] of [[publicId, "public"], [privateId, "partner"]]) {
+    await owner.traceEvent.create({ data: { id: randomUUID(), issuerInstanceId: "A",
+      externalEventId, eventType: "trading.transfer.confirmed.v1", batchId,
+      originIssuerInstanceId: "A", originLotId: batch.originLotId, occurredAt: new Date(),
+      verificationState: "partner_asserted", payloadVersion: "1.0", summary: {},
+      checksumHex: "b".repeat(64) } });
+    await owner.federatedTraceSummary.create({ data: { id: randomUUID(),
+      issuerInstanceId: "A", externalEventId, policyVersion: 1,
+      disclosureScope, state: "active", sourceInboxId: sourceInbox.id,
+      observedAt: new Date(), batchId } });
+  }
+  const transferEventId = randomUUID();
+  const transferEnvelopeId = randomUUID();
+  const transferLineId = randomUUID();
+  const transferDocumentId = randomUUID();
+  const issueDocumentId = randomUUID();
+  const issueLineId = randomUUID();
+  await owner.document.create({ data: { id: issueDocumentId,
+    documentType: "goods_issue", documentNumber: `TEST-${randomUUID()}`,
+    status: "draft", issuePurpose: "partner_transfer",
+    createdBySub: "fixture", correlationId: randomUUID(),
+    lines: { create: { id: issueLineId, lineNo: 1, warehouseId, batchId,
+      productId: batch.productId, productVariantId: batch.productVariantId,
+      uomId: uom.id, quantity: 1 } } } });
+  await owner.document.update({ where: { id: issueDocumentId }, data: {
+    status: "confirmed", confirmedBySub: "fixture", confirmedAt: new Date() } });
+  await owner.document.create({ data: { id: transferDocumentId,
+    documentType: "partner_transfer", documentNumber: `TEST-${randomUUID()}`,
+    status: "draft", createdBySub: "fixture", correlationId: randomUUID(),
+    lines: { create: { id: transferLineId, lineNo: 1, warehouseId, batchId,
+      productId: batch.productId, productVariantId: batch.productVariantId,
+      uomId: uom.id, quantity: 1, sourceIssueLineId: issueLineId } } } });
+  await owner.transferDetail.create({ data: { documentId: transferDocumentId,
+    linkedIssueId: issueDocumentId, destinationPartnerId: cPartnerId } });
+  await owner.document.update({ where: { id: transferDocumentId }, data: {
+    status: "confirmed", confirmedBySub: "fixture", confirmedAt: new Date() } });
+  await owner.traceEvent.create({ data: { id: randomUUID(), issuerInstanceId: "B",
+    externalEventId: transferEventId, eventType: "trading.transfer.confirmed.v1",
+    batchId, documentId: transferDocumentId,
+    originIssuerInstanceId: "A", originLotId: batch.originLotId,
+    occurredAt: new Date(), verificationState: "local_verified", payloadVersion: "1.0",
+    summary: {}, checksumHex: "c".repeat(64) } });
+  await owner.outboxMessage.create({ data: { id: randomUUID(), aggregateType: "document",
+    aggregateId: transferDocumentId, aggregateVersion: 1, eventType: "transfer.announced.v1",
+    schemaVersion: "1", destination: "federation", correlationId: randomUUID(),
+    payload: { messageId: randomUUID(), eventId: transferEnvelopeId,
+      occurredAt: new Date().toISOString(), lots: [{ sourceLineId: transferLineId,
+        senderBatch: { instanceId: "B", batchId }, originLot: {
+          issuerInstanceId: "A", lotId: batch.originLotId } }] } } });
+  const previous = process.env.NEXORA_ISSUER_INSTANCE_ID;
+  process.env.NEXORA_ISSUER_INSTANCE_ID = "B";
+  try {
+    const admin = { userId: "fixture", organizationId: randomUUID(),
+      unitIds: [], roles: ["administrator"] };
+    const result = await publishTraceSummary(db, admin, batchId, "C", randomUUID());
+    assert.equal(result.eventCount, 4);
+    const outbox = await db.outboxMessage.findUniqueOrThrow({ where: { id: result.messageId } });
+    const payload = outbox.payload as { traceSummaries: { issuerInstanceId: string;
+      externalEventId: string; disclosureScope: string }[] };
+    assert.deepEqual(new Set(payload.traceSummaries.map((item) => item.externalEventId)),
+      new Set([localId, publicId, transferEventId,
+        `${transferEnvelopeId}:${transferLineId}`]));
+    assert.equal(payload.traceSummaries.find((item) => item.externalEventId === localId)?.disclosureScope,
+      "partner");
+    assert.equal(JSON.stringify(payload).includes("Shared product name"), false);
+  } finally { process.env.NEXORA_ISSUER_INSTANCE_ID = previous; }
+});
+
+test("forward impact maps federation EA to the local stock UOM", async () => {
+  const batchId = await makeBatch("A", randomUUID());
+  const batch = await db.batch.findUniqueOrThrow({ where: { id: batchId } });
+  const uomId = randomUUID();
+  await owner.uom.create({ data: { id: uomId, code: `CAI-${randomUUID().slice(0, 8)}`,
+    name: "Cái", nameKey: randomUUID(), kind: "count" } });
+  await owner.productVariantUom.create({ data: { id: randomUUID(),
+    productVariantId: batch.productVariantId, uomId, factorToStockUom: 1,
+    isStockKeeping: true } });
+  await owner.traceEvent.create({ data: { id: randomUUID(), issuerInstanceId: "B",
+    externalEventId: randomUUID(), eventType: "downstream.impact.v1", batchId,
+    originIssuerInstanceId: "A", originLotId: batch.originLotId,
+    occurredAt: new Date(), verificationState: "partner_asserted",
+    payloadVersion: "1.0", checksumHex: "d".repeat(64), summary: {
+      quantity: "2", unit: "EA", sourceLineId: randomUUID(),
+      sourceDocument: { id: randomUUID() }, downstreamPartnerRef: "C" } } });
+  const reader = { userId: "fixture", organizationId: "fixture", unitIds: [],
+    roles: ["administrator"] };
+  const graph = await forwardTrace(createPrismaForwardPort(db, reader), reader,
+    { batchId, depth: 10, limit: 100 });
+  assert.equal(graph.impact.length, 1);
+  assert.equal(graph.impact[0]!.uomId, uomId);
+  assert.equal(graph.impact[0]!.uomCode, "EA");
+  assert.equal(graph.impact[0]!.partner?.issuerInstanceId, "C");
 });

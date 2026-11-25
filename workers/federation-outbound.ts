@@ -68,7 +68,8 @@ export function createFederationOutboundHandler(db: PrismaClient, issuerInstance
     let outcome: Outcome;
     try {
       if (message.destination !== "federation" ||
-          !["transfer.announced.v1", "receipt.confirmed.v1"].includes(message.eventType) ||
+          !["transfer.announced.v1", "receipt.confirmed.v1", "downstream.impact.v1",
+            "trace.summary.v1"].includes(message.eventType) ||
           message.schemaVersion !== "1") throw new PermanentDeliveryError("UNSUPPORTED_EVENT_TYPE");
       const raw = JSON.stringify(message.payload);
       const checked = validateFederationEnvelope(raw, { partnerIssuerInstanceId: issuerInstanceId });

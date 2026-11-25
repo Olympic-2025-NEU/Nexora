@@ -4,6 +4,7 @@ import { BackwardTrace } from "./_components/backward-trace";
 import { ForwardImpact } from "./_components/forward-impact";
 import { QrPassport } from "./_components/qr-passport";
 import { TraceEvidence } from "./_components/trace-evidence";
+import { FederationShare } from "./_components/federation-share";
 
 export default function TracePage() {
   return <main className="mx-auto max-w-4xl p-6">
@@ -13,5 +14,6 @@ export default function TracePage() {
     <ForwardImpact />
     <QrPassport />
     <TraceEvidence />
+    <FederationShare />
   </main>;
 }

@@ -3,7 +3,7 @@ import type { PrismaClient } from "@prisma/client";
 import type { Actor } from "../../../platform/identity/actor";
 import { BACKWARD_MAX_NODES, type BackwardEvent, type BackwardPort } from "../application/backward";
 import { traceLag } from "./lag";
-import { visibleTraceEventIds } from "./read-scope";
+import { traceSummaryRefreshes, visibleTraceEventIds } from "./read-scope";
 
 function projection(row: {
   id: string; issuerInstanceId: string; batchId: string | null;
@@ -26,14 +26,21 @@ export function createPrismaBackwardPort(db: PrismaClient, actor: Actor): Backwa
   async function scoped<T extends Parameters<typeof projection>[0]>(rows: T[]) {
     const allowed = await visibleTraceEventIds(db, actor, rows);
     const visible = rows.filter((row) => allowed.has(row.id));
-    if (actor.roles.some((role) => role.toLowerCase() === "administrator") || !visible.length)
+    if (!visible.length)
       return visible.map(projection);
+    const refreshes = await traceSummaryRefreshes(db, visible);
     const targetIds = [...new Set(visible.flatMap((row) =>
       row.outgoing.flatMap((link) => link.toEventId ? [link.toEventId] : [])))];
     const targets = await db.traceEvent.findMany({ where: { id: { in: targetIds } },
-      select: { id: true, documentId: true, batchId: true } });
+      select: { id: true, documentId: true, batchId: true,
+        issuerInstanceId: true, externalEventId: true } });
     const allowedTargets = await visibleTraceEventIds(db, actor, targets);
-    return visible.map((row) => projection({ ...row, outgoing: row.outgoing.filter((link) =>
+    return visible.map((row) => projection({ ...row,
+      summary: refreshes.has(`${row.issuerInstanceId}:${row.externalEventId}`)
+        ? { ...(row.summary && typeof row.summary === "object" && !Array.isArray(row.summary)
+          ? row.summary : {}), observedAt: refreshes.get(`${row.issuerInstanceId}:${row.externalEventId}`) }
+        : row.summary,
+      outgoing: row.outgoing.filter((link) =>
       !link.toEventId || allowedTargets.has(link.toEventId)) }));
   }
   return {

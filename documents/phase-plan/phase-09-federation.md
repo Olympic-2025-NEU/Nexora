@@ -48,9 +48,9 @@
 
 ## P09-T07 — Trace xuyên ba instance và offline
 
-- [ ] Receiver lưu local verified/partner-asserted summaries theo sharing policy để C truy A→B→C mà không query DB A trực tiếp; hiển thị khi upstream offline và ghi rõ gap/staleness. B chỉ chuyển tiếp phần A đã cho phép.
-- [ ] Backward/forward trace nối issuer-qualified links. Nếu A cần biết C, gửi downstream impact summary C→B→A theo policy, dedupe/provenance như message khác; nếu bị cấm/chưa nhận, A hiển thị gap thay vì khẳng định danh sách đầy đủ. Passport chỉ projection allowlist.
-- [ ] Test A offline, B/C còn lịch sử đã cache; upstream correction/revoke/policy change được truyền theo version hoặc hiển thị stale đến khi sync.
+- [x] Receiver lưu local verified/partner-asserted summaries theo sharing policy để C truy A→B→C mà không query DB A trực tiếp; hiển thị khi upstream offline và ghi rõ gap/staleness. B chỉ chuyển tiếp phần A đã cho phép.
+- [x] Backward/forward trace nối issuer-qualified links. Nếu A cần biết C, gửi downstream impact summary C→B→A theo policy, dedupe/provenance như message khác; nếu bị cấm/chưa nhận, A hiển thị gap thay vì khẳng định danh sách đầy đủ. Passport chỉ projection allowlist.
+- [x] Test A offline, B/C còn lịch sử đã cache; upstream correction/revoke/policy change được truyền theo version hoặc hiển thị stale đến khi sync. [Bằng chứng T07](evidence/p09-t07.md).
 - **Đầu ra:** cross-instance trace API/UI; **kiểm chứng:** AC-07/09, không dùng shared DB.
 
 ## P09-T08 — Quan sát, bảo mật và vận hành federation
