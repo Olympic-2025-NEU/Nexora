@@ -1,5 +1,7 @@
 # G09 — chạy lại từ clone sạch, không sửa DB bằng tay
 
+**Trạng thái 2026-11-26:** chủ dự án tạm bỏ qua lượt chạy lại này. Tài liệu dưới đây là quy trình cho lần nghiệm thu G09 sau, không phải bằng chứng G09 đã pass. Checklist [P09-T09](phase-09-federation.md) vẫn mở.
+
 ## Phạm vi và an toàn
 
 Gate dùng ba Compose project **mới** `nexora-g09-a/b/c`, ba PostgreSQL cluster/Keycloak/volume riêng và network `nexora-g09-federation`. Issuer nghiệp vụ vẫn là `nexora-a/b/c` vì đây là ba tổ chức của cùng kịch bản, còn nhãn Compose và state Docker hoàn toàn khác demo đang dùng. `prepare-g09-clean.mjs` tạo env ignored với cổng host +2000: ERP A/B/C `21080/21081/21082`, Keycloak `20080/20081/20082`. Script từ chối env có sẵn; không chạy `abc-reset` với prefix mặc định. Không đưa mật khẩu, OTP, token, env hoặc private cert vào Git/log.

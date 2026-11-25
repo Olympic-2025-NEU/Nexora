@@ -65,6 +65,7 @@
 - [ ] AC-01/05/06/07/09 pass trên A/B/C có DB/identity/volumes riêng; outage, retry, dedupe, partial receipt, privacy và trace gap cases pass.
 - [ ] Từ clone sạch chạy lại kịch bản bằng API/UI, không thao tác tay vào DB; lưu provenance và balance assertions tại mỗi bước.
 - **Bằng chứng:** A/B/C compose/DB identity, redacted HTTP logs, outbox/inbox rows, trace graph, UI timeline, failure drill.
+- **Trạng thái 2026-11-26:** chủ dự án yêu cầu bỏ qua lượt chạy lại G09 từ clone sạch ở thời điểm này. T01–T08 đã có bằng chứng theo từng task; [T06](evidence/p09-t06.md), [T07](evidence/p09-t07.md) và [T08](evidence/p09-t08.md) bao phủ hành trình và các phép thử trên môi trường A/B/C hiện có. Chưa có bằng chứng nghiệm thu G09 từ clone sạch, nên giữ hai ô trên mở và không ghi AC-01/05/06/07/09 là đã pass gate. [Quy trình chạy lại](g09-clean-run.md) được giữ để dùng khi cần nghiệm thu cuối.
 
 ## Hồ sơ giao AI theo từng task
 

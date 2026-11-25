@@ -12,6 +12,7 @@
 - **P05 (M01 System & Partner) DONE 2026-11-21** trên `phase-05` (base `phase-04`): consume schema P02; admin-invite membership; API/UI org/members/partners/connection; M2M harden; G05 **CLOSED** (`evidence/G05.md`). Live MFA A/B/C demo still operator follow-up.
 - **P06 (M02 Catalog & Inventory) DONE 2026-11-22** trên `phase-06` (base `phase-05`): schema pack Dev duyệt; Prisma `catalog`/`inventory` + `membership_warehouse`; quantity D07; Inventory port; G06 **CLOSED** (`evidence/G06.md`). **AC-03 chờ P07**. G06 **giữ CLOSED** — không mở lại khi làm P065.
 - **P065 (M02 catalog business upgrade) DONE 2026-11-22:** ADR 0017; migrations applied; API/UI/seed; live smoke 12/12 (`smoke-p065-local.mjs`). Gate **G06.5 CLOSED** technical ([`evidence/G06.5.md`](./evidence/G06.5.md)). AC-03 vẫn P07.
+- **P09 T01–T08 có bằng chứng theo task trên `phase-09`; G09 còn mở (2026-11-26):** chủ dự án tạm bỏ qua lượt chạy lại từ clone sạch. Các kiểm chứng A/B/C và failure drill ở T06–T08 không được tính là gate clone sạch đã pass; xem [trạng thái P09-T09](phase-09-federation.md).
 - `contexts/sales|procurement|finance|master-data`: scaffold cũ, không tính là M01–M04. `contexts/system` là M01. `contexts/catalog` + `contexts/inventory` là M02 (P06 baseline + P065 upgrade).
 - `LICENSE`, `NOTICE`, `CHANGELOG.md`, SPDX trên nguồn viết, repo và issue tracker công khai đã được kiểm trong T04; bản phát hành/PoF vẫn thuộc P13.
 
