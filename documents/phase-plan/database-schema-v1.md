@@ -249,6 +249,12 @@ Migration T03: `prisma/migrations/20261124040000_federation_delivery_attempt/mig
 
 `id`, `created_at`; `inbox_id uuid!→federation.inbox_message.id UNIQUE`, `ack_id text! UNIQUE`, `ack_status text! CHECK IN ('validated','pending_dependency')`, `response_body jsonb!`, `sent_at timestamptz?`. ACK bền vững để replay same hash trả nội dung tương đương; business receipt là event riêng sau Staff confirm.
 
+### `federation.business_receipt` và `business_receipt_line` (P09-T06)
+
+`business_receipt`: `id uuid PK`, `transfer_id uuid!→trading.transfer_detail.document_id UNIQUE`, `inbox_id uuid!→federation.inbox_message.id UNIQUE`, `issuer_instance_id text!`, `source_receiving_id uuid!` (ID chứng từ remote), `sent_quantity numeric(20,3)! >0`, `actual_quantity numeric(20,3)!` trong `[0,sent]`, `discrepancy_quantity numeric(20,3)! = sent-actual`, `discrepancy_reason text?` bắt buộc nếu có lệch, `received_at timestamptz!`. Chỉ ghi sau khi kiểm M2M và so khớp từng line với transfer/outbox immutable local; không đổi issue hoặc stock sender. Một transfer nhận tối đa một business receipt v1; correction là event/contract mới ở phase sau.
+
+`business_receipt_line`: khóa `(receipt_id,source_line_id)`, FK `receipt_id→business_receipt.id`, `source_line_id→trading.document_line.id`, `receiver_batch_id uuid!` là batch remote (không FK local), `sent_quantity`, `actual_quantity numeric(20,3)!` với `0<=actual<=sent`, `unit text! IN (EA,KG,L)`. Đủ mọi transfer source line, gồm line actual bằng 0. Hai bảng append-only đối với app runtime (`SELECT,INSERT`), dùng inbox replay và unique transfer để chống áp business event hai lần.
+
 ## P12 — data quality vận hành
 
 ### `traceability.quality_issue`

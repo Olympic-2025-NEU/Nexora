@@ -8,18 +8,19 @@ import { createFederationOutboundHandler } from "./federation-outbound";
 import type { OutboxMessage } from "../platform/outbox/message";
 
 const payload = JSON.parse(readFileSync("contracts/events/fixtures/a-to-b-transfer-announced.json", "utf8"));
+const receiptPayload = JSON.parse(readFileSync("contracts/events/fixtures/b-to-a-receipt-confirmed.json", "utf8"));
 const ack = () => ({ messageId: payload.messageId, ackId: randomUUID(),
   acceptedAt: "2026-11-14T08:00:02Z", status: "validated" });
 const connection = { endpointUrl: "https://partner.example/api/v1/federation/events",
   outboundTokenUrl: "https://identity.example/token", outboundClientId: "client-a",
   outboundSecretRef: "env:PARTNER_SECRET", outboundAudience: "partner-b", status: "active",
   partner: { issuerInstanceId: "B", status: "active" } };
-function fixture() {
+function fixture(activeConnection = connection, activePayload = payload) {
   const attempts: Array<Record<string, unknown>> = [];
   const states: Array<Record<string, unknown>> = [];
   let inTransaction = false;
   const db = {
-    partnerConnection: { findFirst: async () => connection },
+    partnerConnection: { findFirst: async () => activeConnection },
     deliveryAttempt: {
       aggregate: async () => ({ _max: { attemptNo: attempts.at(-1)?.attemptNo ?? null } }),
       create: async ({ data }: { data: Record<string, unknown> }) => { attempts.push(data); },
@@ -31,9 +32,9 @@ function fixture() {
       try { return await fn(db); } finally { inTransaction = false; }
     },
   };
-  const message = { id: randomUUID(), aggregateId: payload.sourceDocument.id,
-    eventType: payload.eventType, schemaVersion: "1", destination: "federation",
-    payload, correlationId: payload.correlationId, attemptCount: 1 } as OutboxMessage;
+  const message = { id: randomUUID(), aggregateId: activePayload.sourceDocument.id,
+    eventType: activePayload.eventType, schemaVersion: "1", destination: "federation",
+    payload: activePayload, correlationId: activePayload.correlationId, attemptCount: 1 } as OutboxMessage;
   return { db: db as unknown as PrismaClient, attempts, states, message,
     inTransaction: () => inTransaction };
 }
@@ -62,6 +63,18 @@ test("valid ACK marks transfer only after HTTP, records redacted attempt", async
   assert.equal(f.states[0].deliveryState, "technical_ack");
   assert.ok(!JSON.stringify(f.attempts).includes("test-secret"));
   assert.ok(!JSON.stringify(f.attempts).includes("ephemeral-token"));
+});
+
+test("business receipt delivers with ACK but does not mark a transfer technical ACK", async () => {
+  const f = fixture({ ...connection, partner: { issuerInstanceId: "A", status: "active" } }, receiptPayload);
+  await createFederationOutboundHandler(f.db, "B", {
+    resolveSecret: async () => "test-secret",
+    fetcher: async (url) => String(url).includes("identity") ? tokenResponse() :
+      ackResponse({ messageId: receiptPayload.messageId, ackId: randomUUID(),
+        acceptedAt: "2026-11-14T10:00:02Z", status: "validated" }),
+  })(f.message);
+  assert.equal(f.attempts[0].result, "ack");
+  assert.equal(f.states.length, 0);
 });
 
 test("B offline and lost ACK keep same payload for a restarted worker retry", async () => {

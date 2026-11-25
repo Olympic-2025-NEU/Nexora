@@ -143,7 +143,8 @@ test("P08 transfer waits for its confirmed issue source, then links and replays 
   await app.document.create({ data: { id: transferId, documentType: "partner_transfer",
     documentNumber: randomUUID(), status: "draft", createdBySub: "fixture",
     correlationId: randomUUID() } });
-  await app.documentLine.create({ data: { id: randomUUID(), documentId: transferId, lineNo: 1,
+  const transferLineId = randomUUID();
+  await app.documentLine.create({ data: { id: transferLineId, documentId: transferId, lineNo: 1,
     warehouseId, batchId: batches[0], productVariantId: variantId, productId,
     uomId: uom, quantity: "2", sourceIssueLineId: issueLineId } });
   await app.transferDetail.create({ data: { documentId: transferId, linkedIssueId: issueId,
@@ -156,7 +157,7 @@ test("P08 transfer waits for its confirmed issue source, then links and replays 
     aggregateType: "document", aggregateId: transferId, aggregateVersion: transfer.version,
     correlationId: randomUUID(), payload: { eventId: randomUUID(), transferId,
       linkedIssueId: issueId, destinationPartnerId: partnerId,
-      lines: [{ sourceLineId: issueLineId, batchId: batches[0], originLot,
+      lines: [{ sourceLineId: transferLineId, batchId: batches[0], originLot,
         quantity: "2", unit: "EA" }], occurredAt } });
   const pending = await app.outboxMessage.create({ data: { ...transferMessage, id: randomUUID(),
     nextAttemptAt: new Date(Date.now() - 60_000) } });
@@ -193,11 +194,20 @@ test("P08 receiving keeps a verified local source and an explicit remote gap", a
   const remoteEventId = randomUUID();
   const sourceLineId = randomUUID();
   const messageId = randomUUID();
-  const inbound = { eventId: remoteEventId, issuerInstanceId: "trace-remote",
+  const remoteIssuer = "trace-remote-receiving";
+  const partnerId = randomUUID();
+  await app.partner.create({ data: { id: partnerId, issuerInstanceId: remoteIssuer,
+    code: randomUUID(), displayName: "Trace receiving source", createdBySub: "fixture" } });
+  const inbound = { eventId: randomUUID(), issuerInstanceId: remoteIssuer,
     sourceDocument: { id: remoteTransferId } };
   await app.inboundMessage.create({ data: { messageId, eventType: "transfer.announced.v1",
-    issuerInstanceId: "trace-remote", recipientInstanceId: issuer,
+    issuerInstanceId: remoteIssuer, recipientInstanceId: issuer,
     payload: inbound, payloadHash: sha(inbound) } });
+  const verified = { ...inbound, eventId: remoteEventId };
+  await app.inboxMessage.create({ data: { id: randomUUID(), messageId,
+    eventId: remoteEventId, eventType: "transfer.announced.v1", schemaVersion: "1.0",
+    issuerInstanceId: remoteIssuer, payload: verified, payloadSha256: sha(verified),
+    partnerId, state: "applied_to_trace" } });
   await app.document.create({ data: { id: receivingId, documentType: "receiving_confirmation",
     documentNumber: randomUUID(), status: "draft", createdBySub: "fixture",
     correlationId: randomUUID() } });
@@ -205,7 +215,7 @@ test("P08 receiving keeps a verified local source and an explicit remote gap", a
     lineNo: 1, warehouseId, batchId: batches[1], productVariantId: variantId,
     productId, uomId: uom, quantity: "2", actualQuantity: "1", sourceLineRef: sourceLineId } });
   await app.receivingDetail.create({ data: { documentId: receivingId,
-    sourceIssuerInstanceId: "trace-remote", sourceTransferId: remoteTransferId,
+    sourceIssuerInstanceId: remoteIssuer, sourceTransferId: remoteTransferId,
     inboundMessageId: messageId, sentQuantity: "2", actualQuantity: "1",
     discrepancyReason: "one unit missing" } });
   const receiving = await app.document.update({ where: { id: receivingId }, data: {
@@ -213,7 +223,7 @@ test("P08 receiving keeps a verified local source and an explicit remote gap", a
   const [serialized] = serializeDomainEvent({ type: TRADING_EVENT_TYPES.receiving,
     aggregateType: "document", aggregateId: receivingId, aggregateVersion: receiving.version,
     correlationId: randomUUID(), payload: { eventId: randomUUID(), receivingId,
-      sourceIssuerInstanceId: "trace-remote", sourceTransferId: remoteTransferId,
+      sourceIssuerInstanceId: remoteIssuer, sourceTransferId: remoteTransferId,
       sentLines: [{ sourceLineId, originLot: { issuerInstanceId: issuer, lotId: origins[1] },
         sentQuantity: "2", unit: "EA" }],
       actualLines: [{ sourceLineId, localBatchId: batches[1], actualQuantity: "1", unit: "EA" }],
@@ -227,7 +237,7 @@ test("P08 receiving keeps a verified local source and an explicit remote gap", a
   assert.equal(event.verificationState, "local_verified");
   const link = await app.traceLink.findFirstOrThrow({ where: { fromEventId: event.id } });
   assert.equal(link.verificationState, "missing");
-  assert.deepEqual(link.missingRef, { issuerInstanceId: "trace-remote", eventId: remoteEventId });
+  assert.deepEqual(link.missingRef, { issuerInstanceId: remoteIssuer, eventId: remoteEventId });
   const row = await core.coreRecord.findUniqueOrThrow({ where: { kind_sourceType_sourceId: {
     kind: "trace_projection", sourceType: "lot", sourceId: batches[1] } } });
   const edges = (row.payload as { edges: { missingRef?: unknown }[] }).edges;
@@ -327,7 +337,7 @@ test("P08-T03 backward query keeps source links, remote gap and pages distinct",
     other.eventId === node.eventId)), false);
   const remote = await backwardTrace(port, actor, { batchId: batches[1] });
   assert.ok(remote.gaps.some((gap) => gap.reason === "remote_source_unavailable" &&
-    gap.missingRef?.issuerInstanceId === "trace-remote"));
+    gap.missingRef?.issuerInstanceId === "trace-remote-receiving"));
   assert.equal(remote.nodes.some((node) => node.issuerInstanceId === "trace-remote"), false);
 });
 

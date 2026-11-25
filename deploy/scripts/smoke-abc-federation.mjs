@@ -20,7 +20,8 @@ assert.equal(tokenResponse.status, 200, `Token endpoint returned ${tokenResponse
 const { access_token: token } = await tokenResponse.json();
 assert.ok(token, "Token endpoint did not return an access token");
 const claims = JSON.parse(Buffer.from(token.split(".")[1], "base64url").toString());
-assert.equal(claims.iss, `http://keycloak-${receiver}:8080/realms/nexora`);
+const browserPort = { a: 18080, b: 18081, c: 18082 }[receiver];
+assert.equal(claims.iss, `http://127.0.0.1:${browserPort}/realms/nexora`);
 assert.equal(claims.azp, clientId);
 assert.ok([claims.aud].flat().includes("erp-browser"));
 assert.ok(claims.scope.split(" ").includes("federation:write"));

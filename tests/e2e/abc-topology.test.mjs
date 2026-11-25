@@ -34,7 +34,9 @@ test("P09-T01 three Compose projects isolate identity, state, routes and ports",
         `${instance}/${service} has a global container name`);
     }
     assert.ok(config.services.keycloak.networks.internal.aliases.includes(`keycloak-${instance}`));
-    assert.equal(config.services.keycloak.environment.KC_HOSTNAME, env.OIDC_BASE_URL);
+    assert.equal(config.services.keycloak.environment.KC_HOSTNAME, env.OIDC_FRONTEND_URL);
+    assert.equal(config.services.keycloak.environment.KC_HOSTNAME_BACKCHANNEL_DYNAMIC, "true");
+    assert.equal(config.services["keycloak-bootstrap"].environment.OIDC_BASE_URL, env.OIDC_BASE_URL);
     assert.equal(config.services.erp.environment.OIDC_ISSUER_URL, env.OIDC_ISSUER_URL);
     assert.equal(config.services.erp.environment.DATABASE_URL, env.APP_DATABASE_URL);
     assert.equal(config.services["core-data"].environment.CORE_DATABASE_URL, env.CORE_DATABASE_URL);

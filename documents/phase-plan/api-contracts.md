@@ -108,7 +108,9 @@ Input: authenticated partner, message envelope ở `event-contracts.md`. Output 
 
 ### Xác nhận thực nhận
 
-Input: local pending transfer ref, `actualLines` theo lô và số lượng, `discrepancyReason` khi khác số gửi, `Idempotency-Key`. Output: receiving status, movement IDs, discrepancy flag; business receipt event được enqueue sau commit. Partial receipt xử lý theo rule D07, không âm thầm biến sent quantity thành actual quantity.
+`GET /api/v1/receivings?options=1` liệt kê notification từ `federation.inbox_message` đã xác thực (và fixture P07 riêng), có trạng thái phiếu nhận; `batchesFor=<messageId>` chỉ gợi ý batch local khớp cặp `(origin issuer, origin lot)`. `POST /api/v1/receivings` nhận `inboundMessageId` và đúng một `actualLines` cho từng `sourceLineId` trong envelope, gồm `actualQuantity`, `localBatchId`, `warehouseId`, `unit`; trùng/thiếu/thừa line là 422. Tạo Draft gắn external lot trong cùng transaction, chưa đổi tồn. Staff có thể sửa Draft; `POST /api/v1/receivings/{id}/confirm` cần version và `Idempotency-Key`, kiểm `0<=actual<=sent` từng line, yêu cầu `discrepancyReason` nếu khác, chỉ cộng actual dương đúng một lần.
+
+Sau commit, receiver đưa `receipt.confirmed.v1` vào outbox để gửi ngược đến issuer của transfer. `actualLines` bao phủ cả line nhận 0; `lots` chỉ gồm line actual dương. Sender lưu business receipt bất biến, đối chiếu transfer/source line/origin/quantity, cập nhật `deliveryState=received|partial` và actual trên `GET /api/v1/transfers/{id}`; phiếu xuất và movement sender giữ nguyên. Technical ACK chỉ chứng minh inbox đã lưu message, không thay thế business receipt. Over-receipt bị từ chối 422; partial/zero giữ discrepancy theo D07.
 
 ### Product Passport
 

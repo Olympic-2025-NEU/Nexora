@@ -14,7 +14,6 @@ import { createTransferService } from "../../contexts/trading/application/transf
 import { createStocktakeService } from "../../contexts/trading/application/stocktakes";
 import { createSaleService } from "../../contexts/trading/application/sales";
 import { adjustStock } from "../../contexts/inventory/application/adjust-stock";
-import { createCatalogRepos } from "../../contexts/catalog/infrastructure/prisma-repos";
 import { serializeDomainEvent, TRADING_EVENT_TYPES, EVENT_DESTINATIONS } from "../../contracts/events/registry";
 import type { Actor } from "../../platform/identity/actor";
 import type { OutboxMessage } from "../../platform/outbox/message";
@@ -292,13 +291,11 @@ async function receivingDraft() {
   const announced = await db.outboxMessage.findFirstOrThrow({ where: {
     aggregateId: transfer.id, eventType: "transfer.announced.v1" } });
   const envelope = announced.payload as Record<string, unknown>;
-  const sourceLot = (envelope.lots as { sourceLineId: string; senderBatch: { batchId: string } }[])[0]!;
+  const sourceLot = (envelope.lots as { sourceLineId: string }[])[0]!;
   const real = createReceivingService(tradingPorts, "remote-instance");
   await db.$transaction((tx) => real.source({ tx, actor, requestId: randomUUID(), emit: () => {} })
     .seedInboundAnnouncement(envelope));
-  const localBatch = await createCatalogRepos(db).createBatch({ id: randomUUID(), productVariantId: variantId,
-    localCode: randomUUID(), originIssuerInstanceId: "local-instance", originLotId: sourceLot.senderBatch.batchId,
-    createdBySub: actor.userId });
+  const localBatch = { id: sourceBatch };
   const input = { inboundMessageId: envelope.messageId as string,
     actualLines: [{ sourceLineId: sourceLot.sourceLineId, localBatchId: localBatch.id, warehouseId,
       actualQuantity: "5", unit: "EA" as const }] };

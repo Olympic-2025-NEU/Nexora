@@ -6,6 +6,7 @@ import type { Actor } from "@/platform/identity/actor";
 import type { OutboxEventInput } from "@/platform/outbox/message";
 import { DomainError } from "@/platform/kernel/errors";
 import { applyDocumentAction, InvalidTransitionError } from "../domain/document";
+import { bindExternalLotInTx, MappingError } from "@/contexts/federation/application/identity-mapping";
 import { createTradingRepos } from "../infrastructure/prisma-repos";
 import { createAnnouncementService, type Announcement } from "./inbound-announcements";
 import { createPrismaAnnouncementSource } from "../infrastructure/inbound-announcements";
@@ -47,8 +48,8 @@ export function createReceivingService(ports: ReceivingPorts, instanceId: string
     scope(ctx, warehouseId);
     const [batch, warehouse] = await Promise.all([repo(ctx).findBatch(batchId), repo(ctx).findWarehouse(warehouseId)]);
     if (!batch) throw new DomainError("BATCH_NOT_FOUND", 422);
-    if (batch.productId !== lot.product.productId) throw new DomainError("BATCH_PRODUCT_MISMATCH", 422);
-    if (batch.originIssuerInstanceId !== lot.senderBatch.instanceId || batch.originLotId !== lot.senderBatch.batchId) {
+    if (batch.originIssuerInstanceId !== lot.originLot.issuerInstanceId ||
+        batch.originLotId !== lot.originLot.lotId) {
       throw new DomainError("ORIGIN_MISMATCH", 422);
     }
     if (!warehouse || warehouse.status !== "active") throw new DomainError("WAREHOUSE_NOT_ACTIVE", 422);
@@ -122,14 +123,22 @@ export function createReceivingService(ports: ReceivingPorts, instanceId: string
         source(ctx).listInboundAnnouncements(), ctx.tx.warehouse.findMany({ where: { status: "active" },
           select: { id: true, name: true }, take: 100 }),
       ]);
-      return { source: "seeded", messages, warehouses: warehouses.filter((row) =>
+      const notifications = await Promise.all(messages.map(async (message) => {
+        const receipt = await ctx.tx.receivingDetail.findFirst({ where: {
+          sourceIssuerInstanceId: message.issuerInstanceId,
+          sourceTransferId: message.sourceDocument.id,
+          document: { status: { not: "cancelled" } },
+        }, select: { document: { select: { status: true } } } });
+        return { ...message, receivingStatus: receipt?.document.status ?? "pending_receipt" };
+      }));
+      return { source: "verified_inbox_or_seeded_fixture", messages: notifications, warehouses: warehouses.filter((row) =>
         ctx.actor.roles.includes("administrator") || ctx.actor.unitIds.includes(row.id)) };
     },
     async batches(ctx: Context, messageId: string) {
       const message = await source(ctx).resolveVerifiedAnnouncement(messageId);
       return Promise.all(message.lots.map(async (lot) => ({ sourceLineId: lot.sourceLineId,
-        batches: await ctx.tx.batch.findMany({ where: { productId: lot.product.productId,
-          originIssuerInstanceId: message.issuerInstanceId, originLotId: lot.senderBatch.batchId },
+        batches: await ctx.tx.batch.findMany({ where: {
+          originIssuerInstanceId: lot.originLot.issuerInstanceId, originLotId: lot.originLot.lotId },
         select: { id: true, localCode: true, productVariantId: true } }) })));
     },
     async list(ctx: Context) {
@@ -164,6 +173,19 @@ export function createReceivingService(ports: ReceivingPorts, instanceId: string
         sourceLineRef: message.lots[i]!.sourceLineId, quantity: message.lots[i]!.quantity,
         actualQuantity: row.actual, batchId: row.batch.id, warehouseId: row.inputLine.warehouseId,
         productVariantId: row.batch.productVariantId, productId: row.batch.productId, uomId: row.uomId })));
+      const verifiedInbox = await ctx.tx.inboxMessage.findUnique({ where: {
+        issuerInstanceId_messageId: { issuerInstanceId: message.issuerInstanceId,
+          messageId: message.messageId } }, select: { id: true } });
+      if (verifiedInbox) for (let i = 0; i < message.lots.length; i++) {
+        try {
+          await bindExternalLotInTx(ctx.tx, { inboxId: verifiedInbox.id,
+            sourceLineId: message.lots[i]!.sourceLineId,
+            localBatchId: prepared[i]!.batch.id }, ctx.actor.roles);
+        } catch (error) {
+          if (error instanceof MappingError) throw new DomainError(error.code, error.status);
+          throw error;
+        }
+      }
       await ports.audit(ctx.tx, { actorSub: ctx.actor.userId, action: "trading.receiving.create", id,
         requestId: ctx.requestId, after: "draft", version: 1 });
       return view(ctx, id);
@@ -283,7 +305,10 @@ export function createReceivingService(ports: ReceivingPorts, instanceId: string
       ctx.emit({ aggregateType: "document", aggregateId: id, aggregateVersion: updated.version,
         eventType: "receipt.confirmed.v1", schemaVersion: "1", payload: envelope,
         destination: "federation", correlationId: message.messageId,
-        nextAttemptAt: new Date("9999-12-31T00:00:00.000Z") });
+        ...(!await ctx.tx.inboxMessage.findUnique({ where: {
+          issuerInstanceId_messageId: { issuerInstanceId: message.issuerInstanceId,
+            messageId: message.messageId } }, select: { id: true } })
+          ? { nextAttemptAt: new Date("9999-12-31T00:00:00.000Z") } : {}) });
       await ports.audit(ctx.tx, { actorSub: ctx.actor.userId, action: "trading.receiving.confirm", id,
         requestId: ctx.requestId, before: "draft", after: "confirmed", version: updated.version });
       return { id, status: "confirmed", version: updated.version, confirmedAt: occurredAt, movementIds };

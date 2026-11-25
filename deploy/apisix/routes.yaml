@@ -77,9 +77,8 @@ routes:
       <<: *strip-identity-headers
       openid-connect:
         # Bearer-only: gateway verifies token; core verifies Authorization again.
-        # OIDC_ISSUER_URL placeholder — substitute actual value from instance env.
-        # Internal Keycloak URL for Docker Compose: http://keycloak:8080/realms/nexora
-        discovery: "${OIDC_ISSUER_URL}/.well-known/openid-configuration"
+        # Discover through the private Keycloak backchannel; metadata issuer is the frontend URL.
+        discovery: "${OIDC_BASE_URL}/realms/nexora/.well-known/openid-configuration"
         client_id: "${OIDC_GATEWAY_CLIENT_ID}"
         client_secret: "${OIDC_GATEWAY_CLIENT_SECRET}"
         bearer_only: true
@@ -111,7 +110,7 @@ routes:
       request-id: {}
       <<: *strip-identity-headers
       openid-connect:
-        discovery: "${OIDC_ISSUER_URL}/.well-known/openid-configuration"
+        discovery: "${OIDC_BASE_URL}/realms/nexora/.well-known/openid-configuration"
         client_id: "${OIDC_GATEWAY_CLIENT_ID}"
         client_secret: "${OIDC_GATEWAY_CLIENT_SECRET}"
         bearer_only: true
@@ -179,7 +178,7 @@ routes:
       request-id: {}
       <<: *strip-identity-headers
       openid-connect:
-        discovery: "${OIDC_ISSUER_URL}/.well-known/openid-configuration"
+        discovery: "${OIDC_BASE_URL}/realms/nexora/.well-known/openid-configuration"
         client_id: "${OIDC_GATEWAY_CLIENT_ID}"
         client_secret: "${OIDC_GATEWAY_CLIENT_SECRET}"
         bearer_only: true
@@ -211,7 +210,7 @@ routes:
       request-id: {}
       <<: *strip-identity-headers
       openid-connect:
-        discovery: "${OIDC_ISSUER_URL}/.well-known/openid-configuration"
+        discovery: "${OIDC_BASE_URL}/realms/nexora/.well-known/openid-configuration"
         client_id: "${OIDC_GATEWAY_CLIENT_ID}"
         client_secret: "${OIDC_GATEWAY_CLIENT_SECRET}"
         bearer_only: true
@@ -241,7 +240,7 @@ routes:
       request-id: {}
       <<: *strip-identity-headers
       openid-connect:
-        discovery: "${OIDC_ISSUER_URL}/.well-known/openid-configuration"
+        discovery: "${OIDC_BASE_URL}/realms/nexora/.well-known/openid-configuration"
         client_id: "${OIDC_GATEWAY_CLIENT_ID}"
         client_secret: "${OIDC_GATEWAY_CLIENT_SECRET}"
         bearer_only: true
@@ -272,10 +271,8 @@ routes:
       <<: *strip-identity-headers
       openid-connect:
         # NOTE: If APISIX standalone does not support env-var substitution in
-        # routes.yaml, replace ${OIDC_ISSUER_URL} with the literal internal URL:
-        #   http://keycloak:8080/realms/nexora
-        # Match the value of OIDC_ISSUER_URL in deploy/instances/*.env.example.
-        discovery: "${OIDC_ISSUER_URL}/.well-known/openid-configuration"
+        # Render the private OIDC_BASE_URL; validate tokens against metadata's frontend issuer.
+        discovery: "${OIDC_BASE_URL}/realms/nexora/.well-known/openid-configuration"
         client_id: "${OIDC_GATEWAY_CLIENT_ID}"
         client_secret: "${OIDC_GATEWAY_CLIENT_SECRET}"
         bearer_only: true
@@ -381,6 +378,22 @@ routes:
 
   - id: erp-inventory-ui
     uri: /inventory*
+    methods: [GET, HEAD]
+    upstream:
+      type: roundrobin
+      nodes:
+        "${ERP_UPSTREAM}": 1
+    plugins:
+      request-id: {}
+      <<: *strip-identity-headers
+      limit-req:
+        rate: 100
+        burst: 50
+        key: remote_addr
+        rejected_code: 429
+
+  - id: erp-trading-ui
+    uri: /trading*
     methods: [GET, HEAD]
     upstream:
       type: roundrobin

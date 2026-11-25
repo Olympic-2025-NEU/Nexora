@@ -9,6 +9,8 @@ import { receiveFederationEvent } from "../../contexts/federation/application/re
 import { bindExternalLot, MappingError, resolvePendingDependencies } from
   "../../contexts/federation/application/identity-mapping";
 import type { PartnerActor } from "../../platform/identity/partner-actor";
+import { createAnnouncementService } from "../../contexts/trading/application/inbound-announcements";
+import { createPrismaAnnouncementSource } from "../../contexts/trading/infrastructure/inbound-announcements";
 
 if (process.env.NEXORA_TEST_DB !== "1" || !process.env.APP_DATABASE_URL)
   throw Error("Isolated database required");
@@ -39,6 +41,9 @@ test("trusted inbox stores exact ACK, rejects replay conflicts and leaves stock 
   const ack = await receiveFederationEvent(db, raw, actor, "B");
   assert.equal(ack.status, "pending_dependency");
   assert.equal(ack.messageId, JSON.parse(raw).messageId);
+  const pendingReceipt = await db.$transaction((tx) => createAnnouncementService(
+    createPrismaAnnouncementSource(tx), "B").resolveVerifiedAnnouncement(ack.messageId));
+  assert.equal(pendingReceipt.sourceDocument.id, fixture.sourceDocument.id);
   assert.deepEqual(await receiveFederationEvent(db, raw, actor, "B"), ack);
   const parsed = JSON.parse(raw);
   await rejects(JSON.stringify({ ...parsed, sentQuantity: "11" }), "INVALID_EVENT_PAYLOAD", 422);

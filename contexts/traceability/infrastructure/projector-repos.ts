@@ -43,8 +43,10 @@ async function append(app: PrismaClient, issuerInstanceId: string, source: Trace
     for (const item of source.lines) {
       const line = lines.find((row) => source.eventType === "trading.receiving.confirmed.v1"
         ? row.sourceLineRef === item.sourceLineId
-        : ["trading.transfer.confirmed.v1", "trading.sale.recorded.v1"].includes(source.eventType)
-          ? row.sourceIssueLineId === item.sourceLineId : row.id === item.sourceLineId);
+        : source.eventType === "trading.transfer.confirmed.v1"
+          ? row.sourceIssueLineId === item.sourceLineId || row.id === item.sourceLineId
+          : source.eventType === "trading.sale.recorded.v1"
+            ? row.sourceIssueLineId === item.sourceLineId : row.id === item.sourceLineId);
       const quantity = source.eventType === "trading.receiving.confirmed.v1" ? line?.actualQuantity
         : source.eventType === "trading.stocktake.confirmed.v1" ? line?.countedQuantity : line?.quantity;
       if (!line || !quantity || !quantity.eq(new Decimal(item.quantity))) invalid("TRACE_LINES_MISMATCH");
@@ -98,12 +100,20 @@ async function append(app: PrismaClient, issuerInstanceId: string, source: Trace
     }
     if (source.remoteSource) {
       const inboundId = document.receivingDetail?.inboundMessageId;
-      const inbound = inboundId ? await tx.inboundMessage.findUnique({ where: { messageId: inboundId } }) : null;
-      const payload = inbound?.payload as { eventId?: unknown; issuerInstanceId?: unknown;
+      const verified = inboundId ? await tx.inboxMessage.findMany({ where: { messageId: inboundId,
+        eventType: "transfer.announced.v1" }, take: 2 }) : [];
+      if (verified.length > 1 || verified[0]?.state === "rejected")
+        throw new PermanentDeliveryError("TRACE_REMOTE_SOURCE_INVALID");
+      const seeded = inboundId && !verified.length
+        ? await tx.inboundMessage.findUnique({ where: { messageId: inboundId } }) : null;
+      const payload = (verified[0]?.payload ?? seeded?.payload) as { eventId?: unknown; issuerInstanceId?: unknown;
         sourceDocument?: { id?: unknown } } | undefined;
       if (!payload || payload.issuerInstanceId !== source.remoteSource.issuerInstanceId ||
           payload.sourceDocument?.id !== source.remoteSource.transferId ||
-          typeof payload.eventId !== "string") throw new PermanentDeliveryError("TRACE_REMOTE_SOURCE_INVALID");
+          typeof payload.eventId !== "string" || (verified[0] &&
+            (verified[0].issuerInstanceId !== payload.issuerInstanceId ||
+              verified[0].eventId !== payload.eventId)))
+        throw new PermanentDeliveryError("TRACE_REMOTE_SOURCE_INVALID");
       await tx.traceLink.createMany({ data: [{ id: randomUUID(), fromEventId: event.id,
         missingRef: { issuerInstanceId: source.remoteSource.issuerInstanceId, eventId: payload.eventId },
         relation: "received_from", verificationState: "missing" }], skipDuplicates: true });

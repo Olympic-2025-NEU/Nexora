@@ -101,6 +101,21 @@ foreach ($i in @("a", "b", "c")) { node deploy/scripts/seed-abc.mjs $i }
 node deploy/scripts/configure-abc-federation.mjs
 ```
 
+Before submitting the first issue, deploy the BPMN in each Flowable engine
+from Git Bash (or another Bash shell with Docker CLI access):
+
+```bash
+for i in a b c; do bash deploy/scripts/deploy-flowable.sh "$i" "nexora-$i"; done
+```
+
+Keep all three `-f` files when recreating a demo worker. Omitting
+`compose.federation-demo.yml` removes the shared federation network, outbound
+secret slots and local CA trust; an existing transfer then retries without
+reaching the receiving gateway. Deploy the Flowable BPMN on A/B/C before
+submitting any GoodsIssue, or the approval request remains in `starting` and
+the approver inbox stays empty. The guarded `journey-p09-core.mjs` checks all
+three definitions before creating its first document.
+
 Always rebuild the `db-migrate` image after pulling new Prisma migrations.
 Check `docker compose ... logs db-migrate` for its exit code and compare the
 image's migration list with `prisma/migrations/` if the ERP reports a missing

@@ -45,6 +45,7 @@ export async function fetchMe(): Promise<MeResponse | null> {
 export async function loginWithPassword(input: {
   username: string;
   password: string;
+  totp?: string;
 }): Promise<{ ok: true } | { ok: false; message: string }> {
   const res = await fetch("/auth/dev-token", {
     method: "POST",
@@ -52,6 +53,7 @@ export async function loginWithPassword(input: {
     body: JSON.stringify({
       username: input.username.trim(),
       password: input.password,
+      ...(input.totp ? { totp: input.totp } : {}),
     }),
   });
   const json = (await res.json()) as {

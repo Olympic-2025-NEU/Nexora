@@ -9,7 +9,7 @@ import { adminApi } from "@/app/lib/admin-api";
 type Lot = { sourceLineId: string; quantity: string; unit: "EA" | "KG" | "L";
   product: { productId: string }; senderBatch: { batchId: string } };
 type Message = { messageId: string; issuerInstanceId: string;
-  sourceDocument: { id: string }; lots: Lot[] };
+  sourceDocument: { id: string }; lots: Lot[]; receivingStatus?: string };
 type BatchOption = { id: string; localCode: string; productVariantId: string };
 type Receiving = { id: string; documentNumber: string; status: string; version: number;
   inboundMessageId: string; sourceIssuerInstanceId: string; sourceTransferId: string;
@@ -19,13 +19,13 @@ type Receiving = { id: string; documentNumber: string; status: string; version: 
   lines: { id: string; sourceLineId: string; batchId: string; warehouseId: string;
     productId: string; sentQuantity: string; actualQuantity: string }[] };
 type Entry = { sourceLineId: string; actualQuantity: string; localBatchId: string; warehouseId: string; unit: Lot["unit"] };
-type Options = { source: "seeded"; messages: Message[]; warehouses: { id: string; name: string }[] };
+type Options = { source: string; messages: Message[]; warehouses: { id: string; name: string }[] };
 
 export function ReceivingsClient({ id, creating = false }: { id?: string; creating?: boolean }) {
   const router = useRouter();
   const [items, setItems] = useState<Receiving[]>([]);
   const [selected, setSelected] = useState<Receiving | null>(null);
-  const [options, setOptions] = useState<Options>({ source: "seeded", messages: [], warehouses: [] });
+  const [options, setOptions] = useState<Options>({ source: "verified_inbox_or_seeded_fixture", messages: [], warehouses: [] });
   const [messageId, setMessageId] = useState("");
   const [batches, setBatches] = useState<Record<string, BatchOption[]>>({});
   const [entries, setEntries] = useState<Entry[]>([]);
@@ -57,17 +57,16 @@ export function ReceivingsClient({ id, creating = false }: { id?: string; creati
     return () => { active = false; };
   }, [load]);
   useEffect(() => {
-    if (!creating && !id) return;
     void adminApi("/api/v1/receivings?options=1").then(async (response) => {
-      if (!response.ok) throw new Error("Không tải được nguồn seeded.");
+      if (!response.ok) throw new Error("Không tải được thông báo nhận hàng.");
       setOptions((await response.json()).data as Options);
     }).catch((err: Error) => setError(err.message));
-  }, [creating, id]);
+  }, []);
   useEffect(() => {
     if (!messageId) return;
     let active = true;
     void adminApi(`/api/v1/receivings?batchesFor=${encodeURIComponent(messageId)}`).then(async (response) => {
-      if (!response.ok) throw new Error("Không tải được batch theo product và origin.");
+      if (!response.ok) throw new Error("Không tải được batch theo nguồn gốc lô.");
       const rows = (await response.json()).data as { sourceLineId: string; batches: BatchOption[] }[];
       if (active) setBatches(Object.fromEntries(rows.map((row) => [row.sourceLineId, row.batches])));
     }).catch((err: Error) => { if (active) setError(err.message); });
@@ -121,7 +120,7 @@ export function ReceivingsClient({ id, creating = false }: { id?: string; creati
     {creating && <button type="button" className="underline" onClick={() => change(row.sourceLineId, "actualQuantity", lot.quantity)}>
       Điền = sent (chủ động)</button>}
     <p>Delta: {row.actualQuantity === "" ? "chưa đếm" : (Number(lot.quantity) - Number(row.actualQuantity)).toFixed(3)}</p>
-    <label className="block">Local batch (server lọc theo product + origin)
+    <label className="block">Local batch (server lọc theo issuer và origin lot)
       <select className="block w-full border p-2" required value={row.localBatchId}
         onChange={(event) => change(row.sourceLineId, "localBatchId", event.target.value)}>
         <option value="">Chọn batch</option>{(batches[row.sourceLineId] ?? []).map((batch) =>
@@ -141,12 +140,12 @@ export function ReceivingsClient({ id, creating = false }: { id?: string; creati
       <Link href="/trading/receivings">Receivings</Link><Link href="/trading/receivings/create">Tạo receiving</Link></nav>
     {error && <p role="alert" className="text-red-600">{error}</p>}
     {creating && <form className="space-y-4" onSubmit={create}>
-      <p>Nguồn: seeded inbound announcement. Chưa xác thực chữ ký đối tác.</p>
-      <label className="block">Announcement từ seeded inbox
+      <p>Thông báo từ federation inbox đã xác thực hoặc fixture local. Chỉ Confirm mới tăng tồn.</p>
+      <label className="block">Thông báo hàng đến
         <select className="block w-full border p-2" required value={messageId}
           onChange={(event) => selectMessage(event.target.value)}>
           <option value="">Chọn message</option>{options.messages.map((item) => <option key={item.messageId} value={item.messageId}>
-            {item.issuerInstanceId} · transfer {item.sourceDocument.id} · message {item.messageId}</option>)}
+            {item.issuerInstanceId} · transfer {item.sourceDocument.id} · {item.receivingStatus ?? "pending_receipt"}</option>)}
         </select></label>
       {message?.lots.map((lot) => input(entries.find((row) => row.sourceLineId === lot.sourceLineId)!, lot))}
       {message && <><p>Sent {sentTotal} · Actual đã đếm {actualTotal} · Chênh {sentTotal - actualTotal}</p>
@@ -155,6 +154,12 @@ export function ReceivingsClient({ id, creating = false }: { id?: string; creati
             onChange={(event) => setReason(event.target.value)} /></label>}
         <button className="rounded border p-2" type="submit" disabled={busy || entries.some((row) => row.actualQuantity === "")}>Tạo Draft</button></>}
     </form>}
+    {!creating && !id && <section className="rounded border p-4"><h2 className="font-medium">Thông báo chờ nhận</h2>
+      <ul>{options.messages.filter((row) => row.receivingStatus === "pending_receipt").map((row) => <li key={row.messageId}>
+        {row.issuerInstanceId} · transfer {row.sourceDocument.id} · message {row.messageId}
+      </li>)}</ul>
+      <Link className="underline" href="/trading/receivings/create">Tạo phiếu nhận từ thông báo</Link>
+    </section>}
     {!creating && !id && <ul className="space-y-2">{items.map((row) => <li key={row.id}>
       <Link className="underline" href={`/trading/receivings/${row.id}`}>{row.documentNumber}</Link> · {row.status} ·
       {row.sourceIssuerInstanceId} / {row.sourceTransferId} · sent {row.sentQuantity} · actual {row.actualQuantity} ·
@@ -162,13 +167,13 @@ export function ReceivingsClient({ id, creating = false }: { id?: string; creati
     </li>)}</ul>}
     {selected && <section className="space-y-4 rounded border p-4">
       <h2 className="text-xl font-medium">{selected.documentNumber} · {selected.status}</h2>
-      <p>Source: {selected.sourceIssuerInstanceId} / transfer {selected.sourceTransferId} / seeded message {selected.inboundMessageId} / receiving {selected.id}</p>
+      <p>Source: {selected.sourceIssuerInstanceId} / transfer {selected.sourceTransferId} / inbound message {selected.inboundMessageId} / receiving {selected.id}</p>
       <p>Sent {selected.sentQuantity} · Actual {selected.actualQuantity} · Delta {selected.discrepancyQuantity}</p>
       {selected.status === "draft" ? <form className="space-y-4" onSubmit={(event) => { event.preventDefault(); void act("update"); }}>
         {selected.lines.map((line) => input(entries.find((row) => row.sourceLineId === line.sourceLineId)!,
           message?.lots.find((lot) => lot.sourceLineId === line.sourceLineId) ?? {
           sourceLineId: line.sourceLineId, quantity: line.sentQuantity, unit: "EA",
-          product: { productId: line.productId }, senderBatch: { batchId: "Xem nguồn seeded" },
+          product: { productId: line.productId }, senderBatch: { batchId: "Xem thông báo nguồn" },
         }))}
         <label className="block">Lý do chênh lệch
           <textarea className="block w-full border p-2" maxLength={1000} required={selected.lines.some((line) =>

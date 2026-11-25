@@ -67,7 +67,8 @@ export function createFederationOutboundHandler(db: PrismaClient, issuerInstance
     let endpointHost = "unconfigured";
     let outcome: Outcome;
     try {
-      if (message.destination !== "federation" || message.eventType !== "transfer.announced.v1" ||
+      if (message.destination !== "federation" ||
+          !["transfer.announced.v1", "receipt.confirmed.v1"].includes(message.eventType) ||
           message.schemaVersion !== "1") throw new PermanentDeliveryError("UNSUPPORTED_EVENT_TYPE");
       const raw = JSON.stringify(message.payload);
       const checked = validateFederationEnvelope(raw, { partnerIssuerInstanceId: issuerInstanceId });
@@ -140,7 +141,7 @@ export function createFederationOutboundHandler(db: PrismaClient, issuerInstance
       const previous = await tx.deliveryAttempt.aggregate({ where: { outboxId: message.id },
         _max: { attemptNo: true } });
       await tx.deliveryAttempt.create({ data: { ...data, attemptNo: (previous._max.attemptNo ?? 0) + 1 } });
-      if (outcome.result === "ack") {
+      if (outcome.result === "ack" && message.eventType === "transfer.announced.v1") {
         await tx.transferDetail.updateMany({ where: { documentId: message.aggregateId,
           deliveryState: "pending" }, data: { deliveryState: "technical_ack",
           technicalAckAt: new Date(outcome.ack!.acceptedAt) } });

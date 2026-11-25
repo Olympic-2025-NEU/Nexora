@@ -130,6 +130,7 @@
     "loginHint": "Sign in with your organization account to manage the workspace.",
     "username": "Username",
     "password": "Password",
+    "totp": "Authenticator code (if MFA is enabled)",
     "submit": "Sign in",
     "signingIn": "Signing in…",
     "forgot": "Reset password",

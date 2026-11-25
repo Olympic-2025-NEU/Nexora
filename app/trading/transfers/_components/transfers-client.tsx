@@ -9,6 +9,10 @@ import { adminApi } from "@/app/lib/admin-api";
 type Transfer = { id: string; documentNumber: string; status: string; version: number; deliveryState: string;
   linkedIssueId: string; linkedIssueNumber?: string; destinationPartnerId: string; recipientInstanceId?: string;
   lines: { id: string; sourceIssueLineId: string; batchId: string; productId: string; quantity: string; uomId: string }[];
+  businessReceipt: { receivedAt: string; sourceReceivingId: string; sentQuantity: string;
+    actualQuantity: string; discrepancyQuantity: string; discrepancyReason: string | null;
+    lines: { sourceLineId: string; receiverBatchId: string; sentQuantity: string;
+      actualQuantity: string; unit: string }[] } | null;
   announcement: { id: string; messageId: string; status: string; attempts: number; nextAttemptAt: string;
     technicalAckAt: string | null; lastError: string | null } | null };
 type Options = { issues: { id: string; documentNumber: string }[];
@@ -88,8 +92,10 @@ export function TransfersClient({ id, creating = false }: { id?: string; creatin
     } catch (err) { setError(err instanceof Error ? err.message : "Không gửi lại được message."); }
     finally { setBusy(false); }
   }
-  const deliveryLabel = (row: Transfer) => ["received", "partial", "disputed"].includes(row.deliveryState)
-    ? row.deliveryState : row.announcement?.status === "dead_letter" ? "Gửi thất bại / bị từ chối" :
+  const deliveryLabel = (row: Transfer) => row.deliveryState === "received" ? "Đối tác đã nhận đủ" :
+    row.deliveryState === "partial" ? "Đối tác nhận thiếu / bằng 0" :
+    row.deliveryState === "disputed" ? "Đang tranh chấp" :
+    row.announcement?.status === "dead_letter" ? "Gửi thất bại / bị từ chối" :
     row.announcement?.status === "retry_due" ? "Đang chờ thử lại" :
       row.deliveryState === "technical_ack" || row.announcement?.status === "delivered"
         ? "Đã ACK kỹ thuật · chờ nhận hàng" : row.status === "confirmed" ? "Đang chờ gửi" : "Chưa gửi";
@@ -125,6 +131,15 @@ export function TransfersClient({ id, creating = false }: { id?: string; creatin
       <p>Partner: {selected.destinationPartnerId} · {selected.recipientInstanceId}</p>
       <p>Delivery: <span className="rounded border px-2">{deliveryLabel(selected)}</span></p>
       {selected.announcement?.technicalAckAt && <p>ACK lúc: {selected.announcement.technicalAckAt}</p>}
+      {selected.businessReceipt && <section className="rounded border p-3">
+        <h3 className="font-medium">Xác nhận nhận hàng thực tế</h3>
+        <p>Receiving remote {selected.businessReceipt.sourceReceivingId} · nhận lúc {selected.businessReceipt.receivedAt}</p>
+        <p>Đã gửi {selected.businessReceipt.sentQuantity} · thực nhận {selected.businessReceipt.actualQuantity} · chênh {selected.businessReceipt.discrepancyQuantity}</p>
+        {selected.businessReceipt.discrepancyReason && <p>Lý do: {selected.businessReceipt.discrepancyReason}</p>}
+        <ul>{selected.businessReceipt.lines.map((line) => <li key={line.sourceLineId}>
+          Line {line.sourceLineId}: {line.actualQuantity}/{line.sentQuantity} {line.unit} · batch nhận {line.receiverBatchId}
+        </li>)}</ul>
+      </section>}
       <ul>{selected.lines.map((line) => <li key={line.id}>
         {line.batchId} · {line.productId} · {line.quantity} · UOM {line.uomId} · transfer line {line.id} · issue line {line.sourceIssueLineId}
       </li>)}</ul>

@@ -138,9 +138,16 @@ export function validateConfig(env, service) {
   if (env.APP_DB_USER === env.CORE_DB_USER ||
       env.APP_DB_NAME === env.KEYCLOAK_DB_NAME || env.APP_DB_NAME === env.FLOWABLE_DB_NAME ||
       env.KEYCLOAK_DB_NAME === env.FLOWABLE_DB_NAME) fail("KEYCLOAK_DATABASE_URL");
-  if (config.OIDC_ISSUER_URL.href !== `${config.OIDC_BASE_URL.href.replace(/\/$/, "")}/realms/nexora`)
+  const frontend = env.OIDC_FRONTEND_URL
+    ? url("OIDC_FRONTEND_URL", env.OIDC_FRONTEND_URL, ["http:", "https:"])
+    : config.OIDC_BASE_URL;
+  if (env.OIDC_FRONTEND_URL && frontend.protocol === "http:" &&
+      !["127.0.0.1", "localhost"].includes(frontend.hostname)) fail("OIDC_FRONTEND_URL");
+  if (env.OIDC_FRONTEND_URL && env.OIDC_BACKCHANNEL_DYNAMIC !== "true")
+    fail("OIDC_BACKCHANNEL_DYNAMIC");
+  if (config.OIDC_ISSUER_URL.href !== `${frontend.href.replace(/\/$/, "")}/realms/nexora`)
     fail("OIDC_ISSUER_URL");
-  if (config.OIDC_JWKS_URL.href !== `${config.OIDC_ISSUER_URL.href}/protocol/openid-connect/certs`)
+  if (config.OIDC_JWKS_URL.href !== `${config.OIDC_BASE_URL.href.replace(/\/$/, "")}/realms/nexora/protocol/openid-connect/certs`)
     fail("OIDC_JWKS_URL");
   for (const name of ["OIDC_REDIRECT_URI_ERP", "OIDC_REDIRECT_URI_DXLAB"]) {
     if (config[name].origin !== config.PUBLIC_BASE_URL.origin) fail(name);

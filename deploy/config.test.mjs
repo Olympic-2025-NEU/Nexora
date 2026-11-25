@@ -46,6 +46,22 @@ test("HTTPS PUBLIC_BASE_URL must match GATEWAY_HTTPS_PORT", () => {
   assert.throws(() => validateConfig(mismatched), { message: "Invalid or missing GATEWAY_HTTPS_PORT" });
 });
 
+test("browser issuer and private Keycloak discovery stay separate in the A/B/C demo", () => {
+  for (const env of examples) {
+    assert.equal(env.OIDC_FRONTEND_URL, `http://127.0.0.1:${env.KEYCLOAK_HOST_PORT}`);
+    assert.equal(env.OIDC_ISSUER_URL, `${env.OIDC_FRONTEND_URL}/realms/nexora`);
+    assert.equal(env.OIDC_JWKS_URL,
+      `${env.OIDC_BASE_URL}/realms/nexora/protocol/openid-connect/certs`);
+    validateConfig(env);
+  }
+  assert.throws(() => validateConfig({ ...examples[0], OIDC_BACKCHANNEL_DYNAMIC: "false" }),
+    { message: "Invalid or missing OIDC_BACKCHANNEL_DYNAMIC" });
+  assert.throws(() => validateConfig({ ...examples[0], OIDC_FRONTEND_URL: "http://public.example" }),
+    { message: "Invalid or missing OIDC_FRONTEND_URL" });
+  assert.throws(() => validateConfig({ ...examples[0], OIDC_ISSUER_URL: examples[0].OIDC_BASE_URL + "/realms/nexora" }),
+    { message: "Invalid or missing OIDC_ISSUER_URL" });
+});
+
 for (const field of [
   "INSTANCE_ID", "APP_DATABASE_URL", "OIDC_ISSUER_URL", "PARTNER_OUTBOUND_TOKEN_URL",
   "S3_BUCKET_PRIVATE", "FLOWABLE_BASE_URL", "FLOWABLE_HOST_PORT", "REDIS_URL", "AI_BASE_URL",

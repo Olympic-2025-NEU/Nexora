@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { strict as assert } from "node:assert";
 import { before, after, test } from "node:test";
 import { PrismaClient } from "@prisma/client";
+import { Decimal } from "@prisma/client/runtime/library";
 import { getPrismaClient } from "../../platform/persistence/prisma";
 import { createPrismaIdempotency } from "../../platform/http/idempotency";
 import { runCommand } from "../../platform/http/pipeline";
@@ -10,7 +11,6 @@ import { tradingService, tradingUnitOfWork, tradingPorts, transferService, stock
 import { applyApprovalResult } from "../../composition/workflow";
 import { createReceivingService, type ActualInput } from "../../contexts/trading/application/receivings";
 import { listIssueSources } from "../../contexts/trading/application/issue-sources";
-import { createCatalogRepos } from "../../contexts/catalog/infrastructure/prisma-repos";
 import { createDocumentService } from "../../contexts/trading/application/documents";
 import type { Actor } from "../../platform/identity/actor";
 import type { TradingKind } from "../../contexts/trading/application/documents";
@@ -30,6 +30,7 @@ import { createOutboxDispatcher } from "../../platform/outbox/dispatcher";
 import { buildHandlerMap } from "../../composition/event-handlers";
 import { createFederationOutboundHandler } from "../../workers/federation-outbound";
 import { approvalInbox } from "../../composition/approvals";
+import { receiveFederationEvent } from "../../contexts/federation/application/receive-event";
 
 if (process.env.NEXORA_TEST_DB !== "1") throw new Error("Disposable PostgreSQL required");
 const owner = new PrismaClient({ datasources: { db: { url: process.env.OWNER_DATABASE_URL! } } });
@@ -890,8 +891,10 @@ test("offline dispatcher retains frozen envelope; replay and concurrency never d
   const rows = await db.outboxMessage.findMany({ where: { aggregateId: doc.id } });
   assert.equal(rows.length, 2);
   const row = rows.find((entry) => entry.eventType === "transfer.announced.v1")!;
-  assert.equal(rows.find((entry) => entry.eventType === "trading.transfer.confirmed.v1")?.destination,
-    "traceability");
+  const trace = rows.find((entry) => entry.eventType === "trading.transfer.confirmed.v1")!;
+  assert.equal(trace.destination, "traceability");
+  assert.equal((trace.payload as { lines: { sourceLineId: string }[] }).lines[0]!.sourceLineId,
+    issue.lines[0]!.id);
   const envelope = row.payload as Record<string, unknown>;
   const ajv = new Ajv2020({ strict: false });
   addFormats(ajv);
@@ -1015,13 +1018,14 @@ test("G07 seeded real announcement: receipt20, approved issue12, transfer, actua
   const announced = await db.outboxMessage.findFirstOrThrow({ where: {
     aggregateId: transfer.id, eventType: "transfer.announced.v1" } });
   const envelope = announced.payload as Record<string, unknown>;
-  const sourceLot = (envelope.lots as { sourceLineId: string; senderBatch: { batchId: string } }[])[0]!;
+  const sourceLot = (envelope.lots as { sourceLineId: string;
+    originLot: { issuerInstanceId: string; lotId: string } }[])[0]!;
   await db.$transaction((tx) => receiving.source({ tx, actor, requestId: randomUUID(), emit: () => {} })
     .seedInboundAnnouncement(envelope));
   assert.deepEqual((await db.inboundMessage.findUniqueOrThrow({ where: { messageId: envelope.messageId as string } })).payload, envelope);
-  const localBatch = await createCatalogRepos(db).createBatch({ id: randomUUID(), productVariantId: variantId,
-    localCode: randomUUID(), originIssuerInstanceId: "local-instance", originLotId: sourceLot.senderBatch.batchId,
-    createdBySub: actor.userId });
+  // This legacy P07 fixture uses one DB for both sides. The origin pair is unique
+  // per instance, so reuse its batch; P09 G09 exercises truly separate databases.
+  const localBatch = { id: batchId };
   const input = { inboundMessageId: envelope.messageId as string, actualLines: [{ sourceLineId: sourceLot.sourceLineId,
     localBatchId: localBatch.id, warehouseId, actualQuantity: "10", unit: "EA" as const }],
     discrepancyReason: "Two units missing" };
@@ -1042,9 +1046,8 @@ test("G07 seeded real announcement: receipt20, approved issue12, transfer, actua
   await assert.rejects(receivingCommand("confirm", { id: draft.id }, (ctx) => receiving.confirm(ctx,
     draft.id, draft.version), randomUUID()), { code: "VERSION_CONFLICT" });
   assert.equal((await db.stockBalance.findUniqueOrThrow({ where: {
-    warehouseId_batchId: { warehouseId, batchId: localBatch.id } } })).quantity.toFixed(3), "10.000");
-  assert.equal((await db.stockBalance.findUniqueOrThrow({ where: {
-    warehouseId_batchId: { warehouseId, batchId } } })).quantity.toFixed(3), before);
+    warehouseId_batchId: { warehouseId, batchId } } })).quantity.toFixed(3),
+  new Decimal(before).add(10).toFixed(3));
   const detail = await db.receivingDetail.findUniqueOrThrow({ where: { documentId: draft.id } });
   assert.equal(detail.sentQuantity.toFixed(3), "12.000");
   assert.equal(detail.actualQuantity?.toFixed(3), "10.000");
@@ -1072,11 +1075,74 @@ test("G07 seeded real announcement: receipt20, approved issue12, transfer, actua
   assert.equal(held.status, "pending"); assert.equal(held.attemptCount, 0);
   assert.deepEqual(held.payload, reply.payload);
   assert.equal(await db.outboxMessage.count({ where: { aggregateId: draft.id, eventType: { contains: "ack" } } }), 0);
+  const connection = await db.partnerConnection.findUniqueOrThrow({ where: { partnerId } });
+  const partnerActor = { type: "partner" as const, clientId: connection.inboundClientId, partnerId,
+    partnerCode: "remote", issuerInstanceId: "remote-instance", allowedScope: "federation:write" };
+  const rawReply = JSON.stringify(payload);
+  const movementCount = await db.stockMovement.count();
+  const businessAck = await receiveFederationEvent(db, rawReply, partnerActor, "local-instance");
+  assert.equal(businessAck.status, "validated");
+  assert.deepEqual(await receiveFederationEvent(db, rawReply, partnerActor, "local-instance"), businessAck);
+  const business = await db.businessReceipt.findUniqueOrThrow({ where: { transferId: transfer.id },
+    include: { lines: true } });
+  assert.equal(business.actualQuantity.toFixed(3), "10.000");
+  assert.equal(business.discrepancyQuantity.toFixed(3), "2.000");
+  assert.equal(business.lines[0]!.sourceLineId, sourceLot.sourceLineId);
+  assert.equal(business.lines[0]!.actualQuantity.toFixed(3), "10.000");
+  assert.equal((await db.transferDetail.findUniqueOrThrow({ where: { documentId: transfer.id } })).deliveryState,
+    "partial");
+  assert.equal((await db.document.findUniqueOrThrow({ where: { id: sent.id } })).status, "confirmed");
+  assert.equal(await db.stockMovement.count(), movementCount);
   await assert.rejects(receivingCommand("create", input, (ctx) => receiving.create(ctx, input)),
     { code: "RECEIVING_ALREADY_EXISTS", httpStatus: 409 });
   await db.outboxMessage.update({ where: { id: announced.id }, data: { payload: { modified: true } } });
   assert.equal((await db.$transaction((tx) => receiving.source({ tx, actor, requestId: randomUUID(), emit: () => {} })
     .resolveVerifiedAnnouncement(input.inboundMessageId))).sentQuantity, "12");
+});
+
+test("verified federation inbox drives receiving draft, atomic lot bind and business reply", async () => {
+  const receivingLocal = createReceivingService(tradingPorts, "local-instance");
+  const original = (await db.inboundMessage.findFirstOrThrow()).payload as Record<string, unknown>;
+  const originalLot = (original.lots as Record<string, unknown>[])[0]!;
+  const sourceLineId = randomUUID();
+  const messageId = randomUUID();
+  const envelope = { ...original, messageId, eventId: randomUUID(),
+    issuerInstanceId: "remote-instance", recipientInstanceId: "local-instance",
+    occurredAt: new Date().toISOString(), publishedAt: new Date().toISOString(),
+    correlationId: randomUUID(), causationId: randomUUID(),
+    sourceDocument: { type: "partner_transfer", id: randomUUID(), version: 2 },
+    linkedIssueId: randomUUID(), sentQuantity: "3",
+    lots: [{ ...originalLot, sourceLineId, quantity: "3",
+      senderBatch: { instanceId: "remote-instance", batchId: randomUUID() },
+      product: { instanceId: "remote-instance", productId: randomUUID() } }],
+    upstreamReferences: [] };
+  const connection = await db.partnerConnection.findUniqueOrThrow({ where: { partnerId } });
+  const partnerActor = { type: "partner" as const, clientId: connection.inboundClientId,
+    partnerId, partnerCode: "remote", issuerInstanceId: "remote-instance",
+    allowedScope: "federation:write" };
+  const ack = await receiveFederationEvent(db, JSON.stringify(envelope), partnerActor, "local-instance");
+  assert.equal(ack.status, "pending_dependency");
+  const notifications = await db.$transaction((tx) => receivingLocal.options({ tx, actor,
+    requestId: randomUUID(), emit: () => {} }));
+  assert.ok(notifications.messages.some((row) => row.messageId === messageId &&
+    row.receivingStatus === "pending_receipt"));
+  const before = await db.stockBalance.findUniqueOrThrow({ where: {
+    warehouseId_batchId: { warehouseId, batchId } } });
+  const input = { inboundMessageId: messageId, actualLines: [{ sourceLineId,
+    localBatchId: batchId, warehouseId, actualQuantity: "2", unit: "EA" as const }],
+    discrepancyReason: "One item not delivered" };
+  const draft = await receivingCommand("create", input, (ctx) => receivingLocal.create(ctx, input));
+  assert.equal((await db.stockBalance.findUniqueOrThrow({ where: {
+    warehouseId_batchId: { warehouseId, batchId } } })).quantity.toFixed(3), before.quantity.toFixed(3));
+  assert.equal(await db.identityMapping.count({ where: { sourceMessage: { messageId } } }), 1);
+  await receivingCommand("confirm", { id: draft.id }, (ctx) => receivingLocal.confirm(ctx,
+    draft.id, draft.version), randomUUID());
+  assert.equal((await db.stockBalance.findUniqueOrThrow({ where: {
+    warehouseId_batchId: { warehouseId, batchId } } })).quantity.toFixed(3),
+  before.quantity.add(2).toFixed(3));
+  const reply = await db.outboxMessage.findFirstOrThrow({ where: {
+    aggregateId: draft.id, eventType: "receipt.confirmed.v1" } });
+  assert.ok(reply.nextAttemptAt.getUTCFullYear() < 9999);
 });
 
 test("receiving rejects missing, repeated, unknown and over-received source lines; cancel frees source", async () => {
@@ -1089,8 +1155,9 @@ test("receiving rejects missing, repeated, unknown and over-received source line
   const seed = async (payload: Record<string, unknown>) => db.$transaction((tx) => receiving.source({ tx, actor,
     requestId: randomUUID(), emit: () => {} }).seedInboundAnnouncement(payload));
   await seed(clone);
-  const localBatch = await db.batch.findFirstOrThrow({ where: { originIssuerInstanceId: "local-instance",
-    originLotId: batchId } });
+  const origin = originalLot.originLot as { issuerInstanceId: string; lotId: string };
+  const localBatch = await db.batch.findFirstOrThrow({ where: {
+    originIssuerInstanceId: origin.issuerInstanceId, originLotId: origin.lotId } });
   const actualLines: ActualInput[] = clone.lots.map((lot) => ({ sourceLineId: lot.sourceLineId,
     localBatchId: localBatch.id, warehouseId, actualQuantity: "0", unit: "EA" }));
   const input = { inboundMessageId: clone.messageId, actualLines };
@@ -1103,7 +1170,7 @@ test("receiving rejects missing, repeated, unknown and over-received source line
     { code: "OVER_RECEIPT" });
   await assert.rejects(create({ ...input, actualLines: [{ ...actualLines[0]!, localBatchId: randomUUID() }, actualLines[1]!] }),
     { code: "BATCH_NOT_FOUND" });
-  await assert.rejects(create({ ...input, actualLines: [{ ...actualLines[0]!, localBatchId: batchId }, actualLines[1]!] }),
+  await assert.rejects(create({ ...input, actualLines: [{ ...actualLines[0]!, localBatchId: emptyBatchId }, actualLines[1]!] }),
     { code: "ORIGIN_MISMATCH" });
   await assert.rejects(create({ ...input, actualLines: [{ ...actualLines[0]!, unit: "KG" }, actualLines[1]!] }),
     { code: "QUANTITY_UNIT_MISMATCH" });
@@ -1144,7 +1211,7 @@ test("receiving rejects missing, repeated, unknown and over-received source line
   await assert.rejects(create(input), { code: "RECEIVING_ALREADY_EXISTS" });
 });
 
-test("seeded source rejects wrong recipient, shape and changed hash; batch product must match message", async () => {
+test("seeded source rejects wrong recipient, shape and changed hash; origin maps despite different product ids", async () => {
   const original = (await db.inboundMessage.findFirstOrThrow()).payload as Record<string, unknown>;
   const originalLot = (original.lots as Record<string, unknown>[])[0]!;
   const clone = { ...original, messageId: randomUUID(), eventId: randomUUID(),
@@ -1171,12 +1238,14 @@ test("seeded source rejects wrong recipient, shape and changed hash; batch produ
   const wrongProduct = { ...clone, messageId: randomUUID(), lots: [{ ...originalLot,
     product: { instanceId: "local-instance", productId: randomUUID() } }] };
   await seed(wrongProduct);
-  const localBatch = await db.batch.findFirstOrThrow({ where: { originIssuerInstanceId: "local-instance",
-    originLotId: batchId } });
-  await assert.rejects(receivingCommand("create", {}, (ctx) => receiving.create(ctx, {
+  const origin = originalLot.originLot as { issuerInstanceId: string; lotId: string };
+  const localBatch = await db.batch.findFirstOrThrow({ where: {
+    originIssuerInstanceId: origin.issuerInstanceId, originLotId: origin.lotId } });
+  const imported = await receivingCommand("create", {}, (ctx) => receiving.create(ctx, {
     inboundMessageId: wrongProduct.messageId, actualLines: [{ sourceLineId: originalLot.sourceLineId as string,
       localBatchId: localBatch.id, warehouseId, actualQuantity: "10", unit: "EA" }],
-  })), { code: "BATCH_PRODUCT_MISMATCH" });
+  }));
+  assert.equal(imported.lines[0]!.batchId, localBatch.id);
 });
 
 test("all-zero receiving emits both events, no movement, full actualLines and empty lots", async () => {
@@ -1186,8 +1255,9 @@ test("all-zero receiving emits both events, no movement, full actualLines and em
   await db.$transaction((tx) => receiving.source({ tx, actor, requestId: randomUUID(), emit: () => {} })
     .seedInboundAnnouncement(clone));
   const lot = (original.lots as { sourceLineId: string }[])[0]!;
-  const localBatch = await db.batch.findFirstOrThrow({ where: { originIssuerInstanceId: "local-instance",
-    originLotId: batchId } });
+  const origin = (original.lots as { originLot: { issuerInstanceId: string; lotId: string } }[])[0]!.originLot;
+  const localBatch = await db.batch.findFirstOrThrow({ where: {
+    originIssuerInstanceId: origin.issuerInstanceId, originLotId: origin.lotId } });
   const created = await receivingCommand("create", {}, (ctx) => receiving.create(ctx, {
     inboundMessageId: clone.messageId, actualLines: [{ sourceLineId: lot.sourceLineId,
       localBatchId: localBatch.id, warehouseId, actualQuantity: "0", unit: "EA" }],

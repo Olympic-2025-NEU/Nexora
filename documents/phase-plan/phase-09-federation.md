@@ -41,9 +41,9 @@
 
 ## P09-T06 — Business receiving và discrepancy round trip
 
-- [ ] Khi B nhận envelope, tạo pending receipt/notification, **không tăng tồn**. Staff B xác nhận actual quantity và lot mapping theo M03 P07; confirm mới tăng tồn B.
-- [ ] B phát `receipt.confirmed`/discrepancy event tới A; A ghi trạng thái nhận thực tế, giữ nguyên phiếu xuất đã confirm. Partial/zero/over theo D07, không coi technical ACK là business receipt.
-- [ ] Lặp B→C; C ghi sale record; mỗi bước liên kết event/document/lot ID nguồn.
+- [x] Khi B nhận envelope, tạo pending receipt/notification, **không tăng tồn**. Staff B xác nhận actual quantity và lot mapping theo M03 P07; confirm mới tăng tồn B.
+- [x] B phát `receipt.confirmed`/discrepancy event tới A; A ghi trạng thái nhận thực tế, giữ nguyên phiếu xuất đã confirm. Partial/zero/over theo D07, không coi technical ACK là business receipt.
+- [x] Lặp B→C; C ghi sale record; mỗi bước liên kết event/document/lot ID nguồn. [Bằng chứng T06](evidence/p09-t06.md).
 - **Đầu ra:** A→B→C transaction chain; **kiểm chứng:** A 12, B 10, C nhận số thực theo chứng từ, số dư từng DB khớp.
 
 ## P09-T07 — Trace xuyên ba instance và offline

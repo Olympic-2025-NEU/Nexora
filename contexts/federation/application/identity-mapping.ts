@@ -127,39 +127,42 @@ export async function resolveInbox(tx: Tx, inboxId: string): Promise<"validated"
 }
 
 /** Staff binding uses the issuer-qualified identifiers in a verified inbox, never SKU/name. */
-export async function bindExternalLot(db: PrismaClient, input: { inboxId: string; sourceLineId: string;
-  localBatchId: string }, roles: string[]): Promise<string> {
+export async function bindExternalLotInTx(tx: Tx, input: { inboxId: string; sourceLineId: string;
+  localBatchId: string }, roles: readonly string[]): Promise<string> {
   if (!roles.some((role) => ["administrator", "staff"].includes(role.toLowerCase())))
     throw new MappingError("MAPPING_FORBIDDEN", 403);
-  const mappingId = await db.$transaction(async (tx) => {
-    await tx.$queryRaw`SELECT id FROM federation.inbox_message WHERE id = ${input.inboxId}::uuid FOR UPDATE`;
-    const inbox = await tx.inboxMessage.findUnique({ where: { id: input.inboxId } });
-    if (!inbox || inbox.state === "rejected") throw new MappingError("INBOX_NOT_FOUND", 404);
-    const envelope = payloadOf(inbox.payload);
-    const lot = envelope.lots.find((candidate) => candidate.sourceLineId === input.sourceLineId);
-    if (!lot) throw new MappingError("SOURCE_LINE_NOT_FOUND", 404);
-    const batch = await tx.batch.findUnique({ where: { id: input.localBatchId } });
-    if (!batch || batch.originIssuerInstanceId !== lot.originLot.issuerInstanceId ||
-        batch.originLotId !== lot.originLot.lotId)
-      throw new MappingError("LOCAL_BATCH_ORIGIN_MISMATCH");
-    const key = { senderInstanceId: lot.senderBatch.instanceId,
-      senderBatchId: lot.senderBatch.batchId,
-      originIssuerInstanceId: lot.originLot.issuerInstanceId,
-      originLotId: lot.originLot.lotId };
-    const lockKey = `mapping:${key.senderInstanceId}:${key.senderBatchId}:${key.originIssuerInstanceId}:${key.originLotId}`;
-    await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`;
-    const existing = await tx.identityMapping.findUnique({ where: {
-      senderInstanceId_senderBatchId_originIssuerInstanceId_originLotId: key } });
-    if (existing) {
-      if (existing.localBatchId !== batch.id) throw new MappingError("MAPPING_CONFLICT");
-      return existing.id;
-    }
-    const mapped = await tx.identityMapping.create({ data: { id: randomUUID(), ...key,
-      localBatchId: batch.id, sourceMessageId: inbox.id,
-      verificationState: "partner_asserted" } });
-    await resolveInbox(tx, inbox.id);
-    return mapped.id;
-  });
+  await tx.$queryRaw`SELECT id FROM federation.inbox_message WHERE id = ${input.inboxId}::uuid FOR UPDATE`;
+  const inbox = await tx.inboxMessage.findUnique({ where: { id: input.inboxId } });
+  if (!inbox || inbox.state === "rejected") throw new MappingError("INBOX_NOT_FOUND", 404);
+  const envelope = payloadOf(inbox.payload);
+  const lot = envelope.lots.find((candidate) => candidate.sourceLineId === input.sourceLineId);
+  if (!lot) throw new MappingError("SOURCE_LINE_NOT_FOUND", 404);
+  const batch = await tx.batch.findUnique({ where: { id: input.localBatchId } });
+  if (!batch || batch.originIssuerInstanceId !== lot.originLot.issuerInstanceId ||
+      batch.originLotId !== lot.originLot.lotId)
+    throw new MappingError("LOCAL_BATCH_ORIGIN_MISMATCH");
+  const key = { senderInstanceId: lot.senderBatch.instanceId,
+    senderBatchId: lot.senderBatch.batchId,
+    originIssuerInstanceId: lot.originLot.issuerInstanceId,
+    originLotId: lot.originLot.lotId };
+  const lockKey = `mapping:${key.senderInstanceId}:${key.senderBatchId}:${key.originIssuerInstanceId}:${key.originLotId}`;
+  await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`;
+  const existing = await tx.identityMapping.findUnique({ where: {
+    senderInstanceId_senderBatchId_originIssuerInstanceId_originLotId: key } });
+  if (existing) {
+    if (existing.localBatchId !== batch.id) throw new MappingError("MAPPING_CONFLICT");
+    return existing.id;
+  }
+  const mapped = await tx.identityMapping.create({ data: { id: randomUUID(), ...key,
+    localBatchId: batch.id, sourceMessageId: inbox.id,
+    verificationState: "partner_asserted" } });
+  await resolveInbox(tx, inbox.id);
+  return mapped.id;
+}
+
+export async function bindExternalLot(db: PrismaClient, input: { inboxId: string; sourceLineId: string;
+  localBatchId: string }, roles: readonly string[]): Promise<string> {
+  const mappingId = await db.$transaction((tx) => bindExternalLotInTx(tx, input, roles));
   await resolvePendingDependencies(db);
   return mappingId;
 }

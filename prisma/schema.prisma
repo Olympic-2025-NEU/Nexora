@@ -171,6 +171,7 @@ model InboxMessage {
   partner          Partner  @relation(fields: [partnerId], references: [id])
   ack              PartnerAck?
   identityMappings IdentityMapping[]
+  businessReceipt  BusinessReceipt?
 
   @@unique([issuerInstanceId, messageId], map: "uq_inbox_issuer_message")
   @@unique([issuerInstanceId, eventId, eventType], map: "uq_inbox_issuer_event_type")
@@ -196,6 +197,43 @@ model IdentityMapping {
   @@unique([senderInstanceId, senderBatchId, originIssuerInstanceId, originLotId], map: "uq_identity_sender_origin")
   @@index([localBatchId], map: "idx_identity_local_batch")
   @@map("identity_mapping")
+  @@schema("federation")
+}
+
+model BusinessReceipt {
+  id                  String   @id @db.Uuid
+  transferId          String   @unique @map("transfer_id") @db.Uuid
+  inboxId             String   @unique @map("inbox_id") @db.Uuid
+  issuerInstanceId    String   @map("issuer_instance_id")
+  sourceReceivingId   String   @map("source_receiving_id") @db.Uuid
+  sentQuantity        Decimal  @map("sent_quantity") @db.Decimal(20, 3)
+  actualQuantity      Decimal  @map("actual_quantity") @db.Decimal(20, 3)
+  discrepancyQuantity Decimal  @map("discrepancy_quantity") @db.Decimal(20, 3)
+  discrepancyReason   String?  @map("discrepancy_reason")
+  receivedAt          DateTime @default(now()) @map("received_at") @db.Timestamptz(6)
+
+  transfer TransferDetail @relation(fields: [transferId], references: [documentId])
+  inbox InboxMessage @relation(fields: [inboxId], references: [id])
+  lines BusinessReceiptLine[]
+
+  @@index([receivedAt(sort: Desc)])
+  @@map("business_receipt")
+  @@schema("federation")
+}
+
+model BusinessReceiptLine {
+  receiptId       String  @map("receipt_id") @db.Uuid
+  sourceLineId    String  @map("source_line_id") @db.Uuid
+  receiverBatchId String  @map("receiver_batch_id") @db.Uuid
+  sentQuantity    Decimal @map("sent_quantity") @db.Decimal(20, 3)
+  actualQuantity  Decimal @map("actual_quantity") @db.Decimal(20, 3)
+  unit            String
+
+  receipt BusinessReceipt @relation(fields: [receiptId], references: [id])
+  sourceLine DocumentLine @relation("BusinessReceiptSourceLine", fields: [sourceLineId], references: [id])
+
+  @@id([receiptId, sourceLineId])
+  @@map("business_receipt_line")
   @@schema("federation")
 }
 
@@ -735,6 +773,7 @@ model DocumentLine {
   movements StockMovement[]
   sourceAllocations IssueSourceAllocation[] @relation("IssueAllocationLine")
   allocatedToIssues IssueSourceAllocation[] @relation("AllocationSourceLine")
+  businessReceiptLines BusinessReceiptLine[] @relation("BusinessReceiptSourceLine")
 
   @@unique([documentId, lineNo], map: "uq_trading_line_number")
   @@unique([id, documentId], map: "uq_trading_line_document")
@@ -769,6 +808,7 @@ model TransferDetail {
   document Document @relation("TransferDocument", fields: [documentId], references: [id])
   linkedIssue Document @relation("TransferIssue", fields: [linkedIssueId], references: [id])
   destinationPartner Partner @relation(fields: [destinationPartnerId], references: [id])
+  businessReceipt BusinessReceipt?
 
   @@index([destinationPartnerId], map: "idx_trading_transfer_partner")
   @@index([linkedIssueId], map: "idx_trading_transfer_issue")

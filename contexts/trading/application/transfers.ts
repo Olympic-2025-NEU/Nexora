@@ -41,16 +41,25 @@ export function createTransferService(ports: TransferPorts, instanceId: string) 
       throw new DomainError("WAREHOUSE_SCOPE_REQUIRED", 403);
     }
     doc.lines.forEach((line) => scope(ctx, line.warehouseId));
-    const [issue, destination, announcement] = await Promise.all([
+    const [issue, destination, announcement, receipt] = await Promise.all([
       ctx.tx.document.findUnique({ where: { id: doc.transferDetail.linkedIssueId }, select: { documentNumber: true } }),
       ctx.tx.partner.findUnique({ where: { id: doc.transferDetail.destinationPartnerId }, select: { issuerInstanceId: true } }),
       ctx.tx.outboxMessage.findFirst({ where: { aggregateId: id, eventType: "transfer.announced.v1" } }),
+      ctx.tx.businessReceipt.findUnique({ where: { transferId: id }, include: { lines: true } }),
     ]);
     return { id, documentNumber: doc.documentNumber, status: doc.status, version: doc.version,
       createdAt: doc.createdAt.toISOString(), confirmedAt: doc.confirmedAt?.toISOString() ?? null,
       note: doc.note, linkedIssueId: doc.transferDetail.linkedIssueId, linkedIssueNumber: issue?.documentNumber,
       destinationPartnerId: doc.transferDetail.destinationPartnerId, recipientInstanceId: destination?.issuerInstanceId,
       deliveryState: doc.transferDetail.deliveryState,
+      businessReceipt: receipt ? { receivedAt: receipt.receivedAt.toISOString(),
+        sourceReceivingId: receipt.sourceReceivingId, sentQuantity: receipt.sentQuantity.toFixed(3),
+        actualQuantity: receipt.actualQuantity.toFixed(3),
+        discrepancyQuantity: receipt.discrepancyQuantity.toFixed(3),
+        discrepancyReason: receipt.discrepancyReason,
+        lines: receipt.lines.map((line) => ({ sourceLineId: line.sourceLineId,
+          receiverBatchId: line.receiverBatchId, sentQuantity: line.sentQuantity.toFixed(3),
+          actualQuantity: line.actualQuantity.toFixed(3), unit: line.unit })) } : null,
       announcement: announcement ? { id: announcement.id,
         messageId: (announcement.payload as { messageId: string }).messageId,
         status: announcement.status, attempts: announcement.attemptCount,
@@ -143,21 +152,56 @@ export function createTransferService(ports: TransferPorts, instanceId: string) 
       const updated = await repo.transition(id, doc.status, version, "confirmed", ctx.actor.userId);
       if (!updated) throw new DomainError("VERSION_CONFLICT", 409);
       const uoms = await ctx.tx.uom.findMany({ where: { id: { in: doc.lines.map((line) => line.uomId) } } });
+      const batches = await ctx.tx.batch.findMany({ where: { id: { in: doc.lines.map((line) => line.batchId) } },
+        select: { id: true, originIssuerInstanceId: true, originLotId: true } });
       const lots = doc.lines.map((line) => {
         const unit = ({ count: "EA", mass: "KG", volume: "L" } as const)[uoms.find((row) => row.id === line.uomId)?.kind as "count" | "mass" | "volume"];
         if (!unit) throw new DomainError("UOM_KIND_INVALID", 422);
+        const batch = batches.find((row) => row.id === line.batchId);
+        if (!batch) throw new DomainError("BATCH_NOT_FOUND", 422);
         return { sourceLineId: line.id,
-          originLot: { issuerInstanceId: instanceId, lotId: line.batchId },
+          originLot: { issuerInstanceId: batch.originIssuerInstanceId, lotId: batch.originLotId },
           senderBatch: { instanceId, batchId: line.batchId },
           product: { instanceId, productId: line.productId }, quantity: line.quantity!.toFixed(), unit };
       });
+      const mapped = await ctx.tx.identityMapping.findMany({ where: {
+        localBatchId: { in: issue.lines.map((line) => line.batchId) } }, select: { localBatchId: true } });
+      const mappedBatchIds = new Set(mapped.map((row) => row.localBatchId));
+      const importedIssueLines = issue.lines.filter((line) => mappedBatchIds.has(line.batchId));
+      const allocations = importedIssueLines.length ? await ctx.tx.issueSourceAllocation.findMany({
+        where: { issueLineId: { in: importedIssueLines.map((line) => line.id) } },
+        include: { sourceLine: { include: { document: { include: { receivingDetail: true } } } } },
+      }) : [];
+      const inboundIds = new Set<string>();
+      for (const line of importedIssueLines) {
+        const selected = allocations.filter((row) => row.issueLineId === line.id);
+        if (!line.quantity || !selected.length ||
+            !selected.reduce((sum, row) => sum.add(row.quantity), new Decimal(0)).eq(line.quantity))
+          throw new DomainError("FEDERATION_SOURCE_ALLOCATION_REQUIRED", 422);
+        for (const row of selected) {
+          const receipt = row.sourceLine.document;
+          if (receipt.status !== "confirmed" || receipt.documentType !== "receiving_confirmation" ||
+              row.sourceLine.batchId !== line.batchId ||
+              !receipt.receivingDetail?.inboundMessageId)
+            throw new DomainError("FEDERATION_SOURCE_ALLOCATION_INVALID", 422);
+          inboundIds.add(receipt.receivingDetail.inboundMessageId);
+        }
+      }
+      const upstreamInbox = inboundIds.size ? await ctx.tx.inboxMessage.findMany({
+        where: { messageId: { in: [...inboundIds] }, eventType: "transfer.announced.v1" },
+        select: { issuerInstanceId: true, messageId: true, eventId: true } }) : [];
+      if (upstreamInbox.length !== inboundIds.size)
+        throw new DomainError("FEDERATION_SOURCE_INBOX_MISSING", 422);
+      const upstreamReferences = upstreamInbox.map((row) => ({ issuerInstanceId: row.issuerInstanceId,
+        messageId: row.messageId, eventId: row.eventId })).sort((a, b) =>
+        a.issuerInstanceId.localeCompare(b.issuerInstanceId) || a.messageId.localeCompare(b.messageId));
       const occurredAt = updated.confirmedAt!.toISOString();
       const payload = { schemaVersion: "1.0", messageId: randomUUID(), eventId: randomUUID(),
         eventType: "transfer.announced.v1", issuerInstanceId: instanceId,
         recipientInstanceId: destination.issuerInstanceId, occurredAt, publishedAt: occurredAt,
         correlationId: doc.correlationId, causationId: issue.id,
         sourceDocument: { type: "partner_transfer", id, version: updated.version }, lots,
-        upstreamReferences: [], evidence: [], sharingPolicyVersion: "v1",
+        upstreamReferences, evidence: [], sharingPolicyVersion: "v1",
         linkedIssueId: issue.id, sentQuantity: doc.lines.reduce((sum, line) => sum.add(line.quantity!), new Decimal(0)).toFixed() };
       ctx.emit({ aggregateType: "document", aggregateId: id, aggregateVersion: updated.version,
         eventType: "transfer.announced.v1", schemaVersion: "1", payload,
@@ -165,8 +209,9 @@ export function createTransferService(ports: TransferPorts, instanceId: string) 
       for (const event of ports.transferEvent({ id, linkedIssueId: issue.id,
         destinationPartnerId: destination.id, version: updated.version,
         correlationId: doc.correlationId, occurredAt,
-        lines: lots.map((lot) => ({ sourceLineId: lot.sourceLineId, batchId: lot.senderBatch.batchId,
-          originLot: lot.originLot, quantity: lot.quantity, unit: lot.unit })) })) ctx.emit(event);
+        lines: doc.lines.map((line, index) => ({ sourceLineId: line.sourceIssueLineId!,
+          batchId: lots[index]!.senderBatch.batchId, originLot: lots[index]!.originLot,
+          quantity: lots[index]!.quantity, unit: lots[index]!.unit })) })) ctx.emit(event);
       await ports.audit(ctx.tx, { actorSub: ctx.actor.userId, action: "trading.transfer.confirm", id,
         requestId: ctx.requestId, before: doc.status, after: "confirmed", version: updated.version });
       return { id, status: "confirmed", version: updated.version, confirmedAt: occurredAt, movementIds: [] };

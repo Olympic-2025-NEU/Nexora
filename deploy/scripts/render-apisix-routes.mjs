@@ -19,7 +19,7 @@ if (!envFile) {
 
 const root = resolve(fileURLToPath(import.meta.url), "../..");
 const env = parseEnv(readFileSync(resolve(envFile), "utf8"));
-const required = ["OIDC_ISSUER_URL", "OIDC_GATEWAY_CLIENT_ID", "OIDC_GATEWAY_CLIENT_SECRET"];
+const required = ["OIDC_BASE_URL", "OIDC_GATEWAY_CLIENT_ID", "OIDC_GATEWAY_CLIENT_SECRET"];
 for (const key of required) {
   if (!env[key] || String(env[key]).includes("CHANGE_ME_")) {
     console.error(`Missing or unsubstituted ${key} in ${envFile}`);
@@ -30,7 +30,7 @@ for (const key of required) {
 const erpUpstream = (env.ERP_UPSTREAM || "erp:3000").trim();
 const template = readFileSync(resolve(root, "apisix/routes.yaml"), "utf8");
 let rendered = template
-  .replaceAll("${OIDC_ISSUER_URL}", env.OIDC_ISSUER_URL)
+  .replaceAll("${OIDC_BASE_URL}", env.OIDC_BASE_URL)
   .replaceAll("${OIDC_GATEWAY_CLIENT_ID}", env.OIDC_GATEWAY_CLIENT_ID)
   .replaceAll("${OIDC_GATEWAY_CLIENT_SECRET}", env.OIDC_GATEWAY_CLIENT_SECRET)
   .replaceAll("${ERP_UPSTREAM}", erpUpstream);

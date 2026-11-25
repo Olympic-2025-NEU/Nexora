@@ -6,6 +6,7 @@ import { classifyFederationReplay, FederationContractError,
 import type { PartnerActor } from "../../../platform/identity/partner-actor";
 import { assertAcyclic, resolveInbox,
   resolvePendingDependencies } from "./identity-mapping";
+import { applyBusinessReceipt } from "./apply-business-receipt";
 
 export type TechnicalAck = { messageId: string; ackId: string; acceptedAt: string;
   status: "validated" | "pending_dependency" };
@@ -60,7 +61,10 @@ export async function receiveFederationEvent(db: PrismaClient, raw: string,
       schemaVersion: envelope.schemaVersion, payloadSha256: hash,
       payload: envelope as Prisma.InputJsonObject, partnerId: actor.partnerId,
       state: "validated" } });
-    const state = await resolveInbox(tx, inboxId);
+    let state: "validated" | "pending_dependency" | "applied_to_trace" = "validated";
+    if (envelope.eventType === "receipt.confirmed.v1")
+      await applyBusinessReceipt(tx, envelope, inboxId, actor.partnerId, receiverInstanceId);
+    else state = await resolveInbox(tx, inboxId);
     if (state === "pending_dependency") ack.status = "pending_dependency";
     await tx.partnerAck.create({ data: { id: randomUUID(), inboxId,
       ackId: ack.ackId, ackStatus: ack.status,

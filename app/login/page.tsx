@@ -20,6 +20,7 @@ function LoginForm() {
   const next = search.get("next") || "/admin";
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [totp, setTotp] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -27,7 +28,7 @@ function LoginForm() {
     e.preventDefault();
     setBusy(true);
     setError(null);
-    const result = await loginWithPassword({ username, password });
+    const result = await loginWithPassword({ username, password, totp: totp.trim() || undefined });
     setBusy(false);
     if (!result.ok) {
       setError(result.message);
@@ -63,6 +64,11 @@ function LoginForm() {
           onChange={(e) => setPassword(e.target.value)}
           required
         />
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor="totp">{t("auth.totp")}</Label>
+        <Input id="totp" inputMode="numeric" autoComplete="one-time-code"
+          pattern="[0-9]{6,8}" value={totp} onChange={(event) => setTotp(event.target.value)} />
       </div>
       {error ? (
         <p className="text-sm text-destructive" role="alert">
