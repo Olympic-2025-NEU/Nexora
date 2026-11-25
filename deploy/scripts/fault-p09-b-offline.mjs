@@ -5,6 +5,7 @@ import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { parseEnv } from "node:util";
+import { demoProject } from "./demo-project.mjs";
 
 if (process.env.DEMO_ONLY !== "true") throw new Error("DEMO_ONLY=true required");
 const root = resolve(import.meta.dirname, "../..");
@@ -17,7 +18,7 @@ const instances = Object.fromEntries("abc".split("").map((name) => {
 }));
 const composeArgs = ["compose", "-f", "deploy/compose.yml", "-f", "deploy/compose.local-admin.yml",
   "-f", "deploy/compose.federation-demo.yml", "--env-file", "deploy/instances/b.env",
-  "-p", "nexora-b", "--profile", "apps"];
+  "-p", demoProject("b"), "--profile", "apps"];
 function compose(action) {
   const result = spawnSync("docker", [...composeArgs, action, "gateway", "erp"],
     { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });

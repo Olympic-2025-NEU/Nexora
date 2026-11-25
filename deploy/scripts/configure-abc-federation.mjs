@@ -6,6 +6,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { parseEnv } from "node:util";
 import { PrismaClient } from "@prisma/client";
+import { demoProject } from "./demo-project.mjs";
 
 if (process.env.DEMO_ONLY !== "true") throw new Error("DEMO_ONLY=true required");
 const root = resolve(import.meta.dirname, "../..");
@@ -20,7 +21,7 @@ for (const layout of layouts) {
   const env = parseEnv(readFileSync(path, "utf8"));
   if (env.INSTANCE_ID !== layout.instance || env.ORG_CODE !== `ORG-${layout.instance.toUpperCase()}`)
     throw new Error(`Demo identity mismatch: ${layout.instance}`);
-  const project = `nexora-${layout.instance}`;
+  const project = demoProject(layout.instance);
   const compose = spawnSync("docker", ["compose", "-f", "deploy/compose.yml",
     "--env-file", path, "-p", project, "ps", "-q", "postgres"],
   { cwd: root, encoding: "utf8" });
@@ -37,7 +38,8 @@ for (const layout of layouts) {
   const db = new PrismaClient({ datasources: { db: { url: url.href } } });
   try {
     const org = await db.organization.findUniqueOrThrow({ where: { singletonSlot: 1 } });
-    if (org.instanceId !== project) throw new Error(`Database identity mismatch: ${project}`);
+    if (org.instanceId !== `nexora-${layout.instance}`)
+      throw new Error(`Database identity mismatch: ${project}`);
     for (const peer of layout.peers) {
       const outgoingId = env[`FEDERATION_OUTBOUND_CLIENT_${peer.outgoing}_ID`];
       const incomingId = env[`FEDERATION_INBOUND_CLIENT_${peer.incoming}_ID`];

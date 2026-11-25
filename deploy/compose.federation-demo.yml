@@ -29,4 +29,4 @@ services:
 networks:
   federation:
     external: true
-    name: nexora-federation
+    name: ${FEDERATION_NETWORK_NAME:-nexora-federation}

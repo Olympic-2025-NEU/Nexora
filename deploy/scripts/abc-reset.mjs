@@ -5,6 +5,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { parseEnv } from "node:util";
 import { validateConfig } from "../config.mjs";
+import { demoProject } from "./demo-project.mjs";
 
 const instance = process.argv[2];
 if (process.env.DEMO_ONLY !== "true" || !/^[abc]$/.test(instance ?? "")) {
@@ -20,7 +21,7 @@ if (values.INSTANCE_ID !== instance || values.ORG_CODE !== `ORG-${instance.toUpp
     values.APISIX_RENDERED_PATH !== `./instances/${instance}/apisix.generated.yaml`) {
   throw new Error("Reset refused: demo identity mismatch");
 }
-const project = `nexora-${instance}`;
+const project = demoProject(instance);
 const args = ["compose", "-f", "deploy/compose.yml",
   "-f", "deploy/compose.local-admin.yml", "--env-file", file,
   "-p", project, "--profile", "apps", "--profile", "core",

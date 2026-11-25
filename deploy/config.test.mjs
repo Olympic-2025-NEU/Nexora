@@ -6,11 +6,28 @@ import { parseEnv } from "node:util";
 import { test } from "node:test";
 import { strict as assert } from "node:assert";
 import { validateConfig } from "./config.mjs";
+import { demoProject } from "./scripts/demo-project.mjs";
 
 const examples = ["a", "b", "c"].map((instance) => {
   const text = readFileSync(new URL(`./instances/${instance}.env.example`, import.meta.url), "utf8")
     .replace(/CHANGE_ME_[A-Z0-9_]+/g, (marker) => marker.replace("CHANGE_ME_", "localonly_"));
   return parseEnv(text);
+});
+
+test("G09 project prefix is isolated and allowlisted", () => {
+  const previous = process.env.NEXORA_DEMO_PROJECT_PREFIX;
+  try {
+    delete process.env.NEXORA_DEMO_PROJECT_PREFIX;
+    assert.equal(demoProject("a"), "nexora-a");
+    process.env.NEXORA_DEMO_PROJECT_PREFIX = "nexora-g09";
+    assert.equal(demoProject("b"), "nexora-g09-b");
+    process.env.NEXORA_DEMO_PROJECT_PREFIX = "production";
+    assert.throws(() => demoProject("c"), /Unsupported demo project prefix/);
+    assert.throws(() => demoProject("other"), /Expected a\|b\|c/);
+  } finally {
+    if (previous === undefined) delete process.env.NEXORA_DEMO_PROJECT_PREFIX;
+    else process.env.NEXORA_DEMO_PROJECT_PREFIX = previous;
+  }
 });
 
 test("all instance contracts parse and isolate ports, buckets and credentials", () => {
