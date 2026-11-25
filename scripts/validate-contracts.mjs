@@ -148,7 +148,9 @@ function checkOpenApi() {
         }
         const schema = op.responses[code].content?.["application/json"]?.schema;
         assert(schema && !JSON.stringify(schema).includes("Generic"), `Untyped response: ${name}`);
-        if (path === "/api/v1/federation/events" || path.startsWith("/api/v1/health/")) {
+        if (path === "/api/v1/federation/events" || path.startsWith("/api/v1/health/") ||
+            path.startsWith("/api/v1/admin/retries") ||
+            path.startsWith("/api/v1/admin/federation/operations")) {
           assert(schema.$ref, `Protocol response must be raw: ${name}`);
         } else assert(schema.properties?.data && schema.properties?.requestId, `Envelope missing: ${name}`);
       }

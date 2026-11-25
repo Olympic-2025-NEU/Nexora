@@ -68,6 +68,7 @@ export const APP_NAV: NavItem[] = [
 ];
 
 export const ADMIN_NAV: NavItem[] = [
+  { href: "/admin/federation", labelKey: "nav.federationOperations", roles: ["administrator"] },
   {
     href: "/admin/organization",
     labelKey: "nav.organization",

@@ -55,9 +55,9 @@
 
 ## P09-T08 — Quan sát, bảo mật và vận hành federation
 
-- [ ] Metrics queue lag, attempts/dead-letter, inbox conflict, mapping gaps, business receipt pending/dispute; correlation xuyên A/B/C mà không log token/PII.
-- [ ] Runbook rotate credential, replay message, reprocess pending, resolve dispute; thao tác admin được audit và giới hạn quyền.
-- [ ] Load/fault tests: duplicate burst, timeout, clock skew, oversized payload, rate limit, schema version mismatch, B down/recover.
+- [x] Metrics queue lag, attempts/dead-letter, inbox conflict, mapping gaps, business receipt pending/dispute; correlation xuyên A/B/C mà không log token/PII.
+- [x] Runbook rotate credential, replay message, reprocess pending, resolve dispute; thao tác admin được audit và giới hạn quyền.
+- [x] Load/fault tests: duplicate burst, timeout, clock skew, oversized payload, rate limit, schema version mismatch, B down/recover. [Bằng chứng T08](evidence/p09-t08.md).
 - **Đầu ra:** dashboards/runbook/failure tests; **kiểm chứng:** operator chẩn đoán được một failed transfer từ message ID.
 
 ## P09-T09 — Gate G09

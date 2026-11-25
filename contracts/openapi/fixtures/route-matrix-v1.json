@@ -45,6 +45,38 @@
       ]
     },
     {
+      "method": "GET",
+      "path": "/api/v1/admin/federation/operations",
+      "auth": "protected",
+      "roles": ["administrator"],
+      "scope": "resource",
+      "success": ["200"]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/federation/operations",
+      "auth": "protected",
+      "roles": ["administrator"],
+      "scope": "resource",
+      "success": ["202"]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/retries",
+      "auth": "protected",
+      "roles": ["administrator"],
+      "scope": "resource",
+      "success": ["200"]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/retries",
+      "auth": "protected",
+      "roles": ["administrator"],
+      "scope": "resource",
+      "success": ["202"]
+    },
+    {
       "method": "POST",
       "path": "/api/v1/approvals/{id}/decisions",
       "auth": "protected",

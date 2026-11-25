@@ -127,6 +127,29 @@ test("B offline and lost ACK keep same payload for a restarted worker retry", as
   assert.equal(JSON.parse(sentBodies[0]).messageId, payload.messageId);
 });
 
+test("timeout and rate limit retry the same envelope before a valid ACK", async () => {
+  const f = fixture();
+  const bodies: string[] = [];
+  let sends = 0;
+  const fetcher: typeof fetch = async (url, init) => {
+    if (String(url).includes("identity")) return tokenResponse();
+    bodies.push(String(init?.body));
+    sends++;
+    if (sends === 1) throw new DOMException("timeout", "TimeoutError");
+    if (sends === 2) return new Response("rate limit", { status: 429 });
+    return ackResponse();
+  };
+  for (const code of ["OUTBOUND_TIMEOUT", "PARTNER_UNAVAILABLE"]) {
+    await assert.rejects(createFederationOutboundHandler(f.db, "A", {
+      resolveSecret: async () => "test-secret", fetcher })(f.message), { code });
+  }
+  await createFederationOutboundHandler(f.db, "A", {
+    resolveSecret: async () => "test-secret", fetcher })(f.message);
+  assert.deepEqual(f.attempts.map((row) => row.result), ["retry", "retry", "ack"]);
+  assert.deepEqual(f.attempts.map((row) => row.errorCode), ["OUTBOUND_TIMEOUT", "PARTNER_UNAVAILABLE", null]);
+  assert.ok(bodies.every((body) => body === bodies[0]));
+});
+
 test("admin retry reset keeps delivery attempt numbers monotonic", async () => {
   const f = fixture();
   const handler = createFederationOutboundHandler(f.db, "A", {

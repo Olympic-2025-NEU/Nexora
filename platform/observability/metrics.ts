@@ -6,7 +6,7 @@ const destinations = new Set(["workflow", "local", "traceability", "federation"]
 const states = ["requested", "starting", "pending", "decision_pending"];
 
 export async function workMetrics(db: PrismaClient): Promise<string> {
-  const [outbox, workflow, ages] = await Promise.all([
+  const [outbox, workflow, ages, federationQueue, attempts, inbox, receipts] = await Promise.all([
     db.$queryRaw<{ destination: string; pending: bigint; retry: bigint; dead: bigint }[]>`
       SELECT destination, count(*) FILTER (WHERE status = 'pending') AS pending,
         count(*) FILTER (WHERE status = 'pending' AND attempt_count > 0) AS retry,
@@ -21,6 +21,19 @@ export async function workMetrics(db: PrismaClient): Promise<string> {
         FROM platform.outbox_message WHERE status IN ('pending', 'leased')), 0) AS outbox_age,
         COALESCE((SELECT EXTRACT(EPOCH FROM now() - min(created_at))::float8
         FROM platform.approval_request WHERE state IN ('requested', 'starting', 'pending', 'decision_pending')), 0) AS workflow_age`,
+    db.$queryRaw<{ oldest_age: number; due: bigint }[]>`
+      SELECT COALESCE(EXTRACT(EPOCH FROM now() - min(created_at))::float8, 0) AS oldest_age,
+        count(*) FILTER (WHERE next_attempt_at <= now()) AS due
+      FROM platform.outbox_message WHERE destination = 'federation'
+        AND status IN ('pending', 'leased', 'retry_due')`,
+    db.$queryRaw<{ result: string; total: bigint }[]>`
+      SELECT result, count(*) AS total FROM federation.delivery_attempt GROUP BY result`,
+    db.$queryRaw<{ state: string; total: bigint }[]>`
+      SELECT state, count(*) AS total FROM federation.inbox_message GROUP BY state`,
+    db.$queryRaw<{ delivery_state: string; total: bigint }[]>`
+      SELECT td.delivery_state, count(*) AS total FROM trading.transfer_detail td
+      JOIN trading.document d ON d.id = td.document_id WHERE d.status = 'confirmed'
+      GROUP BY td.delivery_state`,
   ]);
   const lines: string[] = [];
   const counts = new Map<string, { pending: number; retry: number; dead: number }>();
@@ -49,5 +62,13 @@ export async function workMetrics(db: PrismaClient): Promise<string> {
   for (const [reason, count] of failed) lines.push(`workflow_failed{halt_reason="${reason}"} ${count}`);
   lines.push(`outbox_oldest_pending_age_seconds ${Math.max(0, ages[0].outbox_age)}`,
     `workflow_oldest_pending_age_seconds ${Math.max(0, ages[0].workflow_age)}`);
+  lines.push(`federation_queue_oldest_age_seconds ${Math.max(0, federationQueue[0].oldest_age)}`,
+    `federation_queue_due ${Number(federationQueue[0].due)}`);
+  for (const result of ["ack", "retry", "permanent_failure"])
+    lines.push(`federation_delivery_attempts{result="${result}"} ${Number(attempts.find((row) => row.result === result)?.total ?? 0)}`);
+  for (const state of ["validated", "pending_dependency", "applied_to_trace", "rejected"])
+    lines.push(`federation_inbox{state="${state}"} ${Number(inbox.find((row) => row.state === state)?.total ?? 0)}`);
+  for (const state of ["pending", "technical_ack", "received", "partial", "disputed"])
+    lines.push(`federation_business_receipt{state="${state}"} ${Number(receipts.find((row) => row.delivery_state === state)?.total ?? 0)}`);
   return lines.join("\n") + "\n";
 }

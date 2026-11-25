@@ -11,7 +11,7 @@ const WRITER = ["administrator", "staff"];
 const filterTypes = {
   cursor: str(), limit: { type: "integer", minimum: 1, maximum: 100, default: 20 },
   depth: { type: "integer", minimum: 1, maximum: 10 },
-  id: uuid, documentId: uuid, warehouseId: uuid, productId: uuid, batchId: uuid, partnerId: uuid,
+  id: uuid, documentId: uuid, warehouseId: uuid, productId: uuid, batchId: uuid, partnerId: uuid, messageId: uuid,
   targetId: str({ maxLength: 128 }), requestId: str({ maxLength: 128 }),
   download: str({ enum: ["1"] }),
   from: str({ format: "date-time" }), to: str({ format: "date-time" }),
@@ -298,6 +298,21 @@ add("get", "/api/v1/audit-logs", "Operations", "Query audit logs", "AuditEntry",
   errors: [400, 401, 403, 429, 503],
   description: "Administrator-only audit query. Filters are allowlisted and summaries are never returned.",
 });
+add("get", "/api/v1/admin/retries", "Operations", "List dead letters and halted approvals",
+  "OpsRetriesView", { roles: ADMIN, raw: true, errors: [401, 403, 429, 503],
+    description: "Administrator-only redacted operations list; no payload or token." });
+add("post", "/api/v1/admin/retries", "Operations", "Retry one dead-letter outbox message",
+  "OpsRetryResult", { roles: ADMIN, raw: true, body: "OpsRetryInput", status: 202,
+    errors: [400, 401, 403, 404, 409, 429, 503],
+    description: "Only dead_letter may be reset; immutable envelope is retried and action audited." });
+add("get", "/api/v1/admin/federation/operations", "Operations", "Inspect local federation operations",
+  "OpsFederationView", { roles: ADMIN, raw: true, query: ["messageId"],
+    errors: [400, 401, 403, 429, 503],
+    description: "Find sender outbox/attempts or receiver inbox by envelope message ID. Redacted response, no payload, no-store." });
+add("post", "/api/v1/admin/federation/operations", "Operations", "Reprocess one pending federation inbox",
+  "OpsReprocessResult", { roles: ADMIN, raw: true, body: "OpsReprocessInput", status: 202,
+    errors: [400, 401, 403, 404, 409, 429, 503],
+    description: "Re-evaluate one pending_dependency row under lock and audit state before/after." });
 list("/api/v1/reports/inventory-summary", "Operations", "Inventory summary", "InventorySummary", WRITER, ["warehouseId", "productId"]);
 add("get", "/api/v1/reports/document-counts", "Operations", "Document counts", arr(ref("DocumentCount")), { query: ["from", "to", "type", "status"] });
 list("/api/v1/reports/open-quality-signals", "Operations", "Open quality signals", "QualitySignal", ADMIN, ["severity"]);

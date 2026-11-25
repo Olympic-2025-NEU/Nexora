@@ -1,6 +1,14 @@
 {
   "schemaVersion": 1,
   "cases": {
+    "OpsRetryInput": {
+      "valid": { "messageId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" },
+      "invalid": { "messageId": "not-a-uuid" }
+    },
+    "OpsReprocessInput": {
+      "valid": { "action": "reprocess", "inboxId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" },
+      "invalid": { "action": "reprocess", "inboxId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "payload": {} }
+    },
     "FederationSummaryPublishInput": {
       "valid": { "recipientInstanceId": "nexora-c" },
       "invalid": { "recipientInstanceId": "" }

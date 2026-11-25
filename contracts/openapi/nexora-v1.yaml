@@ -5607,6 +5607,144 @@ paths:
           $ref: "#/components/responses/Error"
         "503":
           $ref: "#/components/responses/Error"
+  /api/v1/admin/retries:
+    get:
+      tags:
+        - Operations
+      operationId: getAdminRetries
+      summary: List dead letters and halted approvals
+      description: Administrator-only redacted operations list; no payload or token.
+      security:
+        - oidc: []
+      x-nexora-roles:
+        - administrator
+      x-nexora-scope: resource
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpsRetriesView"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
+    post:
+      tags:
+        - Operations
+      operationId: postAdminRetries
+      summary: Retry one dead-letter outbox message
+      description: Only dead_letter may be reset; immutable envelope is retried and action audited.
+      security:
+        - oidc: []
+      x-nexora-roles:
+        - administrator
+      x-nexora-scope: resource
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OpsRetryInput"
+      responses:
+        "202":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpsRetryResult"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
+  /api/v1/admin/federation/operations:
+    get:
+      tags:
+        - Operations
+      operationId: getAdminFederationOperations
+      summary: Inspect local federation operations
+      description: Find sender outbox/attempts or receiver inbox by envelope message ID. Redacted response, no payload, no-store.
+      security:
+        - oidc: []
+      x-nexora-roles:
+        - administrator
+      x-nexora-scope: resource
+      parameters:
+        - name: messageId
+          in: query
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpsFederationView"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
+    post:
+      tags:
+        - Operations
+      operationId: postAdminFederationOperations
+      summary: Reprocess one pending federation inbox
+      description: Re-evaluate one pending_dependency row under lock and audit state before/after.
+      security:
+        - oidc: []
+      x-nexora-roles:
+        - administrator
+      x-nexora-scope: resource
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OpsReprocessInput"
+      responses:
+        "202":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpsReprocessResult"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
   /api/v1/reports/inventory-summary:
     get:
       tags:
@@ -8305,6 +8443,314 @@ components:
           type: string
           enum:
             - retry_due
+    OpsRetryInput:
+      type: object
+      additionalProperties: false
+      required:
+        - messageId
+      properties:
+        messageId:
+          type: string
+          format: uuid
+    OpsRetryResult:
+      type: object
+      additionalProperties: false
+      required:
+        - requestId
+        - status
+        - auditId
+      properties:
+        requestId:
+          type: string
+        status:
+          type: string
+          enum:
+            - pending
+        auditId:
+          type: string
+          format: uuid
+    OpsReprocessInput:
+      type: object
+      additionalProperties: false
+      required:
+        - action
+        - inboxId
+      properties:
+        action:
+          type: string
+          enum:
+            - reprocess
+        inboxId:
+          type: string
+          format: uuid
+    OpsReprocessResult:
+      type: object
+      additionalProperties: false
+      required:
+        - requestId
+        - state
+        - auditId
+      properties:
+        requestId:
+          type: string
+        state:
+          type: string
+          enum:
+            - pending_dependency
+            - applied_to_trace
+            - rejected
+        code:
+          type: string
+        auditId:
+          type: string
+          format: uuid
+    OpsRetriesView:
+      type: object
+      additionalProperties: false
+      required:
+        - requestId
+        - deadLetters
+        - haltedApprovals
+      properties:
+        requestId:
+          type: string
+        deadLetters:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              id:
+                type: string
+                format: uuid
+              eventType:
+                type: string
+              destination:
+                type: string
+              aggregateId:
+                type: string
+                format: uuid
+              attemptCount:
+                type: integer
+              lastErrorCode:
+                type: string
+                nullable: true
+              correlationId:
+                type: string
+              ageSeconds:
+                type: integer
+        haltedApprovals:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              id:
+                type: string
+                format: uuid
+              documentId:
+                type: string
+                format: uuid
+              haltReason:
+                type: string
+              flowableProcessId:
+                type: string
+                nullable: true
+              ageSeconds:
+                type: integer
+    OpsFederationView:
+      type: object
+      additionalProperties: false
+      required:
+        - requestId
+        - instanceId
+        - queue
+        - queueOldestAgeSeconds
+        - attempts
+        - inbox
+        - receipts
+        - deadLetters
+        - mappingGaps
+        - receiptCases
+        - lookup
+      properties:
+        requestId:
+          type: string
+        instanceId:
+          type: string
+        queue:
+          type: object
+          additionalProperties:
+            type: integer
+        queueOldestAgeSeconds:
+          type: integer
+        attempts:
+          type: object
+          additionalProperties:
+            type: integer
+        inbox:
+          type: object
+          additionalProperties:
+            type: integer
+        receipts:
+          type: object
+          additionalProperties:
+            type: integer
+        deadLetters:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              messageId:
+                type: string
+                format: uuid
+              eventType:
+                type: string
+              correlationId:
+                type: string
+                nullable: true
+              attempts:
+                type: integer
+              errorCode:
+                type: string
+                nullable: true
+              ageSeconds:
+                type: integer
+        mappingGaps:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              inboxId:
+                type: string
+                format: uuid
+              issuerInstanceId:
+                type: string
+              messageId:
+                type: string
+                format: uuid
+              eventType:
+                type: string
+              state:
+                type: string
+              errorCode:
+                type: string
+                nullable: true
+              ageSeconds:
+                type: integer
+        receiptCases:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              transferId:
+                type: string
+                format: uuid
+              state:
+                type: string
+              ageSeconds:
+                type: integer
+              businessReceiptAt:
+                type: string
+                format: date-time
+                nullable: true
+        lookup:
+          type: object
+          additionalProperties: false
+          required:
+            - outbox
+            - inbox
+          properties:
+            outbox:
+              type: array
+              items:
+                type: object
+                additionalProperties: false
+                properties:
+                  outboxId:
+                    type: string
+                    format: uuid
+                  envelopeMessageId:
+                    type: string
+                    format: uuid
+                    nullable: true
+                  eventType:
+                    type: string
+                  status:
+                    type: string
+                  correlationId:
+                    type: string
+                    nullable: true
+                  attemptCount:
+                    type: integer
+                  errorCode:
+                    type: string
+                    nullable: true
+                  ageSeconds:
+                    type: integer
+                  deliveredAt:
+                    type: string
+                    format: date-time
+                    nullable: true
+                  attempts:
+                    type: array
+                    items:
+                      type: object
+                      additionalProperties: false
+                      properties:
+                        number:
+                          type: integer
+                        result:
+                          type: string
+                        httpStatus:
+                          type: integer
+                          nullable: true
+                        errorCode:
+                          type: string
+                          nullable: true
+                        durationMs:
+                          type: integer
+                          nullable: true
+                        ackStatus:
+                          type: string
+                          nullable: true
+                        at:
+                          type: string
+                          format: date-time
+            inbox:
+              type: array
+              items:
+                type: object
+                additionalProperties: false
+                properties:
+                  inboxId:
+                    type: string
+                    format: uuid
+                  issuerInstanceId:
+                    type: string
+                  messageId:
+                    type: string
+                    format: uuid
+                  eventType:
+                    type: string
+                  state:
+                    type: string
+                  errorCode:
+                    type: string
+                    nullable: true
+                  ackStatus:
+                    type: string
+                    nullable: true
+                  ageSeconds:
+                    type: integer
+                  appliedAt:
+                    type: string
+                    format: date-time
+                    nullable: true
+          nullable: true
     AiChatInput:
       type: object
       additionalProperties: false

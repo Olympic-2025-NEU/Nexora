@@ -58,8 +58,11 @@ test("trusted inbox stores exact ACK, rejects replay conflicts and leaves stock 
   await rejects(message({ recipientInstanceId: "C" }), "WRONG_RECIPIENT", 403);
   await rejects(message({ sharingPolicyVersion: "v2" }), "UNSUPPORTED_SHARING_POLICY", 422);
   await rejects(message({ schemaVersion: "2.0" }), "UNSUPPORTED_SCHEMA", 422);
-  assert.equal(await db.inboxMessage.count(), 1);
-  assert.equal(await db.partnerAck.count(), 1);
+  await rejects(`${message()}${" ".repeat(256 * 1024)}`, "PAYLOAD_TOO_LARGE", 413);
+  const skewed = message({ publishedAt: "2020-01-01T00:00:00.000Z" });
+  assert.equal((await receiveFederationEvent(db, skewed, actor, "B")).status, "pending_dependency");
+  assert.equal(await db.inboxMessage.count(), 2);
+  assert.equal(await db.partnerAck.count(), 2);
   assert.equal(await db.stockMovement.count(), 0);
   const inbox = await db.inboxMessage.findFirstOrThrow({ include: { ack: true } });
   assert.equal(inbox.ack?.responseBody && (inbox.ack.responseBody as { ackId: string }).ackId, ack.ackId);
