@@ -42,9 +42,9 @@
 
 ## P10-T06 — Bảo mật, chất lượng và UX
 
-- [ ] Prompt injection trong mô tả product/file/partner event, tool output chứa lệnh giả, yêu cầu exfiltration, repeated calls và token quota; mọi đường đều giữ allowlist/role.
-- [ ] Log prompt/tool đã redacted, retention và opt-out theo policy; không lưu chain-of-thought nội bộ hay secret. Hiển thị AI có thể sai và nguồn tham chiếu trong UI.
-- [ ] Timeout/circuit breaker, loading/error/retry và fallback “xem dữ liệu trực tiếp” khi model không sẵn sàng.
+- [x] Prompt injection trong mô tả product/file/partner event, tool output chứa lệnh giả, yêu cầu exfiltration, repeated calls và token quota; mọi đường đều giữ allowlist/role. [Bằng chứng T06](evidence/p10-t06.md).
+- [x] Log prompt/tool đã redacted, retention và opt-out theo policy; không lưu chain-of-thought nội bộ hay secret. Hiển thị AI có thể sai và nguồn tham chiếu trong UI.
+- [x] Timeout/circuit breaker, loading/error/retry và fallback “xem dữ liệu trực tiếp” khi model không sẵn sàng.
 - **Đầu ra:** adversarial suite, audit/UX; **kiểm chứng:** không có side effect ngoài Draft hợp lệ.
 
 ## P10-T07 — Gate G10

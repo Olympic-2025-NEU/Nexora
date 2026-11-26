@@ -123,6 +123,8 @@ test("optional local AI requires its own internal secret and forbids unknown pro
   assert.throws(() => validateConfig({ ...examples[0], AI_PROVIDER: "external" }), { message: "Invalid or missing AI_PROVIDER" });
   assert.throws(() => validateConfig({ ...examples[0], AI_PROVIDER: "ollama" }), { message: "Invalid or missing AI_INTERNAL_TOKEN" });
   assert.doesNotThrow(() => validateConfig({ ...examples[0], AI_PROVIDER: "ollama", AI_INTERNAL_TOKEN: "a".repeat(32) }));
+  assert.throws(() => validateConfig({ ...examples[0], AI_PROMPT_RETENTION: "raw" }), { message: "Invalid or missing AI_PROMPT_RETENTION" });
+  assert.doesNotThrow(() => validateConfig({ ...examples[0], AI_PROMPT_RETENTION: "redacted" }));
 });
 
 test("CLI rejects unfilled example without displaying its placeholder", () => {

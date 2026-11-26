@@ -219,6 +219,7 @@
   "assistant": {
     "title": "Tra cứu lô có dẫn nguồn",
     "hint": "Hỏi về lô hàng. Câu trả lời chỉ dùng dữ liệu đã đối chiếu từ tool.",
+    "disclaimer": "AI có thể sai — kiểm tra nguồn trước khi dùng",
     "questionLabel": "Câu hỏi",
     "questionPlaceholder": "Ví dụ: Lô LOT-A-001 của nexora-a còn bao nhiêu?",
     "submit": "Tra cứu",
@@ -231,12 +232,13 @@
     "answerTitle": "Kết quả có dẫn nguồn",
     "verifiedLine": "Đã đối chiếu với {count} lượt gọi tool.",
     "aiUnavailable": "AI tạm không khả dụng. Đang hiển thị dữ liệu trực tiếp từ hệ thống.",
-    "directDataLink": "Xem dữ liệu truy xuất trực tiếp",
+    "directDataLink": "Xem dữ liệu trực tiếp",
     "sourceChip": "Nguồn",
     "asOf": "Tính đến",
     "verification": "Đối chiếu",
     "connector": "Ghi chú AI",
     "error": "Không tra cứu được. Vui lòng thử lại.",
+    "retry": "Thử lại",
     "lookupTab": "Tra cứu",
     "risk": {
       "title": "Cảnh báo rủi ro",

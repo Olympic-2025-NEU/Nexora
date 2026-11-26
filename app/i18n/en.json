@@ -219,6 +219,7 @@
   "assistant": {
     "title": "Sourced Lot Lookup",
     "hint": "Ask about a lot. Answers use only tool-verified data.",
+    "disclaimer": "AI can be wrong — check the source before use",
     "questionLabel": "Question",
     "questionPlaceholder": "Example: How much of LOT-A-001 from nexora-a remains?",
     "submit": "Lookup",
@@ -231,12 +232,13 @@
     "answerTitle": "Sourced answer",
     "verifiedLine": "Verified against {count} tool calls.",
     "aiUnavailable": "AI is temporarily unavailable. Showing direct system data.",
-    "directDataLink": "View direct trace data",
+    "directDataLink": "View data directly",
     "sourceChip": "Source",
     "asOf": "As of",
     "verification": "Verification",
     "connector": "AI note",
     "error": "Lookup failed. Please try again.",
+    "retry": "Retry",
     "lookupTab": "Lookup",
     "risk": {
       "title": "Risk alerts",

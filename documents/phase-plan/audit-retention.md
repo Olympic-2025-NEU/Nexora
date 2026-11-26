@@ -14,6 +14,7 @@
 - Backup audit nằm trong backup app DB ở P03-T06. Bản export điều tra dùng `pg_dump`/`pg_restore` với credential **migrator** ở môi trường vận hành cách ly, mã hóa ở nơi lưu, phân quyền chỉ người được giao, không commit bản dump. Xuất phạm vi audit: `pg_dump --data-only --table=platform.audit_log --format=custom --file=<secure-path> <database>`; manifest phải có SHA-256, mốc thời gian, instance ID và reference tới secret key, không có secret thô.
 - Trước mọi purge trong phase vận hành sau: kiểm export/backup đã hoàn tất, restore thử sang DB khác, đối chiếu row count và checksum, rồi mới chạy job bảo trì có audit vận hành. Không UPDATE row cũ để “redact” sau khi ghi; phải ngăn PII ở application và xử lý yêu cầu dữ liệu bằng quy trình quản trị riêng.
 - Security log deny/failure dùng structured reason code và ID request đã kiểm tra; không chứa token/PII. Gửi sang hệ thống log nội bộ theo retention bảo mật của instance, không coi log này thay `platform.audit_log` cho command thành công.
+- AI (P10-T06): `AI_PROMPT_RETENTION=none` là mặc định/opt-out; `redacted` chỉ giữ metadata structured đã sanitize (`quantity`, `unit`, `sourceIds`, `asOf`, `verification`, `count`). Raw prompt, câu trả lời model, token nội bộ và canary/PII không bao giờ được lưu. Đây là cờ env của operator, không có settings UI.
 
 ## Điểm tích hợp còn phải kiểm
 

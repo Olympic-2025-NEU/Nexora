@@ -179,6 +179,7 @@ export function validateConfig(env, service) {
     if (env[name].startsWith("env:") && (!env[key] || env[key].startsWith("CHANGE_ME_"))) fail(name);
   }
   if (!["none", "ollama"].includes(env.AI_PROVIDER)) fail("AI_PROVIDER");
+  if (!["none", "redacted"].includes(env.AI_PROMPT_RETENTION ?? "none")) fail("AI_PROMPT_RETENTION");
   if (env.AI_KEY_REF) check("AI_KEY_REF", env.AI_KEY_REF, "ref");
   if (env.AI_PROVIDER === "ollama" && (!env.AI_INTERNAL_TOKEN ||
       env.AI_INTERNAL_TOKEN.length < 32 || env.AI_INTERNAL_TOKEN.startsWith("CHANGE_ME_"))) {
