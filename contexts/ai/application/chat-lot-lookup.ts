@@ -3,6 +3,7 @@ import { checkPolicy } from "@/platform/access/policy";
 import type { Actor } from "@/platform/identity/actor";
 import { DomainError } from "@/platform/kernel/errors";
 import type { ToolContext } from "./ports";
+import { evaluateRisk, type RiskAlert, type RiskFactBundle, type RiskUnknown } from "./risk-rules";
 
 type Verification = "local_verified" | "partner_asserted" | "missing";
 type FactKind = "quantity" | "unit" | "batchCode" | "issuer" | "eventType" | "gap";
@@ -106,6 +107,8 @@ export type ChatResponse =
     sources: AnswerChip[];
     auditRequestId: string;
     aiUnavailable: boolean;
+    riskAlerts: RiskAlert[];
+    riskUnknowns: RiskUnknown[];
     truncated: FactBundle["truncated"];
     hidden: FactBundle["hidden"];
     toolCalls: number;
@@ -284,6 +287,19 @@ export function buildFactBundle(lot: Row, stock: Row, trace: Row, fallbackAsOf: 
   };
 }
 
+export function buildRiskBundle(lot: Row, bundle: FactBundle): RiskFactBundle {
+  return {
+    facts: bundle.facts.map((fact) => ({ kind: fact.kind, value: fact.value,
+      sourceId: fact.sourceId, asOf: fact.asOf, verification: fact.verification })),
+    batchId: text(lot.batchId),
+    expiresOn: typeof lot.expiresOn === "string" ? lot.expiresOn : null,
+    qualityStatus: typeof lot.qualityStatus === "string" ? lot.qualityStatus : null,
+    unit: bundle.unit,
+    verification: bundle.verification,
+    gaps: bundle.gaps,
+  };
+}
+
 export function renderAnswer(bundle: FactBundle): string {
   const parts = [`Lô ${bundle.lotCode} (issuer ${bundle.issuer}, sản phẩm ${bundle.productName}).`];
   parts.push(`Tổng tồn hiện tại: ${bundle.quantity} ${bundle.unit}, tính đến ${bundle.asOf}, nguồn ${bundle.facts[0]?.sourceId ?? ""}.`);
@@ -335,6 +351,7 @@ export async function runChatLotLookup(input: unknown, deps: ChatDependencies): 
     direction: "backward", depth: 3 }, ctx));
   const bundle = buildFactBundle(resolution.lot ?? {}, stock, trace,
     (deps.now ?? (() => new Date()))().toISOString());
+  const risk = evaluateRisk(buildRiskBundle(resolution.lot ?? {}, bundle), bundle.asOf);
   let connector: string | null = null;
   let aiUnavailable = false;
   if (deps.generate) {
@@ -356,6 +373,7 @@ export async function runChatLotLookup(input: unknown, deps: ChatDependencies): 
   return { status: "answered", answer, connector, facts: bundle.facts,
     sources: bundle.facts.map((fact) => ({ kind: fact.kind, value: fact.value,
       sourceId: fact.sourceId, asOf: fact.asOf, verification: fact.verification })),
-    auditRequestId: deps.requestId, aiUnavailable,
-    truncated: bundle.truncated, hidden: bundle.hidden, toolCalls, requestId: deps.requestId };
+    auditRequestId: deps.requestId, aiUnavailable, riskAlerts: risk.alerts,
+    riskUnknowns: risk.unknowns, truncated: bundle.truncated, hidden: bundle.hidden,
+    toolCalls, requestId: deps.requestId };
 }

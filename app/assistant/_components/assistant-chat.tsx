@@ -8,6 +8,7 @@ import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
 import { useT } from "@/app/i18n/LocaleProvider";
 import { AssistantDraft } from "./assistant-draft";
+import { RiskAlerts, type RiskAlertView, type RiskUnknownView } from "./risk-alerts";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -17,6 +18,7 @@ type Answered = {
   status: "answered"; answer: string; connector: string | null; facts: Chip[]; sources: Chip[];
   auditRequestId: string; aiUnavailable: boolean; truncated: { balances: boolean; events: boolean };
   hidden: { balances: number; events: number }; toolCalls: number; requestId: string;
+  riskAlerts?: RiskAlertView[]; riskUnknowns?: RiskUnknownView[];
 };
 type Ambiguous = { status: "ambiguous"; candidates: Candidate[]; requestId: string };
 type NotFound = { status: "not_found"; hint: string; requestId: string };
@@ -217,6 +219,8 @@ export function AssistantChat() {
               ))}
             </div>
           </div>
+
+          <RiskAlerts alerts={result.riskAlerts ?? []} unknowns={result.riskUnknowns ?? []} />
         </div>
       ) : null}
       </div>

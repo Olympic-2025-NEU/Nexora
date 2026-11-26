@@ -53,6 +53,8 @@ async function seedAiDemoLot(prisma, admin) {
   const localCode = "LOT-A-001";
   const originIssuerInstanceId = "nexora-b";
   const originLotId = stableUuid("b", "batch");
+  // ponytail: fixed date keeps seed idempotent; refresh after 2026-12-08.
+  const expiresOn = new Date("2026-12-08T00:00:00.000Z");
   const product = await prisma.product.upsert({
     where: { id: stableUuid("a", "ai-demo-product") },
     create: { id: stableUuid("a", "ai-demo-product"), name: "Demo Product AI B",
@@ -84,8 +86,8 @@ async function seedAiDemoLot(prisma, admin) {
     create: { id: stableUuid("a", "ai-demo-batch"), productId: product.id,
       productVariantId: variant.id, localCode, originIssuerInstanceId, originLotId,
       qualityStatus: "available", sourcePartnerId: partner?.id ?? null,
-      createdBySub: admin.keycloakSub },
-    update: {},
+      expiresOn, createdBySub: admin.keycloakSub },
+    update: { expiresOn },
   });
   return { batchId: batch.id, productVariantId: variant.id, sku, localCode,
     originIssuerInstanceId, originLotId };

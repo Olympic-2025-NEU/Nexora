@@ -34,10 +34,11 @@
 
 ## P10-T05 — Rule-based risk và giới hạn suy luận
 
-- [ ] Rule minh bạch cho expiry gần hạn, discrepancy, thiếu nguồn, repeated retry hoặc chất lượng restricted; ghi rule version/threshold và source IDs.
-- [ ] Risk chỉ tạo recommendation/alert, không tự khóa lô/đổi tồn/xác nhận; false positive được người dùng xem và ghi phản hồi.
-- [ ] Test deterministic cho từng rule và trường hợp dữ liệu thiếu; không gọi điểm rủi ro là dự đoán xác suất nếu không được hiệu chuẩn.
+- [x] Rule minh bạch cho expiry gần hạn, discrepancy, thiếu nguồn và chất lượng restricted; ghi rule version/threshold và source IDs. `REPEATED_RETRY` hoãn T05b (R2).
+- [x] Risk chỉ tạo recommendation/alert, không tự khóa lô/đổi tồn/xác nhận; false positive được người dùng xem và ghi phản hồi.
+- [x] Test deterministic cho từng rule và trường hợp dữ liệu thiếu; không gọi điểm rủi ro là dự đoán xác suất nếu không được hiệu chuẩn. [Bằng chứng T05](evidence/p10-t05.md).
 - **Đầu ra:** risk insight + explanation; **kiểm chứng:** cùng fixture cho cùng kết quả.
+- **R2 (Chairman):** `REPEATED_RETRY` cắt khỏi v1, hoãn sang **T05b** như tiền lệ T04b. Tool output chưa có counter retry; T02 quota và T06 adversarial giữ phần còn lại. Không tính rule này là xong trong T05.
 
 ## P10-T06 — Bảo mật, chất lượng và UX
 
@@ -60,6 +61,6 @@
 | P10-T02 | `services/ai/tools/` JSON Schemas cho 5 tools trong `ui-ai-spec-v1.md`; delegated actor scoped + backend authz/audit. | Staff ngoài warehouse 403; AI không có Admin DB/confirm/approve tool; mỗi tool call có source ID/request ID. |
 | P10-T03 | `/ai/chat` lot resolver theo `(issuer,lot)`/batchId, getLot/getTrace, answer sources/asOf/verification; UI `/assistant`. Panel lot/document **hoãn (R8)** sang T03b hoặc T06. | Cùng lot code hai issuer → hỏi lại; số lượng khớp API; gap/upstream offline được nói rõ, không bịa GS1 chứng nhận. |
 | P10-T04 | `/ai/draft` (proposal) và `/ai/draft/create` chỉ gọi `createReceiptDraft` (issue → T04b), UI DraftReview trong `/assistant`; server bỏ `status/confirmedBy` client. | AI tạo Draft không movement; human edit/submit/approve/confirm qua M03; prompt “confirm ngay” không tạo confirmed row. |
-| P10-T05 | `services/ai/risk-rules.py` hoặc TypeScript rule adapter theo 4 rule trong `ui-ai-spec-v1.md`, output `{ruleId,ruleVersion,sourceIds,asOf,severity}`. | Same fixture→same risk, no automatic stock/status changes; missing data→unknown/gap. |
+| P10-T05 | TypeScript rule adapter `contexts/ai/application/risk-rules.ts` theo 4 rule trong `ui-ai-spec-v1.md`, output `{ruleId,ruleVersion,sourceIds,asOf,severity,explanation}`; `REPEATED_RETRY` → T05b. | Same fixture→same risk, no automatic stock/status changes; missing data→unknown/gap. |
 | P10-T06 | `tests/ai/adversarial.*`: injection trong product/partner/file text, role escape, quota, timeout; redacted logging/UI error states. | Không exfiltrate/SQL/confirm; provider down có fallback link, tool audit không ghi prompt secret. |
 | P10-T07 | `evidence/G10.md` AC-10/11 fixture Q&A, Draft state/balance, tool audit, negative/provider failure tests. | AI service không DB write credential, stock chỉ đổi do human M03 action. |

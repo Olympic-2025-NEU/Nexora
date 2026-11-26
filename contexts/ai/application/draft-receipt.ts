@@ -7,6 +7,7 @@ import { DomainError } from "@/platform/kernel/errors";
 import type { ToolContext } from "./ports";
 import {
   buildFactBundle,
+  buildRiskBundle,
   extractIssuers,
   extractLotCodes,
   sanitizePartnerText,
@@ -14,6 +15,7 @@ import {
   type LotCandidate,
   type ToolRun,
 } from "./chat-lot-lookup";
+import { alertFingerprint, evaluateRisk, type RiskAlert, type RiskUnknown } from "./risk-rules";
 
 type Row = Record<string, unknown>;
 
@@ -70,16 +72,21 @@ export type DraftWarning = {
   code: DraftWarningCode;
   message: string;
   sourceId?: string;
+  ruleId?: RiskAlert["ruleId"];
+  ruleVersion?: string;
+  severity?: RiskAlert["severity"];
+  asOf?: string;
+  fingerprint?: string;
 };
 
 export type DraftProposalResponse =
   | { status: "empty"; fields: DraftFields; sources: ChatFact[]; warnings: DraftWarning[];
-      proposalId: null; hint: string; requestId: string }
+      riskUnknowns: RiskUnknown[]; proposalId: null; hint: string; requestId: string }
   | { status: "ambiguous"; candidates: LotCandidate[]; requestId: string }
   | { status: "incomplete"; fields: DraftFields; sources: ChatFact[]; warnings: DraftWarning[];
-      requestId: string }
+      riskUnknowns: RiskUnknown[]; requestId: string }
   | { status: "proposed"; fields: DraftFields; sources: ChatFact[]; warnings: DraftWarning[];
-      proposalId: string; requestId: string };
+      riskUnknowns: RiskUnknown[]; proposalId: string; requestId: string };
 
 export type DraftCreated = {
   status: "created";
@@ -337,19 +344,44 @@ function tracedQuantities(trace: Row): bigint[] {
   return values.map(scaled).filter((value): value is bigint => value !== null);
 }
 
-function buildWarnings(lot: Row, trace: Row, bundle: ReturnType<typeof buildFactBundle>,
-  fields: DraftFields): DraftWarning[] {
+function warningFromAlert(code: DraftWarningCode, alert: RiskAlert, batchId: string): DraftWarning {
+  return { code, message: alert.explanation, sourceId: batchId, ruleId: alert.ruleId,
+    ruleVersion: alert.ruleVersion, severity: alert.severity, asOf: alert.asOf };
+}
+
+async function attachFingerprints(warnings: DraftWarning[]): Promise<DraftWarning[]> {
+  return Promise.all(warnings.map(async (warning) => warning.ruleId && warning.ruleVersion
+    ? { ...warning, fingerprint: await alertFingerprint({ ruleId: warning.ruleId,
+      ruleVersion: warning.ruleVersion, sourceIds: warning.sourceId ? [warning.sourceId] : [] }) }
+    : warning));
+}
+
+function draftRiskUnknowns(lot: Row, bundle: ReturnType<typeof buildFactBundle>): RiskUnknown[] {
+  const riskBundle = buildRiskBundle(lot, bundle);
+  const risk = evaluateRisk(riskBundle, bundle.asOf);
+  const partnerRisk = evaluateRisk({ ...riskBundle, gaps: [],
+    facts: riskBundle.facts.filter((fact) => fact.kind !== "gap") }, bundle.asOf);
+  const seen = new Set<string>();
+  return [...risk.unknowns, ...partnerRisk.unknowns].filter((unknown) => {
+    const key = [unknown.ruleId, unknown.ruleVersion, unknown.reason, ...unknown.sourceIds].join("|");
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+async function buildWarnings(lot: Row, trace: Row, bundle: ReturnType<typeof buildFactBundle>,
+  fields: DraftFields): Promise<DraftWarning[]> {
   const warnings: DraftWarning[] = [];
   const batchId = text(lot.batchId);
-  const quality = text(lot.qualityStatus);
-  if (quality && quality !== "available") {
-    warnings.push({ code: "quality_not_available",
-      message: `Lô có trạng thái chất lượng ${quality}.`, sourceId: batchId });
-  }
-  if (bundle.verification === "partner_asserted") {
-    warnings.push({ code: "origin_partner_asserted",
-      message: "Nguồn gốc lô do đối tác khẳng định.", sourceId: batchId });
-  }
+  const riskBundle = buildRiskBundle(lot, bundle);
+  const risk = evaluateRisk(riskBundle, bundle.asOf);
+  const partnerRisk = evaluateRisk({ ...riskBundle, gaps: [],
+    facts: riskBundle.facts.filter((fact) => fact.kind !== "gap") }, bundle.asOf);
+  const quality = risk.alerts.find((alert) => alert.ruleId === "QUALITY_NOT_AVAILABLE");
+  if (quality) warnings.push(warningFromAlert("quality_not_available", quality, batchId));
+  const partner = partnerRisk.alerts.find((alert) => alert.ruleId === "TRACE_GAP_OR_PARTNER");
+  if (partner) warnings.push(warningFromAlert("origin_partner_asserted", partner, batchId));
   const requested = scaled(fields.quantity);
   const current = scaled(bundle.quantity);
   const traced = tracedQuantities(trace);
@@ -359,10 +391,10 @@ function buildWarnings(lot: Row, trace: Row, bundle: ReturnType<typeof buildFact
     warnings.push({ code: "quantity_abnormal",
       message: "Số lượng bất thường so với tồn hoặc số liệu truy vết.", sourceId: batchId });
   }
-  if (bundle.gaps.length) {
-    warnings.push({ code: "trace_gap", message: "Chuỗi truy vết có khoảng trống.", sourceId: batchId });
-  }
-  return warnings;
+  const gap = risk.alerts.find((alert) => alert.ruleId === "TRACE_GAP_OR_PARTNER" &&
+    alert.explanation.startsWith("Chuỗi truy vết có khoảng trống"));
+  if (gap) warnings.push(warningFromAlert("trace_gap", gap, batchId));
+  return attachFingerprints(warnings);
 }
 
 function sourceIdsOf(facts: ChatFact[]): string[] {
@@ -370,7 +402,7 @@ function sourceIdsOf(facts: ChatFact[]): string[] {
 }
 
 function emptyResponse(hint: string, requestId: string): DraftProposalResponse {
-  return { status: "empty", fields: emptyFields(), sources: [], warnings: [],
+  return { status: "empty", fields: emptyFields(), sources: [], warnings: [], riskUnknowns: [],
     proposalId: null, hint, requestId };
 }
 
@@ -401,10 +433,11 @@ export async function runDraftProposal(input: unknown, deps: DraftDependencies):
   const stock = row(await deps.runTool("getStock", { batchId }, ctx));
   const trace = row(await deps.runTool("getTrace", { batchId, direction: "backward", depth: 3 }, ctx));
   const bundle = buildFactBundle(lot, stock, trace, (deps.now ?? (() => new Date()))().toISOString());
-  const warnings = buildWarnings(lot, trace, bundle, fields);
+  const warnings = await buildWarnings(lot, trace, bundle, fields);
+  const riskUnknowns = draftRiskUnknowns(lot, bundle);
   const sources = bundle.facts;
   if (!fields.warehouseId || !fields.quantity || !fields.unit) {
-    return { status: "incomplete", fields, sources, warnings, requestId };
+    return { status: "incomplete", fields, sources, warnings, riskUnknowns, requestId };
   }
   const proposalId = draftProposalId(deps.actor.userId, fields, requestId);
   if (deps.auditDraft) {
@@ -414,7 +447,7 @@ export async function runDraftProposal(input: unknown, deps: DraftDependencies):
         quantity: fields.quantity, unit: fields.unit, sourceIds: sourceIdsOf(sources),
         warnings: warnings.map((warning) => warning.code) } });
   }
-  return { status: "proposed", fields, sources, warnings, proposalId, requestId };
+  return { status: "proposed", fields, sources, warnings, riskUnknowns, proposalId, requestId };
 }
 
 export async function createReceiptDraftFromProposal(input: unknown,

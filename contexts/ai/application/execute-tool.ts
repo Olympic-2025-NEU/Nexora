@@ -82,9 +82,10 @@ async function getLot(api: BusinessApiPort, ctx: ToolContext, input: Row): Promi
   const batchId = value(batch, "id");
   const productId = value(product, "id");
   const origin = row(batch.originLot);
+  const expiresOn = typeof batch.expiresOn === "string" ? batch.expiresOn : null;
   return { batchId, product: { id: productId, name: value(product, "name") },
     originLot: { issuerInstanceId: value(origin, "issuerInstanceId"), lotId: value(origin, "lotId") },
-    qualityStatus: value(batch, "qualityStatus"), sourceIds: [batchId, productId],
+    qualityStatus: value(batch, "qualityStatus"), expiresOn, sourceIds: [batchId, productId],
     verificationStatus: "local_verified", gaps: [],
     asOf: (ctx.now ?? (() => new Date()))().toISOString() };
 }

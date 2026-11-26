@@ -1,0 +1,29 @@
+# P10-T05 — Rule-based risk và giới hạn suy luận — KẾ HOẠCH (LLM Council, 2026-11-26 đêm)
+
+Phối hợp: Council ra plan → LangGraph điều phối → OpenCode code → Milo kiểm chứng → merge --no-ff vào phase-10, giữ nhánh task. Thịnh đã ủy quyền chạy xuyên đêm 2026-11-26, không cần duyệt từng plan.
+
+## Sự thật đã kiểm chứng từ code (Milo đọc trực tiếp 2026-11-26)
+- Batch (prisma/schema.prisma ~dòng 602): `expiresOn DateTime?` (nullable), `qualityStatus String @default("inspect")`, `manufacturedOn`, `sourcePartnerId`. Trường hạn dùng **TỒN TẠI**.
+- `contexts/ai/application/execute-tool.ts` (~dòng 87): getLot đã phát fact `qualityStatus` kèm sourceIds, nhưng **chưa phát `expiresOn`**.
+- T03/T04: fact bundle có sourceIds/asOf/verification (verified | partner_asserted | gap); audit qua `platform/audit/prisma-audit-recorder.ts` (ai.chat.answer, ai.draft.proposed, ai.draft.created).
+- ui-ai-spec-v1.md dòng 43 chốt rule v1: `expires_on <= today+30d`, `quality_status != available`, receiving actual < sent, trace gap/partner_asserted; mỗi alert `{ruleId, ruleVersion, sourceIds, asOf, severity, explanation}`; rule không tự đổi status/tồn.
+- T04 DraftReview đã có warnings ad-hoc (quality, partner_asserted, quantity anomaly, trace gaps) trong draft-receipt.ts.
+
+## Rulings của Chairman (từ 5 advisor, đồng thuận ghi rõ)
+- **R1 — Pure function.** `evaluateRisk(facts, asOf)` trong `contexts/ai/application/risk-rules.ts`: chỉ ăn fact bundle mà T03/T04 đã lấy qua tool + `asOf` được tiêm vào. Không DB, không query mới, không `Date.now()` bên trong rule. Tất định là tính chất cấu trúc, không phải lời hứa.
+- **R2 — 4 rule cho v1, RETRY hoãn T05b.** NEAR_EXPIRY, QUALITY_NOT_AVAILABLE, DISCREPANCY, TRACE_GAP_OR_PARTNER. REPEATED_RETRY cắt khỏi v1 (đồng thuận 4/5 advisor): chưa có counter trong tool output, định nghĩa nào cũng mơ hồ; lạm dụng retry đã được T02 quota chặn và T06 sẽ test đối kháng. Ghi deferral vào phase plan như tiền lệ T04b.
+- **R3 — expiresOn phải được thêm vào fact của getLot** (execute-tool.ts, sourceIds [batchId]). `expiresOn = null` → rule cho kết quả **unknown**, không alert, không suy đoán ngày.
+- **R4 — Thiếu dữ liệu = unknown, theo từng rule.** Đặc biệt DISCREPANCY: không ghép được cặp sent/received từ trace facts (kể cả do actor thiếu scope) → unknown, TUYỆT ĐỐI không đọc thành thiếu hàng. Mỗi rule trả về một trong ba: alert / unknown (kèm lý do) / im lặng (đủ dữ liệu và điều kiện sai).
+- **R5 — Severity cố định theo rule, 2 mức.** "Cần kiểm tra": QUALITY_NOT_AVAILABLE, DISCREPANCY. "Chú ý": NEAR_EXPIRY, TRACE_GAP_OR_PARTNER. Không điểm số, không xác suất, không công thức cộng dồn. `RULESET_VERSION = "risk-v1"` đóng dấu lên toàn bộ kết quả; mỗi alert mang ruleId + ruleVersion.
+- **R6 — Explanation = 1 câu tiếng Việt mẫu xác định**, render từ fact (ngày hết hạn, số lượng chênh), model không tham gia. Ví dụ: "Lô này còn 12 ngày là hết hạn (hạn: 08/12/2026)", "Nhận thực tế ít hơn số đã gửi 50 CAI".
+- **R7 — Bề mặt hiển thị: không trang mới.** (a) chat-lot-lookup gắn `riskAlerts` + `riskUnknowns` vào answer; thẻ trả lời T03 render alert dưới phần nguồn. (b) DraftReview: các warning trùng rule (quality, partner/gap) chuyển sang dùng evaluateRisk làm nguồn duy nhất; warning quantity-anomaly giữ riêng của T04 (đặc thù draft). (c) Feedback: nút nhỏ "Đúng"/"Không đúng" trên mỗi alert → route mới `app/api/v1/ai/risk/feedback/route.ts` (+ shim `app/ai/risk/feedback/route.ts`) ghi ĐÚNG MỘT audit entry `ai.risk.feedback` {alertFingerprint, ruleId, ruleVersion, verdict, actorId} qua audit recorder hiện có; alertFingerprint = hash(ruleId + sourceIds đã sắp xếp + ruleVersion). Không bảng mới, không write path nào khác.
+- **R8 — Test tất định (tiếng Việt).** Unit `risk-rules.test.ts`: mỗi rule 1 ca bắn + 1 ca không bắn + 1 ca thiếu dữ liệu → unknown; cùng fixture chạy 2 lần → deep-equal; đổi giờ hệ thống, giữ nguyên asOf → kết quả không đổi. Golden `tests/ai/risk-rules.golden.test.ts` (script `test:ai:risk`) trên fixture in-memory (mẫu draft-fixture.ts): lô có expiresOn trong 30 ngày, lô expiresOn null, cặp discrepancy, lô partner_asserted. Test route feedback: ghi đúng 1 audit entry, không đổi stock/status.
+- **R9 — Seed demo:** mở rộng `deploy/scripts/seed-abc.mjs`: thêm/gán cho một batch demo `expiresOn` trong vòng 30 ngày (để demo thứ Bảy bắn rule NEAR_EXPIRY) — giữ seed idempotent. Nếu fixture seed không biểu diễn được cặp discrepancy thì ghi rõ trong evidence, không bịa.
+- **R10 — Evidence + tài liệu:** `documents/phase-plan/evidence/p10-t05.md` (bảng rule + ngưỡng + version, deferral RETRY→T05b, bằng chứng tất định 2 lần chạy, hành vi unknown, mẫu audit feedback). Tick T05 trong phase-10-ai.md, chú thích ui-ai-spec. Refresh SPDX inventory cho file nguồn mới.
+
+## Files dự kiến
+- Mới: `contexts/ai/application/risk-rules.ts`, `contexts/ai/application/risk-rules.test.ts`, `app/api/v1/ai/risk/feedback/route.ts`, `app/ai/risk/feedback/route.ts`, `tests/ai/risk-rules.golden.test.ts`, `tests/ai/risk-fixture.ts`, `documents/phase-plan/evidence/p10-t05.md`
+- Sửa: `contexts/ai/application/execute-tool.ts` (fact expiresOn), `contexts/ai/application/chat-lot-lookup.ts` (gắn alerts), `contexts/ai/application/draft-receipt.ts` (dùng chung evaluateRisk cho warning trùng), `app/assistant/_components/*` (render alert + nút feedback), `app/i18n/en.json`, `app/i18n/vi.json`, `composition/ai.ts` (nếu cần wiring), `deploy/scripts/seed-abc.mjs`, `package.json` (script test:ai:risk), `documents/phase-plan/phase-10-ai.md`, `documents/phase-plan/ui-ai-spec-v1.md`, `documents/phase-plan/evidence/source-inventory.json`
+
+## Kiểm chứng (Milo tự chạy, không tin self-report)
+test:ai:tools, test:ai:golden, test:ai:draft, test:ai:adversarial, test:ai:risk, unit risk-rules, typecheck, lint, build, npm test — mọi exit code phải 0. Sau đó merge --no-ff vào phase-10, push cả hai nhánh, CI phải SUCCESS, thẻ kanban T05 → DONE.
