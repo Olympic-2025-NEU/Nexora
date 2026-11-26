@@ -161,6 +161,9 @@ test("sinh đúng bốn loại cảnh báo R8 từ dữ liệu đã có", async 
     "quality_not_available", "origin_partner_asserted", "quantity_abnormal", "trace_gap",
   ]);
   assert.ok(result.warnings.every((warning) => warning.sourceId === batchA));
+  assert.equal(result.warnings[0]?.message, "Lô có trạng thái chất lượng inspect.");
+  assert.equal(result.warnings[1]?.message, "Nguồn gốc lô do đối tác khẳng định.");
+  assert.match(result.warnings[3]?.message ?? "", /^Chuỗi truy vết có khoảng trống:/);
   assert.equal(result.fields.quantity, "200.000");
 });
 

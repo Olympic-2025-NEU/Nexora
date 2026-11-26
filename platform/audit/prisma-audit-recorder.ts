@@ -72,6 +72,19 @@ export function sanitizeAuditSummary(input: unknown): Prisma.InputJsonObject {
       typeof code === "string" && /^[a-z][a-z0-9_]{2,60}$/.test(code));
     if (warnings.length) safe.warnings = [...new Set(warnings)].slice(0, 10);
   }
+  if (typeof value.alertFingerprint === "string" && /^[0-9a-f]{64}$/.test(value.alertFingerprint)) {
+    safe.alertFingerprint = value.alertFingerprint;
+  }
+  if (typeof value.ruleId === "string" && /^[A-Z][A-Z0-9_]{2,40}$/.test(value.ruleId)) {
+    safe.ruleId = value.ruleId;
+  }
+  if (typeof value.ruleVersion === "string" && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,39}$/.test(value.ruleVersion)) {
+    safe.ruleVersion = value.ruleVersion;
+  }
+  if (value.verdict === "correct" || value.verdict === "incorrect") safe.verdict = value.verdict;
+  if (typeof value.actorId === "string" && /^[A-Za-z0-9._:-]{1,256}$/.test(value.actorId)) {
+    safe.actorId = value.actorId;
+  }
   if (typeof value.asOf === "string" &&
       /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/.test(value.asOf)) {
     safe.asOf = value.asOf;

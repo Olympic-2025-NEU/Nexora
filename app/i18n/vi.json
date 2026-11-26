@@ -238,6 +238,23 @@
     "connector": "Ghi chú AI",
     "error": "Không tra cứu được. Vui lòng thử lại.",
     "lookupTab": "Tra cứu",
+    "risk": {
+      "title": "Cảnh báo rủi ro",
+      "unknownTitle": "Chưa đủ dữ liệu để kiểm tra",
+      "unknownLine": "chưa đủ dữ liệu để kiểm tra: {reason}",
+      "severity": {
+        "NEAR_EXPIRY": "Chú ý",
+        "QUALITY_NOT_AVAILABLE": "Cần kiểm tra",
+        "DISCREPANCY": "Cần kiểm tra",
+        "TRACE_GAP_OR_PARTNER": "Chú ý"
+      },
+      "ruleId": "Mã quy tắc",
+      "ruleVersion": "Phiên bản",
+      "feedbackCorrect": "Đúng",
+      "feedbackIncorrect": "Không đúng",
+      "feedbackRecorded": "Đã ghi nhận phản hồi",
+      "feedbackError": "Không ghi nhận được phản hồi."
+    },
     "draft": {
       "tab": "Soạn phiếu nhập",
       "title": "Soạn phiếu nhập",

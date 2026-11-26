@@ -151,6 +151,10 @@ test("answered path audits rendered values only and falls back when provider is 
   if (result.status !== "answered") return;
   assert.equal(result.connector, "Hàng tồn đúng nguồn.");
   assert.match(result.answer, /8\.000 EA/);
+  assert.deepEqual(result.riskAlerts.map((alert) => alert.ruleId), ["TRACE_GAP_OR_PARTNER"]);
+  assert.deepEqual(result.riskUnknowns.map((unknown) => unknown.ruleId),
+    ["NEAR_EXPIRY", "QUALITY_NOT_AVAILABLE", "DISCREPANCY"]);
+  assert.ok(result.riskAlerts.every((alert) => alert.asOf === asOf));
   assert.equal(result.aiUnavailable, false);
   assert.deepEqual(result.auditRequestId, "request-1");
   assert.equal(sample.audits.length, 1);

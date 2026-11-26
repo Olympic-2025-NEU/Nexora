@@ -7,10 +7,12 @@ import { adminApi } from "@/app/lib/admin-api";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
 import { useT } from "@/app/i18n/LocaleProvider";
+import { RiskAlerts, type RiskAlertView, type RiskUnknownView } from "./risk-alerts";
 
 type Fields = { warehouseId: string; batchId: string; quantity: string; unit: string };
 type Source = { kind: string; value: string; sourceId: string; asOf: string; verification: string };
-type Warning = { code: string; message: string; sourceId?: string };
+type Warning = { code: string; message: string; sourceId?: string; ruleId?: RiskAlertView["ruleId"];
+  ruleVersion?: string; severity?: RiskAlertView["severity"]; asOf?: string; fingerprint?: string };
 type Candidate = { batchId: string; lotCode: string; issuer: string; productName: string; sourceId: string };
 type Created = { proposalId: string; draftDocumentId: string };
 
@@ -54,10 +56,30 @@ function readSources(value: unknown): Source[] {
 
 function readWarnings(value: unknown): Warning[] {
   if (!Array.isArray(value)) return [];
+  return value.filter(isRecord).map((row) => {
+    const ruleId = typeof row.ruleId === "string" ? row.ruleId as Warning["ruleId"] : undefined;
+    const severity = row.severity === "Cần kiểm tra" || row.severity === "Chú ý" ? row.severity : undefined;
+    return {
+      code: typeof row.code === "string" ? row.code : "",
+      message: typeof row.message === "string" ? row.message : "",
+      ...(typeof row.sourceId === "string" ? { sourceId: row.sourceId } : {}),
+      ...(ruleId ? { ruleId } : {}),
+      ...(typeof row.ruleVersion === "string" ? { ruleVersion: row.ruleVersion } : {}),
+      ...(severity ? { severity } : {}),
+      ...(typeof row.asOf === "string" ? { asOf: row.asOf } : {}),
+      ...(typeof row.fingerprint === "string" ? { fingerprint: row.fingerprint } : {}),
+    };
+  });
+}
+
+function readUnknowns(value: unknown): RiskUnknownView[] {
+  if (!Array.isArray(value)) return [];
   return value.filter(isRecord).map((row) => ({
-    code: typeof row.code === "string" ? row.code : "",
-    message: typeof row.message === "string" ? row.message : "",
-    ...(typeof row.sourceId === "string" ? { sourceId: row.sourceId } : {}),
+    ruleId: (typeof row.ruleId === "string" ? row.ruleId : "NEAR_EXPIRY") as RiskUnknownView["ruleId"],
+    ruleVersion: typeof row.ruleVersion === "string" ? row.ruleVersion : "",
+    sourceIds: Array.isArray(row.sourceIds) ? row.sourceIds.filter((id): id is string => typeof id === "string") : [],
+    asOf: typeof row.asOf === "string" ? row.asOf : "",
+    reason: typeof row.reason === "string" ? row.reason : "",
   }));
 }
 
@@ -84,6 +106,7 @@ export function AssistantDraft({ batchId }: { batchId?: string | null }) {
   const [fields, setFields] = useState<Fields>({ ...EMPTY_FIELDS, batchId: batchId ?? "" });
   const [sources, setSources] = useState<Source[]>([]);
   const [warnings, setWarnings] = useState<Warning[]>([]);
+  const [riskUnknowns, setRiskUnknowns] = useState<RiskUnknownView[]>([]);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [proposalId, setProposalId] = useState<string | null>(null);
   const [stale, setStale] = useState(false);
@@ -148,6 +171,7 @@ export function AssistantDraft({ batchId }: { batchId?: string | null }) {
       setFields(readFields(data.fields));
       setSources(readSources(data.sources));
       setWarnings(readWarnings(data.warnings));
+      setRiskUnknowns(readUnknowns(data.riskUnknowns));
       const nextProposalId = typeof data.proposalId === "string" ? data.proposalId : null;
       setProposalId(nextProposalId);
       if (nextProposalId) activeRequestId.current = nextRequestId;
@@ -349,14 +373,18 @@ export function AssistantDraft({ batchId }: { batchId?: string | null }) {
       </div>
 
       {warnings.length ? (
-        <div role="alert" className="space-y-2">
+        <div role="alert" className="space-y-3">
           <h3 className="text-sm font-medium">{t("assistant.draft.warnings")}</h3>
-          {warnings.map((warning, index) => (
-            <div key={`${warning.code}-${index}`} className={`rounded-md border p-3 text-sm ${
-              warning.code === "quality_not_available"
-                ? "border-destructive/50 bg-destructive/10 text-destructive"
-                : "border-amber-500/40 bg-amber-500/10"
-            }`}>
+          <RiskAlerts
+            alerts={warnings.filter((warning): warning is Warning & RiskAlertView =>
+              !!warning.ruleId && !!warning.ruleVersion && !!warning.severity && !!warning.asOf)
+              .map((warning) => ({ ruleId: warning.ruleId, ruleVersion: warning.ruleVersion!,
+                sourceIds: warning.sourceId ? [warning.sourceId] : [], asOf: warning.asOf!,
+                severity: warning.severity!, explanation: warning.message, fingerprint: warning.fingerprint }))}
+            unknowns={riskUnknowns}
+          />
+          {warnings.filter((warning) => !warning.ruleId).map((warning, index) => (
+            <div key={`${warning.code}-${index}`} className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
               <p className="font-medium">{warningText(warning)}</p>
               {warning.sourceId ? (
                 <Link href="/trace" className="font-mono text-xs underline underline-offset-2">{warning.sourceId}</Link>
@@ -364,6 +392,9 @@ export function AssistantDraft({ batchId }: { batchId?: string | null }) {
             </div>
           ))}
         </div>
+      ) : null}
+      {!warnings.length && riskUnknowns.length ? (
+        <RiskAlerts alerts={[]} unknowns={riskUnknowns} />
       ) : null}
 
       {creating ? (

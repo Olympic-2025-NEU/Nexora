@@ -238,6 +238,23 @@
     "connector": "AI note",
     "error": "Lookup failed. Please try again.",
     "lookupTab": "Lookup",
+    "risk": {
+      "title": "Risk alerts",
+      "unknownTitle": "Not enough data to check",
+      "unknownLine": "Not enough data to check: {reason}",
+      "severity": {
+        "NEAR_EXPIRY": "Watch",
+        "QUALITY_NOT_AVAILABLE": "Needs review",
+        "DISCREPANCY": "Needs review",
+        "TRACE_GAP_OR_PARTNER": "Watch"
+      },
+      "ruleId": "Rule",
+      "ruleVersion": "Version",
+      "feedbackCorrect": "Correct",
+      "feedbackIncorrect": "Incorrect",
+      "feedbackRecorded": "Feedback recorded",
+      "feedbackError": "Could not record feedback."
+    },
     "draft": {
       "tab": "Draft receipt",
       "title": "Draft receipt",

@@ -27,10 +27,11 @@ function fixture() {
       if (path === `/api/v1/batches/${batchId}`) return { data: {
         id: batchId, productId, productVariantId: variantId, localCode: "A-L1",
         originLot: { issuerInstanceId: "nexora-a", lotId: "A-L1" }, qualityStatus: "available",
+        expiresOn: "2026-12-08T00:00:00.000Z",
       } };
       if (path.startsWith("/api/v1/batches?")) return { data: [{ id: batchId, productId,
         productVariantId: variantId, originLot: { issuerInstanceId: "nexora-a", lotId: "A-L1" },
-        qualityStatus: "available" }], page: { nextCursor: null } };
+        qualityStatus: "available", expiresOn: "2026-12-08T00:00:00.000Z" }], page: { nextCursor: null } };
       if (path === `/api/v1/products/${productId}`) return { data: { id: productId, name: "Rice" } };
       if (path === "/api/v1/uoms") return { data: [{ id: uomId, code: "EA", isActive: true }] };
       if (path === `/api/v1/variants/${variantId}/uoms`) return { data: [{ uomId, factorToStockUom: "1.000000" }] };
@@ -93,6 +94,8 @@ test("read tools return bounded sourced projections and never echo private field
   const stock = await sample.run("getStock", { batchId, warehouseId }, sample.ctx);
   const trace = await sample.run("getTrace", { batchId, direction: "backward", depth: 2 }, sample.ctx);
   assert.equal((lot.product as { name: string }).name, "Rice");
+  assert.equal(lot.expiresOn, "2026-12-08T00:00:00.000Z");
+  assert.ok((lot.sourceIds as string[]).includes(batchId));
   assert.equal(stock.visibleTotalQuantity, "8.000");
   assert.equal(trace.asOf, "2026-11-26T00:00:00.000Z");
   assert.deepEqual(trace.verificationStates, ["partner_asserted"]);
