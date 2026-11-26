@@ -236,6 +236,43 @@
     "asOf": "As of",
     "verification": "Verification",
     "connector": "AI note",
-    "error": "Lookup failed. Please try again."
+    "error": "Lookup failed. Please try again.",
+    "lookupTab": "Lookup",
+    "draft": {
+      "tab": "Draft receipt",
+      "title": "Draft receipt",
+      "hint": "AI only suggests. Review and create a Draft; stock stays unchanged.",
+      "requestLabel": "Receipt request",
+      "requestPlaceholder": "Example: receive 20 EA for lot LOT-A-001 in WH-A",
+      "propose": "Suggest",
+      "phaseBefore": "AI proposal — no document created yet",
+      "phaseAfter": "Draft #{id} created — stock unchanged",
+      "steps": "1 · AI proposes → 2 · You review & create Draft → 3 · Approve/confirm in M03",
+      "fieldsTitle": "Proposed fields (editable)",
+      "warehouse": "Warehouse id",
+      "batch": "Batch id or lot code",
+      "quantity": "Quantity",
+      "unit": "Unit",
+      "note": "Your note",
+      "noteHint": "Only you type here. AI never fills this field.",
+      "sources": "Data sources",
+      "warnings": "Warnings before creation",
+      "create": "Create Draft",
+      "creating": "Creating Draft...",
+      "open": "Open document in M03 →",
+      "prefill": "Draft receipt from this lot",
+      "empty": "No lot extracted. Enter a lot code or a specific request.",
+      "incomplete": "Quantity, unit or warehouse is missing. Fill them to get a proposal.",
+      "ambiguous": "Several lots match. Select one to continue.",
+      "select": "Select this lot",
+      "proposeError": "Could not create proposal. Please try again.",
+      "createError": "Could not create Draft. Please try again.",
+      "warning": {
+        "quality_not_available": "Lot quality status is not available.",
+        "origin_partner_asserted": "Lot origin is partner-asserted.",
+        "quantity_abnormal": "Quantity is abnormal versus stock or trace data.",
+        "trace_gap": "Trace chain has a gap."
+      }
+    }
   }
 }

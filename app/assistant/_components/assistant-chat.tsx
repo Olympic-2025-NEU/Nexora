@@ -7,6 +7,9 @@ import { adminApi } from "@/app/lib/admin-api";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
 import { useT } from "@/app/i18n/LocaleProvider";
+import { AssistantDraft } from "./assistant-draft";
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 type Chip = { kind: string; value: string; sourceId: string; asOf: string; verification: string };
 type Candidate = { batchId: string; lotCode: string; issuer: string; productName: string; sourceId: string };
@@ -43,6 +46,15 @@ export function AssistantChat() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ChatResult | null>(null);
+  const [tab, setTab] = useState<"lookup" | "draft">("lookup");
+  const [draftBatchId, setDraftBatchId] = useState<string | null>(null);
+  const [draftSession, setDraftSession] = useState(0);
+
+  function openDraft(batchId: string) {
+    setDraftBatchId(batchId);
+    setDraftSession((value) => value + 1);
+    setTab("draft");
+  }
 
   async function ask(body: { question: string; batchId?: string }) {
     setLoading(true);
@@ -77,6 +89,10 @@ export function AssistantChat() {
     await ask({ question: q, batchId: candidate.batchId });
   }
 
+  const answeredBatchId = result?.status === "answered"
+    ? result.facts.find((fact) => fact.kind === "batchCode" && UUID_RE.test(fact.sourceId))?.sourceId ?? null
+    : null;
+
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <div className="space-y-2">
@@ -84,6 +100,18 @@ export function AssistantChat() {
         <p className="text-sm text-muted-foreground">{t("assistant.hint")}</p>
       </div>
 
+      <div className="flex gap-2" role="tablist" aria-label={t("assistant.title")}>
+        <Button type="button" role="tab" aria-selected={tab === "lookup"}
+          variant={tab === "lookup" ? "default" : "outline"} onClick={() => setTab("lookup")}>
+          {t("assistant.lookupTab")}
+        </Button>
+        <Button type="button" role="tab" aria-selected={tab === "draft"}
+          variant={tab === "draft" ? "default" : "outline"} onClick={() => setTab("draft")}>
+          {t("assistant.draft.tab")}
+        </Button>
+      </div>
+
+      <div hidden={tab !== "lookup"} className="space-y-6">
       <form className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4 sm:flex-row" onSubmit={onSubmit}>
         <label className="flex-1 space-y-1">
           <span className="text-sm font-medium">{t("assistant.questionLabel")}</span>
@@ -148,6 +176,11 @@ export function AssistantChat() {
             <p className="text-xs text-muted-foreground">
               {t("assistant.verifiedLine").replace("{count}", String(result.toolCalls ?? 0))}
             </p>
+            {answeredBatchId ? (
+              <Button type="button" variant="outline" onClick={() => openDraft(answeredBatchId)}>
+                {t("assistant.draft.prefill")}
+              </Button>
+            ) : null}
           </div>
 
           {result.aiUnavailable ? (
@@ -186,6 +219,11 @@ export function AssistantChat() {
           </div>
         </div>
       ) : null}
+      </div>
+
+      <div hidden={tab !== "draft"}>
+        <AssistantDraft key={draftSession} batchId={draftBatchId} />
+      </div>
     </div>
   );
 }
