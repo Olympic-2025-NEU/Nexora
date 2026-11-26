@@ -18,10 +18,11 @@
 
 ## P10-T03 — Tra cứu lô có dẫn nguồn
 
-- [ ] Parse ý định/tên lô thành lookup có disambiguation theo issuer/product; không tự chọn khi nhiều lô cùng code. Query trace/inventory APIs trong quyền hiện tại.
-- [ ] Trả số liệu với unit, source document/event, thời điểm, verification status; nói rõ dữ liệu thiếu/partner-asserted, không bịa chứng nhận/nguồn gốc.
-- [ ] Golden tests so câu trả lời với API fixture, hỏi lô không tồn tại, upstream offline, cùng code khác issuer.
+- [x] Parse ý định/tên lô thành lookup có disambiguation theo issuer/product; không tự chọn khi nhiều lô cùng code. Query trace/inventory APIs trong quyền hiện tại.
+- [x] Trả số liệu với unit, source document/event, thời điểm, verification status; nói rõ dữ liệu thiếu/partner-asserted, không bịa chứng nhận/nguồn gốc.
+- [x] Golden tests so câu trả lời với API fixture, hỏi lô không tồn tại, upstream offline, cùng code khác issuer. [Bằng chứng T03](evidence/p10-t03.md).
 - **Đầu ra:** lot Q&A; **kiểm chứng:** AC-10 và tool audit khớp mọi con số trọng yếu.
+- **R8 (Chairman):** T03 chỉ ship trang `/assistant`. Panel trên trang lô/document bị **HOÃN** sang T03b hoặc gộp T06; xem `ui-ai-spec-v1.md`. Không tính panel là xong trong T03.
 
 ## P10-T04 — Draft chứng từ có human review
 
@@ -56,7 +57,7 @@
 | --- | --- | --- |
 | P10-T01 | `services/ai/{app,provider,config}/`, `requirements.lock`/container, D09 model/license/data policy; env `AI_PROVIDER/AI_KEY_REF/AI_BASE_URL` theo deploy spec. | ERP/trace chạy khi AI off; external provider không nhận PII/secret mặc định; timeout/quota/fallback có test. |
 | P10-T02 | `services/ai/tools/` JSON Schemas cho 5 tools trong `ui-ai-spec-v1.md`; delegated actor scoped + backend authz/audit. | Staff ngoài warehouse 403; AI không có Admin DB/confirm/approve tool; mỗi tool call có source ID/request ID. |
-| P10-T03 | `/ai/chat` lot resolver theo `(issuer,lot)`/batchId, getLot/getTrace, answer sources/asOf/verification. | Cùng lot code hai issuer → hỏi lại; số lượng khớp API; gap/upstream offline được nói rõ, không bịa GS1 chứng nhận. |
+| P10-T03 | `/ai/chat` lot resolver theo `(issuer,lot)`/batchId, getLot/getTrace, answer sources/asOf/verification; UI `/assistant`. Panel lot/document **hoãn (R8)** sang T03b hoặc T06. | Cùng lot code hai issuer → hỏi lại; số lượng khớp API; gap/upstream offline được nói rõ, không bịa GS1 chứng nhận. |
 | P10-T04 | `/ai/drafts` chỉ gọi `createReceiptDraft`/`createIssueDraft`, UI DraftReview; server bỏ `status/confirmedBy` client. | AI tạo Draft không movement; human edit/submit/approve/confirm qua M03; prompt “confirm ngay” không tạo confirmed row. |
 | P10-T05 | `services/ai/risk-rules.py` hoặc TypeScript rule adapter theo 4 rule trong `ui-ai-spec-v1.md`, output `{ruleId,ruleVersion,sourceIds,asOf,severity}`. | Same fixture→same risk, no automatic stock/status changes; missing data→unknown/gap. |
 | P10-T06 | `tests/ai/adversarial.*`: injection trong product/partner/file text, role escape, quota, timeout; redacted logging/UI error states. | Không exfiltrate/SQL/confirm; provider down có fallback link, tool audit không ghi prompt secret. |

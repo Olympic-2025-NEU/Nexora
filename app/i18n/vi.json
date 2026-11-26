@@ -11,6 +11,7 @@
     "federationOperations": "Vận hành federation",
     "partners": "Đối tác",
     "trace": "Truy xuất",
+    "assistant": "Trợ lý lô",
     "products": "Sản phẩm",
     "categories": "Danh mục",
     "uom": "Đơn vị tính",
@@ -214,5 +215,27 @@
     "staff": "Nhân viên",
     "approver": "Người duyệt",
     "viewer": "Người xem"
+  },
+  "assistant": {
+    "title": "Tra cứu lô có dẫn nguồn",
+    "hint": "Hỏi về lô hàng. Câu trả lời chỉ dùng dữ liệu đã đối chiếu từ tool.",
+    "questionLabel": "Câu hỏi",
+    "questionPlaceholder": "Ví dụ: Lô LOT-A-001 của nexora-a còn bao nhiêu?",
+    "submit": "Tra cứu",
+    "loading": "Đang tra cứu...",
+    "notFound": "Không tìm thấy lô phù hợp.",
+    "traceLink": "Mở trang truy xuất",
+    "ambiguousTitle": "Cần chọn đúng lô",
+    "ambiguousHint": "Có nhiều lô trùng mã. Chọn một lô để tiếp tục.",
+    "select": "Chọn lô này",
+    "answerTitle": "Kết quả có dẫn nguồn",
+    "verifiedLine": "Đã đối chiếu với {count} lượt gọi tool.",
+    "aiUnavailable": "AI tạm không khả dụng. Đang hiển thị dữ liệu trực tiếp từ hệ thống.",
+    "directDataLink": "Xem dữ liệu truy xuất trực tiếp",
+    "sourceChip": "Nguồn",
+    "asOf": "Tính đến",
+    "verification": "Đối chiếu",
+    "connector": "Ghi chú AI",
+    "error": "Không tra cứu được. Vui lòng thử lại."
   }
 }

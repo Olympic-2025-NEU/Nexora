@@ -11,6 +11,7 @@
     "federationOperations": "Federation operations",
     "partners": "Partners",
     "trace": "Traceability",
+    "assistant": "Lot Assistant",
     "products": "Products",
     "categories": "Categories",
     "uom": "Units",
@@ -214,5 +215,27 @@
     "staff": "Staff",
     "approver": "Approver",
     "viewer": "Viewer"
+  },
+  "assistant": {
+    "title": "Sourced Lot Lookup",
+    "hint": "Ask about a lot. Answers use only tool-verified data.",
+    "questionLabel": "Question",
+    "questionPlaceholder": "Example: How much of LOT-A-001 from nexora-a remains?",
+    "submit": "Lookup",
+    "loading": "Looking up...",
+    "notFound": "No matching lot found.",
+    "traceLink": "Open trace page",
+    "ambiguousTitle": "Select the correct lot",
+    "ambiguousHint": "Multiple lots match. Choose one to continue.",
+    "select": "Select this lot",
+    "answerTitle": "Sourced answer",
+    "verifiedLine": "Verified against {count} tool calls.",
+    "aiUnavailable": "AI is temporarily unavailable. Showing direct system data.",
+    "directDataLink": "View direct trace data",
+    "sourceChip": "Source",
+    "asOf": "As of",
+    "verification": "Verification",
+    "connector": "AI note",
+    "error": "Lookup failed. Please try again."
   }
 }

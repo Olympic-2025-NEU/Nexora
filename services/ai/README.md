@@ -2,9 +2,11 @@
 
 The Python service and Ollama run only with Compose profile `ai`; ERP, M03 and M04 do not depend on them. Default `AI_PROVIDER=none` keeps inference disabled. The adapter has no database, file-storage, Flowable or Keycloak credential and does not serve a public port.
 
-For a local demo, put `AI_PROVIDER=ollama` and a random `AI_INTERNAL_TOKEN` of at least 32 characters in each ignored `deploy/instances/{a,b,c}.env` where AI is enabled. Never copy the token into Git, a model prompt or a browser request. `AI_MODEL=qwen3:0.6b`, `AI_MODEL_BASE_URL=http://ollama:11434`. Bring up the optional profile for only the intended instance, then pull the approved model in that instance's Ollama container:
+For a local demo, override `AI_PROVIDER=ollama` and `AI_INTERNAL_TOKEN` in the shell for the selected Compose command. Shell values take precedence over `--env-file`, so no ignored `deploy/instances/{a,b,c}.env` needs editing. Generate a fresh token of at least 32 characters; keep the same value in shells that call the internal endpoint. Never copy the token into Git, a model prompt or a browser request. `AI_MODEL=qwen3:0.6b`, `AI_MODEL_BASE_URL=http://ollama:11434`. Bring up the optional profile for only the intended instance, then pull the approved model in that instance's Ollama container:
 
 ```powershell
+$env:AI_PROVIDER = "ollama"
+$env:AI_INTERNAL_TOKEN = node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"
 docker compose -f deploy/compose.yml --env-file deploy/instances/a.env -p nexora-a --profile ai up -d --build ai ollama
 docker compose -f deploy/compose.yml --env-file deploy/instances/a.env -p nexora-a --profile ai exec ollama ollama pull qwen3:0.6b
 ```
