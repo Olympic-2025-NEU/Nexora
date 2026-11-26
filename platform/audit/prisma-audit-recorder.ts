@@ -57,6 +57,21 @@ export function sanitizeAuditSummary(input: unknown): Prisma.InputJsonObject {
     safe.quantity = value.quantity;
   }
   if (typeof value.unit === "string" && /^[A-Za-z]{1,10}$/.test(value.unit)) safe.unit = value.unit;
+  if (typeof value.proposalId === "string" && /^[A-Za-z0-9_-]{8,128}$/.test(value.proposalId)) {
+    safe.proposalId = value.proposalId;
+  }
+  if (typeof value.batchId === "string" && UUID_RE.test(value.batchId)) safe.batchId = value.batchId;
+  if (typeof value.warehouseId === "string" && UUID_RE.test(value.warehouseId)) {
+    safe.warehouseId = value.warehouseId;
+  }
+  if (typeof value.draftDocumentId === "string" && UUID_RE.test(value.draftDocumentId)) {
+    safe.draftDocumentId = value.draftDocumentId;
+  }
+  if (Array.isArray(value.warnings)) {
+    const warnings = value.warnings.filter((code): code is string =>
+      typeof code === "string" && /^[a-z][a-z0-9_]{2,60}$/.test(code));
+    if (warnings.length) safe.warnings = [...new Set(warnings)].slice(0, 10);
+  }
   if (typeof value.asOf === "string" &&
       /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/.test(value.asOf)) {
     safe.asOf = value.asOf;

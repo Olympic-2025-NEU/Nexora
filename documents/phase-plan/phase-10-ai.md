@@ -26,10 +26,11 @@
 
 ## P10-T04 — Draft chứng từ có human review
 
-- [ ] AI đề xuất field cho **một loại** M03 document đã có API, validate schema và số lượng/lot; tạo bằng `createDraft...` với actor hiện tại và idempotency key.
-- [ ] UI hiển thị field AI đề xuất, nguồn, cảnh báo và quyền sửa; người dùng tự submit/approve/confirm qua luồng M03. Stock không đổi khi AI tạo Draft.
-- [ ] Không cho AI trigger confirm qua endpoint gián tiếp, tool chaining hoặc payload field `status`; test prompt injection “bỏ qua phê duyệt”.
-- **Đầu ra:** AI Draft workflow; **kiểm chứng:** AC-11, audit ghi AI suggestion và người xác nhận cuối cùng.
+- [x] AI đề xuất field cho **một loại** M03 document đã có API, validate schema và số lượng/lot; tạo bằng `createDraft...` với actor hiện tại và idempotency key.
+- [x] UI hiển thị field AI đề xuất, nguồn, cảnh báo và quyền sửa; người dùng tự submit/approve/confirm qua luồng M03. Stock không đổi khi AI tạo Draft.
+- [x] Không cho AI trigger confirm qua endpoint gián tiếp, tool chaining hoặc payload field `status`; test prompt injection “bỏ qua phê duyệt”.
+- **Đầu ra:** AI Draft workflow; **kiểm chứng:** AC-11, audit ghi AI suggestion và người xác nhận cuối cùng. [Bằng chứng T04](evidence/p10-t04.md).
+- **R1 (Chairman):** Chỉ phiếu nhập ship ở T04. `createIssueDraft` giữ trạng thái đã đăng ký ở T02; issue Draft và luồng review tương ứng hoãn sang **T04b**. Không tính issue là xong trong T04.
 
 ## P10-T05 — Rule-based risk và giới hạn suy luận
 
@@ -58,7 +59,7 @@
 | P10-T01 | `services/ai/{app,provider,config}/`, `requirements.lock`/container, D09 model/license/data policy; env `AI_PROVIDER/AI_KEY_REF/AI_BASE_URL` theo deploy spec. | ERP/trace chạy khi AI off; external provider không nhận PII/secret mặc định; timeout/quota/fallback có test. |
 | P10-T02 | `services/ai/tools/` JSON Schemas cho 5 tools trong `ui-ai-spec-v1.md`; delegated actor scoped + backend authz/audit. | Staff ngoài warehouse 403; AI không có Admin DB/confirm/approve tool; mỗi tool call có source ID/request ID. |
 | P10-T03 | `/ai/chat` lot resolver theo `(issuer,lot)`/batchId, getLot/getTrace, answer sources/asOf/verification; UI `/assistant`. Panel lot/document **hoãn (R8)** sang T03b hoặc T06. | Cùng lot code hai issuer → hỏi lại; số lượng khớp API; gap/upstream offline được nói rõ, không bịa GS1 chứng nhận. |
-| P10-T04 | `/ai/drafts` chỉ gọi `createReceiptDraft`/`createIssueDraft`, UI DraftReview; server bỏ `status/confirmedBy` client. | AI tạo Draft không movement; human edit/submit/approve/confirm qua M03; prompt “confirm ngay” không tạo confirmed row. |
+| P10-T04 | `/ai/draft` (proposal) và `/ai/draft/create` chỉ gọi `createReceiptDraft` (issue → T04b), UI DraftReview trong `/assistant`; server bỏ `status/confirmedBy` client. | AI tạo Draft không movement; human edit/submit/approve/confirm qua M03; prompt “confirm ngay” không tạo confirmed row. |
 | P10-T05 | `services/ai/risk-rules.py` hoặc TypeScript rule adapter theo 4 rule trong `ui-ai-spec-v1.md`, output `{ruleId,ruleVersion,sourceIds,asOf,severity}`. | Same fixture→same risk, no automatic stock/status changes; missing data→unknown/gap. |
 | P10-T06 | `tests/ai/adversarial.*`: injection trong product/partner/file text, role escape, quota, timeout; redacted logging/UI error states. | Không exfiltrate/SQL/confirm; provider down có fallback link, tool audit không ghi prompt secret. |
 | P10-T07 | `evidence/G10.md` AC-10/11 fixture Q&A, Draft state/balance, tool audit, negative/provider failure tests. | AI service không DB write credential, stock chỉ đổi do human M03 action. |

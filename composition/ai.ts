@@ -3,6 +3,13 @@ import type { NextRequest } from "next/server";
 import { resolveUserActor } from "./system";
 import { createToolExecutor } from "@/contexts/ai/application/execute-tool";
 import { runChatLotLookup, type AnswerAuditPort } from "@/contexts/ai/application/chat-lot-lookup";
+import {
+  createReceiptDraftFromProposal,
+  parseDraftCreateInput,
+  runDraftProposal,
+  type DraftAuditPort,
+  type DraftWarehouse,
+} from "@/contexts/ai/application/draft-receipt";
 import { createBusinessApi } from "@/contexts/ai/infrastructure/business-api";
 import { createAiGenerateClient } from "@/contexts/ai/infrastructure/ai-generate-client";
 import { toolAudit } from "@/contexts/ai/infrastructure/tool-audit";
@@ -54,4 +61,46 @@ export async function answerChatQuestion(request: NextRequest, input: unknown) {
     generate: createAiGenerateClient(),
     auditAnswer: answerAudit,
   });
+}
+
+const draftAudit: DraftAuditPort = {
+  async record(entry) {
+    await getPrismaClient().$transaction((tx) => prismaAuditRecorder.record(tx, {
+      actor: { kind: "user", sub: entry.actor.userId },
+      action: entry.action,
+      targetType: entry.targetType,
+      targetId: entry.targetId,
+      requestId: entry.requestId,
+      after: entry.after,
+    }));
+  },
+};
+
+async function draftDependencies(request: NextRequest) {
+  const actor = await resolveUserActor(request);
+  const suppliedId = request.headers.get("x-request-id");
+  const requestId = suppliedId && /^[A-Za-z0-9_-]{1,128}$/.test(suppliedId)
+    ? suppliedId : crypto.randomUUID();
+  const warehouses: DraftWarehouse[] = await getPrismaClient().warehouse.findMany({
+    where: actor.roles.includes("administrator") ? undefined : { id: { in: [...actor.unitIds] } },
+    select: { id: true, code: true, name: true },
+  });
+  return {
+    actor,
+    authorization: request.headers.get("authorization") ?? "",
+    requestId,
+    runTool: createToolExecutor(createBusinessApi(), toolAudit),
+    warehouses,
+    auditDraft: draftAudit,
+  };
+}
+
+export async function proposeAiDraft(request: NextRequest, input: unknown) {
+  return runDraftProposal(input, await draftDependencies(request));
+}
+
+export async function createAiDraft(request: NextRequest, input: unknown) {
+  const deps = await draftDependencies(request);
+  const created = await createReceiptDraftFromProposal(parseDraftCreateInput(input), deps);
+  return { ...created, requestId: deps.requestId };
 }
