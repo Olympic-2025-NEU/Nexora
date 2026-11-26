@@ -11,7 +11,7 @@ ERP canonical surfaces (ADR 0016): `/admin` (org/members only), `/partners`, `/c
 | H | `/work`, `/profile`, members/partners management views | Task inbox của tôi, org/role, partner connection metadata; Admin quản user/partner, không hiện secret | `/me`, organization/members; partners surface; core files |
 | P | `/operations/receipts`, `/operations/issues`, `/operations/transfers`, `/operations/receivings`, `/work/approvals` | Draft forms có batch picker/quantity; sent-vs-actual; approver khác creator; pending/retry/dispute | M02/M03; ERP `/trading/*` when present |
 | D | `/data/inventory`, `/data/lots/[id]`, `/data/impact/[id]` | balance theo lot/kho, timeline A→B→C, backward/forward, provenance/gap/asOf, document/attachment link | inventory/trace; ERP `/inventory/*`, `/catalog/*`, `/trace/*` |
-| I | `/assistant` và panel trên lot/document | Q&A nguồn, disambiguation lô, nguồn trích, AI Draft review, provider-down fallback | AI chat/drafts/tool calls |
+| I | `/assistant` (T03); panel trên lot/document **HOÃN (R8)** sang T03b hoặc gộp T06 | Q&A nguồn, disambiguation lô, nguồn trích, AI Draft review, provider-down fallback | AI chat/drafts/tool calls |
 | Public | `/passport/[token]` | QR mobile, public field allowlist, revoke/expired/unknown state | public Passport only |
 
 `apps/dx-lab/app/(workspace)/...` tổ chức route group, `components/{shell,forms,tables,trace,ai}/` chỉ UI, `lib/api-client/` typed từ OpenAPI. Mỗi route có loading/empty/error/403/409/503; form disable double submit và giữ draft khi request retryable; ETag/version hiển thị conflict và reload. Keyboard focus/labels, mobile 360px, decimal/unit/timezone đúng. Route authorization ở server/API, ẩn navigation chỉ là UX.
@@ -24,7 +24,7 @@ ERP canonical surfaces (ADR 0016): `/admin` (org/members only), `/partners`, `/c
 - `ApprovalInbox`: task Flowable qua backend, approve/reject reason, creator bị chặn server; engine down hiện chờ, không nút bypass.
 - `TraceTimeline/ImpactGraph`: mỗi node có issuer/source ID/occurredAt/verificationState, gap/stale rõ; cycle/depth limit, không suy diễn A verified chỉ từ B assertion.
 - `PassportView`: request public projection, không render field raw/private vào DOM/network; QR revoked → 404/expired message an toàn.
-- `AiPanel/DraftReview`: sources có timestamp/verification, AI suggestion editable; Draft chỉ sau user review mới mở nút submit/confirm nghiệp vụ thường.
+- `AiPanel/DraftReview`: sources có timestamp/verification, AI suggestion editable; Draft chỉ sau user review mới mở nút submit/confirm nghiệp vụ thường. Phần `AiPanel` trên lot/document **hoãn theo R8** (T03b hoặc T06); T03 chỉ ship `/assistant` với chip nguồn dạng cấu trúc và fallback `/trace`. `DraftReview` vẫn thuộc T04.
 
 ## AI tool registry và dữ liệu
 

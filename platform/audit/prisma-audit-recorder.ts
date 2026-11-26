@@ -13,6 +13,7 @@ const kinds = new Set(["evidence_metadata", "trace_projection", "ot_reading", "a
 const visibilities = new Set(["private", "partner", "public"]);
 const scanStates = new Set(["pending", "clean", "infected", "error"]);
 const tools = new Set(["getLot", "getStock", "getTrace", "createReceiptDraft", "createIssueDraft"]);
+const verifications = new Set(["local_verified", "partner_asserted", "missing"]);
 const changedFields = new Set([
   "status", "version", "role", "visibility", "scanState", "connectionStatus",
   "policyVersion", "scope", "ownerId", "ownerType", "payload", "endpointUrl",
@@ -51,6 +52,17 @@ export function sanitizeAuditSummary(input: unknown): Prisma.InputJsonObject {
   if (typeof value.reason === "string") {
     const reason = value.reason.trim().slice(0, 200);
     if (reason.length > 0 && /^[\p{L}\p{N}\s.,;:_\-/()]+$/u.test(reason)) safe.reason = reason;
+  }
+  if (typeof value.quantity === "string" && /^\d{1,15}(?:\.\d{1,3})?$/.test(value.quantity)) {
+    safe.quantity = value.quantity;
+  }
+  if (typeof value.unit === "string" && /^[A-Za-z]{1,10}$/.test(value.unit)) safe.unit = value.unit;
+  if (typeof value.asOf === "string" &&
+      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/.test(value.asOf)) {
+    safe.asOf = value.asOf;
+  }
+  if (typeof value.verification === "string" && verifications.has(value.verification)) {
+    safe.verification = value.verification;
   }
   if (typeof value.role === "string" && ["administrator", "staff", "approver", "viewer"].includes(value.role)) {
     safe.role = value.role;

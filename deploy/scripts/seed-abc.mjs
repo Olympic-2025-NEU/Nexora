@@ -5,7 +5,7 @@ import { spawnSync } from "node:child_process";
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { parseEnv } from "node:util";
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, Prisma } from "@prisma/client";
 import { validateConfig } from "../config.mjs";
 import { demoProject } from "./demo-project.mjs";
 
@@ -47,6 +47,48 @@ const env = { ...process.env, ...values, NODE_ENV: "test", DEMO_ONLY: "true",
 function stableUuid(part, label) {
   const hex = createHash("sha256").update(`${part}:${label}`).digest("hex");
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-a${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
+}
+async function seedAiDemoLot(prisma, admin) {
+  const sku = "A-AI-P1";
+  const localCode = "LOT-A-001";
+  const originIssuerInstanceId = "nexora-b";
+  const originLotId = stableUuid("b", "batch");
+  const product = await prisma.product.upsert({
+    where: { id: stableUuid("a", "ai-demo-product") },
+    create: { id: stableUuid("a", "ai-demo-product"), name: "Demo Product AI B",
+      searchText: "demo ai duplicate lot issuer b",
+      attributes: { description: "P10-T03 duplicate-lot demo" },
+      categoryId: "bbbbbbbb-0001-4000-8000-000000000001", isActive: true,
+      createdBySub: admin.keycloakSub },
+    update: {},
+  });
+  const variant = await prisma.productVariant.upsert({
+    where: { id: stableUuid("a", "ai-demo-variant") },
+    create: { id: stableUuid("a", "ai-demo-variant"), productId: product.id, sku,
+      barcode: sku, isPrimary: true, isActive: true, createdBySub: admin.keycloakSub },
+    update: {},
+  });
+  await prisma.variantCode.upsert({ where: { code: sku },
+    create: { code: sku, variantId: variant.id, source: "both" }, update: {} });
+  await prisma.productVariantUom.upsert({
+    where: { productVariantId_uomId: { productVariantId: variant.id,
+      uomId: "aaaaaaaa-0001-4000-8000-000000000001" } },
+    create: { id: stableUuid("a", "ai-demo-variant-uom"), productVariantId: variant.id,
+      uomId: "aaaaaaaa-0001-4000-8000-000000000001", isStockKeeping: true,
+      factorToStockUom: new Prisma.Decimal(1) },
+    update: {},
+  });
+  const partner = await prisma.partner.findUnique({ where: { issuerInstanceId: originIssuerInstanceId } });
+  const batch = await prisma.batch.upsert({
+    where: { originIssuerInstanceId_originLotId: { originIssuerInstanceId, originLotId } },
+    create: { id: stableUuid("a", "ai-demo-batch"), productId: product.id,
+      productVariantId: variant.id, localCode, originIssuerInstanceId, originLotId,
+      qualityStatus: "available", sourcePartnerId: partner?.id ?? null,
+      createdBySub: admin.keycloakSub },
+    update: {},
+  });
+  return { batchId: batch.id, productVariantId: variant.id, sku, localCode,
+    originIssuerInstanceId, originLotId };
 }
 function run(script, childEnv) {
   const child = spawnSync(process.execPath, [resolve(root, script)], {
@@ -91,10 +133,12 @@ try {
     prisma.batch.findUniqueOrThrow({ where: { id: stableUuid(instance, "batch") } }),
     prisma.warehouse.findUniqueOrThrow({ where: { code: `WH-${instance.toUpperCase()}` } }),
   ]);
+  const aiDemoLot = instance === "a" ? await seedAiDemoLot(prisma, admin) : null;
   const manifest = { instanceId: organization.instanceId, organizationId: organization.id,
     productVariantId: product.id, batchId: batch.id, warehouseId: warehouse.id,
     originIssuerInstanceId: batch.originIssuerInstanceId, originLotId: batch.originLotId,
-    roles: members.map((row) => row.role).sort(), partnerIssuers: adjacent.map((peer) => `nexora-${peer}`) };
+    roles: members.map((row) => row.role).sort(), partnerIssuers: adjacent.map((peer) => `nexora-${peer}`),
+    ...(aiDemoLot ? { aiDemoLot } : {}) };
   const destination = resolve(root, "deploy", "instances", instance, "fixture-manifest.json");
   mkdirSync(dirname(destination), { recursive: true });
   writeFileSync(destination, `${JSON.stringify(manifest, null, 2)}\n`, { mode: 0o600 });
