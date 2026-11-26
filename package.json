@@ -46,6 +46,8 @@
     "test:ai:golden": "node --test --require tsx/cjs tests/ai/lot-lookup.golden.test.ts",
     "test:ai:draft": "node --test --require tsx/cjs tests/ai/draft-receipt.golden.test.ts contexts/ai/application/draft-receipt.test.ts",
     "test:ai:adversarial": "node --test --require tsx/cjs tests/ai/draft-adversarial.test.ts",
+    "test:ai:t06": "node --test --require tsx/cjs tests/ai/adversarial-t06.test.ts",
+    "test:ai:security": "npm run test:ai:tools && npm run test:ai:golden && npm run test:ai:draft && npm run test:ai:risk && npm run test:ai:t06",
     "test:ai:risk": "node --test --require tsx/cjs tests/ai/risk-rules.golden.test.ts contexts/ai/application/risk-rules.test.ts tests/ai/risk-feedback.route.test.ts",
     "test:platform:ai-tools": "node scripts/run-platform-test.mjs ai-tools",
     "test:gateway": "node --test tests/gateway/private.test.mjs tests/gateway/public.test.mjs tests/gateway/m2m.test.mjs tests/gateway/policy.test.mjs tests/system/m01-policy.test.mjs",

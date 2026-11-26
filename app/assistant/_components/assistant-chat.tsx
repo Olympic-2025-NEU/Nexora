@@ -23,6 +23,7 @@ type Answered = {
 type Ambiguous = { status: "ambiguous"; candidates: Candidate[]; requestId: string };
 type NotFound = { status: "not_found"; hint: string; requestId: string };
 type ChatResult = Answered | Ambiguous | NotFound;
+type AskBody = { question: string; batchId?: string };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
@@ -48,6 +49,7 @@ export function AssistantChat() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ChatResult | null>(null);
+  const [lastAsk, setLastAsk] = useState<AskBody | null>(null);
   const [tab, setTab] = useState<"lookup" | "draft">("lookup");
   const [draftBatchId, setDraftBatchId] = useState<string | null>(null);
   const [draftSession, setDraftSession] = useState(0);
@@ -58,7 +60,8 @@ export function AssistantChat() {
     setTab("draft");
   }
 
-  async function ask(body: { question: string; batchId?: string }) {
+  async function ask(body: AskBody) {
+    setLastAsk(body);
     setLoading(true);
     setError(null);
     try {
@@ -94,12 +97,23 @@ export function AssistantChat() {
   const answeredBatchId = result?.status === "answered"
     ? result.facts.find((fact) => fact.kind === "batchCode" && UUID_RE.test(fact.sourceId))?.sourceId ?? null
     : null;
+  const retryButton = lastAsk ? (
+    <Button type="button" variant="outline" disabled={loading} onClick={() => void ask(lastAsk)}>
+      {t("assistant.retry")}
+    </Button>
+  ) : null;
+  const directDataLink = (
+    <Link href="/inventory/balances" className="text-primary underline underline-offset-4">
+      {t("assistant.directDataLink")}
+    </Link>
+  );
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <div className="space-y-2">
         <h1 className="text-2xl font-semibold tracking-tight">{t("assistant.title")}</h1>
         <p className="text-sm text-muted-foreground">{t("assistant.hint")}</p>
+        <p role="note" className="text-xs text-muted-foreground">{t("assistant.disclaimer")}</p>
       </div>
 
       <div className="flex gap-2" role="tablist" aria-label={t("assistant.title")}>
@@ -133,8 +147,10 @@ export function AssistantChat() {
       </form>
 
       {error ? (
-        <div role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
-          {error}
+        <div role="alert" className="space-y-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+          <p>{error}</p>
+          {retryButton}
+          {directDataLink}
         </div>
       ) : null}
 
@@ -185,12 +201,13 @@ export function AssistantChat() {
             ) : null}
           </div>
 
-          {result.aiUnavailable ? (
-            <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm space-y-1">
+          {result.aiUnavailable && !error ? (
+            <div role="alert" className="space-y-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
               <p>{t("assistant.aiUnavailable")}</p>
-              <Link href="/trace" className="text-primary underline underline-offset-4">
-                {t("assistant.directDataLink")}
-              </Link>
+              <div className="flex flex-wrap items-center gap-3">
+                {retryButton}
+                {directDataLink}
+              </div>
             </div>
           ) : null}
 
