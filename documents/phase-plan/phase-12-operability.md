@@ -14,7 +14,7 @@
 
 - [x] Giữ PostgreSQL cho OLTP confirm; sau commit export sự kiện lịch sử versioned/checksummed sang object storage hoặc kho truy vấn riêng theo D11, có checkpoint/replay và retention policy.
 - [x] Tạo projection/report theo batch/time/issuer truy vấn được từ dữ liệu lưu trữ, đo thời gian/lag và chứng minh report/export không khóa confirm transaction.
-- [x] Test late/duplicate event, export worker down/restart, checksum mismatch và rebuild. Ghi rõ đây là lớp phân tích/projection tối thiểu, chỉ gọi “lakehouse” nếu có đủ định nghĩa kỹ thuật.
+- [ ] Test late/duplicate event, export worker down/restart, checksum mismatch và rebuild. Source test đã chứng minh pagination >1.000 event, lỗi ghi giữa partition và phát hiện checksum sai; live restart/rebuild còn mở. Không gọi JSONL archive là “lakehouse”.
 - **Đầu ra:** lifecycle pipeline + query demo; **kiểm chứng:** source→archive→report với source IDs, metric lag và failure recovery.
   [Bằng chứng T02](evidence/p12-t02.md).
 
@@ -22,7 +22,7 @@
 
 - [x] Chọn đầu vào scanner/temperature **simulated** có device ID, timestamp, batch/transfer reference, payload schema, authn/rate limit và timestamp/duplicate policy.
 - [x] Ingest qua gateway, validate/map vào event/evidence; correlation tới receipt/trace và cảnh báo nhiệt độ/scan mismatch. Tạo lot digital representation tối thiểu gồm trạng thái nghiệp vụ + reading hiện trường mới nhất, timestamp/lag; dữ liệu thiết bị không tự sửa stock hoặc quality status.
-- [x] UI D hiển thị event OT cạnh event nghiệp vụ với provenance; test wrong device, stale timestamp, duplicate và offline upload. Dán nhãn mô phỏng rõ trong demo.
+- [ ] UI D hiển thị event OT cạnh event nghiệp vụ với provenance; unit test wrong device/instance, unknown batch, duplicate sau stale và body bounds đã pass. Chờ deploy image mới rồi thử stale/offline upload và UI thật. Dán nhãn mô phỏng rõ trong demo.
 - **Đầu ra:** IT/OT adapter + fixture; **kiểm chứng:** trace liên kết event thiết bị với lô và nguồn, lỗi bị cách ly.
   [Bằng chứng T03](evidence/p12-t03.md).
 
@@ -81,8 +81,8 @@ Rule v1 để AI triển khai (ngưỡng demo được đổi bằng D11 có tes
 
 ## P12-T09 — Gate G12
 
-- [x] Bốn nguyên lý có artifact/test đúng mức D11; zero-trust và scan, GitOps drift nếu được yêu cầu, lifecycle/IT-OT/lineage đều có trace nguồn.
-- [x] Failure, load, backup/restore và observability suite pass trên cấu hình demo đã pin; mọi gap còn lại được ghi với ảnh hưởng nghiệm thu.
+- [ ] Bốn nguyên lý có artifact/test đúng mức D11; lifecycle/IT-OT source được sửa và unit test, nhưng runtime mới, GitOps/BTC alternate và các gate phụ thuộc chưa có bằng chứng hoàn tất.
+- [ ] Failure, load, backup/restore và observability suite phải pass trên cấu hình demo đã pin; fresh-project restore và archive corruption rebuild còn mở. Ghi gap với ảnh hưởng nghiệm thu.
 - **Bằng chứng:** evidence map, scripts, dashboards, restore log, provenance query, GitOps sync record hoặc gap chưa đạt rõ.
   [G12.md](evidence/G12.md).
 
