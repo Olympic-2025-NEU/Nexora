@@ -16,6 +16,8 @@ ERP canonical surfaces (ADR 0016): `/admin` (org/members only), `/partners`, `/c
 
 `apps/dx-lab/app/(workspace)/...` tổ chức route group, `components/{shell,forms,tables,trace,ai}/` chỉ UI, `lib/api-client/` typed từ OpenAPI. Mỗi route có loading/empty/error/403/409/503; form disable double submit và giữ draft khi request retryable; ETag/version hiển thị conflict và reload. Keyboard focus/labels, mobile 360px, decimal/unit/timezone đúng. Route authorization ở server/API, ẩn navigation chỉ là UX.
 
+P11 deploy path là `/dxlab/*` qua APISIX tới runtime Next riêng; các route ở bảng là đường dẫn **bên trong** ứng dụng (ví dụ `/work` thành `/dxlab/work`). `basePath` giữ cả asset và callback dưới prefix này. Gateway đưa `/api/v1/core/*`, `/api/v1/files*` tới Core Data/File API, `/api/v1/*` còn lại tới ERP business API; DX-Lab không kết nối PostgreSQL, SeaweedFS hoặc Flowable REST trực tiếp. Route/service ownership và trường hợp dừng hai UI được ghi trong [P11-T01](evidence/p11-t01.md).
+
 ## Component contract theo hành trình
 
 - `BatchPicker`: tìm theo SKU/barcode/issuer/expiry, trả `{batchId,productId,unit,qualityStatus,availableQuantity}`; restricted/inspect hiển thị lý do và chặn Issue.

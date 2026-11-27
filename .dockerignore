@@ -1,6 +1,7 @@
 .git
 .github
 .next
+apps/dx-lab/.next
 node_modules
 **/.env
 **/.env.*

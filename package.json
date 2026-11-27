@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:dxlab": "next build apps/dx-lab",
     "start": "node deploy/config.mjs --runtime erp && next start",
     "lint": "eslint --max-warnings=0",
     "typecheck": "next typegen && tsc --noEmit",

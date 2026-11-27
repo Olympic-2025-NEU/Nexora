@@ -10,6 +10,7 @@ const eslintConfig = defineConfig([
   globalIgnores([
     // Default ignores of eslint-config-next:
     ".next/**",
+    "apps/dx-lab/.next/**",
     "out/**",
     "build/**",
     "worker/dist/**",

@@ -419,12 +419,18 @@ services:
 
   dx-lab:
     profiles: ["dxlab"]
+    image: nexora-dx-lab:${NEXORA_IMAGE_TAG:-p11-local}
     build:
-      context: ../apps/dx-lab
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: apps/dx-lab/Dockerfile
     environment:
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL}
       OIDC_ISSUER_URL: ${OIDC_ISSUER_URL}
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/dxlab/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
     networks: [internal]
     deploy:
       resources:

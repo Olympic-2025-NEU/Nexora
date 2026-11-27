@@ -2,7 +2,7 @@ name: ci
 
 on:
   push:
-    branches: [develop, main, "chore/**", "spike/**", "phase-*/**", "phase01/**", "phase-03", "phase03/**", "phase-04", "phase04/**", "phase-07", "phase07/**", "phase-08", "phase08/**", "phase-09", "phase-10"]
+    branches: [develop, main, "chore/**", "spike/**", "phase-*/**", "phase01/**", "phase-03", "phase03/**", "phase-04", "phase04/**", "phase-07", "phase07/**", "phase-08", "phase08/**", "phase-09", "phase-10", "phase-11"]
   pull_request:
     branches: [develop, main]
 
@@ -175,6 +175,8 @@ jobs:
         run: docker build -t nexora-erp:ci -f Dockerfile .
       - name: Build core-data image
         run: docker build -t nexora-core-data:ci -f services/core-data/Dockerfile .
+      - name: Build DX-Lab image
+        run: docker build -t nexora-dx-lab:ci -f apps/dx-lab/Dockerfile .
 
   secret-scan:
     runs-on: ubuntu-latest

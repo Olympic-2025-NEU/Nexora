@@ -17,7 +17,7 @@ Chọn công nghệ qua spike **không** nghĩa app/core đã triển khai. Hai 
 | [D07](../adr/D07-quantity-unit-lot.md) → [0007](../adr/0007-decimal-unit-lot.md) | `numeric(20,3)`/unit/lot **đã chốt thiết kế** | P06/P07 schema thật |
 | [D08](../adr/D08-federation-envelope.md) → [0008](../adr/0008-trace-federation-envelope.md) | Envelope/ACK v1 **đã chốt thiết kế** | P00-T05 schema + Node/Python vectors pass; P09 E2E |
 | [D09](../adr/D09-ai-provider-boundary.md) → [0009](../adr/0009-ai-provider.md) | Ranh giới AI **đã chốt**; model hoãn P10 | P10 license/policy |
-| [D10](../adr/D10-dx-lab-hpdi.md) → [0010](../adr/0010-hpdi-dx-lab.md) | DX-Lab H-P-D-I **đã chốt thiết kế** | P11 UI thật |
+| [D10](../adr/D10-dx-lab-hpdi.md) → [0010](../adr/0010-hpdi-dx-lab.md) | DX-Lab runtime riêng **đã chứng minh P11-T01**; H/P/D/I UX và G11 còn mở | [Bằng chứng P11-T01](./evidence/p11-t01.md) |
 | [D11](../adr/D11-dxos-principles-evidence.md) → [0011](../adr/0011-four-principles-proof.md) | Bốn nguyên lý **đã chốt thiết kế** | BTC + P12 |
 | [D12](../adr/D12-gitops-demo.md) → [0012](../adr/0012-gitops-demo.md) | k3s/Argo **có điều kiện** | P12 drift/reconcile |
 | [D13](../adr/D13-versions-licenses-resources.md) → [0013](../adr/0013-versions-licenses.md) | Digest/license/RAM snapshot **đã ghi** | P00-T04 npm inventory pass; P01 peak, P13 release SBOM |
@@ -40,7 +40,7 @@ Smoke: [infra](./evidence/spikes/infra/README.md), [pg semantics spike](./eviden
 | D07 Decimal/lot | P00/P06 | **Accepted P00 design** | [0007](../adr/0007-decimal-unit-lot.md) | SQL/contract pass; app constraints P06/P07 |
 | D08 Envelope | P00/P08 | **Accepted P00 design** | [0008](../adr/0008-trace-federation-envelope.md) | Schema + Node/Python vectors pass; P09 E2E |
 | D09 AI | P10 | **Accepted P10-T01** local Ollama + Qwen3 0.6B; live quality G10 | [0009](../adr/0009-ai-provider.md) | Data/fail boundary: [P10-T01 evidence](./evidence/p10-t01.md); earlier boundary: `D09-ai-provider-boundary.md` |
-| D10 H-P-D-I | P00/P11 | Design locked | [0010](../adr/0010-hpdi-dx-lab.md) | Evidence: `D10-dx-lab-hpdi.md` |
+| D10 H-P-D-I | P00/P11 | Runtime boundary verified P11-T01; UX gate open | [0010](../adr/0010-hpdi-dx-lab.md) | [P11-T01 evidence](./evidence/p11-t01.md) |
 | D11 Principles | P00/P12 | Design locked | [0011](../adr/0011-four-principles-proof.md) | Evidence: `D11-dxos-principles-evidence.md` |
 | D12 GitOps | P12 | Conditional | [0012](../adr/0012-gitops-demo.md) | Evidence: `D12-gitops-demo.md` |
 | D13 Versions | P01/P13 | Snapshot recorded | [0013](../adr/0013-versions-licenses.md) | Evidence: `D13-versions-licenses-resources.md` |

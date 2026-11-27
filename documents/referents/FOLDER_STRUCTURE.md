@@ -52,7 +52,7 @@ nexora/
   LICENSE                   # GNU AGPL v3 only
 ```
 
-Lõi headless là các dịch vụ triển khai và API của chúng (Identity/SSO, API Gateway, core data/file API cho dữ liệu có/không cấu trúc, Workflow). `services/core-data/` là runtime không UI; nó cung cấp metadata/projection và file có quyền, không sở hữu transaction chứng từ/tồn của ERP. `apps/dx-lab/` là frontend tầng 2 khác runtime Nexora ERP. Thư mục `platform/` chứa hợp đồng và adapter TypeScript để ứng dụng Nexora sử dụng các dịch vụ đó; không đại diện cho toàn bộ PaaS đã triển khai. Hiện `deploy/` mới có PostgreSQL.
+Lõi headless là các dịch vụ triển khai và API của chúng (Identity/SSO, API Gateway, core data/file API cho dữ liệu có/không cấu trúc, Workflow). `services/core-data/` là runtime không UI; nó cung cấp metadata/projection và file có quyền, không sở hữu transaction chứng từ/tồn của ERP. `apps/dx-lab/` là frontend tầng 2 khác runtime Nexora ERP. Thư mục `platform/` chứa hợp đồng và adapter TypeScript để ứng dụng Nexora sử dụng các dịch vụ đó; không đại diện cho toàn bộ PaaS đã triển khai. Compose A/B/C hiện có các runtime này; bằng chứng lõi không phụ thuộc UI ở `phase-plan/evidence/p11-t01.md`.
 
 ## Luật import
 

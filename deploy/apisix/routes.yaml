@@ -288,6 +288,24 @@ routes:
         key: remote_addr
         rejected_code: 429
 
+  # DX-Lab is a separate Next runtime. Its built-in /dxlab basePath keeps
+  # assets, callbacks and application routes on this upstream.
+  - id: dx-lab-app
+    uris: [/dxlab, /dxlab/*]
+    methods: [GET, HEAD, POST, PUT, PATCH, DELETE]
+    upstream:
+      type: roundrobin
+      nodes:
+        "dx-lab:3001": 1
+    plugins:
+      request-id: {}
+      <<: *strip-identity-headers
+      limit-req:
+        rate: 100
+        burst: 50
+        key: remote_addr
+        rejected_code: 429
+
   # -------------------------------------------------------------------------
   # 7. ERP UI via /erp/* (strip prefix) plus root /_next and /admin that Next
   #    emits in HTML when basePath is unset. Without these, CSS/JS 404 at the

@@ -4,9 +4,9 @@
 
 ## P11-T01 — Chốt ứng dụng tầng 2 và bản đồ service
 
-- [ ] Định nghĩa **DX-Lab Operations Workspace** là một ứng dụng frontend/runtime riêng tầng 2 trong cùng monorepo theo D15; H = môi trường làm việc cá nhân/SSO/hồ sơ, P = giao nhận/phê duyệt, D = tồn/trace/impact, I = AI tra cứu/Draft. Không tuyên bố bốn sản phẩm độc lập.
-- [ ] Vẽ route→gateway→core data/file API/ERP business API→DB/storage/Flowable map và chứng minh UI không cần gọi trực tiếp DB hay API admin của engine. Core vẫn chạy/được smoke test khi cả DX-Lab và ERP UI tắt.
-- [ ] ADR D10 ghi user journey tối thiểu cho Admin, Staff, Approver, Viewer và public; chọn dữ liệu A/B/C để dùng xuyên màn hình.
+- [x] Định nghĩa **DX-Lab Operations Workspace** là một ứng dụng frontend/runtime riêng tầng 2 trong cùng monorepo theo D15; H = môi trường làm việc cá nhân/SSO/hồ sơ, P = giao nhận/phê duyệt, D = tồn/trace/impact, I = AI tra cứu/Draft. Không tuyên bố bốn sản phẩm độc lập.
+- [x] Vẽ route→gateway→core data/file API/ERP business API→DB/storage/Flowable map và chứng minh UI không cần gọi trực tiếp DB hay API admin của engine. Core vẫn chạy/được smoke test khi cả DX-Lab và ERP UI tắt.
+- [x] ADR D10 ghi user journey tối thiểu cho Admin, Staff, Approver, Viewer và public; chọn dữ liệu A/B/C để dùng xuyên màn hình. [Bằng chứng T01](evidence/p11-t01.md).
 - **Đầu ra:** app map + service call trace; **kiểm chứng:** headless API script chạy độc lập UI.
 
 ## P11-T02 — Shell, session và điều hướng theo quyền
