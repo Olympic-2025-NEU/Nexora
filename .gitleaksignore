@@ -19,3 +19,6 @@ cfea7759d617bf19711c699d60f87649eefefa70:documents/phase-plan/evidence/G02.md:cu
 71f1b48664d010d117d40cbd90fe52f23ed4c803:platform/http/pipeline.test.ts:generic-api-key:231
 # P10-T01 input-rejection test contains a synthetic API-key-shaped string, not a credential.
 7e70f1d6b0b8a8312be67048b3afd8aca48e9302:services/ai/tests/test_service.py:generic-api-key:77
+
+# P12-T02 archive worker reads S3 credentials from runtime environment; no secret literal is committed.
+e3a0c873b5f4c2d28ac2ab255c45b20a9ee01360:workers/archive-export.ts:generic-api-key:49
