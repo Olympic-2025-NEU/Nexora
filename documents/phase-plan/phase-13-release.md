@@ -4,10 +4,11 @@
 
 ## P13-T01 — Freeze contract và ma trận phạm vi
 
-- [ ] Chốt version API/event/BPMN/migration/seed/image; đối chiếu `SOURCE_OF_TRUTH.md`, proposal Ch6, `OLP_2026_ALIGNMENT.md` và `test-matrix.md` từng AC.
-- [ ] Không mở tính năng finance/CRM/POS đầy đủ/production ngoài MVP trong release branch; blocker có owner, severity, cách tái hiện và quyết định release.
-- [ ] Update diagram, ADR, API examples, README với hiện trạng thực sau implement; xóa tuyên bố scaffold hoặc feature ảo.
+- [x] Chốt version API/event/BPMN/migration/seed/image; đối chiếu `SOURCE_OF_TRUTH.md`, proposal Ch6, `OLP_2026_ALIGNMENT.md` và `test-matrix.md` từng AC.
+- [x] Không mở tính năng finance/CRM/POS đầy đủ/production ngoài MVP trong release branch; blocker có owner, severity, cách tái hiện và quyết định release.
+- [x] Update diagram, ADR, API examples, README với hiện trạng thực sau implement; xóa tuyên bố scaffold hoặc feature ảo. (freeze map + known blockers; README install polish in T03)
 - **Đầu ra:** release checklist + traceability matrix; **kiểm chứng:** mỗi AC trỏ tới test/evidence và owner.
+  [Bằng chứng T01](evidence/p13-t01.md) · [release-traceability.md](evidence/release-traceability.md).
 
 ## P13-T02 — E2E A→B→C không chạm DB bằng tay
 
