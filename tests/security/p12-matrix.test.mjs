@@ -8,7 +8,9 @@ test("gateway default-deny and forged identity docs/tests exist", () => {
   assert.ok(existsSync("tests/gateway/private.test.mjs"));
   assert.ok(existsSync("tests/gateway/m2m.test.mjs"));
   const policy = readFileSync("tests/gateway/policy.test.mjs", "utf8");
-  assert.match(policy, /401|403|audience|issuer/i);
+  assert.match(policy, /fail-closed|adminAlwaysAllowed|federation:events:write/i);
+  const m2m = readFileSync("tests/gateway/m2m.test.mjs", "utf8");
+  assert.match(m2m, /401|403|audience|issuer/i);
 });
 
 test("ClamAV fail-closed scan suite exists", () => {

@@ -1031,3 +1031,28 @@ model QrToken {
   @@map("qr_token")
   @@schema("traceability")
 }
+
+model QualityIssue {
+  id               String    @id @db.Uuid
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+  version          Int       @default(1)
+  ruleId           String    @map("rule_id")
+  sourceType       String    @map("source_type")
+  sourceId         String    @map("source_id")
+  state            String    @default("open")
+  severity         String
+  sourceEventIds   String[]  @default([]) @map("source_event_ids") @db.Uuid
+  detail           Json      @db.JsonB
+  policyVersion    String    @map("policy_version")
+  firstDetectedAt  DateTime  @map("first_detected_at") @db.Timestamptz(6)
+  lastDetectedAt   DateTime  @map("last_detected_at") @db.Timestamptz(6)
+  resolvedAt       DateTime? @map("resolved_at") @db.Timestamptz(6)
+  resolvedBySub    String?   @map("resolved_by_sub")
+
+  @@unique([ruleId, sourceType, sourceId], map: "uq_quality_issue_rule_source")
+  @@index([state, severity, lastDetectedAt(sort: Desc)], map: "idx_quality_issue_state")
+  @@index([sourceType, sourceId], map: "idx_quality_issue_source")
+  @@map("quality_issue")
+  @@schema("traceability")
+}

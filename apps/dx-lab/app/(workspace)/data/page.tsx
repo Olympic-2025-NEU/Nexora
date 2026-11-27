@@ -9,6 +9,7 @@ export default function DataHomePage() {
       <nav className="area-nav" aria-label="Dữ liệu">
         <Link href="/data/inventory">Tồn kho</Link>
         <Link href="/data/lots">Lô / timeline</Link>
+        <Link href="/data/quality">Quality issues</Link>
       </nav>
     </section>
   );

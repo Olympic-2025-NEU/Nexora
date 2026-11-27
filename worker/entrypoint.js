@@ -8,6 +8,7 @@ import { main as startOutbox } from "./dist/workers/outbox-dispatcher.js";
 import { createPrismaIdempotency } from "./dist/platform/http/idempotency.js";
 import { traceLag } from "./dist/workers/trace-projector.js";
 import { createArchiveExporter, archiveLag } from "./dist/workers/archive-export.js";
+import { detectQualityIssues } from "./dist/workers/quality-detector.js";
 import { resolvePendingDependencies } from "./dist/contexts/federation/application/identity-mapping.js";
 
 validateConfig(process.env, "worker");
@@ -38,6 +39,21 @@ async function runArchiveExport() {
 }
 setInterval(() => { void runArchiveExport(); }, 30_000);
 void runArchiveExport();
+
+async function runQualityDetect() {
+  try {
+    const count = await detectQualityIssues(prisma);
+    if (count) console.log(JSON.stringify({ service: "worker", outcome: "quality_detect", count }));
+  } catch (error) {
+    console.error(JSON.stringify({
+      service: "worker",
+      outcome: "quality_detect_failed",
+      error: error instanceof Error ? error.message : "unknown",
+    }));
+  }
+}
+setInterval(() => { void runQualityDetect(); }, 60_000);
+void runQualityDetect();
 const idempotency = createPrismaIdempotency(prisma);
 async function purgeIdempotency() {
   try {

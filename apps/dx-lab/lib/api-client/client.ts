@@ -355,6 +355,52 @@ export async function aiDraftCreate(
   return gatewayData("/api/v1/ai/draft/create", accessToken, { method: "POST", body });
 }
 
+export async function listQualityIssues(
+  accessToken: string,
+  query: { state?: string } = {},
+): Promise<Record<string, unknown>[]> {
+  const params = new URLSearchParams();
+  if (query.state) params.set("state", query.state);
+  const q = params.toString();
+  const path = (q ? `/api/v1/quality/issues?${q}` : "/api/v1/quality/issues") as `/api/v1/${string}`;
+  return gatewayData(path, accessToken);
+}
+
+export async function getQualityIssue(
+  accessToken: string,
+  id: string,
+): Promise<Record<string, unknown>> {
+  return gatewayData(`/api/v1/quality/issues/${id}`, accessToken);
+}
+
+export async function acknowledgeQualityIssue(
+  accessToken: string,
+  id: string,
+  version: number,
+  reason: string,
+): Promise<Record<string, unknown>> {
+  return gatewayData(`/api/v1/quality/issues/${id}/acknowledge`, accessToken, {
+    method: "POST",
+    body: { reason },
+    ifMatch: version,
+    idempotencyKey: crypto.randomUUID(),
+  });
+}
+
+export async function resolveQualityIssue(
+  accessToken: string,
+  id: string,
+  version: number,
+  reason: string,
+): Promise<Record<string, unknown>> {
+  return gatewayData(`/api/v1/quality/issues/${id}/resolve`, accessToken, {
+    method: "POST",
+    body: { reason },
+    ifMatch: version,
+    idempotencyKey: crypto.randomUUID(),
+  });
+}
+
 function isMe(value: unknown): value is Me {
   if (!value || typeof value !== "object") return false;
   const data = value as Record<string, unknown>;
