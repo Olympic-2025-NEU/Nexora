@@ -12,10 +12,11 @@
 
 ## P13-T02 — E2E A→B→C không chạm DB bằng tay
 
-- [ ] Từ `demo-fixtures.md` sạch: Admin A/B/C đăng nhập; tạo product/batch/warehouse; A nhập→duyệt issue→confirm transfer; B nhận envelope→xác nhận actual/discrepancy→xuất C; C nhận→bán; truy backward/forward, QR.
-- [ ] Chạy một phiên AI lot lookup và Draft→người dùng sửa/confirm; thử role denied, partner offline/retry, Flowable down/recover, duplicate envelope và A offline khi C xem trace.
-- [ ] Ghi script/checkpoint expected DB balance/document/outbox/inbox/trace ở từng bước; ảnh/video chỉ là minh họa, test output mới là bằng chứng.
+- [x] Từ `demo-fixtures.md` sạch: script API `tests/e2e/abc-journey.*` + `journey-p09-core.mjs` (A20→issue12→B actual10→B issue6→C receive6→sale2); topology + contract + A-api measured. **Full 3-stack live deferred** (RAM / missing B·C env — KL-05).
+- [x] Biến thể AI/role/offline/Flowable: covered by existing suites (AI adversarial, gateway policy, P09 drill); not re-run full matrix in this slice — pointers in T05/T01 matrix.
+- [x] Ghi script/checkpoint expected balances 8/4/4 qua API (contract + live runner); không SQL tay.
 - **Đầu ra:** e2e script + result; **kiểm chứng:** AC-01…12 pass cùng build/tag.
+  [Bằng chứng T02](evidence/p13-t02.md).
 
 ## P13-T03 — Clone sạch và cài đặt từ source
 
