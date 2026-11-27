@@ -232,6 +232,129 @@ export async function getFileMetadata(
   }
 }
 
+export type TradingKind = "receipts" | "issues" | "transfers" | "receivings";
+
+export async function listTradingDocuments(
+  accessToken: string,
+  kind: TradingKind,
+): Promise<Record<string, unknown>[]> {
+  return gatewayData(`/api/v1/${kind}`, accessToken);
+}
+
+export async function getTradingDocument(
+  accessToken: string,
+  kind: TradingKind,
+  id: string,
+): Promise<Record<string, unknown>> {
+  return gatewayData(`/api/v1/${kind}/${id}`, accessToken);
+}
+
+export async function createTradingDocument(
+  accessToken: string,
+  kind: TradingKind,
+  body: unknown,
+): Promise<Record<string, unknown>> {
+  return gatewayData(`/api/v1/${kind}`, accessToken, {
+    method: "POST",
+    body,
+    okStatuses: [201],
+  });
+}
+
+export async function tradingAction(
+  accessToken: string,
+  kind: TradingKind,
+  id: string,
+  action: string,
+  version: number,
+  body: unknown = {},
+): Promise<Record<string, unknown>> {
+  return gatewayData(`/api/v1/${kind}/${id}/${action}`, accessToken, {
+    method: "POST",
+    ifMatch: version,
+    idempotencyKey: crypto.randomUUID(),
+    body,
+  });
+}
+
+export async function decideApproval(
+  accessToken: string,
+  approvalRequestId: string,
+  decision: "approve" | "reject",
+  version: number,
+  note?: string,
+): Promise<Record<string, unknown>> {
+  return gatewayData(`/api/v1/approvals/${approvalRequestId}/decisions`, accessToken, {
+    method: "POST",
+    ifMatch: version,
+    idempotencyKey: crypto.randomUUID(),
+    body: { decision, version, ...(note ? { note } : {}) },
+    okStatuses: [202],
+  });
+}
+
+export async function listBatches(accessToken: string, q?: string): Promise<Record<string, unknown>[]> {
+  const path = q?.trim()
+    ? `/api/v1/batches?q=${encodeURIComponent(q.trim())}&limit=50`
+    : "/api/v1/batches?limit=50";
+  return gatewayData(path as `/api/v1/${string}`, accessToken);
+}
+
+export async function listWarehouses(accessToken: string): Promise<Record<string, unknown>[]> {
+  return gatewayData("/api/v1/warehouses?limit=100", accessToken);
+}
+
+export async function listBalances(accessToken: string): Promise<Record<string, unknown>[]> {
+  return gatewayData("/api/v1/inventory/balances?limit=100", accessToken);
+}
+
+export async function listMovements(accessToken: string): Promise<Record<string, unknown>[]> {
+  return gatewayData("/api/v1/inventory/movements?limit=50", accessToken);
+}
+
+export async function getLotHistory(accessToken: string, lotId: string): Promise<Record<string, unknown>> {
+  return gatewayData(`/api/v1/lots/${lotId}/history`, accessToken);
+}
+
+export async function getLotTrace(
+  accessToken: string,
+  lotId: string,
+  direction: "backward" | "forward",
+): Promise<Record<string, unknown>> {
+  return gatewayData(`/api/v1/lots/${lotId}/trace/${direction}`, accessToken);
+}
+
+export async function getPublicPassport(token: string): Promise<Record<string, unknown>> {
+  const response = await fetch(new URL(`/api/v1/public/passport/${token}`, authConfig().gatewayUrl), {
+    cache: "no-store",
+    headers: { Accept: "application/json" },
+    signal: AbortSignal.timeout(10000),
+  });
+  if (!response.ok) throw new ApiError(response.status, await readErrorCode(response));
+  return unwrapData(await response.json());
+}
+
+export async function aiChat(
+  accessToken: string,
+  body: { question: string; batchId?: string; lotCode?: string; issuer?: string },
+): Promise<Record<string, unknown>> {
+  return gatewayData("/api/v1/ai/chat", accessToken, { method: "POST", body });
+}
+
+export async function aiDraftPropose(
+  accessToken: string,
+  body: { request: string; batchId?: string; lotCode?: string; issuer?: string },
+): Promise<Record<string, unknown>> {
+  return gatewayData("/api/v1/ai/draft", accessToken, { method: "POST", body });
+}
+
+export async function aiDraftCreate(
+  accessToken: string,
+  body: { proposalId: string; fields: Record<string, string>; note?: string },
+): Promise<Record<string, unknown>> {
+  return gatewayData("/api/v1/ai/draft/create", accessToken, { method: "POST", body });
+}
+
 function isMe(value: unknown): value is Me {
   if (!value || typeof value !== "object") return false;
   const data = value as Record<string, unknown>;

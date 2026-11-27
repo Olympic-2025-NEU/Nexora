@@ -27,37 +27,42 @@
 
 ## P11-T04 — P: giao dịch, nhận hàng và approval inbox
 
-- [ ] Product/batch/warehouse picker, receipt/issue/transfer Draft editor; hiển thị quantity/unit/expiry/quality/balance và validation từ server.
-- [ ] Approval inbox liên kết Flowable task; approve/reject trả `decision_pending` tới khi worker/poller đối soát, reject cần reason; sau đó người có quyền confirm; người tạo không tự duyệt theo D06 v1.
-- [ ] Receiver thấy sent vs actual, discrepancy và technical ACK tách khỏi business receipt; UI retryable/offline/rejected states và lịch sử action.
+- [x] Product/batch/warehouse picker, receipt/issue/transfer Draft editor; hiển thị quantity/unit/expiry/quality/balance và validation từ server.
+- [x] Approval inbox liên kết Flowable task; approve/reject trả `decision_pending` tới khi worker/poller đối soát, reject cần reason; sau đó người có quyền confirm; người tạo không tự duyệt theo D06 v1.
+- [x] Receiver thấy sent vs actual, discrepancy và technical ACK tách khỏi business receipt; UI retryable/offline/rejected states và lịch sử action.
 - **Đầu ra:** P journey; **kiểm chứng:** AC-03/04/06/12 thực hiện được không mở DB/Flowable admin UI.
+  [Bằng chứng T04](evidence/p11-t04.md).
 
 ## P11-T05 — D: tồn, timeline và impact
 
-- [ ] Dashboard tồn theo lô/kho, document history, A→B→C timeline với source/verification/gap/staleness; link tới bằng chứng clean có quyền.
-- [ ] Backward và forward trace từ một lô, affected partner/document list, filters/pagination; dùng số liệu từ API, không hardcode fixture vào UI.
-- [ ] Passport public mobile và QR scan có design dễ đọc, chỉ field allowlist; trường private không xuất hiện ở DOM/network response.
+- [x] Dashboard tồn theo lô/kho, document history, A→B→C timeline với source/verification/gap/staleness; link tới bằng chứng clean có quyền.
+- [x] Backward và forward trace từ một lô, affected partner/document list, filters/pagination; dùng số liệu từ API, không hardcode fixture vào UI.
+- [x] Passport public mobile và QR scan có design dễ đọc, chỉ field allowlist; trường private không xuất hiện ở DOM/network response.
 - **Đầu ra:** D journey; **kiểm chứng:** AC-07/08/09 UI và privacy snapshot.
+  [Bằng chứng T05](evidence/p11-t05.md).
 
 ## P11-T06 — I: AI panel và human-in-loop
 
-- [ ] Panel hỏi lot có disambiguation, source citations, trạng thái thiếu dữ liệu và quyền; loading/timeout/fallback truy vấn trực tiếp.
-- [ ] Draft suggestion mở form M03 với dữ liệu AI đề xuất, người dùng xem/sửa và thực hiện action riêng; UI không tự confirm khi model trả “đã xong”.
-- [ ] Thể hiện AI source/time và cảnh báo giới hạn trong ngữ cảnh, không che giấu trạng thái partner-asserted.
+- [x] Panel hỏi lot có disambiguation, source citations, trạng thái thiếu dữ liệu và quyền; loading/timeout/fallback truy vấn trực tiếp.
+- [x] Draft suggestion mở form M03 với dữ liệu AI đề xuất, người dùng xem/sửa và thực hiện action riêng; UI không tự confirm khi model trả “đã xong”.
+- [x] Thể hiện AI source/time và cảnh báo giới hạn trong ngữ cảnh, không che giấu trạng thái partner-asserted.
 - **Đầu ra:** I journey; **kiểm chứng:** AC-10/11 qua UI với role ít quyền và provider down.
+  [Bằng chứng T06](evidence/p11-t06.md).
 
 ## P11-T07 — Luồng xuyên module và trạng thái lỗi
 
-- [ ] Tạo navigation/notification link từ transfer tới receiver inbox, từ receipt tới trace, từ risk insight tới batch/document; URL an toàn và permission check ở từng đích.
-- [ ] Empty/loading/error/409 conflict/429 rate limit/503 core down/retry states có thông điệp hành động được, không làm người dùng double-submit.
-- [ ] Dữ liệu A/B/C được tạo bằng seed/API; test e2e bằng browser cho kịch bản chính và ít nhất một kịch bản lỗi mạng.
+- [x] Tạo navigation/notification link từ transfer tới receiver inbox, từ receipt tới trace, từ risk insight tới batch/document; URL an toàn và permission check ở từng đích.
+- [x] Empty/loading/error/409 conflict/429 rate limit/503 core down/retry states có thông điệp hành động được, không làm người dùng double-submit.
+- [x] Dữ liệu A/B/C được tạo bằng seed/API; test e2e bằng browser cho kịch bản chính và ít nhất một kịch bản lỗi mạng.
 - **Đầu ra:** UX e2e suite; **kiểm chứng:** người ngoài nhóm chạy được kịch bản bằng runbook.
+  [Bằng chứng T07](evidence/p11-t07.md).
 
 ## P11-T08 — Khả dụng, đo lường và gate G11
 
-- [ ] Kiểm tra keyboard/tab order, labels, contrast, responsive, long strings, timezone/decimal, QR trên điện thoại; sửa blocker demo.
-- [ ] Ghi service-call trace cho từng vùng H/P/D/I và test tắt cả DX-Lab/ERP UI vẫn gọi được core API qua gateway. Không dùng mock làm bằng chứng gate.
+- [x] Kiểm tra keyboard/tab order, labels, contrast, responsive, long strings, timezone/decimal, QR trên điện thoại; sửa blocker demo.
+- [x] Ghi service-call trace cho từng vùng H/P/D/I và test tắt cả DX-Lab/ERP UI vẫn gọi được core API qua gateway. Không dùng mock làm bằng chứng gate.
 - **Bằng chứng:** e2e run/video đã redacted, accessibility checklist, gateway traces, UI screenshots trên mobile/desktop.
+  [Bằng chứng T08 / G11](evidence/G11.md) · [p11-t08](evidence/p11-t08.md).
 
 ## Hồ sơ giao AI theo từng task
 
