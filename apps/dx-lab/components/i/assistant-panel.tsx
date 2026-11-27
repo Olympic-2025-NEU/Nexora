@@ -10,11 +10,24 @@ import {
 } from "../../lib/i/actions";
 import { StatusBanner } from "../h/status-banner";
 
+type DraftFields = { warehouseId: string; batchId: string; quantity: string; unit: string };
+
+function editableFields(value: unknown): DraftFields {
+  const fields = value && typeof value === "object" ? value as Record<string, unknown> : {};
+  return {
+    warehouseId: String(fields.warehouseId ?? ""),
+    batchId: String(fields.batchId ?? ""),
+    quantity: String(fields.quantity ?? ""),
+    unit: String(fields.unit ?? ""),
+  };
+}
+
 export function AssistantPanel() {
   const [question, setQuestion] = useState("");
   const [request, setRequest] = useState("");
   const [answer, setAnswer] = useState<Record<string, unknown> | null>(null);
   const [proposal, setProposal] = useState<Record<string, unknown> | null>(null);
+  const [draftFields, setDraftFields] = useState<DraftFields>(editableFields(null));
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -43,20 +56,21 @@ export function AssistantPanel() {
         return;
       }
       setProposal(result.data);
+      setDraftFields(editableFields(result.data.fields));
     });
   }
 
   function createDraft() {
     if (!proposal || proposal.status !== "proposed") return;
-    const fields = proposal.fields as Record<string, string> | undefined;
     const proposalId = String(proposal.proposalId ?? "");
-    if (!fields || !proposalId) {
+    if (!proposalId || Object.values(draftFields).some((value) => !value.trim()) ||
+        !Number.isFinite(Number(draftFields.quantity)) || Number(draftFields.quantity) <= 0) {
       setError("Proposal thiếu fields/proposalId.");
       return;
     }
     setError(null);
     startTransition(async () => {
-      const result = await aiDraftCreateAction({ proposalId, fields });
+      const result = await aiDraftCreateAction({ proposalId, fields: draftFields });
       if (!result.ok) {
         setError(result.message);
         return;
@@ -82,11 +96,19 @@ export function AssistantPanel() {
             <>
               <p>{String(answer.answer)}</p>
               {answer.aiUnavailable
-                ? <StatusBanner tone="warning">Provider down — dùng facts deterministic / fallback trực tiếp.</StatusBanner>
+                ? <StatusBanner tone="warning">Model tạm không sẵn sàng. Xem dữ liệu trực tiếp tại <Link href="/data/lots">Danh sách lô</Link>.</StatusBanner>
                 : null}
-              <p className="muted">
-                Sources: {JSON.stringify(answer.sources ?? [])}
-              </p>
+              <h3>Nguồn và thời điểm</h3>
+              <ul className="task-list">
+                {(Array.isArray(answer.sources) ? answer.sources : []).map((source, index) => {
+                  const item = source as Record<string, unknown>;
+                  return <li key={`${String(item.sourceId ?? "")}-${index}`}>
+                    {String(item.kind ?? "dữ liệu")} · {String(item.value ?? "")} ·{" "}
+                    nguồn {String(item.sourceId ?? "—")} · asOf {String(item.asOf ?? "—")} ·{" "}
+                    xác minh {String(item.verification ?? "—")}
+                  </li>;
+                })}
+              </ul>
               {"riskAlerts" in answer && Array.isArray(answer.riskAlerts) && answer.riskAlerts.length
                 ? (
                   <StatusBanner tone="warning">
@@ -116,19 +138,42 @@ export function AssistantPanel() {
       {proposal ? (
         <section className="panel">
           <h2>Proposal · {String(proposal.status)}</h2>
-          <pre className="mono">{JSON.stringify(proposal.fields ?? proposal.candidates ?? proposal, null, 2)}</pre>
+          {proposal.status !== "proposed"
+            ? <pre className="mono">{JSON.stringify(proposal.candidates ?? proposal, null, 2)}</pre>
+            : null}
+          {Array.isArray(proposal.warnings) && proposal.warnings.length ? (
+            <StatusBanner tone="warning">
+              Cảnh báo: {proposal.warnings.map((warning) =>
+                String((warning as { message?: string }).message ?? "Kiểm tra lại dữ liệu nguồn"))
+                .join("; ")}
+            </StatusBanner>
+          ) : null}
+          {Array.isArray(proposal.sources) && proposal.sources.length ? (
+            <p className="muted">Nguồn đề xuất: {proposal.sources.map((source) => {
+              const item = source as Record<string, unknown>;
+              return `${String(item.sourceId ?? "—")} (${String(item.asOf ?? "—")}, ${
+                String(item.verification ?? "—")})`;
+            }).join("; ")}</p>
+          ) : null}
           {proposal.status === "proposed" ? (
-            <div className="actions">
-              <button type="button" disabled={pending} onClick={createDraft}>
-                Tạo draft M03 (human action)
+            <form className="form-grid" onSubmit={(event) => { event.preventDefault(); createDraft(); }}>
+              <p>Kiểm tra và sửa các trường trước khi tạo Draft. Đây là thao tác riêng của bạn; AI không xác nhận phiếu.</p>
+              {(["warehouseId", "batchId", "quantity", "unit"] as const).map((field) => (
+                <label key={field}>{field}
+                  <input value={draftFields[field]} required disabled={pending || "created" in proposal}
+                    onChange={(event) => setDraftFields((current) => ({ ...current, [field]: event.target.value }))} />
+                </label>
+              ))}
+              <button type="submit" disabled={pending || "created" in proposal}>
+                {pending ? "Đang tạo…" : "Tạo Draft M03"}
               </button>
-              <Link href="/operations/receipts">Mở form phiếu nhập</Link>
-            </div>
+            </form>
           ) : null}
           {"created" in proposal ? (
             <StatusBanner tone="success">
-              Đã tạo draft {String((proposal.created as { draftDocumentId?: string }).draftDocumentId)}.
-              AI không tự confirm.
+              Đã tạo Draft. <Link href={`/operations/receipts?id=${encodeURIComponent(String(
+                (proposal.created as { draftDocumentId?: string }).draftDocumentId ?? "",
+              ))}`}>Mở phiếu để xem, sửa hoặc confirm theo quyền M03</Link>.
             </StatusBanner>
           ) : null}
           <p className="muted">UI không tự confirm khi model nói “đã xong”.</p>

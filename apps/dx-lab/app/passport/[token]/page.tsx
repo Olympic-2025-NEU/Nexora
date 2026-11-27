@@ -21,10 +21,15 @@ export default async function PassportPage({ params }: { params: Promise<{ token
   const productName = String(passport?.productName ?? "");
   const publicLotCode = String(passport?.publicLotCode ?? "");
   const originIssuer = String(passport?.originIssuer ?? "");
-  const timeline = (passport?.timeline as Record<string, unknown>[] | undefined) ?? [];
-  const leaked = passport
-    ? /email|price|stock|credential|rawPayload|buyerRef/i.test(JSON.stringify(passport))
-    : false;
+  const timeline = Array.isArray(passport?.timeline)
+    ? passport.timeline.filter((item): item is Record<string, unknown> =>
+      !!item && typeof item === "object" && !Array.isArray(item))
+    : [];
+  const verificationState = String(passport?.verificationState ?? "");
+  const asOf = String(passport?.asOf ?? "");
+  const gaps = Array.isArray(passport?.gaps)
+    ? passport.gaps.filter((gap): gap is string => typeof gap === "string")
+    : [];
 
   return (
     <main className="intro stack">
@@ -36,15 +41,20 @@ export default async function PassportPage({ params }: { params: Promise<{ token
           <dl className="profile">
             <dt>Lô công khai</dt><dd>{publicLotCode || "—"}</dd>
             <dt>Origin issuer</dt><dd>{originIssuer || "—"}</dd>
+            <dt>Xác minh</dt><dd>{verificationState || "—"}</dd>
+            <dt>Cập nhật lúc</dt><dd>{asOf || "—"}</dd>
           </dl>
-          {leaked
-            ? <StatusBanner tone="error">Phát hiện field private trong payload — dừng demo.</StatusBanner>
-            : <StatusBanner tone="success">Không thấy field private trong response allowlist.</StatusBanner>}
+          {gaps.length ? <StatusBanner tone="warning">Dữ liệu còn thiếu: {gaps.join(", ")}</StatusBanner> : null}
           <section className="panel">
             <h2>Timeline</h2>
             <ul className="task-list">
               {timeline.map((item, index) => (
-                <li key={index}>{JSON.stringify(item)}</li>
+                <li key={`${String(item.sourceId ?? "")}-${index}`}>
+                  {String(item.type ?? "")} · {String(item.issuer ?? "")} ·{" "}
+                  {String(item.verificationState ?? "")} · {String(item.occurredAt ?? "")}
+                  {item.sentQuantity ? ` · gửi ${String(item.sentQuantity)}` : ""}
+                  {item.actualQuantity ? ` · nhận ${String(item.actualQuantity)}` : ""}
+                </li>
               ))}
             </ul>
           </section>

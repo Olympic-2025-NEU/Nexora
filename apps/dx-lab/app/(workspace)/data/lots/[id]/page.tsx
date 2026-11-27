@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import Link from "next/link";
 import { StatusBanner } from "../../../../../components/h/status-banner";
+import { QrIssuer } from "../../../../../components/d/qr-issuer";
 import { ApiError, getLotHistory, getLotTrace } from "../../../../../lib/api-client/client";
 import { requireAccessToken } from "../../../../../lib/auth/access-token";
 import { currentActor } from "../../../../../lib/auth/current-actor";
@@ -20,7 +21,10 @@ async function loadLot(token: string, id: string) {
   }
 }
 
-export default async function LotDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function LotDetailPage({ params, searchParams }: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ backPage?: string; forwardPage?: string }>;
+}) {
   await currentActor();
   const { id } = await params;
   const token = await requireAccessToken();
@@ -29,6 +33,13 @@ export default async function LotDetailPage({ params }: { params: Promise<{ id: 
   const otReadings = (loaded.history?.otReadings as Record<string, unknown>[] | undefined) ?? [];
   const backNodes = (loaded.backward?.nodes as Record<string, unknown>[] | undefined) ?? [];
   const forwardNodes = (loaded.forward?.nodes as Record<string, unknown>[] | undefined) ?? [];
+  const query = await searchParams;
+  const pageFor = (raw: string | undefined, count: number) => Math.min(
+    Math.max(1, Number.isSafeInteger(Number(raw)) ? Number(raw) : 1),
+    Math.max(1, Math.ceil(count / 20)),
+  );
+  const backPage = pageFor(query.backPage, backNodes.length);
+  const forwardPage = pageFor(query.forwardPage, forwardNodes.length);
 
   return (
     <section className="stack">
@@ -37,8 +48,6 @@ export default async function LotDetailPage({ params }: { params: Promise<{ id: 
       <p className="mono">{id}</p>
       <p>
         <Link href={`/data/impact/${id}`}>Impact graph</Link>
-        {" · "}
-        <Link href="/passport/demo">Passport (token)</Link>
       </p>
       {loaded.error ? <StatusBanner tone="error">{loaded.error}</StatusBanner> : null}
       {!loaded.error ? (
@@ -82,26 +91,37 @@ export default async function LotDetailPage({ params }: { params: Promise<{ id: 
             <h2>Backward</h2>
             <p className="muted">{backNodes.length} node(s) — số liệu từ API, không hardcode.</p>
             <ul className="task-list">
-              {backNodes.slice(0, 20).map((node) => (
+              {backNodes.slice((backPage - 1) * 20, backPage * 20).map((node) => (
                 <li key={String(node.eventId)}>
                   {String(node.eventType)} · {String(node.verificationState)} · {String(node.issuerInstanceId)}
                 </li>
               ))}
             </ul>
+            <nav aria-label="Trang truy ngược" className="actions">
+              {backPage > 1 ? <Link href={`/data/lots/${id}?backPage=${backPage - 1}&forwardPage=${forwardPage}`}>Trước</Link> : null}
+              <span>Trang {backPage}/{Math.max(1, Math.ceil(backNodes.length / 20))}</span>
+              {backPage * 20 < backNodes.length ? <Link href={`/data/lots/${id}?backPage=${backPage + 1}&forwardPage=${forwardPage}`}>Sau</Link> : null}
+            </nav>
           </section>
           <section className="panel">
             <h2>Forward</h2>
             <p className="muted">{forwardNodes.length} node(s)</p>
             <ul className="task-list">
-              {forwardNodes.slice(0, 20).map((node) => (
+              {forwardNodes.slice((forwardPage - 1) * 20, forwardPage * 20).map((node) => (
                 <li key={String(node.eventId)}>
                   {String(node.eventType)} · {String(node.verificationState)} · {String(node.issuerInstanceId)}
                 </li>
               ))}
             </ul>
+            <nav aria-label="Trang truy xuôi" className="actions">
+              {forwardPage > 1 ? <Link href={`/data/lots/${id}?backPage=${backPage}&forwardPage=${forwardPage - 1}`}>Trước</Link> : null}
+              <span>Trang {forwardPage}/{Math.max(1, Math.ceil(forwardNodes.length / 20))}</span>
+              {forwardPage * 20 < forwardNodes.length ? <Link href={`/data/lots/${id}?backPage=${backPage}&forwardPage=${forwardPage + 1}`}>Sau</Link> : null}
+            </nav>
           </section>
         </>
       ) : null}
+      <QrIssuer batchId={id} />
     </section>
   );
 }
