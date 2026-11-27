@@ -58,3 +58,4 @@ deploy/certs/*.key
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+.browser-temp/

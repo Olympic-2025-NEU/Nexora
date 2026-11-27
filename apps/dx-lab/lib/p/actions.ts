@@ -6,6 +6,9 @@ import {
   ApiError,
   createTradingDocument,
   decideApproval,
+  getIssueSources,
+  getReceivingBatchOptions,
+  patchTradingDocument,
   tradingAction,
   type TradingKind,
 } from "../api-client/client";
@@ -36,6 +39,57 @@ function fail(error: unknown, fallback: string): ActionResult<never> {
     };
   }
   return { ok: false, status: 500, message: fallback };
+}
+
+export async function editDocumentAction(
+  kind: TradingKind,
+  id: string,
+  version: number,
+  body: Record<string, unknown>,
+): Promise<ActionResult> {
+  try {
+    assertNoOrganizationId(body);
+    const token = await requireAccessToken();
+    await patchTradingDocument(token, kind, id, version, body);
+    revalidatePath(`/operations/${kind}`);
+    return { ok: true, data: undefined };
+  } catch (error) {
+    return fail(error, "Không sửa được Draft");
+  }
+}
+
+export async function loadIssueSourcesAction(
+  batchId: string,
+  warehouseId: string,
+): Promise<ActionResult<{ sourceLineId: string; availableQuantity: string; uomId: string }[]>> {
+  try {
+    const token = await requireAccessToken();
+    const rows = await getIssueSources(token, batchId, warehouseId);
+    return { ok: true, data: rows.map((row) => ({
+      sourceLineId: String(row.sourceLineId),
+      availableQuantity: String(row.availableQuantity),
+      uomId: String(row.uomId),
+    })) };
+  } catch (error) {
+    return fail(error, "Không tải được nguồn xuất");
+  }
+}
+
+export async function loadReceivingBatchesAction(messageId: string): Promise<ActionResult<
+  { sourceLineId: string; batches: { id: string; label: string }[] }[]
+>> {
+  try {
+    const token = await requireAccessToken();
+    const rows = await getReceivingBatchOptions(token, messageId);
+    return { ok: true, data: rows.map((row) => ({
+      sourceLineId: String(row.sourceLineId),
+      batches: (Array.isArray(row.batches) ? row.batches : []).map((batch) => ({
+        id: String(batch.id), label: String(batch.localCode ?? batch.id),
+      })),
+    })) };
+  } catch (error) {
+    return fail(error, "Không tải được lô nhận phù hợp");
+  }
 }
 
 function assertNoOrganizationId(body: object) {

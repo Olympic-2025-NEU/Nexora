@@ -116,7 +116,7 @@ export const schemas = {
   TraceProjectorStatus: obj({ state: enumeration("caught_up", "pending", "lagging"),
     pendingEvents: { type: "integer", minimum: 0 }, lagSeconds: { type: "number", minimum: 0 },
     checkedAt: time }, ["state", "pendingEvents", "lagSeconds", "checkedAt"]),
-  TraceHistory: obj({ lot: ref("Batch"), events: arr(obj({ eventId: uuid, type: str(), issuer: str(), occurredAt: time, sourceDocumentId: uuid, verificationState: str(), gap: { type: "boolean" } }, ["eventId", "type", "issuer", "occurredAt", "verificationState"])), nextCursor: str() }, ["lot", "events"]),
+  TraceHistory: obj({ lot: ref("Batch"), events: arr(obj({ eventId: uuid, type: str(), issuer: str(), occurredAt: time, sourceDocumentId: uuid, verificationState: str(), gap: { type: "boolean" } }, ["eventId", "type", "issuer", "occurredAt", "verificationState"])), otReadings: arr(obj({ id: uuid, deviceId: str(), readingId: str(), metric: str(), value: str(), unit: str(), observedAt: time, qualityState: enumeration("accepted", "stale"), simulated: { type: "boolean" }, asOf: time, lagSeconds: { type: "integer", minimum: 0 } }, ["id", "deviceId", "readingId", "metric", "value", "unit", "observedAt", "qualityState", "simulated", "asOf", "lagSeconds"])), nextCursor: str() }, ["lot", "events", "otReadings"]),
   TraceGraph: obj({
     root: obj({ batchId: uuid, documentId: uuid }, ["batchId"]),
     nodes: arr(obj({ eventId: uuid, issuerInstanceId: str(), batchId: { ...uuid, nullable: true },
@@ -282,6 +282,8 @@ export const schemas = {
   DocumentCount: obj({ documentType: str(), status: str(), count: { type: "integer", minimum: 0 } }, ["documentType", "status", "count"]),
   QualityIssue: obj({ id: uuid, ruleId: str(), sourceType: str(), sourceId: str(), state: enumeration("open", "acknowledged", "resolved"), severity: enumeration("info", "warning", "critical"), firstDetectedAt: time, lastDetectedAt: time, version: integer, sourceEventIds: arr(uuid), detail: { type: "object" } }, ["id", "ruleId", "sourceType", "sourceId", "state", "severity", "firstDetectedAt", "lastDetectedAt", "version"]),
   QualitySignal: obj({ id: uuid, ruleId: str(), sourceType: str(), sourceId: str(), severity: str(), state: str(), lastDetectedAt: time }, ["id", "ruleId", "sourceType", "sourceId", "severity", "state", "lastDetectedAt"]),
+  OtReadingInput: obj({ deviceId: str({ minLength: 1, maxLength: 128 }), readingId: str({ minLength: 1, maxLength: 128 }), batchId: uuid, value: str({ pattern: "^-?(0|[1-9][0-9]{0,2})(\\.[0-9]{1,3})?$" }), observedAt: time }, ["deviceId", "readingId", "batchId", "value", "observedAt"]),
+  OtReadingAccepted: obj({ id: uuid, checksumHex: str({ pattern: "^[0-9a-f]{64}$" }), reused: { type: "boolean" } }, ["id", "checksumHex", "reused"]),
   EvidenceMetadataPayload: jsonSchemaAsOpenApi("contracts/core-records/evidence_metadata.schema.json"),
   TraceProjectionPayload: jsonSchemaAsOpenApi("contracts/core-records/trace_projection.schema.json"),
   OtReadingPayload: jsonSchemaAsOpenApi("contracts/core-records/ot_reading.schema.json"),

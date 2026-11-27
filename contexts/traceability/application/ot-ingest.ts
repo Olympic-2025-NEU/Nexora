@@ -15,13 +15,12 @@ export type OtIngestInput = {
   batchId: string;
   value: string;
   observedAt: string;
-  qualityState?: "accepted" | "stale";
 };
 
 export type DeviceRegistry = {
   schemaVersion: number;
   simulated: boolean;
-  devices: { deviceId: string; maxStaleSeconds?: number }[];
+  devices: { deviceId: string; instanceId: string; maxStaleSeconds?: number }[];
 };
 
 export function loadDeviceRegistry(path = resolve("deploy/ot/device-registry.example.json")): DeviceRegistry {
@@ -43,12 +42,17 @@ export class OtIngestError extends Error {
 }
 
 export async function ingestOtReading(
+  app: PrismaClient,
   core: PrismaClient,
   registry: DeviceRegistry,
   input: OtIngestInput,
+  instanceId: string,
   audit?: (event: string, detail: Record<string, unknown>) => Promise<void>,
 ): Promise<{ id: string; checksumHex: string; reused: boolean }> {
-  const device = registry.devices.find((row) => row.deviceId === input.deviceId);
+  if (registry.schemaVersion !== 1 || registry.simulated !== true) {
+    throw new OtIngestError("OT_REGISTRY_INVALID", 503);
+  }
+  const device = registry.devices.find((row) => row.deviceId === input.deviceId && row.instanceId === instanceId);
   if (!device) {
     await audit?.("ot.device_unknown", { deviceId: input.deviceId });
     throw new OtIngestError("OT_DEVICE_UNKNOWN", 403);
@@ -56,11 +60,22 @@ export async function ingestOtReading(
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(input.batchId)) {
     throw new OtIngestError("OT_BATCH_INVALID", 400);
   }
+  if (!/^[A-Za-z0-9._:-]{1,128}$/.test(input.readingId)) {
+    throw new OtIngestError("OT_READING_ID_INVALID", 400);
+  }
+  if (!/^-?(?:0|[1-9][0-9]{0,2})(?:\.[0-9]{1,3})?$/.test(input.value) ||
+    Number(input.value) < -50 || Number(input.value) > 100) {
+    throw new OtIngestError("OT_VALUE_INVALID", 400);
+  }
   const observedAt = new Date(input.observedAt);
   if (Number.isNaN(observedAt.getTime())) throw new OtIngestError("OT_TIMESTAMP_INVALID", 400);
+  if (observedAt.getTime() > Date.now() + 5 * 60 * 1000) {
+    throw new OtIngestError("OT_TIMESTAMP_FUTURE", 400);
+  }
+  const batch = await app.batch.findUnique({ where: { id: input.batchId }, select: { id: true } });
+  if (!batch) throw new OtIngestError("OT_BATCH_NOT_FOUND", 404);
   const maxStale = device.maxStaleSeconds ?? 900;
-  let qualityState = input.qualityState ?? "accepted";
-  if ((Date.now() - observedAt.getTime()) / 1000 > maxStale) qualityState = "stale";
+  const qualityState = (Date.now() - observedAt.getTime()) / 1000 > maxStale ? "stale" : "accepted";
 
   const payload = {
     schemaVersion: 1 as const,
@@ -79,9 +94,16 @@ export async function ingestOtReading(
   const existing = await core.coreRecord.findUnique({
     where: { kind_sourceType_sourceId: { kind: KIND, sourceType: SOURCE_TYPE, sourceId } },
   });
+  const sameInput = (record: { payload: unknown }) => {
+    if (!record.payload || typeof record.payload !== "object" || Array.isArray(record.payload)) return false;
+    const saved = record.payload as Record<string, unknown>;
+    return saved.deviceId === input.deviceId && saved.readingId === input.readingId &&
+      saved.batchId === input.batchId && saved.value === input.value &&
+      saved.observedAt === observedAt.toISOString();
+  };
   if (existing) {
-    if (existing.checksumHex === checksumHex) {
-      return { id: existing.id, checksumHex, reused: true };
+    if (sameInput(existing)) {
+      return { id: existing.id, checksumHex: existing.checksumHex, reused: true };
     }
     await audit?.("ot.hash_conflict", { sourceId });
     throw new OtIngestError("OT_HASH_CONFLICT", 409);
@@ -107,7 +129,7 @@ export async function ingestOtReading(
       const again = await core.coreRecord.findUniqueOrThrow({
         where: { kind_sourceType_sourceId: { kind: KIND, sourceType: SOURCE_TYPE, sourceId } },
       });
-      if (again.checksumHex === checksumHex) return { id: again.id, checksumHex, reused: true };
+      if (sameInput(again)) return { id: again.id, checksumHex: again.checksumHex, reused: true };
       throw new OtIngestError("OT_HASH_CONFLICT", 409);
     }
     throw error;
@@ -116,14 +138,13 @@ export async function ingestOtReading(
 
 export async function listOtReadingsForBatch(core: PrismaClient, batchId: string) {
   const rows = await core.coreRecord.findMany({
-    where: { kind: KIND, sourceType: SOURCE_TYPE },
+    where: { kind: KIND, sourceType: SOURCE_TYPE, payload: { path: ["batchId"], equals: batchId } },
     orderBy: { builtAt: "desc" },
     take: 200,
   });
   return rows
     .map((row) => {
       const payload = row.payload as Record<string, unknown>;
-      if (String(payload.batchId) !== batchId) return null;
       const observedAt = String(payload.observedAt ?? row.builtAt.toISOString());
       const lagSeconds = Math.max(0, Math.floor((Date.now() - new Date(observedAt).getTime()) / 1000));
       return {
@@ -139,6 +160,5 @@ export async function listOtReadingsForBatch(core: PrismaClient, batchId: string
         asOf: row.builtAt.toISOString(),
         lagSeconds,
       };
-    })
-    .filter((row): row is NonNullable<typeof row> => row !== null);
+    });
 }

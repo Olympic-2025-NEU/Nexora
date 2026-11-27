@@ -261,6 +261,20 @@ export async function createTradingDocument(
   });
 }
 
+export async function patchTradingDocument(
+  accessToken: string,
+  kind: TradingKind,
+  id: string,
+  version: number,
+  body: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  return gatewayData(`/api/v1/${kind}/${id}`, accessToken, {
+    method: "PATCH",
+    ifMatch: version,
+    body,
+  });
+}
+
 export async function tradingAction(
   accessToken: string,
   kind: TradingKind,
@@ -304,6 +318,31 @@ export async function listWarehouses(accessToken: string): Promise<Record<string
   return gatewayData("/api/v1/warehouses?limit=100", accessToken);
 }
 
+export async function listUoms(accessToken: string): Promise<Record<string, unknown>[]> {
+  return gatewayData("/api/v1/uoms?limit=100", accessToken);
+}
+
+export async function getIssueSources(
+  accessToken: string,
+  batchId: string,
+  warehouseId: string,
+): Promise<Record<string, unknown>[]> {
+  return gatewayData(`/api/v1/lots/${encodeURIComponent(batchId)}/issue-sources?warehouseId=${
+    encodeURIComponent(warehouseId)
+  }&limit=100`, accessToken);
+}
+
+export async function getReceivingOptions(accessToken: string): Promise<Record<string, unknown>> {
+  return gatewayData("/api/v1/receivings?options", accessToken);
+}
+
+export async function getReceivingBatchOptions(
+  accessToken: string,
+  messageId: string,
+): Promise<Record<string, unknown>[]> {
+  return gatewayData(`/api/v1/receivings?batchesFor=${encodeURIComponent(messageId)}`, accessToken);
+}
+
 export async function listBalances(accessToken: string): Promise<Record<string, unknown>[]> {
   return gatewayData("/api/v1/inventory/balances?limit=100", accessToken);
 }
@@ -332,6 +371,33 @@ export async function getPublicPassport(token: string): Promise<Record<string, u
   });
   if (!response.ok) throw new ApiError(response.status, await readErrorCode(response));
   return unwrapData(await response.json());
+}
+
+export async function issuePassportQr(
+  accessToken: string,
+  batchId: string,
+  policyVersion: string,
+): Promise<{ qrUrl: string; tokenId: string }> {
+  return gatewayData(`/api/v1/lots/${encodeURIComponent(batchId)}/qr`, accessToken, {
+    method: "POST",
+    idempotencyKey: crypto.randomUUID(),
+    body: { policyVersion },
+    okStatuses: [201],
+  });
+}
+
+export async function revokePassportQr(
+  accessToken: string,
+  batchId: string,
+  tokenId: string,
+  reason: string,
+): Promise<void> {
+  const response = await gatewayFetch(
+    `/api/v1/lots/${encodeURIComponent(batchId)}/qr/${encodeURIComponent(tokenId)}/revoke`,
+    accessToken,
+    { method: "POST", body: { reason } },
+  );
+  if (response.status !== 204) throw new ApiError(response.status, await readErrorCode(response));
 }
 
 export async function aiChat(

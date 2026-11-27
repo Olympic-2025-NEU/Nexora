@@ -41,6 +41,7 @@ export function createArchiveExporter(
   app: PrismaClient,
   core: PrismaClient,
   env: ArchiveEnv,
+  putArchive?: (key: string, body: Buffer, sha256Hex: string) => Promise<void>,
 ) {
   const s3 = new S3Client({
     endpoint: env.S3_ENDPOINT,
@@ -76,30 +77,41 @@ export function createArchiveExporter(
   async function exportOnce(): Promise<{ exported: number; skipped: number }> {
     const instanceId = env.NEXORA_ISSUER_INSTANCE_ID;
     const watermark = await globalCheckpoint();
+    const [checkpointTime, checkpointId] = watermark?.split("|") ?? [];
+    if (watermark && (!checkpointId || Number.isNaN(new Date(checkpointTime).getTime()))) {
+      throw new Error("Invalid archive checkpoint");
+    }
     const delivered = await app.outboxMessage.findMany({
-      where: { status: "delivered", deliveredAt: { not: null } },
+      where: {
+        status: "delivered",
+        deliveredAt: { not: null },
+        ...(watermark ? {
+          OR: [
+            { deliveredAt: { gt: new Date(checkpointTime) } },
+            { deliveredAt: new Date(checkpointTime), id: { gt: checkpointId } },
+          ],
+        } : {}),
+      },
       orderBy: [{ deliveredAt: "asc" }, { id: "asc" }],
-      take: BATCH * 5,
+      take: BATCH,
     });
-    const freshAll = watermark
-      ? delivered.filter((row) => stampOf(row) > watermark)
-      : delivered;
-    const fresh = freshAll.slice(0, BATCH);
-    if (!fresh.length) return { exported: 0, skipped: delivered.length };
+    if (!delivered.length) return { exported: 0, skipped: 0 };
 
-    const groups = new Map<string, typeof fresh>();
-    for (const row of fresh) {
+    // Keep partitions contiguous so a failed write cannot advance the checkpoint
+    // past an earlier event from another partition in the same batch.
+    const groups: { partition: string; rows: typeof delivered }[] = [];
+    for (const row of delivered) {
       const at = row.deliveredAt ?? row.createdAt;
       const parts = partitionParts(instanceId, at, row.eventType);
       const key = `${parts.instanceId}/${parts.year}/${parts.month}/${parts.eventType}`;
-      const list = groups.get(key) ?? [];
-      list.push(row);
-      groups.set(key, list);
+      const last = groups[groups.length - 1];
+      if (last?.partition === key) last.rows.push(row);
+      else groups.push({ partition: key, rows: [row] });
     }
 
     let exported = 0;
     let skipped = 0;
-    for (const [partition, rows] of groups) {
+    for (const { partition, rows } of groups) {
       const lines = rows.map((row) => JSON.stringify({
         id: row.id,
         eventType: row.eventType,
@@ -113,9 +125,10 @@ export function createArchiveExporter(
       }));
       const body = Buffer.from(`${lines.join("\n")}\n`, "utf8");
       const sha256Hex = objectSha(body);
-      const runId = randomUUID();
+      const runId = sha256Hex;
       const objectKey = `archive/${partition}/${runId}.jsonl`;
-      await s3.send(new PutObjectCommand({
+      if (putArchive) await putArchive(objectKey, body, sha256Hex);
+      else await s3.send(new PutObjectCommand({
         Bucket: env.S3_BUCKET_PRIVATE,
         Key: objectKey,
         Body: body,

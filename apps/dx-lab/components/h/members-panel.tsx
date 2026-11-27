@@ -35,12 +35,13 @@ export function MembersPanel({ initialMembers }: { initialMembers: Member[] }) {
         return;
       }
       if (result.data.provisionalPassword) setProvisionalPassword(result.data.provisionalPassword);
+      const member = { ...result.data };
+      delete member.provisionalPassword;
+      setMembers((rows) => [member, ...rows]);
       setUsername("");
       setDisplayName("");
       setEmail("");
       setRole("staff");
-      // Server revalidates; optimistic empty until refresh is fine — reload list via router refresh path.
-      window.location.reload();
     });
   }
 

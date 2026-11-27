@@ -257,7 +257,35 @@ routes:
         rejected_code: 429
 
   # -------------------------------------------------------------------------
-  # 6. ERP app API catch-all /api/v1/* — MUST be AFTER specific prefixes above
+  # 6. Simulated OT ingest — authenticated user, tightly rate-limited; the ERP
+  #    also checks role, device allowlist and local batch ownership.
+  - id: ot-readings-v1
+    uri: /api/v1/ot/readings
+    methods: [POST]
+    upstream:
+      type: roundrobin
+      nodes:
+        "${ERP_UPSTREAM}": 1
+    plugins:
+      request-id: {}
+      <<: *strip-identity-headers
+      openid-connect:
+        discovery: "${OIDC_BASE_URL}/realms/nexora/.well-known/openid-configuration"
+        client_id: "${OIDC_GATEWAY_CLIENT_ID}"
+        client_secret: "${OIDC_GATEWAY_CLIENT_SECRET}"
+        bearer_only: true
+        use_jwks: true
+        realm: nexora
+        set_access_token_header: false
+        set_userinfo_header: false
+        access_token_in_authorization_header: true
+      limit-req:
+        rate: 5
+        burst: 5
+        key: remote_addr
+        rejected_code: 429
+
+  # 7. ERP app API catch-all /api/v1/* — MUST be AFTER specific prefixes above
   # -------------------------------------------------------------------------
   - id: erp-api-v1
     uri: /api/v1/*

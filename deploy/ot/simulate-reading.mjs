@@ -1,90 +1,76 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 /**
- * Simulated OT temperature ingest (P12-T03). Does not change stock/quality.
- * Usage: node deploy/ot/simulate-reading.mjs a --batch <uuid> [--device sim-temp-a1] [--value 4.5] [--stale]
+ * Simulated OT temperature ingest through the gateway (P12-T03).
+ * Usage: node deploy/ot/simulate-reading.mjs a --batch <uuid> [--reading <id>] [--stale]
  */
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { parseArgs, parseEnv } from "node:util";
-import { PrismaClient } from "@prisma/client";
-import canonicalize from "canonicalize";
 
-const { values } = parseArgs({
+const { values, positionals } = parseArgs({
   args: process.argv.slice(2),
   options: {
     batch: { type: "string" },
-    device: { type: "string", default: "sim-temp-a1" },
+    device: { type: "string" },
     value: { type: "string", default: "4.500" },
     stale: { type: "boolean", default: false },
     reading: { type: "string" },
   },
   allowPositionals: true,
 });
-const instance = process.argv[2] && !process.argv[2].startsWith("-") ? process.argv[2] : "a";
+const instance = positionals[0] ?? "a";
+if (!/^[abc]$/.test(instance) || !values.batch) {
+  console.error("Usage: node deploy/ot/simulate-reading.mjs a|b|c --batch <uuid> [--reading <id>] [--stale]");
+  process.exit(2);
+}
 const env = parseEnv(readFileSync(`deploy/instances/${instance}.env`, "utf8"));
-const batchId = values.batch;
-if (!batchId) {
-  console.error("Missing --batch <uuid>");
+if (!env.PUBLIC_BASE_URL || !env.KEYCLOAK_HOST_PORT || !env.KC_DEV_USERNAME || !env.KC_DEV_USER_PASSWORD) {
+  console.error("OT_DEMO_CONFIG_MISSING");
   process.exit(2);
 }
 const registry = JSON.parse(readFileSync("deploy/ot/device-registry.example.json", "utf8"));
-const device = registry.devices.find((row) => row.deviceId === values.device);
+const deviceId = values.device ?? `sim-temp-${instance}1`;
+const device = registry.devices.find((row) => row.deviceId === deviceId && row.instanceId === `nexora-${instance}`);
 if (!device) {
-  console.error(JSON.stringify({ error: "OT_DEVICE_UNKNOWN", deviceId: values.device }));
+  console.error("OT_DEVICE_UNKNOWN");
   process.exit(3);
 }
-const observedAt = values.stale
-  ? new Date(Date.now() - ((device.maxStaleSeconds ?? 900) + 60) * 1000)
-  : new Date();
-const readingId = values.reading || randomUUID();
-const payload = {
-  schemaVersion: 1,
-  deviceId: values.device,
-  readingId,
-  batchId,
-  metric: "temperature_c",
-  value: values.value,
-  unit: "C",
-  observedAt: observedAt.toISOString(),
-  qualityState: values.stale ? "stale" : "accepted",
-  simulated: true,
-};
-const checksumHex = createHash("sha256").update(canonicalize(payload), "utf8").digest("hex");
-const sourceId = `${values.device}:${readingId}`;
-const core = new PrismaClient({ datasources: { db: { url: env.CORE_DATABASE_URL } } });
-const existing = await core.coreRecord.findUnique({
-  where: { kind_sourceType_sourceId: { kind: "ot_reading", sourceType: "simulator", sourceId } },
-});
-if (existing) {
-  if (existing.checksumHex === checksumHex) {
-    console.log(JSON.stringify({ ok: true, reused: true, id: existing.id, sourceId, qualityState: payload.qualityState }));
-    await core.$disconnect();
-    process.exit(0);
-  }
-  console.error(JSON.stringify({ error: "OT_HASH_CONFLICT", sourceId }));
-  await core.$disconnect();
+
+const observedAt = new Date(Date.now() - (values.stale ? (device.maxStaleSeconds ?? 900) + 60 : 0) * 1000);
+const tokenResponse = await fetch(
+  `http://127.0.0.1:${env.KEYCLOAK_HOST_PORT}/realms/nexora/protocol/openid-connect/token`,
+  {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "password",
+      client_id: "erp-browser",
+      username: env.KC_DEV_USERNAME,
+      password: env.KC_DEV_USER_PASSWORD,
+    }),
+    signal: AbortSignal.timeout(15000),
+  },
+);
+if (!tokenResponse.ok) {
+  console.error(`OT_AUTH_FAILED ${tokenResponse.status}`);
   process.exit(4);
 }
-const created = await core.coreRecord.create({
-  data: {
-    id: randomUUID(),
-    kind: "ot_reading",
-    sourceType: "simulator",
-    sourceId,
-    payload,
-    visibility: "private",
-    policyVersion: "p12-t03-v1",
-    checksumHex,
-    builtAt: observedAt,
-  },
+const token = (await tokenResponse.json()).access_token;
+const response = await fetch(`${env.PUBLIC_BASE_URL}/api/v1/ot/readings`, {
+  method: "POST",
+  headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+  body: JSON.stringify({
+    deviceId,
+    readingId: values.reading ?? randomUUID(),
+    batchId: values.batch,
+    value: values.value,
+    observedAt: observedAt.toISOString(),
+  }),
+  signal: AbortSignal.timeout(15000),
 });
-console.log(JSON.stringify({
-  ok: true,
-  reused: false,
-  id: created.id,
-  sourceId,
-  qualityState: payload.qualityState,
-  simulated: true,
-  note: "OT simulator — does not mutate stock or lot quality",
-}));
-await core.$disconnect();
+const result = await response.json();
+if (!response.ok) {
+  console.error(JSON.stringify({ error: result.error ?? "OT_INGEST_FAILED", status: response.status }));
+  process.exit(5);
+}
+console.log(JSON.stringify({ ...result.data, simulated: true }));

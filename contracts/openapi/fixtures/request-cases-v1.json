@@ -1,6 +1,20 @@
 {
   "schemaVersion": 1,
   "cases": {
+    "OtReadingInput": {
+      "valid": {
+        "deviceId": "sim-temp-a1",
+        "readingId": "reading-1",
+        "batchId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        "value": "4.500",
+        "observedAt": "2026-11-27T00:00:00.000Z"
+      },
+      "invalid": {
+        "deviceId": "sim-temp-a1",
+        "batchId": "not-a-uuid",
+        "value": "4.500"
+      }
+    },
     "OpsRetryInput": {
       "valid": { "messageId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" },
       "invalid": { "messageId": "not-a-uuid" }

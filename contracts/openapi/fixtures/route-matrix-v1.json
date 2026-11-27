@@ -496,6 +496,14 @@
       ]
     },
     {
+      "method": "POST",
+      "path": "/api/v1/ot/readings",
+      "auth": "protected",
+      "roles": ["administrator", "staff"],
+      "scope": "resource",
+      "success": ["202"]
+    },
+    {
       "method": "GET",
       "path": "/api/v1/lots/{id}/passport-policy",
       "auth": "protected",

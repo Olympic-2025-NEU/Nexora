@@ -19,33 +19,33 @@
 
 ## P11-T03 — H: tổ chức và người dùng
 
-- [x] Trang công việc cá nhân có approval/receiving tasks, tệp/hồ sơ liên quan qua core file API, org profile, membership/role và partner connection dùng M01 API; trạng thái kết nối/rotation chỉ hiển thị metadata an toàn.
+- [ ] Trang công việc cá nhân có approval/receiving tasks, tệp/hồ sơ liên quan qua core file API, org profile, membership/role và partner connection dùng M01 API; trạng thái kết nối/rotation chỉ hiển thị metadata an toàn. UI đã bổ sung receiving inbox/Core File metadata; chờ thử vai trò và dữ liệu A/B/C.
 - [x] Form validation, optimistic conflict, save/error/permission-denied; Admin có thể mời/disable, Staff không truy cập route admin.
-- [x] Handoff từ H sang P: actor và partner được chọn đúng trong giao dịch, không đổi org ID trong request.
+- [ ] Handoff từ H sang P: actor và partner được chọn đúng trong giao dịch, không đổi org ID trong request. Contract đã dùng partnerId; chờ hành trình A/B/C.
 - **Đầu ra:** H journey; **kiểm chứng:** AC-02 qua UI trên A/B/C.
   [Bằng chứng T03](evidence/p11-t03.md).
 
 ## P11-T04 — P: giao dịch, nhận hàng và approval inbox
 
 - [x] Product/batch/warehouse picker, receipt/issue/transfer Draft editor; hiển thị quantity/unit/expiry/quality/balance và validation từ server.
-- [x] Approval inbox liên kết Flowable task; approve/reject trả `decision_pending` tới khi worker/poller đối soát, reject cần reason; sau đó người có quyền confirm; người tạo không tự duyệt theo D06 v1.
-- [x] Receiver thấy sent vs actual, discrepancy và technical ACK tách khỏi business receipt; UI retryable/offline/rejected states và lịch sử action.
+- [ ] Approval inbox liên kết Flowable task; approve/reject trả `decision_pending` tới khi worker/poller đối soát, reject cần reason; sau đó người có quyền confirm; người tạo không tự duyệt theo D06 v1. Code có; chờ browser rehearsal bằng hai actor.
+- [ ] Receiver thấy sent vs actual, discrepancy và technical ACK tách khỏi business receipt; UI retryable/offline/rejected states và lịch sử action. UI có chi tiết nhận hàng; chờ chứng minh luồng B/C thật.
 - **Đầu ra:** P journey; **kiểm chứng:** AC-03/04/06/12 thực hiện được không mở DB/Flowable admin UI.
   [Bằng chứng T04](evidence/p11-t04.md).
 
 ## P11-T05 — D: tồn, timeline và impact
 
-- [x] Dashboard tồn theo lô/kho, document history, A→B→C timeline với source/verification/gap/staleness; link tới bằng chứng clean có quyền.
+- [ ] Dashboard tồn theo lô/kho, document history, A→B→C timeline với source/verification/gap/staleness; link tới bằng chứng clean có quyền. Màn hình dùng API thật; chờ dữ liệu và hành trình A/B/C.
 - [x] Backward và forward trace từ một lô, affected partner/document list, filters/pagination; dùng số liệu từ API, không hardcode fixture vào UI.
-- [x] Passport public mobile và QR scan có design dễ đọc, chỉ field allowlist; trường private không xuất hiện ở DOM/network response.
+- [ ] Passport public mobile và QR scan có design dễ đọc, chỉ field allowlist; trường private không xuất hiện ở DOM/network response. Code đã có QR/passport allowlist; chờ quét điện thoại và privacy snapshot với token thật.
 - **Đầu ra:** D journey; **kiểm chứng:** AC-07/08/09 UI và privacy snapshot.
   [Bằng chứng T05](evidence/p11-t05.md).
 
 ## P11-T06 — I: AI panel và human-in-loop
 
-- [x] Panel hỏi lot có disambiguation, source citations, trạng thái thiếu dữ liệu và quyền; loading/timeout/fallback truy vấn trực tiếp.
-- [x] Draft suggestion mở form M03 với dữ liệu AI đề xuất, người dùng xem/sửa và thực hiện action riêng; UI không tự confirm khi model trả “đã xong”.
-- [x] Thể hiện AI source/time và cảnh báo giới hạn trong ngữ cảnh, không che giấu trạng thái partner-asserted.
+- [ ] Panel hỏi lot có disambiguation, source citations, trạng thái thiếu dữ liệu và quyền; loading/timeout/fallback truy vấn trực tiếp. UI đã có; chờ provider và thử AC-10/11.
+- [ ] Draft suggestion mở form M03 với dữ liệu AI đề xuất, người dùng xem/sửa và thực hiện action riêng; UI không tự confirm khi model trả “đã xong”. Form đã có; chờ thử trên AI/ERP Phase 10.
+- [ ] Thể hiện AI source/time và cảnh báo giới hạn trong ngữ cảnh, không che giấu trạng thái partner-asserted. UI đã có; chờ đối chiếu payload thật.
 - **Đầu ra:** I journey; **kiểm chứng:** AC-10/11 qua UI với role ít quyền và provider down.
   [Bằng chứng T06](evidence/p11-t06.md).
 
@@ -53,16 +53,18 @@
 
 - [x] Tạo navigation/notification link từ transfer tới receiver inbox, từ receipt tới trace, từ risk insight tới batch/document; URL an toàn và permission check ở từng đích.
 - [x] Empty/loading/error/409 conflict/429 rate limit/503 core down/retry states có thông điệp hành động được, không làm người dùng double-submit.
-- [x] Dữ liệu A/B/C được tạo bằng seed/API; test e2e bằng browser cho kịch bản chính và ít nhất một kịch bản lỗi mạng.
+- [ ] Dữ liệu A/B/C được tạo bằng seed/API; test e2e bằng browser cho kịch bản chính và ít nhất một kịch bản lỗi mạng. Chrome A + lỗi mạng PASS; B/C và luồng giao dịch xuyên instance chờ rehearsal.
 - **Đầu ra:** UX e2e suite; **kiểm chứng:** người ngoài nhóm chạy được kịch bản bằng runbook.
   [Bằng chứng T07](evidence/p11-t07.md).
 
 ## P11-T08 — Khả dụng, đo lường và gate G11
 
-- [x] Kiểm tra keyboard/tab order, labels, contrast, responsive, long strings, timezone/decimal, QR trên điện thoại; sửa blocker demo.
+- [ ] Kiểm tra keyboard/tab order, labels, contrast, responsive, long strings, timezone/decimal, QR trên điện thoại; sửa blocker demo. Chrome/axe A ở 360px và desktop PASS; screen reader/QR điện thoại và B/C chờ kiểm tra thủ công.
 - [x] Ghi service-call trace cho từng vùng H/P/D/I và test tắt cả DX-Lab/ERP UI vẫn gọi được core API qua gateway. Không dùng mock làm bằng chứng gate.
 - **Bằng chứng:** e2e run/video đã redacted, accessibility checklist, gateway traces, UI screenshots trên mobile/desktop.
   [Bằng chứng T08 / G11](evidence/G11.md) · [p11-t08](evidence/p11-t08.md).
+
+**Trạng thái sau rà soát 2026-11-27:** G11 mở cho các bước thủ công trong [hướng dẫn nghiệm thu](evidence/G11-manual-rehearsal.md). Không dùng checkbox đã tick trước đây làm bằng chứng thay cho browser A/B/C và screen reader.
 
 ## Hồ sơ giao AI theo từng task
 

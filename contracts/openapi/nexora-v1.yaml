@@ -4081,6 +4081,61 @@ paths:
           $ref: "#/components/responses/Error"
         "503":
           $ref: "#/components/responses/Error"
+  /api/v1/ot/readings:
+    post:
+      tags:
+        - Operations
+      operationId: postOtReadings
+      summary: Ingest a simulated device reading
+      description: Authenticated demo simulator through the gateway. Device is scoped to this instance; the local batch must exist. Duplicate reading IDs with identical input are reused. Readings never change stock or lot quality.
+      security:
+        - oidc: []
+      x-nexora-roles:
+        - administrator
+        - staff
+      x-nexora-scope: resource
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OtReadingInput"
+      responses:
+        "202":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - data
+                  - requestId
+                properties:
+                  data:
+                    $ref: "#/components/schemas/OtReadingAccepted"
+                  requestId:
+                    type: string
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "413":
+          $ref: "#/components/responses/Error"
+        "415":
+          $ref: "#/components/responses/Error"
+        "422":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
   /api/v1/lots/{id}/trace/backward:
     get:
       tags:
@@ -7746,6 +7801,7 @@ components:
       required:
         - lot
         - events
+        - otReadings
       properties:
         lot:
           $ref: "#/components/schemas/Batch"
@@ -7778,6 +7834,53 @@ components:
                 type: string
               gap:
                 type: boolean
+        otReadings:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required:
+              - id
+              - deviceId
+              - readingId
+              - metric
+              - value
+              - unit
+              - observedAt
+              - qualityState
+              - simulated
+              - asOf
+              - lagSeconds
+            properties:
+              id:
+                type: string
+                format: uuid
+              deviceId:
+                type: string
+              readingId:
+                type: string
+              metric:
+                type: string
+              value:
+                type: string
+              unit:
+                type: string
+              observedAt:
+                type: string
+                format: date-time
+              qualityState:
+                type: string
+                enum:
+                  - accepted
+                  - stale
+              simulated:
+                type: boolean
+              asOf:
+                type: string
+                format: date-time
+              lagSeconds:
+                type: integer
+                minimum: 0
         nextCursor:
           type: string
     TraceGraph:
@@ -9457,6 +9560,49 @@ components:
         lastDetectedAt:
           type: string
           format: date-time
+    OtReadingInput:
+      type: object
+      additionalProperties: false
+      required:
+        - deviceId
+        - readingId
+        - batchId
+        - value
+        - observedAt
+      properties:
+        deviceId:
+          type: string
+          minLength: 1
+          maxLength: 128
+        readingId:
+          type: string
+          minLength: 1
+          maxLength: 128
+        batchId:
+          type: string
+          format: uuid
+        value:
+          type: string
+          pattern: ^-?(0|[1-9][0-9]{0,2})(\.[0-9]{1,3})?$
+        observedAt:
+          type: string
+          format: date-time
+    OtReadingAccepted:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - checksumHex
+        - reused
+      properties:
+        id:
+          type: string
+          format: uuid
+        checksumHex:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+        reused:
+          type: boolean
     EvidenceMetadataPayload:
       title: evidence_metadata
       type: object
