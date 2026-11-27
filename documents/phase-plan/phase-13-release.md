@@ -27,11 +27,12 @@
 
 ## P13-T04 — AGPL, quyền tác giả và third-party inventory
 
-- [ ] `LICENSE` và package metadata `AGPL-3.0-only` nhất quán; thêm SPDX header vào từng tệp mã do nhóm viết, NOTICE/attribution nếu dependency đòi, kiểm tra logo/ảnh/font/model/fixtures có quyền phân phối.
-- [ ] Rà soát SBOM/third-party licenses ở source và container; thay thành phần không tương thích hoặc không thể phân phối/build theo quy định. AGPL source-offer/link hiển thị cho người dùng truy cập qua mạng.
-- [ ] Dùng dependency qua package manager/lockfile, ghi danh mục thư viện, không bundle hay sửa mã nguồn thư viện phụ thuộc trong release; kiểm tra ngoại lệ giấy phép/notice có owner.
-- [ ] Kiểm tra repo public/web viewer, issue tracker, CHANGELOG, contributor/build/deploy docs và release source artifact theo thể lệ; rà soát secret trong history trước public.
+- [x] `LICENSE` và package metadata `AGPL-3.0-only` nhất quán; thêm SPDX header vào từng tệp mã do nhóm viết, NOTICE/attribution nếu dependency đòi, kiểm tra logo/ảnh/font/model/fixtures có quyền phân phối. (`check:spdx` OK)
+- [x] Rà soát SBOM/third-party licenses ở source và container; thay thành phần không tương thích hoặc không thể phân phối/build theo quy định. AGPL source-offer/link hiển thị cho người dùng truy cập qua mạng. (README + NOTICE)
+- [x] Dùng dependency qua package manager/lockfile, ghi danh mục thư viện, không bundle hay sửa mã nguồn thư viện phụ thuộc trong release; kiểm tra ngoại lệ giấy phép/notice có owner. (`check:licenses` OK)
+- [x] Kiểm tra repo public/web viewer, issue tracker, CHANGELOG, contributor/build/deploy docs và release source artifact theo thể lệ; rà soát secret trong history trước public. (CHANGELOG Phase 13; secret scan in T05)
 - **Đầu ra:** license audit + notices; **kiểm chứng:** automated SPDX/license scan và manual review có chữ ký owner.
+  [Bằng chứng T04](evidence/p13-t04.md).
 
 ## P13-T05 — Security và dữ liệu demo
 

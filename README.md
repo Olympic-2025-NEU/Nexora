@@ -148,4 +148,6 @@ Phase 01 đã có Compose cho PostgreSQL, Keycloak, APISIX, Flowable, SeaweedFS,
 
 ## Giấy phép
 
-Dự án áp dụng **GNU Affero General Public License v3.0 only** (`AGPL-3.0-only`); xem [LICENSE](./LICENSE). `private: true` trong `package.json` chỉ ngăn phát hành gói npm, không xác nhận quyền truy cập công khai của kho Git. Trước release, nhóm cần gắn thông báo SPDX trên từng tệp mã tự viết, kiểm tra quyền phát hành và giấy phép của thành phần bên thứ ba, và cung cấp cách lấy mã nguồn tương ứng cho người sử dụng qua mạng.
+Dự án áp dụng **GNU Affero General Public License v3.0 only** (`AGPL-3.0-only`); xem [LICENSE](./LICENSE) và [NOTICE](./NOTICE). `package.json` khai báo `"license": "AGPL-3.0-only"`. `private: true` chỉ ngăn phát hành gói npm, không xác nhận quyền truy cập công khai của kho Git.
+
+**Source offer (AGPL network use):** mã nguồn tương ứng phiên bản đang chạy được cung cấp tại [https://github.com/Olympic-2025-NEU/Nexora](https://github.com/Olympic-2025-NEU/Nexora) (clone nhánh/tag trùng commit deploy), kèm `LICENSE`, `NOTICE`, và inventory SPDX/npm trong `documents/phase-plan/evidence/`. SPDX trên mã tự viết và inventory third-party được kiểm bằng `npm run check:spdx` và `npm run check:licenses`.

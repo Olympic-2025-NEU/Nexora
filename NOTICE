@@ -1,6 +1,9 @@
-Nexora — third-party notices for the Phase 00 source tree
+Nexora — third-party notices (Phase 00 inventory; refreshed for Phase 13 release prep)
 
 Nexora-authored source is licensed under AGPL-3.0-only; see LICENSE.
+Network use (AGPL §13): corresponding source for the version you are running is
+offered at https://github.com/Olympic-2025-NEU/Nexora (branch/tag matching the
+deployed commit) together with LICENSE and this NOTICE. See README “Giấy phép”.
 The npm packages installed from package-lock.json retain their own licenses.
 The exact package versions, license expressions, registry URLs and integrity
 hashes are recorded in documents/phase-plan/evidence/npm-license-inventory.json.
