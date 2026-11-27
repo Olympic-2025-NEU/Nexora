@@ -736,6 +736,21 @@
       ]
     },
     {
+      "method": "GET",
+      "path": "/api/v1/partners/{id}/connection",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff",
+        "approver",
+        "viewer"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
       "method": "PUT",
       "path": "/api/v1/partners/{id}/connection",
       "auth": "protected",

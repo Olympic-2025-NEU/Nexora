@@ -210,7 +210,7 @@
     },
     "MemberCreate": {
       "valid": {
-        "keycloakSub": "user-123",
+        "username": "staff.a",
         "displayName": "Staff A",
         "role": "staff"
       },

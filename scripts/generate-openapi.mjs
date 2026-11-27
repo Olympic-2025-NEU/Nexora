@@ -157,6 +157,12 @@ patch("/api/v1/members/{id}", "M01", "Update member", "Member", "MemberPatch", A
 list("/api/v1/partners", "M01", "List partners", "Partner", EVERY_USER, ["status"]);
 create("/api/v1/partners", "M01", "Create partner", "Partner", "PartnerCreate", ADMIN);
 patch("/api/v1/partners/{id}", "M01", "Update partner", "Partner", "PartnerPatch", ADMIN);
+add("get", "/api/v1/partners/{id}/connection", "M01", "Read partner connection metadata", "PartnerConnectionView", {
+  roles: EVERY_USER,
+  status: 200,
+  description: "Returns safe connection view only (endpoint host, status, rotatedAt). outboundSecretRef is never included.",
+  errors: [401, 403, 404, 429, 503],
+});
 add("put", "/api/v1/partners/{id}/connection", "M01", "Upsert partner connection", "PartnerConnectionView", { body: "PartnerConnectionInput", roles: ADMIN, status: 200, description: "Admin only; URLs must be HTTPS and SSRF-safe. Response never includes outboundSecretRef." });
 
 list("/api/v1/products", "M02", "List products", "Product", EVERY_USER, ["q", "isActive", "categoryId"]);

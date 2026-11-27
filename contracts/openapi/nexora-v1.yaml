@@ -501,6 +501,53 @@ paths:
         "503":
           $ref: "#/components/responses/Error"
   /api/v1/partners/{id}/connection:
+    get:
+      tags:
+        - M01
+      operationId: getPartnersByIdConnection
+      summary: Read partner connection metadata
+      description: Returns safe connection view only (endpoint host, status, rotatedAt). outboundSecretRef is never included.
+      security:
+        - oidc: []
+      x-nexora-roles:
+        - administrator
+        - staff
+        - approver
+        - viewer
+      x-nexora-scope: resource
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - data
+                  - requestId
+                properties:
+                  data:
+                    $ref: "#/components/schemas/PartnerConnectionView"
+                  requestId:
+                    type: string
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
     put:
       tags:
         - M01
@@ -6291,6 +6338,10 @@ components:
         contactEmail:
           type: string
           format: email
+        contactPhone:
+          type: string
+        address:
+          type: string
     OrganizationPatch:
       type: object
       additionalProperties: false
@@ -6301,8 +6352,18 @@ components:
         contactEmail:
           type: string
           format: email
+          nullable: true
+        contactPhone:
+          type: string
+          nullable: true
+        address:
+          type: string
+          nullable: true
         timezone:
           type: string
+        version:
+          type: integer
+          minimum: 1
       minProperties: 1
     Member:
       type: object
@@ -6342,15 +6403,20 @@ components:
         version:
           type: integer
           minimum: 1
+        provisionalPassword:
+          type: string
+          description: Present only on invite response; never persisted for later GET.
+        keycloakCreated:
+          type: boolean
     MemberCreate:
       type: object
       additionalProperties: false
       required:
-        - keycloakSub
+        - username
         - displayName
         - role
       properties:
-        keycloakSub:
+        username:
           type: string
           minLength: 1
         displayName:
@@ -6371,6 +6437,10 @@ components:
           items:
             type: string
             format: uuid
+        temporaryPassword:
+          type: string
+          minLength: 8
+      description: Admin invite provisions (or reuses) a Keycloak user by username. Clients must not send keycloakSub — the IdP allocates or resolves the subject.
     MemberPatch:
       type: object
       additionalProperties: false
@@ -6387,11 +6457,21 @@ components:
           enum:
             - active
             - disabled
+        displayName:
+          type: string
+          minLength: 1
+        email:
+          type: string
+          format: email
+          nullable: true
         warehouseIds:
           type: array
           items:
             type: string
             format: uuid
+        version:
+          type: integer
+          minimum: 1
       minProperties: 1
     Partner:
       type: object
@@ -6458,6 +6538,10 @@ components:
         contactEmail:
           type: string
           format: email
+          nullable: true
+        version:
+          type: integer
+          minimum: 1
       minProperties: 1
     PartnerConnectionInput:
       type: object
@@ -6483,12 +6567,19 @@ components:
           type: string
         outboundSecretRef:
           type: string
+          description: Write-only secret reference; never returned by GET/PUT responses.
         outboundAudience:
           type: string
         inboundClientId:
           type: string
         allowedInboundScope:
           type: string
+        status:
+          type: string
+          enum:
+            - active
+            - rotating
+            - disabled
     PartnerConnectionView:
       type: object
       additionalProperties: false
@@ -6507,6 +6598,7 @@ components:
         rotatedAt:
           type: string
           format: date-time
+      description: Safe connection metadata. outboundSecretRef is never included.
     Product:
       type: object
       additionalProperties: false
