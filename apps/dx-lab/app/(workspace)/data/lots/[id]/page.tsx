@@ -26,6 +26,7 @@ export default async function LotDetailPage({ params }: { params: Promise<{ id: 
   const token = await requireAccessToken();
   const loaded = await loadLot(token, id);
   const events = (loaded.history?.events as Record<string, unknown>[] | undefined) ?? [];
+  const otReadings = (loaded.history?.otReadings as Record<string, unknown>[] | undefined) ?? [];
   const backNodes = (loaded.backward?.nodes as Record<string, unknown>[] | undefined) ?? [];
   const forwardNodes = (loaded.forward?.nodes as Record<string, unknown>[] | undefined) ?? [];
 
@@ -55,6 +56,23 @@ export default async function LotDetailPage({ params }: { params: Promise<{ id: 
                       {event.sourceDocumentId
                         ? <> · <Link href={`/operations/receipts?id=${String(event.sourceDocumentId)}`}>doc</Link></>
                         : null}
+                    </li>
+                  ))}
+                </ul>
+              )}
+          </section>
+          <section className="panel">
+            <h2>OT readings (simulated)</h2>
+            <p className="muted">Thiết bị mô phỏng — không tự đổi stock/quality.</p>
+            {!otReadings.length
+              ? <StatusBanner tone="info">Chưa có ot_reading.</StatusBanner>
+              : (
+                <ul className="task-list">
+                  {otReadings.map((reading) => (
+                    <li key={String(reading.id)}>
+                      {String(reading.deviceId)} · {String(reading.value)}{String(reading.unit)} ·{" "}
+                      {String(reading.qualityState)} · lag {String(reading.lagSeconds)}s · asOf {String(reading.asOf)}
+                      {reading.simulated ? " · simulated" : ""}
                     </li>
                   ))}
                 </ul>
