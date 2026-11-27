@@ -7,12 +7,37 @@ import { requestId, response, log, timed } from "../deploy/health.mjs";
 import { main as startOutbox } from "./dist/workers/outbox-dispatcher.js";
 import { createPrismaIdempotency } from "./dist/platform/http/idempotency.js";
 import { traceLag } from "./dist/workers/trace-projector.js";
+import { createArchiveExporter, archiveLag } from "./dist/workers/archive-export.js";
 import { resolvePendingDependencies } from "./dist/contexts/federation/application/identity-mapping.js";
 
 validateConfig(process.env, "worker");
 const prisma = new PrismaClient();
 const core = new PrismaClient({ datasources: { db: { url: process.env.CORE_DATABASE_URL } } });
 const { dispatcher } = startOutbox(prisma, core, process.env.NEXORA_ISSUER_INSTANCE_ID);
+const archive = createArchiveExporter(prisma, core, {
+  S3_ENDPOINT: process.env.S3_ENDPOINT,
+  S3_ACCESS_KEY: process.env.S3_ACCESS_KEY,
+  S3_SECRET_KEY: process.env.S3_SECRET_KEY,
+  S3_BUCKET_PRIVATE: process.env.S3_BUCKET_PRIVATE,
+  S3_REGION: process.env.S3_REGION,
+  NEXORA_ISSUER_INSTANCE_ID: process.env.NEXORA_ISSUER_INSTANCE_ID,
+});
+async function runArchiveExport() {
+  try {
+    const result = await archive.exportOnce();
+    if (result.exported) {
+      console.log(JSON.stringify({ service: "worker", outcome: "archive_export", ...result }));
+    }
+  } catch (error) {
+    console.error(JSON.stringify({
+      service: "worker",
+      outcome: "archive_export_failed",
+      error: error instanceof Error ? error.message : "unknown",
+    }));
+  }
+}
+setInterval(() => { void runArchiveExport(); }, 30_000);
+void runArchiveExport();
 const idempotency = createPrismaIdempotency(prisma);
 async function purgeIdempotency() {
   try {
@@ -67,10 +92,14 @@ http.createServer(async (req, res) => {
     const up = await ready(id);
     log("worker", id, "metrics", up ? "up" : "down");
     let stats, lag;
-    try { [stats, lag] = await Promise.all([dispatcher.stats(), traceLag(prisma)]); }
-    catch { res.writeHead(503); res.end(); return; }
+    let archiveStats;
+    try {
+      [stats, lag, archiveStats] = await Promise.all([
+        dispatcher.stats(), traceLag(prisma), archiveLag(core),
+      ]);
+    } catch { res.writeHead(503); res.end(); return; }
     res.writeHead(200, { "content-type": "text/plain; version=0.0.4", "cache-control": "no-store", "x-request-id": id });
-    res.end(`# TYPE service_up gauge\nservice_up{service="worker"} ${Number(up)}\n# TYPE worker_queue_depth gauge\nworker_queue_depth ${stats.pending + stats.retryDue + stats.leased}\n# TYPE worker_outbox_dead_letter gauge\nworker_outbox_dead_letter ${stats.deadLetter}\n# TYPE trace_projection_pending gauge\ntrace_projection_pending ${lag.pending}\n# TYPE trace_projection_lag_seconds gauge\ntrace_projection_lag_seconds ${lag.seconds}\n`);
+    res.end(`# TYPE service_up gauge\nservice_up{service="worker"} ${Number(up)}\n# TYPE worker_queue_depth gauge\nworker_queue_depth ${stats.pending + stats.retryDue + stats.leased}\n# TYPE worker_outbox_dead_letter gauge\nworker_outbox_dead_letter ${stats.deadLetter}\n# TYPE trace_projection_pending gauge\ntrace_projection_pending ${lag.pending}\n# TYPE trace_projection_lag_seconds gauge\ntrace_projection_lag_seconds ${lag.seconds}\n# TYPE archive_manifest_count gauge\narchive_manifest_count ${archiveStats.manifests}\n# TYPE archive_export_lag_seconds gauge\narchive_export_lag_seconds ${archiveStats.lagSeconds}\n`);
     return;
   }
   res.writeHead(404); res.end();

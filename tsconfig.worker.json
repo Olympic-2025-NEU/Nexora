@@ -10,7 +10,7 @@
     "rootDir": ".",
     "outDir": "worker/dist"
   },
-  "include": ["workers/outbox-dispatcher.ts", "workers/federation-outbound.ts", "contexts/federation/application/identity-mapping.ts", "platform/outbox/*.ts", "platform/http/idempotency.ts",
+  "include": ["workers/outbox-dispatcher.ts", "workers/federation-outbound.ts", "workers/archive-export.ts", "contexts/federation/application/identity-mapping.ts", "platform/outbox/*.ts", "platform/http/idempotency.ts",
     "composition/event-handlers.ts", "composition/workflow.ts", "contracts/events/registry.ts",
     "platform/workflow/*.ts"]
 }

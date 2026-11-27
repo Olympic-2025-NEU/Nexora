@@ -49,7 +49,8 @@ const runtime = {
   erp: { DATABASE_URL: "database", OIDC_ISSUER_URL: "url", PUBLIC_BASE_URL: "url",
     AI_BASE_URL: "url", AI_PROVIDER: "id" },
   worker: { DATABASE_URL: "database", CORE_DATABASE_URL: "database", NEXORA_ISSUER_INSTANCE_ID: "id",
-    FLOWABLE_BASE_URL: "url", REDIS_URL: "redis", FLOWABLE_ADMIN_USER: "id", FLOWABLE_ADMIN_PASSWORD: "secret" },
+    FLOWABLE_BASE_URL: "url", REDIS_URL: "redis", FLOWABLE_ADMIN_USER: "id", FLOWABLE_ADMIN_PASSWORD: "secret",
+    S3_ENDPOINT: "url", S3_ACCESS_KEY: "secret", S3_SECRET_KEY: "secret", S3_BUCKET_PRIVATE: "bucket" },
   "core-data": {
     CORE_DATABASE_URL: "database", S3_ENDPOINT: "url", S3_ACCESS_KEY: "secret",
     S3_SECRET_KEY: "secret", S3_BUCKET_PRIVATE: "bucket",
