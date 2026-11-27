@@ -20,22 +20,41 @@
     },
     "AiChatInput": {
       "valid": {
-        "message": "Show lot trace",
-        "lotRef": "A/A-L1"
+        "question": "Lô LOT-A-001 của nexora-a?"
+      },
+      "invalid": {}
+    },
+    "AiDraftProposeInput": {
+      "valid": {
+        "request": "Tạo phiếu nhập 10 KG cho LOT-A-001 kho KHO-A1"
       },
       "invalid": {
-        "lotRef": "A/A-L1"
+        "request": ""
       }
     },
-    "AiDraftInput": {
+    "AiDraftCreateInput": {
       "valid": {
-        "documentType": "goods_issue",
-        "instruction": "Prepare an outbound issue for 5 EA",
-        "purpose": "partner_transfer"
+        "proposalId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "fields": {
+          "warehouseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          "batchId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+          "quantity": "10.000",
+          "unit": "KG"
+        }
       },
       "invalid": {
-        "instruction": "Prepare an outbound issue for 5 EA",
-        "purpose": "partner_transfer"
+        "proposalId": "short"
+      }
+    },
+    "AiRiskFeedbackInput": {
+      "valid": {
+        "alertFingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "ruleId": "NEAR_EXPIRY",
+        "ruleVersion": "risk-v1",
+        "verdict": "correct"
+      },
+      "invalid": {
+        "verdict": "maybe"
       }
     },
     "ApprovalDecisionInput": {
