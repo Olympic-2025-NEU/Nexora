@@ -46,10 +46,23 @@ export default async function WorkPage() {
 
       <section className="panel">
         <h2>Hồ sơ / tệp liên quan</h2>
-        <StatusBanner tone="info">
-          Approval inbox chưa mang file evidence IDs. Khi có ID, DX-Lab sẽ gọi Core
-          {" "}<code>GET /api/v1/files/{"{id}"}</code> và chỉ hiện metadata clean.
-        </StatusBanner>
+        {inbox.tasks.some((task) => (task.evidenceFileIds ?? []).length > 0)
+          ? (
+            <ul className="task-list">
+              {inbox.tasks.flatMap((task) =>
+                (task.evidenceFileIds ?? []).map((fileId) => (
+                  <li key={`${task.approvalRequestId}-${fileId}`}>
+                    Evidence <code>{fileId}</code> · metadata qua Core File API (không raw payload).
+                  </li>
+                )))}
+            </ul>
+          )
+          : (
+            <StatusBanner tone="info">
+              Chưa có evidenceFileIds trên inbox. Khi có, DX-Lab gọi
+              {" "}<code>GET /api/v1/files/{"{id}"}</code> và chỉ hiện metadata clean.
+            </StatusBanner>
+          )}
       </section>
     </section>
   );

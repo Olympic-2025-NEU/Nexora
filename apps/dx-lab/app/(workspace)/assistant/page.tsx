@@ -1,5 +1,17 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-export default function AssistantPage() {
-  return <section><p className="eyebrow">I · Intelligence</p><h1>Trợ lý có dẫn nguồn</h1>
-    <p>Tra cứu lô và gợi ý Draft có người duyệt sẽ được nối trong T06.</p></section>;
+import { AssistantPanel } from "../../../components/i/assistant-panel";
+import { currentActor } from "../../../lib/auth/current-actor";
+
+export default async function AssistantPage() {
+  const actor = await currentActor();
+  return (
+    <section className="stack">
+      <p className="eyebrow">I · Intelligence</p>
+      <h1>Trợ lý AI</h1>
+      <p className="muted">
+        {actor.displayName} · lot Q&A có nguồn và draft human-in-the-loop. Không có tool confirm.
+      </p>
+      <AssistantPanel />
+    </section>
+  );
 }

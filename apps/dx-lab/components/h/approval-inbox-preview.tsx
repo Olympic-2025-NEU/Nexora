@@ -16,7 +16,7 @@ export function ApprovalInboxPreview({
     <section className="panel">
       <div className="panel-header">
         <h2>Hộp phê duyệt</h2>
-        <Link href="/operations">Mở vùng P</Link>
+        <Link href="/work/approvals">Mở inbox quyết định</Link>
       </div>
       {denied
         ? <StatusBanner tone="info">Chỉ vai trò Approver mới xem được inbox phê duyệt.</StatusBanner>
@@ -31,13 +31,13 @@ export function ApprovalInboxPreview({
             <li key={task.approvalRequestId}>
               <strong>{task.documentNumber}</strong>
               <span className="muted">
-                {" "}· {task.documentType} · {Math.floor(task.ageSeconds / 60)} phút · {task.approvalState}
+                {" "}· {task.documentType} · v{task.approvalVersion} · {Math.floor(task.ageSeconds / 60)} phút · {task.approvalState}
               </span>
             </li>
           ))}
         </ul>
       ) : null}
-      <p className="muted">Quyết định approve/reject đầy đủ thuộc P11-T04.</p>
+      <p className="muted">Approve/reject qua P · không gọi Flowable admin từ browser.</p>
     </section>
   );
 }

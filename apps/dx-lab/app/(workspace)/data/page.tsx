@@ -1,5 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-export default function DataPage() {
-  return <section><p className="eyebrow">D · Data</p><h1>Tồn kho và truy vết</h1>
-    <p>Vùng dữ liệu sẽ hiển thị tồn kho, nguồn và khoảng trống truy vết trong T05.</p></section>;
+import Link from "next/link";
+
+export default function DataHomePage() {
+  return (
+    <section className="stack">
+      <p className="eyebrow">D · Data</p>
+      <h1>Tồn và truy xuất</h1>
+      <nav className="area-nav" aria-label="Dữ liệu">
+        <Link href="/data/inventory">Tồn kho</Link>
+        <Link href="/data/lots">Lô / timeline</Link>
+      </nav>
+    </section>
+  );
 }
