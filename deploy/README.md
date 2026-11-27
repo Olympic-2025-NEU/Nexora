@@ -1,7 +1,26 @@
-# Nexora deploy (P01–P02)
+# Nexora deploy (P01–P02 + Phase 13 clean install)
 
 Single Compose entrypoint: [`compose.yml`](./compose.yml).  
 Legacy `docker-compose.yml` (Postgres-only) is removed; do not reintroduce a second entrypoint.
+
+## Clean install (AC-13)
+
+Audience: someone who did **not** author the laptop paths. Full quickstart lives in the repo root [README.md](../README.md).
+
+1. Clone public repo (`phase-13` or release tag when published) into any directory.
+2. `npm ci` from lockfile only (Node 22+ recommended).
+3. Copy config via `deploy/scripts/bootstrap.sh` / `bootstrap.ps1` from `deploy/instances/{a,b,c}.env.example` — never invent secrets from memory or author machines.
+4. `docker compose … config -q` then `up -d --build` with an explicit `-p <project>` (e.g. `nexora-a`). Images build from Dockerfiles in-tree; digests for base images are pinned in `compose.yml`.
+5. `bash deploy/scripts/smoke.sh <instance> <project>`; optional `seed.sh` for synthetic demo data.
+6. Run containers under Docker’s project volumes — **not** bind-mounted author home directories for app data.
+
+| Resource | Minimum guidance |
+| --- | --- |
+| Free RAM | ≥ 8 GiB one instance + apps; A+B+C concurrent often needs ≥ 12 GiB (demo hosts with ~2 GiB free: run **one** stack) |
+| Disk | ≥ 20 GiB for builds + ClamAV |
+| OS | Linux or Windows + Docker Desktop; PowerShell scripts for bootstrap on Windows |
+
+**AC-13 second-person status:** agent/host verification is recorded in [p13-t03.md](../documents/phase-plan/evidence/p13-t03.md). Independent teammate VM confirmation may still be pending — do not claim “another person already passed” without their sign-off.
 
 For the P09 A/B/C independent-instance topology, fixture bootstrap, failure
 drill, guarded reset and optional HTTPS federation transport, use
