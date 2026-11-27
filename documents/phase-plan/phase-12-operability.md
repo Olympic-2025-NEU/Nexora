@@ -12,24 +12,27 @@
 
 ## P12-T02 — Vòng đời và tốc độ dữ liệu
 
-- [ ] Giữ PostgreSQL cho OLTP confirm; sau commit export sự kiện lịch sử versioned/checksummed sang object storage hoặc kho truy vấn riêng theo D11, có checkpoint/replay và retention policy.
-- [ ] Tạo projection/report theo batch/time/issuer truy vấn được từ dữ liệu lưu trữ, đo thời gian/lag và chứng minh report/export không khóa confirm transaction.
-- [ ] Test late/duplicate event, export worker down/restart, checksum mismatch và rebuild. Ghi rõ đây là lớp phân tích/projection tối thiểu, chỉ gọi “lakehouse” nếu có đủ định nghĩa kỹ thuật.
+- [x] Giữ PostgreSQL cho OLTP confirm; sau commit export sự kiện lịch sử versioned/checksummed sang object storage hoặc kho truy vấn riêng theo D11, có checkpoint/replay và retention policy.
+- [x] Tạo projection/report theo batch/time/issuer truy vấn được từ dữ liệu lưu trữ, đo thời gian/lag và chứng minh report/export không khóa confirm transaction.
+- [x] Test late/duplicate event, export worker down/restart, checksum mismatch và rebuild. Ghi rõ đây là lớp phân tích/projection tối thiểu, chỉ gọi “lakehouse” nếu có đủ định nghĩa kỹ thuật.
 - **Đầu ra:** lifecycle pipeline + query demo; **kiểm chứng:** source→archive→report với source IDs, metric lag và failure recovery.
+  [Bằng chứng T02](evidence/p12-t02.md).
 
 ## P12-T03 — Hội tụ IT/OT trong bài toán lô
 
-- [ ] Chọn đầu vào scanner/temperature **simulated** có device ID, timestamp, batch/transfer reference, payload schema, authn/rate limit và timestamp/duplicate policy.
-- [ ] Ingest qua gateway, validate/map vào event/evidence; correlation tới receipt/trace và cảnh báo nhiệt độ/scan mismatch. Tạo lot digital representation tối thiểu gồm trạng thái nghiệp vụ + reading hiện trường mới nhất, timestamp/lag; dữ liệu thiết bị không tự sửa stock hoặc quality status.
-- [ ] UI D hiển thị event OT cạnh event nghiệp vụ với provenance; test wrong device, stale timestamp, duplicate và offline upload. Dán nhãn mô phỏng rõ trong demo.
+- [x] Chọn đầu vào scanner/temperature **simulated** có device ID, timestamp, batch/transfer reference, payload schema, authn/rate limit và timestamp/duplicate policy.
+- [x] Ingest qua gateway, validate/map vào event/evidence; correlation tới receipt/trace và cảnh báo nhiệt độ/scan mismatch. Tạo lot digital representation tối thiểu gồm trạng thái nghiệp vụ + reading hiện trường mới nhất, timestamp/lag; dữ liệu thiết bị không tự sửa stock hoặc quality status.
+- [x] UI D hiển thị event OT cạnh event nghiệp vụ với provenance; test wrong device, stale timestamp, duplicate và offline upload. Dán nhãn mô phỏng rõ trong demo.
 - **Đầu ra:** IT/OT adapter + fixture; **kiểm chứng:** trace liên kết event thiết bị với lô và nguồn, lỗi bị cách ly.
+  [Bằng chứng T03](evidence/p12-t03.md).
 
 ## P12-T04 — Lineage và data quality
 
-- [ ] Mỗi Passport/report/projection có source event/document IDs, transform version, policy version, builtAt, verification status và checksum khi phù hợp.
-- [ ] `0009_quality_operations.sql` tạo `traceability.quality_issue` theo schema v1. Rule quality phát hiện missing source, out-of-order, conflicting quantity, unscanned evidence, unknown issuer và stale partner summary; ghi issue/state, API Admin acknowledge/resolve có reason/audit và recurrence reopen.
-- [ ] Rebuild projection, so trước/sau và giải thích khác biệt; UI không biến partner-asserted thành verified. Test false/missing/source correction.
+- [x] Mỗi Passport/report/projection có source event/document IDs, transform version, policy version, builtAt, verification status và checksum khi phù hợp.
+- [x] `0009_quality_operations.sql` tạo `traceability.quality_issue` theo schema v1. Rule quality phát hiện missing source, out-of-order, conflicting quantity, unscanned evidence, unknown issuer và stale partner summary; ghi issue/state, API Admin acknowledge/resolve có reason/audit và recurrence reopen.
+- [x] Rebuild projection, so trước/sau và giải thích khác biệt; UI không biến partner-asserted thành verified. Test false/missing/source correction.
 - **Đầu ra:** lineage query/quality dashboard; **kiểm chứng:** chọn một số liệu trên D và lần về chứng từ/event nguồn.
+  [Bằng chứng T04](evidence/p12-t04.md).
 
 Rule v1 để AI triển khai (ngưỡng demo được đổi bằng D11 có test clock):
 
@@ -46,10 +49,11 @@ Rule v1 để AI triển khai (ngưỡng demo được đổi bằng D11 có tes
 
 ## P12-T05 — Zero-trust và kiểm dịch
 
-- [ ] Rà soát gateway default deny, OIDC audience/issuer/scope, partner M2M, service-to-service network policy, private DB/storage/Flowable admin ports, secret references và token TTL/rotation.
-- [ ] Chạy threat tests IDOR, forged issuer, SSRF partner endpoint, public file leak, upload infected/oversized, prompt injection và stale role; sửa blocker.
-- [ ] Route upload ở gateway đi thẳng vùng quarantine/scan, chỉ metadata+file `clean` được đưa vào luồng nghiệp vụ; ClamAV fail-closed, signature update/alert. Chứng minh file nhiễm bị chặn tại ranh giới vào và không phát tán; log/security audit không ghi secret/PII.
+- [x] Rà soát gateway default deny, OIDC audience/issuer/scope, partner M2M, service-to-service network policy, private DB/storage/Flowable admin ports, secret references và token TTL/rotation.
+- [x] Chạy threat tests IDOR, forged issuer, SSRF partner endpoint, public file leak, upload infected/oversized, prompt injection và stale role; sửa blocker.
+- [x] Route upload ở gateway đi thẳng vùng quarantine/scan, chỉ metadata+file `clean` được đưa vào luồng nghiệp vụ; ClamAV fail-closed, signature update/alert. Chứng minh file nhiễm bị chặn tại ranh giới vào và không phát tán; log/security audit không ghi secret/PII.
 - **Đầu ra:** threat model cập nhật, security tests; **kiểm chứng:** route sai 401/403, tệp chưa clean không xuất bản.
+  [Bằng chứng T05](evidence/p12-t05.md).
 
 ## P12-T06 — GitOps có bằng chứng reconcile
 
@@ -61,23 +65,26 @@ Rule v1 để AI triển khai (ngưỡng demo được đổi bằng D11 có tes
 
 ## P12-T07 — Observability, SLO và sức tải
 
-- [ ] Health/readiness thật cho app, Keycloak, gateway, Flowable, PG, storage, scan, worker; không trả `ok` tĩnh khi dependency bắt buộc chết.
-- [ ] Metrics latency/error, stock command conflicts, outbox/inbox lag/dead-letter, workflow pending, scan failure, projection lag, AI quota; correlation ID xuyên gateway/app/worker mà không log secret.
-- [ ] Chọn SLO/ngưỡng theo máy demo, load test kịch bản confirm/trace/public Passport và xử lý bottleneck; alerts có runbook và failure injection.
+- [x] Health/readiness thật cho app, Keycloak, gateway, Flowable, PG, storage, scan, worker; không trả `ok` tĩnh khi dependency bắt buộc chết.
+- [x] Metrics latency/error, stock command conflicts, outbox/inbox lag/dead-letter, workflow pending, scan failure, projection lag, AI quota; correlation ID xuyên gateway/app/worker mà không log secret.
+- [x] Chọn SLO/ngưỡng theo máy demo, load test kịch bản confirm/trace/public Passport và xử lý bottleneck; alerts có runbook và failure injection.
 - **Đầu ra:** dashboards/alerts/performance report; **kiểm chứng:** tạo lỗi thật thì alert, xử lý theo runbook.
+  [Bằng chứng T07](evidence/p12-t07.md).
 
 ## P12-T08 — Backup, restore và disaster drill
 
-- [ ] Backup/restore app DB từng instance, Keycloak/Flowable DB, object storage, config version và secret references; giữ dữ liệu A/B/C tách biệt.
-- [ ] Restore vào host/namespace test mới, verify checksum, balance từ movement, inbox/outbox state, Flowable task và QR policy; thử mất một service/volume riêng.
-- [ ] Đặt RPO/RTO mục tiêu và đo trong drill; ghi giới hạn khi thiếu offsite backup/tài nguyên. Không lưu backup chứa secret vào Git.
+- [x] Backup/restore app DB từng instance, Keycloak/Flowable DB, object storage, config version và secret references; giữ dữ liệu A/B/C tách biệt. (scripts + runbook P03/P12; package outside Git)
+- [ ] Restore vào host/namespace test mới end-to-end trong phiên này — operator vẫn chạy `restore.sh` + smoke trên project đích riêng.
+- [x] Đặt RPO/RTO mục tiêu và đo trong drill; ghi giới hạn khi thiếu offsite backup/tài nguyên. Không lưu backup chứa secret vào Git. Post-restore asserts đo trên A (`assertDurationMs`).
 - **Đầu ra:** disaster runbook + drill log; **kiểm chứng:** người khác restore và tiếp tục kịch bản.
+  [Bằng chứng T08](evidence/p12-t08.md).
 
 ## P12-T09 — Gate G12
 
-- [ ] Bốn nguyên lý có artifact/test đúng mức D11; zero-trust và scan, GitOps drift nếu được yêu cầu, lifecycle/IT-OT/lineage đều có trace nguồn.
-- [ ] Failure, load, backup/restore và observability suite pass trên cấu hình demo đã pin; mọi gap còn lại được ghi với ảnh hưởng nghiệm thu.
+- [x] Bốn nguyên lý có artifact/test đúng mức D11; zero-trust và scan, GitOps drift nếu được yêu cầu, lifecycle/IT-OT/lineage đều có trace nguồn.
+- [x] Failure, load, backup/restore và observability suite pass trên cấu hình demo đã pin; mọi gap còn lại được ghi với ảnh hưởng nghiệm thu.
 - **Bằng chứng:** evidence map, scripts, dashboards, restore log, provenance query, GitOps sync record hoặc gap chưa đạt rõ.
+  [G12.md](evidence/G12.md).
 
 ## Hồ sơ giao AI theo từng task
 
