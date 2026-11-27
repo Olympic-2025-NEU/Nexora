@@ -221,6 +221,10 @@ add("post", "/api/v1/approvals/{id}/decisions", "M03", "Record approval decision
 add("get", "/api/v1/trace/status", "M04", "Local trace projector status", "TraceProjectorStatus", {
   description: "Authenticated local outbox lag. A caught-up queue does not assert that remote partner history is complete." });
 add("get", "/api/v1/lots/{id}/history", "M04", "Lot history", "TraceHistory", { query: ["cursor", "limit"] });
+add("post", "/api/v1/ot/readings", "Operations", "Ingest a simulated device reading", "OtReadingAccepted", {
+  roles: WRITER, body: "OtReadingInput", status: 202, errors: [400, 401, 403, 404, 409, 413, 415, 422, 429, 503],
+  description: "Authenticated demo simulator through the gateway. Device is scoped to this instance; the local batch must exist. Duplicate reading IDs with identical input are reused. Readings never change stock or lot quality.",
+});
 add("get", "/api/v1/lots/{id}/trace/backward", "M04", "Trace backward", "TraceGraph", {
   query: ["documentId", "depth", "cursor", "limit"],
   description: "Authenticated local backward graph. Only explicit confirmed source links imply causality. Same-batch events provide context; missing remote source, unknown local allocation and projector lag remain explicit gaps. Cursor freezes the recorded-at snapshot; depth counts source-link hops (1–10)." });

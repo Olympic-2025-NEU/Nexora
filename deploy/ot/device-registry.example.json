@@ -4,6 +4,7 @@
   "devices": [
     {
       "deviceId": "sim-temp-a1",
+      "instanceId": "nexora-a",
       "kind": "temperature",
       "warehouseCode": "KHO-A1",
       "batchIdHint": null,
@@ -12,8 +13,27 @@
     },
     {
       "deviceId": "sim-temp-a2",
+      "instanceId": "nexora-a",
       "kind": "temperature",
       "warehouseCode": "KHO-A2",
+      "batchIdHint": null,
+      "maxStaleSeconds": 900,
+      "notes": "Demo simulator — not a production sensor"
+    },
+    {
+      "deviceId": "sim-temp-b1",
+      "instanceId": "nexora-b",
+      "kind": "temperature",
+      "warehouseCode": "KHO-B1",
+      "batchIdHint": null,
+      "maxStaleSeconds": 900,
+      "notes": "Demo simulator — not a production sensor"
+    },
+    {
+      "deviceId": "sim-temp-c1",
+      "instanceId": "nexora-c",
+      "kind": "temperature",
+      "warehouseCode": "KHO-C1",
       "batchIdHint": null,
       "maxStaleSeconds": 900,
       "notes": "Demo simulator — not a production sensor"
