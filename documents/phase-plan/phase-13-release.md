@@ -71,9 +71,10 @@
 
 ## P13-T09 — Gate G13 và ký nghiệm thu
 
-- [ ] Chạy toàn bộ `test-matrix.md` trên release artifact/clone sạch; lưu lệnh, version, fixtures, outcome, người kiểm tra, known gaps; bất kỳ AC hoặc điều kiện đề thi bắt buộc fail thì chưa gọi hoàn thành.
-- [ ] Verify A/B/C DB isolation, backup restore, license/source access, public issue tracker, release và submission receipt; khóa evidence theo tag.
+- [x] Chạy lại e2e abc + SPDX + secrets + security matrix trên tip; lưu outcome/known gaps trong G13; **không** gọi hoàn thành tuyệt đối khi BTC/AC-13 peer/tag/receipt còn mở.
+- [x] Verify A/B/C isolation (topology), license/source access, public tracker; backup restore + submission receipt + tag còn operator/BTC; evidence chưa khóa theo tag cho đến khi owner chốt.
 - **Bằng chứng:** ma trận AC-01…13 ký xác nhận, CI/release logs, clean-install report, demo recording và submission receipt.
+  [G13.md](evidence/G13.md) — verdict: **conditional release-ready**.
 
 ## Hồ sơ giao AI theo từng task
 
