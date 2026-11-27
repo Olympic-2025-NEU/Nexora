@@ -60,3 +60,16 @@ bash tests/deploy/backup-restore.sh a nexora /absolute/path/to/target-checkout r
 ```
 
 Nếu restore lỗi: giữ gateway/ứng dụng đích đóng, giữ gói gốc và log đã che secret, sửa lỗi trong đích mới khác thay vì restore đè hay `down -v` nguồn. Nguồn tiếp tục chạy; nếu nguồn chưa lên sau backup, kiểm `docker compose ... ps`, khởi động dịch vụ bị dừng theo README rồi chạy smoke. Nếu kiểm quyền, checksum hoặc migration không khớp, không công bố clone. Xoay credential Keycloak/client và cập nhật cấu hình đích trước khi dùng ngoài môi trường drill cô lập. RPO thực là tuổi bản backup cuối được verify tại thời điểm sự cố; RTO đo từ bắt đầu restore đến khi các kiểm tra bắt buộc đạt. Chưa coi đây là disaster recovery liên máy cho đến khi người thứ hai hoàn tất drill.
+
+## P12-T08 — Post-restore asserts + RPO/RTO
+
+Sau restore (hoặc trên instance A live để kiểm invariant):
+
+```bash
+node deploy/scripts/post-restore-assert.mjs nexora deploy/instances/a.env
+node deploy/scripts/dr-drill.mjs nexora
+```
+
+Assert bắt buộc: `stock_balance.quantity = sum(stock_movement.delta)` theo `(warehouse_id,batch_id)`; inbox/outbox counts đọc được; attachment SHA-256 shape; mẫu `qr_token` / `passport_policy`; Flowable definition tables hiện diện (task state nghiệp vụ vẫn **N/A** nếu bridge hạn chế). Topology B/C: cùng script, project/volume/port tách; không share PG volume với A.
+
+Ghi `assertDurationMs` từ `dr-drill.mjs` vào evidence; RPO = tuổi gói `verify-backup.mjs` cuối cùng tại thời điểm sự cố (không phải replication liên tục).
