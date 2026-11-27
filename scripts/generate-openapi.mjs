@@ -276,9 +276,10 @@ add("post", "/api/v1/federation/events", "M04", "Accept federation event", "Fede
 list("/api/v1/federation/deliveries", "M04", "List outbound delivery status", "FederationDelivery", ADMIN, ["status", "partnerId"]);
 action("/api/v1/federation/deliveries/{id}/retry", "M04", "Retry outbound delivery", "FederationRetryResult", { body: "Reason", roles: ADMIN, status: 202, ifMatch: false });
 
-add("post", "/api/v1/ai/chat", "AI01", "AI chat with delegated tools", "AiChatResult", { body: "AiChatInput", status: 200, roles: EVERY_USER });
-create("/api/v1/ai/drafts", "AI01", "Create AI-assisted draft", "AiDraftResult", "AiDraftInput", WRITER, { idempotent: true, status: 201 });
-detail("/api/v1/ai/tool-calls/{id}", "AI01", "Get redacted AI tool call", "AiToolCall");
+add("post", "/api/v1/ai/chat", "AI01", "Lot lookup Q&A with sourced facts", "AiChatResult", { body: "AiChatInput", status: 200, roles: EVERY_USER, description: "Deterministic facts with optional connector text. No confirm tools." });
+add("post", "/api/v1/ai/draft", "AI01", "Propose receipt draft fields", "AiDraftProposeResult", { body: "AiDraftProposeInput", status: 200, roles: WRITER, description: "Proposal only; does not create a trading document or change stock." });
+add("post", "/api/v1/ai/draft/create", "AI01", "Create receipt draft from reviewed proposal", "AiDraftCreateResult", { body: "AiDraftCreateInput", status: 200, roles: WRITER, description: "Creates M03 draft after human review; never confirms stock." });
+add("post", "/api/v1/ai/risk/feedback", "AI01", "Record risk alert feedback", "AiRiskFeedbackResult", { body: "AiRiskFeedbackInput", status: 200, roles: EVERY_USER, description: "Audit-only feedback; does not change stock or approvals." });
 create("/api/v1/core/records", "Core", "Create private evidence record", "CoreRecord", "CoreRecordCreate", WRITER, { idempotent: true, errors: [401, 403, 404, 409, 422, 503], description: "Only evidence_metadata with an authorized active membership or organization owner and clean private attachment. Server assigns source key, visibility and policy version. Same Idempotency-Key and payload returns 200; different payload returns 409 unless If-Match names the current version and owner remains unchanged." });
 doc.paths["/api/v1/core/records"].post.responses["200"] = doc.paths["/api/v1/core/records"].post.responses["201"];
 doc.paths["/api/v1/core/records"].post.parameters.push({ name: "If-Match", in: "header", required: false,

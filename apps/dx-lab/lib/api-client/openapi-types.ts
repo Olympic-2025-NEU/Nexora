@@ -120,3 +120,50 @@ export interface FileMetadata {
   nextScanAt?: (string) | null;
   quarantinePurgedAt?: (string) | null;
 }
+export interface AiChatInput {
+  question: string;
+  batchId?: string;
+  lotCode?: string;
+  issuer?: string;
+}
+export interface AiChatResult {
+  status: "answered" | "ambiguous" | "not_found";
+  requestId: string;
+  answer?: string;
+  sources?: (Record<string, unknown>)[];
+  candidates?: (Record<string, unknown>)[];
+  hint?: string;
+  aiUnavailable?: boolean;
+  riskAlerts?: (Record<string, unknown>)[];
+}
+export interface AiDraftProposeInput {
+  request?: string;
+  question?: string;
+  batchId?: string;
+  lotCode?: string;
+  issuer?: string;
+  fields?: Record<string, unknown>;
+}
+export interface AiDraftProposeResult {
+  status: "proposed" | "ambiguous" | "incomplete" | "empty";
+  requestId: string;
+  proposalId?: (string) | null;
+  fields?: Record<string, unknown>;
+  sources?: (Record<string, unknown>)[];
+  warnings?: (Record<string, unknown>)[];
+  candidates?: (Record<string, unknown>)[];
+  hint?: string;
+}
+export interface AiDraftCreateInput {
+  proposalId: string;
+  fields: { warehouseId: string; batchId: string; quantity: string; unit: string };
+  note?: string;
+}
+export interface AiDraftCreateResult {
+  status: "created";
+  proposalId: string;
+  draftDocumentId: string;
+  fields: Record<string, unknown>;
+  sourceIds: (string)[];
+  requestId?: string;
+}

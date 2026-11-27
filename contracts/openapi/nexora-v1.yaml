@@ -5085,8 +5085,8 @@ paths:
       tags:
         - AI01
       operationId: postAiChat
-      summary: AI chat with delegated tools
-      description: Target contract; runtime implementation is tracked by the owning phase.
+      summary: Lot lookup Q&A with sourced facts
+      description: Deterministic facts with optional connector text. No confirm tools.
       security:
         - oidc: []
       x-nexora-roles:
@@ -5131,29 +5131,27 @@ paths:
           $ref: "#/components/responses/Error"
         "503":
           $ref: "#/components/responses/Error"
-  /api/v1/ai/drafts:
+  /api/v1/ai/draft:
     post:
       tags:
         - AI01
-      operationId: postAiDrafts
-      summary: Create AI-assisted draft
-      description: Target contract; runtime implementation is tracked by the owning phase.
+      operationId: postAiDraft
+      summary: Propose receipt draft fields
+      description: Proposal only; does not create a trading document or change stock.
       security:
         - oidc: []
       x-nexora-roles:
         - administrator
         - staff
       x-nexora-scope: resource
-      parameters:
-        - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/AiDraftInput"
+              $ref: "#/components/schemas/AiDraftProposeInput"
       responses:
-        "201":
+        "200":
           description: Success
           content:
             application/json:
@@ -5165,7 +5163,7 @@ paths:
                   - requestId
                 properties:
                   data:
-                    $ref: "#/components/schemas/AiDraftResult"
+                    $ref: "#/components/schemas/AiDraftProposeResult"
                   requestId:
                     type: string
         "400":
@@ -5182,28 +5180,25 @@ paths:
           $ref: "#/components/responses/Error"
         "503":
           $ref: "#/components/responses/Error"
-  /api/v1/ai/tool-calls/{id}:
-    get:
+  /api/v1/ai/draft/create:
+    post:
       tags:
         - AI01
-      operationId: getAiToolCallsById
-      summary: Get redacted AI tool call
-      description: Target contract; runtime implementation is tracked by the owning phase.
+      operationId: postAiDraftCreate
+      summary: Create receipt draft from reviewed proposal
+      description: Creates M03 draft after human review; never confirms stock.
       security:
         - oidc: []
       x-nexora-roles:
         - administrator
         - staff
-        - approver
-        - viewer
       x-nexora-scope: resource
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AiDraftCreateInput"
       responses:
         "200":
           description: Success
@@ -5217,14 +5212,69 @@ paths:
                   - requestId
                 properties:
                   data:
-                    $ref: "#/components/schemas/AiToolCall"
+                    $ref: "#/components/schemas/AiDraftCreateResult"
                   requestId:
                     type: string
+        "400":
+          $ref: "#/components/responses/Error"
         "401":
           $ref: "#/components/responses/Error"
         "403":
           $ref: "#/components/responses/Error"
-        "404":
+        "409":
+          $ref: "#/components/responses/Error"
+        "422":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
+  /api/v1/ai/risk/feedback:
+    post:
+      tags:
+        - AI01
+      operationId: postAiRiskFeedback
+      summary: Record risk alert feedback
+      description: Audit-only feedback; does not change stock or approvals.
+      security:
+        - oidc: []
+      x-nexora-roles:
+        - administrator
+        - staff
+        - approver
+        - viewer
+      x-nexora-scope: resource
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AiRiskFeedbackInput"
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - data
+                  - requestId
+                properties:
+                  data:
+                    $ref: "#/components/schemas/AiRiskFeedbackResult"
+                  requestId:
+                    type: string
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "422":
           $ref: "#/components/responses/Error"
         "429":
           $ref: "#/components/responses/Error"
@@ -8858,124 +8908,211 @@ components:
       type: object
       additionalProperties: false
       required:
-        - message
+        - question
       properties:
-        message:
+        question:
           type: string
           minLength: 1
-        conversationId:
+        batchId:
           type: string
           format: uuid
-        lotRef:
+        lotCode:
+          type: string
+        issuer:
           type: string
     AiChatResult:
       type: object
       additionalProperties: false
       required:
-        - answer
-        - sources
-        - toolCallIds
-        - needsClarification
+        - status
+        - requestId
       properties:
+        status:
+          type: string
+          enum:
+            - answered
+            - ambiguous
+            - not_found
+        requestId:
+          type: string
         answer:
           type: string
         sources:
           type: array
           items:
             type: object
-            additionalProperties: false
-            required:
-              - type
-              - id
-              - verificationState
-            properties:
-              type:
-                type: string
-              id:
-                type: string
-              verificationState:
-                type: string
-              asOf:
-                type: string
-                format: date-time
-        toolCallIds:
+        candidates:
           type: array
           items:
-            type: string
-            format: uuid
-        needsClarification:
+            type: object
+        hint:
+          type: string
+        aiUnavailable:
           type: boolean
-    AiDraftInput:
+        riskAlerts:
+          type: array
+          items:
+            type: object
+      description: Discriminated by status; answered includes answer/sources, ambiguous includes candidates.
+    AiDraftProposeInput:
       type: object
       additionalProperties: false
-      required:
-        - documentType
-        - instruction
       properties:
-        documentType:
-          type: string
-          enum:
-            - goods_receipt
-            - goods_issue
-        instruction:
+        request:
           type: string
           minLength: 1
-        purpose:
+        question:
           type: string
-          enum:
-            - partner_transfer
-            - sale
-            - other
-        proposedFields:
+        batchId:
+          type: string
+          format: uuid
+        lotCode:
+          type: string
+        issuer:
+          type: string
+        fields:
           type: object
-    AiDraftResult:
+    AiDraftProposeResult:
       type: object
       additionalProperties: false
       required:
-        - draftDocumentId
         - status
-        - proposedFields
-        - sources
-        - warnings
+        - requestId
       properties:
-        draftDocumentId:
-          type: string
-          format: uuid
         status:
           type: string
           enum:
-            - draft
-        proposedFields:
+            - proposed
+            - ambiguous
+            - incomplete
+            - empty
+        requestId:
+          type: string
+        proposalId:
+          type: string
+          nullable: true
+        fields:
           type: object
         sources:
           type: array
           items:
-            type: string
+            type: object
         warnings:
           type: array
           items:
-            type: string
-    AiToolCall:
+            type: object
+        candidates:
+          type: array
+          items:
+            type: object
+        hint:
+          type: string
+    AiDraftCreateInput:
       type: object
       additionalProperties: false
       required:
-        - id
-        - toolName
-        - actorSub
-        - outcome
+        - proposalId
+        - fields
       properties:
-        id:
+        proposalId:
+          type: string
+          minLength: 1
+        fields:
+          type: object
+          additionalProperties: false
+          required:
+            - warehouseId
+            - batchId
+            - quantity
+            - unit
+          properties:
+            warehouseId:
+              type: string
+              format: uuid
+            batchId:
+              type: string
+              format: uuid
+            quantity:
+              type: string
+            unit:
+              type: string
+        note:
+          type: string
+    AiDraftCreateResult:
+      type: object
+      additionalProperties: false
+      required:
+        - status
+        - proposalId
+        - draftDocumentId
+        - fields
+        - sourceIds
+      properties:
+        status:
+          type: string
+          enum:
+            - created
+        proposalId:
+          type: string
+        draftDocumentId:
           type: string
           format: uuid
-        toolName:
-          type: string
-        actorSub:
-          type: string
+        fields:
+          type: object
         sourceIds:
           type: array
           items:
             type: string
-        outcome:
+        requestId:
+          type: string
+    AiRiskFeedbackInput:
+      type: object
+      additionalProperties: false
+      required:
+        - alertFingerprint
+        - ruleId
+        - ruleVersion
+        - verdict
+      properties:
+        alertFingerprint:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+        ruleId:
+          type: string
+          minLength: 1
+        ruleVersion:
+          type: string
+          minLength: 1
+        verdict:
+          type: string
+          enum:
+            - correct
+            - incorrect
+    AiRiskFeedbackResult:
+      type: object
+      additionalProperties: false
+      required:
+        - alertFingerprint
+        - ruleId
+        - ruleVersion
+        - verdict
+        - actorId
+        - requestId
+      properties:
+        alertFingerprint:
+          type: string
+        ruleId:
+          type: string
+        ruleVersion:
+          type: string
+        verdict:
+          type: string
+          enum:
+            - correct
+            - incorrect
+        actorId:
+          type: string
+        requestId:
           type: string
     CoreRecordCreate:
       type: object

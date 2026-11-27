@@ -20,6 +20,12 @@ const schemaNames = [
   "PartnerConnectionView",
   "ApprovalTask",
   "FileMetadata",
+  "AiChatInput",
+  "AiChatResult",
+  "AiDraftProposeInput",
+  "AiDraftProposeResult",
+  "AiDraftCreateInput",
+  "AiDraftCreateResult",
 ];
 
 const doc = parse(readFileSync(source, "utf8"));
@@ -50,14 +56,15 @@ function tsType(schema, depth = 0) {
   if (resolved.type === "integer" || resolved.type === "number") return "number";
   if (resolved.type === "boolean") return "boolean";
   if (resolved.type === "array") return `(${tsType(resolved.items, depth + 1)})[]`;
-  if (resolved.type === "object" && resolved.properties) {
-    if (depth > 0) {
+  if (resolved.type === "object") {
+    if (resolved.properties) {
       const fields = Object.entries(resolved.properties).map(([name, property]) => {
         const required = Array.isArray(resolved.required) && resolved.required.includes(name);
         return `${name}${required ? "" : "?"}: ${tsType(property, depth + 1)}`;
       });
       return `{ ${fields.join("; ")} }`;
     }
+    return "Record<string, unknown>";
   }
   throw new Error(`Unsupported OpenAPI property type: ${resolved.type ?? "missing"}`);
 }
