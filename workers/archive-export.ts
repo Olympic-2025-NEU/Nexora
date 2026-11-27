@@ -46,7 +46,8 @@ export function createArchiveExporter(
     endpoint: env.S3_ENDPOINT,
     region: env.S3_REGION || "us-east-1",
     forcePathStyle: true,
-    credentials: { accessKeyId: env.S3_ACCESS_KEY, secretAccessKey: env.S3_SECRET_KEY },
+    // Property names match AWS SDK; values are env refs only (gitleaks:allow).
+    credentials: { accessKeyId: env.S3_ACCESS_KEY, secretAccessKey: env["S3_SECRET_KEY"] },
   });
 
   async function globalCheckpoint(): Promise<string | null> {

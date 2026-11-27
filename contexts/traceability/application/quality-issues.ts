@@ -118,7 +118,7 @@ export async function acknowledgeQualityIssue(
   version: number,
   reason: string,
   actorSub: string,
-  requestId = randomUUID(),
+  requestId: string = randomUUID(),
 ) {
   if (!reason.trim()) throw new DomainError("QUALITY_REASON_REQUIRED", 422);
   const row = await getQualityIssue(db, id);
@@ -158,7 +158,7 @@ export async function resolveQualityIssue(
   version: number,
   reason: string,
   actorSub: string,
-  requestId = randomUUID(),
+  requestId: string = randomUUID(),
 ) {
   if (!reason.trim()) throw new DomainError("QUALITY_REASON_REQUIRED", 422);
   const row = await getQualityIssue(db, id);

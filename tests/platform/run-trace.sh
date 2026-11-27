@@ -33,7 +33,7 @@ cp prisma/schema.prisma "$temp_root/schema.prisma"
 cp prisma/migrations/migration_lock.toml "$temp_root/migrations/"
 for migration in prisma/migrations/*/; do
   case "$migration" in
-    *20261123060000_traceability_baseline/|*20261124010000_passport_policy/|*20261124020000_qr_lifecycle/|*20261124030000_trace_evidence/|*20261124040000_issue_source_allocation/|*20261124060000_federation_identity_mapping/) ;;
+    *20261123060000_traceability_baseline/|*20261124010000_passport_policy/|*20261124020000_qr_lifecycle/|*20261124030000_trace_evidence/|*20261124040000_issue_source_allocation/|*20261124060000_federation_identity_mapping/|*20261127160000_quality_operations/) ;;
     *) cp -R "$migration" "$temp_root/migrations/" ;;
   esac
 done

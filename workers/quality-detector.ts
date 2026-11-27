@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { createHash, randomUUID } from "node:crypto";
-import type { Prisma, PrismaClient } from "@prisma/client";
+import { Prisma, type PrismaClient } from "@prisma/client";
 
 const POLICY = "p12-t04-v1";
 
@@ -83,7 +83,7 @@ export async function detectQualityIssues(db: PrismaClient): Promise<number> {
   const dayAgo = new Date(Date.now() - 24 * 60 * 60_000);
 
   const links = await db.traceLink.findMany({
-    where: { missingRef: { not: null }, createdAt: { lte: fiveMin } },
+    where: { missingRef: { not: Prisma.DbNull }, createdAt: { lte: fiveMin } },
     take: 50,
     orderBy: { createdAt: "asc" },
   });
