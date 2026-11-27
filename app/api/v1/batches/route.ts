@@ -50,6 +50,8 @@ export async function GET(request: NextRequest): Promise<Response> {
       throw new DomainError("DATE_INVALID", 422);
     }
     const issuer = params.get("issuer");
+    const q = params.get("q");
+    if (q !== null && q.trim().length > 80) throw new DomainError("QUERY_TOO_LONG", 422);
 
     const page = await catalogRepos().listBatches({
       ...(productId ? { productId } : {}),
@@ -57,6 +59,7 @@ export async function GET(request: NextRequest): Promise<Response> {
       ...(issuer ? { issuer } : {}),
       ...(status ? { status: status as QualityStatus } : {}),
       ...(expiresBefore ? { expiresBefore } : {}),
+      ...(q && q.trim() ? { q: q.trim() } : {}),
       ...(cursor ? { cursorId: decodeIdCursor(cursor) } : {}),
       limit,
     });

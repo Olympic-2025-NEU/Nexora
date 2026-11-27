@@ -1420,6 +1420,10 @@ paths:
           in: query
           schema:
             type: string
+        - name: q
+          in: query
+          schema:
+            type: string
       responses:
         "200":
           description: Success
@@ -3935,7 +3939,7 @@ paths:
         - M03
       operationId: postApprovalsByIdDecisions
       summary: Record approval decision intent
-      description: Creator cannot decide own issue. Decision intent commits before Flowable completion; result is asynchronous.
+      description: Creator cannot decide own issue. Decision intent commits before Flowable completion; result is asynchronous. Clients must send If-Match / version from approvalVersion.
       security:
         - oidc: []
       x-nexora-roles:
@@ -3948,6 +3952,7 @@ paths:
           schema:
             type: string
             format: uuid
+        - $ref: "#/components/parameters/IfMatch"
         - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
         required: true
@@ -7585,6 +7590,7 @@ components:
         - lineHash
         - approvalState
         - processDefinitionVersion
+        - approvalVersion
       properties:
         approvalRequestId:
           type: string
@@ -7616,6 +7622,14 @@ components:
         processDefinitionVersion:
           type: integer
           minimum: 1
+        approvalVersion:
+          type: integer
+          minimum: 1
+        evidenceFileIds:
+          type: array
+          items:
+            type: string
+            format: uuid
     ApprovalDecisionInput:
       type: object
       additionalProperties: false
@@ -7629,6 +7643,9 @@ components:
             - reject
         note:
           type: string
+        version:
+          type: integer
+          minimum: 1
     ApprovalDecisionResult:
       type: object
       additionalProperties: false

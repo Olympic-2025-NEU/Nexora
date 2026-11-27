@@ -741,9 +741,11 @@ export function createCatalogRepos(db: Db) {
       issuer?: string;
       status?: QualityStatus;
       expiresBefore?: string;
+      q?: string;
       cursorId?: string;
       limit: number;
     }): Promise<CatalogPage<BatchRecord>> {
+      const q = filters.q?.trim();
       const rows = await db.batch.findMany({
         where: {
           ...(filters.productId ? { productId: filters.productId } : {}),
@@ -752,6 +754,17 @@ export function createCatalogRepos(db: Db) {
           ...(filters.status ? { qualityStatus: filters.status } : {}),
           ...(filters.expiresBefore
             ? { expiresOn: { lt: parseDateOnly(filters.expiresBefore)! } }
+            : {}),
+          ...(q
+            ? {
+              OR: [
+                { localCode: { contains: q, mode: "insensitive" } },
+                { originIssuerInstanceId: { contains: q, mode: "insensitive" } },
+                ...(/^[0-9a-f-]{36}$/i.test(q)
+                  ? [{ id: q }, { originLotId: q }, { productId: q }, { productVariantId: q }]
+                  : []),
+              ],
+            }
             : {}),
         },
         orderBy: [{ createdAt: "desc" }, { id: "desc" }],
