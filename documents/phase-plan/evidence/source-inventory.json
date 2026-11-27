@@ -434,6 +434,7 @@
     "services/core-data/repositories.mjs",
     "services/core-data/server.js",
     "tests/ai/adversarial-t06.test.ts",
+    "tests/ai/compose-boundary.test.mjs",
     "tests/ai/draft-adversarial.test.ts",
     "tests/ai/draft-fixture.ts",
     "tests/ai/draft-receipt.golden.test.ts",

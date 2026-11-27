@@ -46,7 +46,8 @@ const groups = {
 };
 
 const runtime = {
-  erp: { DATABASE_URL: "database", OIDC_ISSUER_URL: "url", PUBLIC_BASE_URL: "url" },
+  erp: { DATABASE_URL: "database", OIDC_ISSUER_URL: "url", PUBLIC_BASE_URL: "url",
+    AI_BASE_URL: "url", AI_PROVIDER: "id" },
   worker: { DATABASE_URL: "database", CORE_DATABASE_URL: "database", NEXORA_ISSUER_INSTANCE_ID: "id",
     FLOWABLE_BASE_URL: "url", REDIS_URL: "redis", FLOWABLE_ADMIN_USER: "id", FLOWABLE_ADMIN_PASSWORD: "secret" },
   "core-data": {
@@ -107,6 +108,13 @@ export function validateConfig(env, service) {
   const fields = service ? runtime[service] : Object.assign({}, ...Object.values(groups));
   const config = {};
   for (const [name, type] of Object.entries(fields)) config[name] = check(name, env[name], type);
+  if (service === "erp") {
+    if (!["none", "ollama"].includes(env.AI_PROVIDER)) fail("AI_PROVIDER");
+    if (env.AI_PROVIDER === "ollama" && (!env.AI_INTERNAL_TOKEN ||
+        env.AI_INTERNAL_TOKEN.length < 32 || env.AI_INTERNAL_TOKEN.startsWith("CHANGE_ME_"))) {
+      fail("AI_INTERNAL_TOKEN");
+    }
+  }
   if (service) return config;
   if (!/^[abc]$/.test(env.INSTANCE_ID)) fail("INSTANCE_ID");
   if (env.APISIX_RENDERED_PATH &&

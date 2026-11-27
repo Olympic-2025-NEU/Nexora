@@ -7,11 +7,13 @@ For a local demo, override `AI_PROVIDER=ollama` and `AI_INTERNAL_TOKEN` in the s
 ```powershell
 $env:AI_PROVIDER = "ollama"
 $env:AI_INTERNAL_TOKEN = node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"
-docker compose -f deploy/compose.yml --env-file deploy/instances/a.env -p nexora-a --profile ai up -d --build ai ollama
+docker compose -f deploy/compose.yml --env-file deploy/instances/a.env -p nexora-a --profile ai up -d --build erp ai ollama
 docker compose -f deploy/compose.yml --env-file deploy/instances/a.env -p nexora-a --profile ai exec ollama ollama pull qwen3:0.6b
 ```
 
-`/health` checks the adapter process. `/ready` returns 503 until the model exists and Ollama responds. The internal generation endpoint requires `X-AI-Internal-Token`; P10-T03 will connect the ERP orchestration to it. Only an allowlisted, bounded question and factual source fields can reach Ollama. Provider down, timeout or missing model returns 503 with `/trace` fallback; the ERP workflow continues independently.
+Keep the same shell token for the Compose command that recreates both `erp` and `ai`; changing only one service makes their private calls fail. For an existing locally built ERP image, use `--no-build` instead of `--build`. Confirm available disk space before pulling the model.
+
+`/health` checks the adapter process. `/ready` returns 503 until the model exists and Ollama responds. The internal generation endpoint requires `X-AI-Internal-Token`; P10-T03 connects the ERP orchestration to it. Only an allowlisted, bounded question and factual source fields can reach Ollama. Provider down, timeout or missing model returns 503 with `/trace` fallback; the ERP workflow continues independently.
 
 The image is pinned in [D09](../../documents/adr/0009-ai-provider.md). Model tag/manifest, license and resource budget are recorded there. The model is not bundled into the repository or auto-downloaded when the ordinary app stack starts. Tests use Python's standard library: from `services/ai`, run `python -m unittest discover -s tests -v`.
 
