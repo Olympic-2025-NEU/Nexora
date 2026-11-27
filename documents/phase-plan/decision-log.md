@@ -18,8 +18,8 @@ Chọn công nghệ qua spike **không** nghĩa app/core đã triển khai. Hai 
 | [D08](../adr/D08-federation-envelope.md) → [0008](../adr/0008-trace-federation-envelope.md) | Envelope/ACK v1 **đã chốt thiết kế** | P00-T05 schema + Node/Python vectors pass; P09 E2E |
 | [D09](../adr/D09-ai-provider-boundary.md) → [0009](../adr/0009-ai-provider.md) | Ranh giới AI **đã chốt**; model hoãn P10 | P10 license/policy |
 | [D10](../adr/D10-dx-lab-hpdi.md) → [0010](../adr/0010-hpdi-dx-lab.md) | DX-Lab runtime riêng **đã chứng minh P11-T01**; shell, SSO và vai trò **đã chứng minh P11-T02**; H/P/D/I UX và G11 còn mở | [T01](./evidence/p11-t01.md), [T02](./evidence/p11-t02.md) |
-| [D11](../adr/D11-dxos-principles-evidence.md) → [0011](../adr/0011-four-principles-proof.md) | Bốn nguyên lý **đã chốt thiết kế** | BTC + P12 |
-| [D12](../adr/D12-gitops-demo.md) → [0012](../adr/0012-gitops-demo.md) | k3s/Argo **có điều kiện** | P12 drift/reconcile |
+| [D11](../adr/D11-dxos-principles-evidence.md) → [0011](../adr/0011-four-principles-proof.md) + [D11-dxos-proof.md](../adr/D11-dxos-proof.md) | Thiết kế chốt; **proof map P12-T01 2026-11-27**; BTC depth còn mở | P12 T02+ / G12 |
+| [D12](../adr/D12-gitops-demo.md) → [0012](../adr/0012-gitops-demo.md) | k3s/Argo **có điều kiện**; **gap máy demo 2026-11-27** (RAM free ~2.2 GiB) | P12-T06 hoặc BTC alternate |
 | [D13](../adr/D13-versions-licenses-resources.md) → [0013](../adr/0013-versions-licenses.md) | Digest/license/RAM snapshot **đã ghi** | P00-T04 npm inventory pass; P01 peak, P13 release SBOM |
 | [D14](../adr/D14-stock-movement-ownership.md) → [0014](../adr/0014-movement-ownership.md) | **Closed at P07-T01 contract level**: [matrix, guards, evidence](./evidence/p07-t01.md) | Runtime DB/HTTP/Flowable tests P07-T02/T03/T07/T08; cross-instance P09 |
 | [D15](../adr/D15-headless-core-boundary.md) → [0015](../adr/0015-headless-tier2-boundary.md) | Ba runtime **đã chốt**; headless spike pass | Core Data/File API sản phẩm chưa có |

@@ -4,10 +4,11 @@
 
 ## P12-T01 — Chốt mức minh chứng với đề thi
 
-- [ ] Đọc lại đề thi/thể lệ bản cuối; đối chiếu từng nguyên lý mục 4, yêu cầu hạ tầng thực tế và tài nguyên đội. Ghi phản hồi BTC nếu có; nếu chưa có, ADR D11 nêu giả định và mức bằng chứng.
-- [ ] Tạo kịch bản demo đo được cho mỗi nguyên lý, owner, lệnh chạy, expected result, failure case và điều **không** được tuyên bố.
-- [ ] Nếu yêu cầu rộng hơn MVP, thêm task/gate cụ thể trước G12, không đánh dấu Done bằng slide.
+- [x] Đọc lại đề thi/thể lệ bản cuối; đối chiếu từng nguyên lý mục 4, yêu cầu hạ tầng thực tế và tài nguyên đội. Ghi phản hồi BTC nếu có; nếu chưa có, ADR D11 nêu giả định và mức bằng chứng.
+- [x] Tạo kịch bản demo đo được cho mỗi nguyên lý, owner, lệnh chạy, expected result, failure case và điều **không** được tuyên bố.
+- [x] Nếu yêu cầu rộng hơn MVP, thêm task/gate cụ thể trước G12, không đánh dấu Done bằng slide.
 - **Đầu ra:** D11 và evidence map; **kiểm chứng:** mỗi nguyên lý có artifact/chạy thực.
+  [Bằng chứng T01](evidence/p12-t01.md) · [D11-dxos-proof.md](../adr/D11-dxos-proof.md).
 
 ## P12-T02 — Vòng đời và tốc độ dữ liệu
 
