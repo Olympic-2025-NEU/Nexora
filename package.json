@@ -60,6 +60,7 @@
     "test:e2e:abc": "node --test tests/e2e/abc-journey.test.mjs && node tests/e2e/abc-journey.mjs contract",
     "test:e2e:abc:live": "node tests/e2e/abc-journey.mjs live",
     "test:e2e:abc:a-api": "node tests/e2e/abc-journey.mjs a-api",
+    "prep:release-archive": "node scripts/prep-release-archive.mjs",
     "slo:load": "node deploy/scripts/slo-load.mjs",
     "test": "npm run check:spdx && npm run check:licenses && npm run check:secrets && npm run test:contracts && node --test deploy/config.test.mjs && npm run test:identity && npm run test:catalog && npm run test:trading && npm run test:federation:outbound && npm run test:ai:compose && npm run test:ai:tools && npm run test:ai:golden && npm run test:ai:draft && npm run test:ai:adversarial && npm run test:ai:risk && npm run test:gateway && npm run test:transaction:unit && npm run test:audit:unit && npm run test:http && node --test --require tsx/cjs platform/workflow/flowable-client.test.ts platform/workflow/approval-service.test.ts platform/workflow/flowable-decider.test.ts"
   },

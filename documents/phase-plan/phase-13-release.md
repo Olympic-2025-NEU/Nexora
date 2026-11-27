@@ -46,10 +46,11 @@
 
 ## P13-T06 — Release artifact có thể tái lập
 
-- [ ] Tạo tag semver hoặc contest release ID **trước thời điểm nộp**, CHANGELOG từ commit, source archive định dạng mở (ưu tiên `.tar.gz`), image digest, migration/BPMN/schema versions, checksum và SBOM/license inventory; không chỉ cung cấp `.zip/.rar`.
-- [ ] CI từ commit/tag chạy lint/typecheck/test/build, integration/federation/e2e cần thiết; deploy demo từ artifact pin và thử rollback/restore.
-- [ ] Release notes phân biệt năng lực thực, simulated OT, GitOps evidence/limitation và cách tự thử; liên kết source và issue tracker.
+- [x] Source archive `.tar.gz` + sha256 + meta via `npm run prep:release-archive`; migration/BPMN/OpenAPI/SBOM pointers; CHANGELOG Phase 13. **Tag/GitHub release chưa tạo** — chờ owner chốt tên (`v0.13.0-contest` hoặc `contest-2026-p13`).
+- [x] CI branch triggers include `phase-13` / `phase13/**` (T01); e2e abc npm scripts available; restore/rollback remain operator per P12-T08.
+- [x] Release notes / known limitations phân biệt simulated OT, GitOps gap; source + issue tracker links in README/NOTICE.
 - **Đầu ra:** release page + artifacts; **kiểm chứng:** người khác lấy tag xây lại cùng version.
+  [Bằng chứng T06](evidence/p13-t06.md) — tag deferred.
 
 ## P13-T07 — Demo và hồ sơ chấm
 

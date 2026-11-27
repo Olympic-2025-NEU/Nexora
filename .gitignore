@@ -23,6 +23,7 @@
 # production
 /build
 /worker/dist/
+/dist/
 
 # misc
 .DS_Store
