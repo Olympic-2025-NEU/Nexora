@@ -125,6 +125,12 @@ test("optional local AI requires its own internal secret and forbids unknown pro
   assert.doesNotThrow(() => validateConfig({ ...examples[0], AI_PROVIDER: "ollama", AI_INTERNAL_TOKEN: "a".repeat(32) }));
   assert.throws(() => validateConfig({ ...examples[0], AI_PROMPT_RETENTION: "raw" }), { message: "Invalid or missing AI_PROMPT_RETENTION" });
   assert.doesNotThrow(() => validateConfig({ ...examples[0], AI_PROMPT_RETENTION: "redacted" }));
+  const erp = { ...examples[0], DATABASE_URL: examples[0].APP_DATABASE_URL };
+  assert.throws(() => validateConfig({ ...erp, AI_PROVIDER: "external" }, "erp"),
+    { message: "Invalid or missing AI_PROVIDER" });
+  assert.throws(() => validateConfig({ ...erp, AI_PROVIDER: "ollama" }, "erp"),
+    { message: "Invalid or missing AI_INTERNAL_TOKEN" });
+  assert.doesNotThrow(() => validateConfig({ ...erp, AI_PROVIDER: "ollama", AI_INTERNAL_TOKEN: "a".repeat(32) }, "erp"));
 });
 
 test("CLI rejects unfilled example without displaying its placeholder", () => {

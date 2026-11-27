@@ -278,6 +278,11 @@ services:
       OIDC_JWKS_URL: ${OIDC_JWKS_URL}
       OIDC_AUDIENCE: ${OIDC_AUDIENCE}
       OIDC_CLIENT_ID_ERP: ${OIDC_CLIENT_ID_ERP}
+      # ERP's actor-scoped AI orchestration talks only to the private adapter.
+      # The same token is injected into ai; neither service depends on a model.
+      AI_PROVIDER: ${AI_PROVIDER:-none}
+      AI_BASE_URL: ${AI_BASE_URL:-http://ai:8080}
+      AI_INTERNAL_TOKEN: ${AI_INTERNAL_TOKEN:-}
       ALLOW_DEV_PASSWORD_LOGIN: ${ALLOW_DEV_PASSWORD_LOGIN:-true}
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL}
       # Browser reset-password page links to Keycloak Account (needs local-admin publish).
