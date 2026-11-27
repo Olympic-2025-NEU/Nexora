@@ -15,9 +15,18 @@ import {
   projectBatch,
 } from "@/contexts/catalog/application/http";
 import { createCatalogRepos } from "@/contexts/catalog/infrastructure/prisma-repos";
+import { listOtReadingsForBatch } from "@/contexts/traceability/application/ot-ingest";
+import { PrismaClient } from "@prisma/client";
+
+function corePrisma(): PrismaClient {
+  const url = process.env.CORE_DATABASE_URL;
+  if (!url) return getPrismaClient();
+  return new PrismaClient({ datasources: { db: { url } } });
+}
 
 export async function lotHistoryRoute(request: NextRequest, batchId: string): Promise<Response> {
   const requestId = request.headers.get("x-request-id") ?? crypto.randomUUID();
+  let core: PrismaClient | undefined;
   try {
     if (!isUuid(batchId)) throw new DomainError("BATCH_ID_INVALID", 422);
     const actor = await resolveUserActor(request);
@@ -35,20 +44,24 @@ export async function lotHistoryRoute(request: NextRequest, batchId: string): Pr
     if (!batch) throw new DomainError("BATCH_NOT_FOUND", 404);
 
     const db = getPrismaClient();
-    const rows = await db.traceEvent.findMany({
-      where: { batchId },
-      orderBy: [{ occurredAt: "desc" }, { id: "desc" }],
-      take: limit + 1,
-      ...(cursor ? { cursor: { id: decodeIdCursor(cursor) }, skip: 1 } : {}),
-      select: {
-        id: true,
-        eventType: true,
-        issuerInstanceId: true,
-        occurredAt: true,
-        documentId: true,
-        verificationState: true,
-      },
-    });
+    core = corePrisma();
+    const [rows, otReadings] = await Promise.all([
+      db.traceEvent.findMany({
+        where: { batchId },
+        orderBy: [{ occurredAt: "desc" }, { id: "desc" }],
+        take: limit + 1,
+        ...(cursor ? { cursor: { id: decodeIdCursor(cursor) }, skip: 1 } : {}),
+        select: {
+          id: true,
+          eventType: true,
+          issuerInstanceId: true,
+          occurredAt: true,
+          documentId: true,
+          verificationState: true,
+        },
+      }),
+      listOtReadingsForBatch(core, batchId),
+    ]);
     const page = rows.slice(0, limit);
     const next = rows.length > limit ? encodeCursor(page[page.length - 1]!.id) : undefined;
     const payload = {
@@ -62,6 +75,7 @@ export async function lotHistoryRoute(request: NextRequest, batchId: string): Pr
         verificationState: event.verificationState,
         gap: event.verificationState !== "local_verified",
       })),
+      otReadings: otReadings.slice(0, 50),
       ...(next ? { nextCursor: next } : {}),
     };
     const response = ok(payload, requestId);
@@ -69,5 +83,7 @@ export async function lotHistoryRoute(request: NextRequest, batchId: string): Pr
     return response;
   } catch (error) {
     return mapRouteError(error, requestId);
+  } finally {
+    if (core && core !== getPrismaClient()) await core.$disconnect().catch(() => undefined);
   }
 }

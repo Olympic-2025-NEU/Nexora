@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "simulated": true,
+  "devices": [
+    {
+      "deviceId": "sim-temp-a1",
+      "kind": "temperature",
+      "warehouseCode": "KHO-A1",
+      "batchIdHint": null,
+      "maxStaleSeconds": 900,
+      "notes": "Demo simulator — not a production sensor"
+    },
+    {
+      "deviceId": "sim-temp-a2",
+      "kind": "temperature",
+      "warehouseCode": "KHO-A2",
+      "batchIdHint": null,
+      "maxStaleSeconds": 900,
+      "notes": "Demo simulator — not a production sensor"
+    }
+  ]
+}

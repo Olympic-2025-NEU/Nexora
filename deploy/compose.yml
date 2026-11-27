@@ -271,6 +271,7 @@ services:
       target: runner
     environment:
       DATABASE_URL: ${APP_DATABASE_URL}
+      CORE_DATABASE_URL: ${CORE_DATABASE_URL}
       INSTANCE_ID: ${INSTANCE_ID}
       NEXORA_ISSUER_INSTANCE_ID: nexora-${INSTANCE_ID}
       OIDC_ISSUER_URL: ${OIDC_ISSUER_URL}
