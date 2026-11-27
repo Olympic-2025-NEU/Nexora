@@ -53,10 +53,11 @@
 
 ## P13-T07 — Demo và hồ sơ chấm
 
-- [ ] Chuẩn bị walkthrough theo tiêu chí: lõi headless qua API, H-P-D-I app, A→B→C DB riêng, Flowable thật, QR/public policy, AI Draft, bốn nguyên lý và bằng chứng nguồn mở.
-- [ ] Chọn kịch bản 15 phút hoặc theo thể lệ chính thức; rehearsal có thời gian thao tác/lỗi, backup path và câu hỏi về design tradeoffs, AGPL, threat model, dữ liệu thiếu.
-- [ ] Mọi slide/ảnh có command/URL/test tương ứng; không trình diễn mock thay cho core và không gọi simulation là production.
+- [x] Chuẩn bị walkthrough theo tiêu chí: lõi headless qua API, H-P-D-I app, A→B→C DB riêng, Flowable thật, QR/public policy, AI Draft, bốn nguyên lý và bằng chứng nguồn mở.
+- [x] Chọn kịch bản 15 phút hoặc theo thể lệ chính thức; rehearsal có thời gian thao tác/lỗi, backup path và câu hỏi về design tradeoffs, AGPL, threat model, dữ liệu thiếu.
+- [x] Mọi slide/ảnh có command/URL/test tương ứng; không trình diễn mock thay cho core và không gọi simulation là production.
 - **Đầu ra:** demo runbook + Q&A; **kiểm chứng:** người khác chạy lại theo thứ tự từ fresh seed.
+  [Bằng chứng T07](evidence/p13-t07.md) · [demo/runbook.md](../demo/runbook.md).
 
 ## P13-T08 — Chốt lịch và quy định nộp
 
