@@ -1,0 +1,22 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Demo scrape config for Compose network (profile: observability).
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  - /etc/prometheus/rules.yml
+
+scrape_configs:
+  - job_name: erp
+    metrics_path: /api/v1/metrics
+    static_configs:
+      - targets: ["erp:3000"]
+        labels:
+          service: erp
+  - job_name: worker
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["worker:8081"]
+        labels:
+          service: worker
