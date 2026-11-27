@@ -318,6 +318,7 @@
     "deploy/scripts/seed-system.mjs",
     "deploy/scripts/smoke-abc-federation.mjs",
     "deploy/scripts/smoke-core.mjs",
+    "deploy/scripts/smoke-g10-ac11.mjs",
     "deploy/scripts/smoke-https-local.mjs",
     "deploy/scripts/smoke-p05-local.mjs",
     "deploy/scripts/smoke-p065-local.mjs",

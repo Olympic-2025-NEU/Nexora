@@ -49,10 +49,10 @@
 
 ## P10-T07 — Gate G10
 
-- [ ] AC-10/11 pass qua gateway với Keycloak, PG và API M03/M04 thật; prompt injection/permission/provider-failure tests pass.
-- [ ] AI không có DB credential và không có tool confirm/approve; Draft chỉ đổi stock sau user action được bảo vệ ở M03.
+- [x] AC-10/11 pass qua gateway với Keycloak, PG và API M03/M04 thật; prompt injection/permission/provider-failure tests pass.
+- [x] AI không có DB credential và không có tool confirm/approve; Draft chỉ đổi stock sau user action được bảo vệ ở M03.
 - **Bằng chứng:** tool call audit, API snapshots, AI response có source, state/balance trước-sau, negative tests.
-- Hồ sơ: `evidence/G10.md` đã tổng hợp (2026-11-27); gate CHƯA ký — còn mục dữ liệu live và duyệt đội.
+- Hồ sơ: `evidence/G10.md` đã tổng hợp (2026-11-27); hai điều kiện kỹ thuật đã có bằng chứng, gate CHƯA ký — còn duyệt đội và cố vấn.
 
 ## Hồ sơ giao AI theo từng task
 
