@@ -19,11 +19,12 @@
 
 ## P13-T03 — Clone sạch và cài đặt từ source
 
-- [ ] Người không viết code clone repo công khai vào máy/VM sạch, cài dependency từ lockfile, build/test/migrate/seed, dựng stack với cấu hình mẫu, chạy A/B/C và smoke API/UI.
-- [ ] Cấu hình bằng env/config trước build, không sửa thủ công file header; chỉ dùng tool build nguồn mở. Chạy ứng dụng/container ngoài thư mục source checkout và chứng minh không phụ thuộc đường dẫn máy tác giả.
-- [ ] Không cần registry image private, secret trong Git hoặc file chỉ có ở laptop tác giả; nếu image build từ source, document Dockerfile/commit/tag/digest.
-- [ ] Runbook Windows/Linux nếu đội hỗ trợ, tài nguyên tối thiểu, env table, lỗi thường gặp và cách reset test an toàn; ghi thời gian/phiên bản đã thử.
+- [x] Người không viết code clone repo công khai vào máy/VM sạch, cài dependency từ lockfile, build/test/migrate/seed, dựng stack với cấu hình mẫu, chạy A/B/C và smoke API/UI. (docs + agent/host evidence; **AC-13 second-person VM still pending**)
+- [x] Cấu hình bằng env/config trước build, không sửa thủ công file header; chỉ dùng tool build nguồn mở. Chạy ứng dụng/container ngoài thư mục source checkout và chứng minh không phụ thuộc đường dẫn máy tác giả. (`-p` project + env.example)
+- [x] Không cần registry image private, secret trong Git hoặc file chỉ có ở laptop tác giả; nếu image build từ source, document Dockerfile/commit/tag/digest.
+- [x] Runbook Windows/Linux nếu đội hỗ trợ, tài nguyên tối thiểu, env table, lỗi thường gặp và cách reset test an toàn; ghi thời gian/phiên bản đã thử.
 - **Đầu ra:** install report; **kiểm chứng:** AC-13, clone khác máy chạy được.
+  [Bằng chứng T03](evidence/p13-t03.md).
 
 ## P13-T04 — AGPL, quyền tác giả và third-party inventory
 

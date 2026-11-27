@@ -105,46 +105,79 @@ Luật import và schema: [documents/referents/FOLDER_STRUCTURE.md](./documents/
 
 Tiêu chí nghiệm thu MVP (AC-01…AC-13): [documents/referents/ACCEPTANCE_MVP.md](./documents/referents/ACCEPTANCE_MVP.md).
 
-## Bắt đầu nhanh
+## Bắt đầu nhanh (clean install)
+
+Hướng dẫn này giả định máy/VM **không** có secret của tác giả, không dùng registry private, và chạy container bằng Compose với project name độc lập (không phụ thuộc đường dẫn checkout máy người viết). Chi tiết đầy đủ: [deploy/README.md](./deploy/README.md).
 
 ### Yêu cầu
 
-- Node.js (khuyến nghị bản LTS tương thích Next.js 16)
-- npm
-- Docker Engine cùng Docker Compose v2 (cho stack cục bộ)
+| Thành phần | Ghi chú |
+| --- | --- |
+| Node.js | LTS tương thích Next.js 16 (đã thử Node 22 / 24 trên máy demo) |
+| npm | Đi kèm Node; **chỉ** `npm ci` từ `package-lock.json` |
+| Docker Engine + Compose v2 | Build image từ Dockerfile trong repo; không cần image private |
+| RAM trống khuyến nghị | ≥ **8 GiB** free cho một instance A + apps; ≥ **12 GiB** nếu cố A+B+C song song. Máy demo hẹp (~1.5–2 GiB free với A) → chỉ một stack / tắt profile thừa |
+| Ổ đĩa | ≥ **20 GiB** trống (image build + ClamAV signatures) |
 
-### Chạy scaffold giao diện
+### Linux / macOS (Bash)
 
 ```bash
-npm install
+git clone --branch phase-13 https://github.com/Olympic-2025-NEU/Nexora.git Nexora-clean
+cd Nexora-clean/nexora   # hoặc thư mục chứa package.json nếu monorepo layout khác
+npm ci
+bash deploy/scripts/bootstrap.sh a
+docker compose -f deploy/compose.yml --env-file deploy/instances/a.env -p nexora-a --profile apps config -q
+docker compose -f deploy/compose.yml --env-file deploy/instances/a.env -p nexora-a --profile apps up -d --build
+bash deploy/scripts/smoke.sh a nexora-a
+# optional seed (dev fixtures): bash deploy/scripts/seed.sh a nexora-a
+```
+
+### Windows (PowerShell)
+
+```powershell
+git clone --branch phase-13 https://github.com/Olympic-2025-NEU/Nexora.git Nexora-clean
+cd Nexora-clean\nexora
+npm ci
+./deploy/scripts/bootstrap.ps1 a
+docker compose -f deploy/compose.yml --env-file deploy/instances/a.env -p nexora-a --profile apps config -q
+docker compose -f deploy/compose.yml --env-file deploy/instances/a.env -p nexora-a --profile apps up -d --build
+bash deploy/scripts/smoke.sh a nexora-a   # Git Bash / WSL; or use Docker Desktop bash
+```
+
+`bootstrap` tạo `deploy/instances/a.env` từ `a.env.example`, điền `CHANGE_ME_*`, **không** cần file secret có sẵn trên laptop tác giả. Migration chạy qua service `db-migrate` trước ERP. Không commit `.env`. Instance B/C: thay `a` → `b`/`c` và cổng trong env example (B gateway `19081`).
+
+**Chạy ngoài path máy tác giả:** dùng `-p nexora-a` (hoặc tên project bất kỳ) và checkout vào thư mục mới (`Nexora-clean`). Volume/network gắn theo project name, không hard-code `E:\Working\…`.
+
+### Chỉ UI scaffold (không Compose)
+
+```bash
+npm ci
 npm run dev
 ```
 
 Mở [http://localhost:3000](http://localhost:3000).
 
-### Cài toàn bộ stack từ clone sạch
+### Lỗi thường gặp
 
-```bash
-bash deploy/scripts/bootstrap.sh a
-docker compose -f deploy/compose.yml --env-file deploy/instances/a.env -p nexora-a --profile apps config -q
-docker compose -f deploy/compose.yml --env-file deploy/instances/a.env -p nexora-a --profile apps up -d --build
-bash deploy/scripts/smoke.sh a
-```
-
-`bootstrap.sh` tạo `deploy/instances/a.env` riêng từ `a.env.example`, sinh mật khẩu ngẫu nhiên và kiểm tra cấu hình; không cần tệp bí mật có sẵn. `up` chạy migration PostgreSQL qua `db-migrate` trước khi bật ERP/core-data/worker. Đợi các dịch vụ khởi động rồi chạy lại `smoke.sh` nếu chúng còn đang khởi động. Không commit tệp `.env`. Để chạy B đồng thời, thay `a` bằng `b` và `nexora-a` bằng `nexora-b` trong bốn lệnh trên; B dùng cổng gateway 19081 thay vì 19080. Xem [deploy/README.md](./deploy/README.md).
+| Triệu chứng | Cách xử lý |
+| --- | --- |
+| Port `19080` đã chiếm | Đổi `GATEWAY_HTTP_PORT` / `PUBLIC_BASE_URL` / OIDC redirect trong `a.env`, rồi `bootstrap` validate lại |
+| OOM / Docker kill khi build hoặc up A+B+C | Chỉ một instance; bỏ `--profile dxlab`/`ai` nếu cần; xem [known-limitations.md](./documents/phase-plan/evidence/known-limitations.md) |
+| `docker compose` unknown | Cài Compose plugin; fallback CLI image trong [deploy/README.md](./deploy/README.md) |
+| Smoke fail khi service còn starting | Đợi healthy rồi chạy lại `smoke.sh` |
+| Muốn reset an toàn | `docker compose … down` (giữ volume) hoặc theo [backup-restore.md](./deploy/backup-restore.md); không xóa volume production |
 
 ### Scripts
 
 | Lệnh | Việc |
 | --- | --- |
-| `npm run dev` | Dev server |
-| `npm run build` | Build production |
-| `npm run start` | Chạy bản build |
-| `npm run lint` | ESLint |
+| `npm ci` | Cài đúng lockfile |
+| `npm run dev` / `build` / `start` / `lint` | Dev / production / lint |
+| `npm test` | Gate unit/contract/security checks (không thay smoke Compose) |
 
 ## Trạng thái hiện tại
 
-Phase 01 đã có Compose cho PostgreSQL, Keycloak, APISIX, Flowable, SeaweedFS, ERP và core-data/worker nền tảng. Chưa có nghiệp vụ M01–M04 hoặc AI01 hoàn chỉnh; xem [phase plan](./documents/phase-plan/README.md) để biết các gate còn mở.
+Stack Compose (PostgreSQL, Keycloak, APISIX, Flowable, SeaweedFS, ERP, core-data, worker, DX-Lab, AI stub) và nghiệp vụ MVP theo phase-plan đã có trên nhánh release `phase-13`. Gate và khoảng trống trung thực: [evidence/known-limitations.md](./documents/phase-plan/evidence/known-limitations.md), [phase-plan](./documents/phase-plan/README.md).
 
 ## Giấy phép
 
