@@ -121,6 +121,8 @@ const ACTION_POLICIES: Record<string, ActionPolicy> = {
   "trace:passport-policy:manage": { roles: ["administrator"], adminAlwaysAllowed: true },
   "trace:qr:manage": { roles: ["administrator", "staff"], adminAlwaysAllowed: true },
   "trace:evidence:manage": { roles: ["administrator", "staff"], adminAlwaysAllowed: true },
+  "ops:quality:read": { roles: ["administrator"], adminAlwaysAllowed: true },
+  "ops:quality:manage": { roles: ["administrator"], adminAlwaysAllowed: true },
 
   // --- Catalog/Inventory (P06 + P065) ---
   "catalog:product:create": { roles: ["administrator", "staff"], adminAlwaysAllowed: true },
