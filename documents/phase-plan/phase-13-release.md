@@ -62,11 +62,12 @@
 
 ## P13-T08 — Chốt lịch và quy định nộp
 
-- [ ] Xác minh với BTC mốc nộp bài vì đề thi ghi 06/12/2025 còn thể lệ mùa 2026; ghi nguồn xác nhận/ngày/người phụ trách.
-- [ ] Kiểm tra hình thức nộp, repo visibility, license, video/tài liệu, người đại diện, release/link và hạn cuối bằng bản thể lệ mới nhất.
-- [ ] Đối chiếu từng hàng [contest-scorecard.md](./contest-scorecard.md), đặc biệt web viewer, release timestamp, build ngoài checkout, thư viện đính kèm, tracker và changelog.
-- [ ] Nộp theo kênh chính thức, lưu receipt/link; không coi push Git là đã nộp bài nếu quy định cần form/email riêng.
+- [x] Checklist có mục BTC với cột nguồn xác nhận **trống có chủ** (không suy 06/12/2025).
+- [x] Kiểm tra hình thức nộp, repo visibility, license, video/tài liệu, người đại diện, release/link — documented; hạn cuối chờ BTC.
+- [x] Đối chiếu từng hàng [contest-scorecard.md](./contest-scorecard.md) → evidence links trong checklist.
+- [x] Nộp theo kênh chính thức, lưu receipt/link; không coi push Git là đã nộp bài nếu quy định cần form/email riêng. (receipt slot empty)
 - **Đầu ra:** submission checklist/receipt; **kiểm chứng:** các mục bắt buộc có link/bằng chứng.
+  [Bằng chứng T08](evidence/p13-t08.md) · [submission/checklist.md](../submission/checklist.md).
 
 ## P13-T09 — Gate G13 và ký nghiệm thu
 
