@@ -35,10 +35,11 @@
 
 ## P13-T05 — Security và dữ liệu demo
 
-- [ ] Chạy lại threat/federation/AI/privacy tests; dependency/container scan, secret scan, gateway route diff, defaults, admin ports và backup access.
-- [ ] Dữ liệu demo synthetic; redact token/PII trong logs/video; QR public chỉ allowlist; public repo không có credential, data dump thật hoặc PDF không được phép phát hành.
-- [ ] Fix blocker, ghi known limitations cụ thể và cách giảm tác động; không che lỗi thiếu bốn nguyên lý hay AC.
+- [x] Chạy lại threat/federation/AI/privacy tests; dependency/container scan, secret scan, gateway route diff, defaults, admin ports và backup access. (`test:security:p12` + `check:secrets`; suite pointers in evidence)
+- [x] Dữ liệu demo synthetic; redact token/PII trong logs/video; QR public chỉ allowlist; public repo không có credential, data dump thật hoặc PDF không được phép phát hành.
+- [x] Fix blocker, ghi known limitations cụ thể và cách giảm tác động; không che lỗi thiếu bốn nguyên lý hay AC. ([known-limitations.md](evidence/known-limitations.md))
 - **Đầu ra:** security review; **kiểm chứng:** scans và negative tests pass cùng release commit.
+  [Bằng chứng T05](evidence/p13-t05.md).
 
 ## P13-T06 — Release artifact có thể tái lập
 
