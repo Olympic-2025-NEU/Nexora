@@ -28,7 +28,7 @@ test("P08 schema, role grants, migration and safe initial states", async () => {
     SELECT table_name FROM information_schema.tables WHERE table_schema='traceability' ORDER BY table_name`;
   assert.deepEqual(tables.map((row) => row.table_name),
     ["passport_policy", "passport_projection", "public_evidence_download", "qr_token",
-      "trace_event", "trace_evidence", "trace_evidence_access", "trace_link"]);
+      "quality_issue", "trace_event", "trace_evidence", "trace_evidence_access", "trace_link"]);
   const rights = await owner.$queryRaw<Array<Record<string, boolean>>>`
     SELECT has_table_privilege('app_runtime','traceability.trace_event','INSERT') AS event_insert,
       has_table_privilege('app_runtime','traceability.trace_event','UPDATE') AS event_update,
@@ -37,10 +37,18 @@ test("P08 schema, role grants, migration and safe initial states", async () => {
       has_table_privilege('app_runtime','traceability.passport_projection','UPDATE') AS passport_update,
       has_table_privilege('core_data','traceability.trace_event','SELECT') AS core_event_read,
       has_table_privilege('core_data','traceability.public_evidence_download','SELECT') AS core_public_read,
-      has_table_privilege('app_runtime','traceability.trace_evidence','INSERT') AS evidence_insert`;
+      has_table_privilege('app_runtime','traceability.trace_evidence','INSERT') AS evidence_insert,
+      has_table_privilege('app_runtime','traceability.quality_issue','SELECT') AS quality_select,
+      has_table_privilege('app_runtime','traceability.quality_issue','INSERT') AS quality_insert,
+      has_table_privilege('app_runtime','traceability.quality_issue','UPDATE') AS quality_update`;
   assert.deepEqual(rights[0], { event_insert: true, event_update: false,
     event_delete: false, policy_insert: true, passport_update: true,
-    core_event_read: false, core_public_read: true, evidence_insert: true });
+    core_event_read: false, core_public_read: true, evidence_insert: true,
+    quality_select: true, quality_insert: true, quality_update: true });
+  const qualityMigration = await owner.$queryRaw<{ migration_name: string }[]>`
+    SELECT migration_name FROM public._prisma_migrations
+    WHERE migration_name='20261127160000_quality_operations' AND finished_at IS NOT NULL`;
+  assert.equal(qualityMigration.length, 1);
   const migration = await owner.$queryRaw<{ migration_name: string }[]>`
     SELECT migration_name FROM public._prisma_migrations
     WHERE migration_name='20261123060000_traceability_baseline' AND finished_at IS NOT NULL`;
