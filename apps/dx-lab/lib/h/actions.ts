@@ -12,6 +12,7 @@ import {
   putPartnerConnection,
 } from "../api-client/client";
 import type {
+  Member,
   MemberCreate,
   MemberPatch,
   OrganizationPatch,
@@ -66,16 +67,13 @@ export async function saveOrganizationAction(
 
 export async function inviteMemberAction(
   body: MemberCreate,
-): Promise<ActionResult<{ provisionalPassword?: string }>> {
+): Promise<ActionResult<Member>> {
   try {
     assertNoOrganizationId(body);
     const token = await requireAccessToken();
     const member = await createMember(token, body);
     revalidatePath("/members");
-    return {
-      ok: true,
-      data: member.provisionalPassword ? { provisionalPassword: member.provisionalPassword } : {},
-    };
+    return { ok: true, data: member };
   } catch (error) {
     return fail(error, "Không mời được thành viên");
   }
