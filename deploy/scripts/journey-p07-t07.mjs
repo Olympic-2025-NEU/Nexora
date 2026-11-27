@@ -68,9 +68,14 @@ const approval = await waitFor(async () => {
   return inbox.find((task) => task.documentId === issue.id);
 }, "inbox task");
 expect(await api(approver, "POST", `/api/v1/approvals/${ownApprovalId}/decisions`,
-  { decision: "approve" }, { "idempotency-key": crypto.randomUUID() }), 403, "self-approval blocked");
+  { decision: "approve", version: 1 }, {
+    "idempotency-key": crypto.randomUUID(), "if-match": "1",
+  }), 403, "self-approval blocked");
+if (typeof approval.approvalVersion !== "number") throw new Error("inbox missing approvalVersion");
 const intent = expect(await api(approver, "POST", `/api/v1/approvals/${approval.approvalRequestId}/decisions`,
-  { decision: "approve" }, { "idempotency-key": crypto.randomUUID() }), 202, "decision intent");
+  { decision: "approve", version: approval.approvalVersion }, {
+    "idempotency-key": crypto.randomUUID(), "if-match": String(approval.approvalVersion),
+  }), 202, "decision intent");
 if (intent.state !== "decision_pending") throw new Error("Decision response claimed final result");
 if (await balance(creator) !== before) throw new Error("Stock changed before confirm");
 const approved = await waitFor(async () => {

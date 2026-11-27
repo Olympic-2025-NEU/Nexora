@@ -6,18 +6,25 @@ import { tradingIdempotency, tradingUnitOfWork } from "@/composition/trading";
 import { runCommand } from "@/platform/http/pipeline";
 import { DomainError } from "@/platform/kernel/errors";
 import { assertBody, isUuid, mapRouteError, ok, readJson } from "@/contexts/catalog/application/http";
+import { parseIfMatchVersion } from "@/contexts/system/application/http";
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const requestId = request.headers.get("x-request-id") ?? crypto.randomUUID();
   try {
     const { id } = await params;
     if (!isUuid(id)) throw new DomainError("APPROVAL_ID_INVALID", 422);
-    const body = assertBody(await readJson(request), ["decision", "note"]);
-    if (body.decision !== "approve" && body.decision !== "reject") throw new DomainError("DECISION_INVALID", 422);
+    const body = assertBody(await readJson(request), ["decision", "note", "version"]);
+    if (body.decision !== "approve" && body.decision !== "reject") {
+      throw new DomainError("DECISION_INVALID", 422);
+    }
     if (body.note !== undefined && (typeof body.note !== "string" || body.note.length > 2000)) {
       throw new DomainError("NOTE_INVALID", 422);
     }
-    if (body.decision === "reject" && !String(body.note ?? "").trim()) throw new DomainError("NOTE_REQUIRED", 422);
+    if (body.decision === "reject" && !String(body.note ?? "").trim()) {
+      throw new DomainError("NOTE_REQUIRED", 422);
+    }
+    const expectedVersion = parseIfMatchVersion(request.headers.get("if-match"), body.version);
+    if (!expectedVersion) throw new DomainError("VERSION_REQUIRED", 422);
     const key = request.headers.get("idempotency-key");
     if (!key) throw new DomainError("IDEMPOTENCY_KEY_REQUIRED", 400);
     const result = await runCommand({ requestId }, {
@@ -26,12 +33,23 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         if (!("organizationId" in actor)) throw new DomainError("TENANT_FORBIDDEN", 403);
         return actor.organizationId;
       },
-      action: "workflow:approval:decide", method: "POST", routeKey: `approvals:${id}:decisions`,
-      payload: body, idempotencyKey: key, idempotencyPort: tradingIdempotency(), unitOfWork: tradingUnitOfWork,
+      action: "workflow:approval:decide",
+      method: "POST",
+      routeKey: `approvals:${id}:decisions`,
+      payload: { ...body, version: expectedVersion },
+      idempotencyKey: key,
+      idempotencyPort: tradingIdempotency(),
+      unitOfWork: tradingUnitOfWork,
       domain: async (ctx) => {
         if (!("organizationId" in ctx.actor)) throw new DomainError("TENANT_FORBIDDEN", 403);
-        return decideApproval(ctx.tx, ctx.actor, id, body.decision === "approve" ? "approved" : "rejected",
-          body.note as string | undefined);
+        return decideApproval(
+          ctx.tx,
+          ctx.actor,
+          id,
+          body.decision === "approve" ? "approved" : "rejected",
+          body.note as string | undefined,
+          expectedVersion,
+        );
       },
     });
     return ok(result, requestId, 202);

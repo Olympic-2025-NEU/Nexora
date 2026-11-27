@@ -105,6 +105,8 @@ export interface ApprovalTask {
   lineHash: string;
   approvalState: string;
   processDefinitionVersion: number;
+  approvalVersion: number;
+  evidenceFileIds?: (string)[];
 }
 export interface FileMetadata {
   id: string;

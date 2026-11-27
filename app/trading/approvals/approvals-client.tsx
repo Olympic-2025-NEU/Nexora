@@ -6,7 +6,7 @@ import Link from "next/link";
 import { adminApi } from "@/app/lib/admin-api";
 
 type Task = { approvalRequestId: string; documentId: string; documentNumber: string; creatorSub: string;
-  ageSeconds: number; lineHash: string; processDefinitionVersion: number };
+  ageSeconds: number; lineHash: string; processDefinitionVersion: number; approvalVersion: number };
 
 export function ApprovalsClient() {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -28,9 +28,17 @@ export function ApprovalsClient() {
     setBusy(task.approvalRequestId); setError("");
     try {
       const response = await adminApi(`/api/v1/approvals/${task.approvalRequestId}/decisions`, {
-        method: "POST", headers: { "idempotency-key": crypto.randomUUID() },
-        body: JSON.stringify({ decision, ...(notes[task.approvalRequestId]?.trim() &&
-          { note: notes[task.approvalRequestId].trim() }) }),
+        method: "POST",
+        headers: {
+          "idempotency-key": crypto.randomUUID(),
+          "if-match": String(task.approvalVersion),
+        },
+        body: JSON.stringify({
+          decision,
+          version: task.approvalVersion,
+          ...(notes[task.approvalRequestId]?.trim() &&
+            { note: notes[task.approvalRequestId].trim() }),
+        }),
       });
       if (!response.ok) throw new Error((await response.json()).error ?? "Không ghi được quyết định.");
       setWaiting((current) => ({ ...current, [task.approvalRequestId]: "Đang chờ workflow engine" }));
