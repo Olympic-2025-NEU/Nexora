@@ -147,7 +147,7 @@ const action = (path, tag, summary, response, options = {}) =>
 
 add("get", "/api/v1/health/live", "Platform", "Liveness", "HealthStatus", { auth: "public", raw: true, errors: [429] });
 add("get", "/api/v1/health/ready", "Platform", "Readiness", "HealthStatus", { auth: "public", raw: true, errors: [429, 503] });
-detail("/api/v1/me", "Platform", "Current actor", "Me");
+add("get", "/api/v1/me", "Platform", "Current actor", "Me", { raw: true });
 detail("/api/v1/organization", "M01", "Get organization", "Organization");
 patch("/api/v1/organization", "M01", "Update organization", "Organization", "OrganizationPatch", ADMIN);
 

@@ -6,6 +6,7 @@ const config: NextConfig = {
   basePath: "/dxlab",
   output: "standalone",
   outputFileTracingRoot: resolve(__dirname, "../.."),
+  experimental: { authInterrupts: true },
 };
 
 export default config;

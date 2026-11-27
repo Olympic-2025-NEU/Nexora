@@ -431,6 +431,12 @@ services:
     environment:
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL}
       OIDC_ISSUER_URL: ${OIDC_ISSUER_URL}
+      OIDC_BASE_URL: ${OIDC_BASE_URL}
+      OIDC_JWKS_URL: ${OIDC_JWKS_URL}
+      OIDC_CLIENT_ID_DXLAB: ${OIDC_CLIENT_ID_DXLAB}
+      OIDC_REDIRECT_URI_DXLAB: ${OIDC_REDIRECT_URI_DXLAB}
+      GATEWAY_INTERNAL_URL: http://gateway:9080
+      DXLAB_SESSION_SECRET: ${DXLAB_SESSION_SECRET:-}
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/dxlab/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 10s

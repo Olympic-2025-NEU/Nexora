@@ -11,10 +11,11 @@
 
 ## P11-T02 — Shell, session và điều hướng theo quyền
 
-- [ ] Build/deploy frontend tầng 2 độc lập (`apps/dx-lab/` cùng Next/React), OIDC login/logout/session refresh, org/role context từ server, navigation có quyền; CI/build image riêng, không dựa vào ẩn nút để bảo mật.
-- [ ] Route bảo vệ phản hồi 401/403/session-expired rõ, preserve intended path nếu an toàn; token không lộ qua browser logs/URL.
-- [ ] Keyboard focus, semantic labels, mobile navigation, dark/light nếu nằm trong design scope; test viewport mobile/desktop và screen reader cơ bản.
+- [x] Build/deploy frontend tầng 2 độc lập (`apps/dx-lab/` cùng Next/React), OIDC login/logout/session refresh, org/role context từ server, navigation có quyền; CI/build image riêng, không dựa vào ẩn nút để bảo mật.
+- [x] Route bảo vệ phản hồi 401/403/session-expired rõ, preserve intended path nếu an toàn; token không lộ qua browser logs/URL.
+- [x] Keyboard focus, semantic labels, mobile navigation, dark/light nếu nằm trong design scope; test viewport mobile/desktop và screen reader cơ bản.
 - **Đầu ra:** app shell; **kiểm chứng:** Admin/Staff/Approver/public nhìn đúng luồng, backend vẫn chặn đường vòng.
+  [Bằng chứng T02](evidence/p11-t02.md). Đánh giá screen reader toàn diện của các hành trình H/P/D/I thuộc G11/T08.
 
 ## P11-T03 — H: tổ chức và người dùng
 

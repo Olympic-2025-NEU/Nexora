@@ -90,16 +90,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: false
-                required:
-                  - data
-                  - requestId
-                properties:
-                  data:
-                    $ref: "#/components/schemas/Me"
-                  requestId:
-                    type: string
+                $ref: "#/components/schemas/Me"
         "401":
           $ref: "#/components/responses/Error"
         "403":
@@ -6242,30 +6233,33 @@ components:
       type: object
       additionalProperties: false
       required:
-        - sub
+        - userId
+        - organizationId
+        - roles
+        - unitIds
         - displayName
-        - role
-        - status
-        - warehouseIds
       properties:
-        sub:
+        userId:
           type: string
-        displayName:
+        organizationId:
           type: string
-        role:
-          type: string
-          enum:
-            - administrator
-            - staff
-            - approver
-            - viewer
-        status:
-          type: string
-        warehouseIds:
+          format: uuid
+        roles:
+          type: array
+          items:
+            type: string
+            enum:
+              - administrator
+              - staff
+              - approver
+              - viewer
+        unitIds:
           type: array
           items:
             type: string
             format: uuid
+        displayName:
+          type: string
     Organization:
       type: object
       additionalProperties: false

@@ -163,6 +163,8 @@ jobs:
         run: cd services/ai && python -m unittest discover -s tests -v
       - name: Typecheck (after Next typegen)
         run: npm run typecheck
+      - name: DX-Lab OpenAPI client and auth boundary
+        run: npm run check:dxlab-api && npm run test:dxlab:auth
       - name: Provenance, secrets and static contracts
         run: npm test
 

@@ -17,7 +17,7 @@ Chọn công nghệ qua spike **không** nghĩa app/core đã triển khai. Hai 
 | [D07](../adr/D07-quantity-unit-lot.md) → [0007](../adr/0007-decimal-unit-lot.md) | `numeric(20,3)`/unit/lot **đã chốt thiết kế** | P06/P07 schema thật |
 | [D08](../adr/D08-federation-envelope.md) → [0008](../adr/0008-trace-federation-envelope.md) | Envelope/ACK v1 **đã chốt thiết kế** | P00-T05 schema + Node/Python vectors pass; P09 E2E |
 | [D09](../adr/D09-ai-provider-boundary.md) → [0009](../adr/0009-ai-provider.md) | Ranh giới AI **đã chốt**; model hoãn P10 | P10 license/policy |
-| [D10](../adr/D10-dx-lab-hpdi.md) → [0010](../adr/0010-hpdi-dx-lab.md) | DX-Lab runtime riêng **đã chứng minh P11-T01**; H/P/D/I UX và G11 còn mở | [Bằng chứng P11-T01](./evidence/p11-t01.md) |
+| [D10](../adr/D10-dx-lab-hpdi.md) → [0010](../adr/0010-hpdi-dx-lab.md) | DX-Lab runtime riêng **đã chứng minh P11-T01**; shell, SSO và vai trò **đã chứng minh P11-T02**; H/P/D/I UX và G11 còn mở | [T01](./evidence/p11-t01.md), [T02](./evidence/p11-t02.md) |
 | [D11](../adr/D11-dxos-principles-evidence.md) → [0011](../adr/0011-four-principles-proof.md) | Bốn nguyên lý **đã chốt thiết kế** | BTC + P12 |
 | [D12](../adr/D12-gitops-demo.md) → [0012](../adr/0012-gitops-demo.md) | k3s/Argo **có điều kiện** | P12 drift/reconcile |
 | [D13](../adr/D13-versions-licenses-resources.md) → [0013](../adr/0013-versions-licenses.md) | Digest/license/RAM snapshot **đã ghi** | P00-T04 npm inventory pass; P01 peak, P13 release SBOM |

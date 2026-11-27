@@ -51,7 +51,7 @@ export const schemas = {
   }, ["code", "message", "requestId"]),
   HealthStatus: obj({ status: enumeration("ok", "degraded"), service: str(), version: str() }, ["status", "service", "version"]),
   Page: obj({ nextCursor: str(), limit: { type: "integer", minimum: 1, maximum: 100 } }, ["limit"]),
-  Me: obj({ sub: str(), displayName: str(), role: enumeration("administrator", "staff", "approver", "viewer"), status: str(), warehouseIds: arr(uuid) }, ["sub", "displayName", "role", "status", "warehouseIds"]),
+  Me: obj({ userId: str(), organizationId: uuid, roles: arr(enumeration("administrator", "staff", "approver", "viewer")), unitIds: arr(uuid), displayName: str() }, ["userId", "organizationId", "roles", "unitIds", "displayName"]),
   Organization: obj({ id: uuid, instanceId: str(), code: str(), name: str(), timezone: str(), status: str(), version: integer, contactEmail: str({ format: "email" }) }, ["id", "instanceId", "code", "name", "timezone", "status", "version"]),
   OrganizationPatch: obj({ name: str({ minLength: 1 }), contactEmail: str({ format: "email" }), timezone: str() }, [], { minProperties: 1 }),
   Member: obj({ id: uuid, keycloakSub: str(), displayName: str(), email: str({ format: "email" }), role: enumeration("administrator", "staff", "approver", "viewer"), status: str(), warehouseIds: arr(uuid), version: integer }, ["id", "keycloakSub", "displayName", "role", "status", "version"]),

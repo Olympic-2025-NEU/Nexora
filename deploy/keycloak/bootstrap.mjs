@@ -26,6 +26,10 @@ for (const [client, idVar, redirectVar] of [
   if (!['http:', 'https:'].includes(redirect.protocol)) throw new Error(`Invalid ${redirectVar}`);
   client.redirectUris = [redirect.href];
   client.webOrigins = [redirect.origin];
+  if (idVar === 'OIDC_CLIENT_ID_DXLAB') {
+    // Keycloak validates RP-initiated logout against a separate allowlist.
+    client.attributes['post.logout.redirect.uris'] = new URL('/dxlab', redirect).href;
+  }
 }
 // Local smoke uses Resource-Owner password grant against erp-browser (G02 curl matrix).
 // Browser production path remains auth-code + PKCE; do not expose ROPC on public internet demos.

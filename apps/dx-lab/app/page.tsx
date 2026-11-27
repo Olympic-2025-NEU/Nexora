@@ -3,6 +3,7 @@ export default function HomePage() {
   return <main className="intro">
     <p className="eyebrow">Nexora · DX-Lab</p>
     <h1>Operations Workspace</h1>
-    <p>Ứng dụng H-P-D-I đang được thiết lập. Dữ liệu nghiệp vụ sẽ được đọc qua API Gateway sau khi đăng nhập.</p>
+    <p>Một không gian làm việc cho con người, quy trình, dữ liệu và trợ lý có dẫn nguồn.</p>
+    <a className="button" href="/dxlab/work">Mở không gian làm việc</a>
   </main>;
 }
