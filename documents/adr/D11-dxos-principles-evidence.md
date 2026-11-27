@@ -1,6 +1,6 @@
 # D11 — Bốn nguyên lý DX-OS và mức minh chứng
 
-- Ngày: 2026-11-16. Trạng thái: **chấp nhận kế hoạch kỹ thuật có rủi ro diễn giải BTC**, bằng chứng runtime P12/G12 và xác nhận BTC còn mở; reviewer thứ hai G00.
+- Ngày: 2026-11-16. Trạng thái: **chấp nhận kế hoạch kỹ thuật có rủi ro diễn giải BTC**; **proof map P12-T01:** [`D11-dxos-proof.md`](./D11-dxos-proof.md) (2026-11-27). Bằng chứng runtime T02+ / G12 và xác nhận BTC còn mở.
 - Quyết định: bốn nguyên lý §4 được kiểm bằng luồng chạy thực, dữ liệu nguồn và failure injection; không suy tên sản phẩm trong bảng bảy lớp của đề là bắt buộc nguyên xi. Mức tối thiểu Nexora được định nghĩa ở `scope-v1.md`, `phase-12-operability.md`, `core-record-payloads-v1.md`.
 - Câu hỏi: với MVP một-org-per-instance, làm sao chứng minh lifecycle dữ liệu, IT/OT, lineage/quality, zero-trust/GitOps mà không tuyên bố các hệ production chưa có?
 
