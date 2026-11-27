@@ -55,8 +55,9 @@ Rule v1 để AI triển khai (ngưỡng demo được đổi bằng D11 có tes
 
 - [ ] D12 quyết định topology GitOps demo; nếu áp dụng k3s/Argo CD, cấu hình desired state trong Git, image digest/secret references, namespace/network policy và sync health.
 - [ ] Cố ý tạo drift không gây mất dữ liệu ở môi trường test, chứng minh controller phát hiện/reconcile về Git; chụp commit, sync event và actual state. Rollback bằng commit revert đã thử.
-- [ ] Nếu môi trường chỉ chạy Compose, ghi đúng là IaC+CI và đánh dấu nguyên lý GitOps chưa đạt cho tới khi có controller/evidence hoặc BTC xác nhận cách minh chứng khác.
+- [x] Nếu môi trường chỉ chạy Compose, ghi đúng là IaC+CI và đánh dấu nguyên lý GitOps chưa đạt cho tới khi có controller/evidence hoặc BTC xác nhận cách minh chứng khác. **Gap có chủ** — không dựng `deploy/gitops/` giả pass.
 - **Đầu ra:** GitOps environment/runbook hoặc gap có chủ; **kiểm chứng:** drift/reconcile test lặp lại được.
+  [Bằng chứng T06 gap](evidence/p12-t06.md).
 
 ## P12-T07 — Observability, SLO và sức tải
 
