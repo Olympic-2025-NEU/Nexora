@@ -39,7 +39,7 @@ Smoke: [infra](./evidence/spikes/infra/README.md), [pg semantics spike](./eviden
 | D06 Workflow | P04/P07 | **Accepted** (spike) | [0006](../adr/0006-workflow-flowable-goods-issue.md) | Evidence: `D06-workflow-engine.md` |
 | D07 Decimal/lot | P00/P06 | **Accepted P00 design** | [0007](../adr/0007-decimal-unit-lot.md) | SQL/contract pass; app constraints P06/P07 |
 | D08 Envelope | P00/P08 | **Accepted P00 design** | [0008](../adr/0008-trace-federation-envelope.md) | Schema + Node/Python vectors pass; P09 E2E |
-| D09 AI | P10 | **Accepted P10-T01** local Ollama + Qwen3 0.6B; G10 technical evidence complete, team/advisor sign-off pending | [0009](../adr/0009-ai-provider.md) | [G10 evidence](./evidence/G10.md); data/fail boundary: [P10-T01 evidence](./evidence/p10-t01.md) |
+| D09 AI | P10 | **Accepted P10-T01** local Ollama + Qwen3 0.6B; live quality G10 | [0009](../adr/0009-ai-provider.md) | Data/fail boundary: [P10-T01 evidence](./evidence/p10-t01.md); earlier boundary: `D09-ai-provider-boundary.md` |
 | D10 H-P-D-I | P00/P11 | Design locked | [0010](../adr/0010-hpdi-dx-lab.md) | Evidence: `D10-dx-lab-hpdi.md` |
 | D11 Principles | P00/P12 | Design locked | [0011](../adr/0011-four-principles-proof.md) | Evidence: `D11-dxos-principles-evidence.md` |
 | D12 GitOps | P12 | Conditional | [0012](../adr/0012-gitops-demo.md) | Evidence: `D12-gitops-demo.md` |
