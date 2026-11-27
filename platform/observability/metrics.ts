@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { PrismaClient } from "@prisma/client";
 import { safeHaltReason } from "./diagnostics";
-
 const destinations = new Set(["workflow", "local", "traceability", "federation"]);
 const states = ["requested", "starting", "pending", "decision_pending"];
 
 export async function workMetrics(db: PrismaClient): Promise<string> {
-  const [outbox, workflow, ages, federationQueue, attempts, inbox, receipts] = await Promise.all([
+  const [outbox, workflow, ages, federationQueue, attempts, inbox, receipts, scans, quality, aiDrafts] = await Promise.all([
     db.$queryRaw<{ destination: string; pending: bigint; retry: bigint; dead: bigint }[]>`
       SELECT destination, count(*) FILTER (WHERE status = 'pending') AS pending,
         count(*) FILTER (WHERE status = 'pending' AND attempt_count > 0) AS retry,
@@ -34,6 +33,13 @@ export async function workMetrics(db: PrismaClient): Promise<string> {
       SELECT td.delivery_state, count(*) AS total FROM trading.transfer_detail td
       JOIN trading.document d ON d.id = td.document_id WHERE d.status = 'confirmed'
       GROUP BY td.delivery_state`,
+    db.$queryRaw<{ scan_state: string; total: bigint }[]>`
+      SELECT scan_state, count(*) AS total FROM platform.attachment GROUP BY scan_state`,
+    db.$queryRaw<{ state: string; total: bigint }[]>`
+      SELECT state, count(*) AS total FROM traceability.quality_issue GROUP BY state`,
+    db.$queryRaw<{ total: bigint }[]>`
+      SELECT count(*) AS total FROM platform.audit_log
+      WHERE action LIKE 'ai.%' AND created_at > now() - interval '1 hour'`,
   ]);
   const lines: string[] = [];
   const counts = new Map<string, { pending: number; retry: number; dead: number }>();
@@ -70,5 +76,10 @@ export async function workMetrics(db: PrismaClient): Promise<string> {
     lines.push(`federation_inbox{state="${state}"} ${Number(inbox.find((row) => row.state === state)?.total ?? 0)}`);
   for (const state of ["pending", "technical_ack", "received", "partial", "disputed"])
     lines.push(`federation_business_receipt{state="${state}"} ${Number(receipts.find((row) => row.delivery_state === state)?.total ?? 0)}`);
-  return lines.join("\n") + "\n";
+  for (const state of ["pending", "clean", "infected", "error"])
+    lines.push(`attachment_scan{state="${state}"} ${Number(scans.find((row) => row.scan_state === state)?.total ?? 0)}`);
+  for (const state of ["open", "acknowledged", "resolved"])
+    lines.push(`quality_issue{state="${state}"} ${Number(quality.find((row) => row.state === state)?.total ?? 0)}`);
+  lines.push(`ai_audit_events_1h ${Number(aiDrafts[0]?.total ?? 0)}`);
+  return `${lines.join("\n")}\n`;
 }

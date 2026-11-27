@@ -1,0 +1,33 @@
+{
+  "title": "Nexora demo overview",
+  "uid": "nexora-demo",
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "panels": [
+    {
+      "type": "stat",
+      "title": "ERP up",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "targets": [{ "expr": "service_up{service=\"erp\"}", "refId": "A" }]
+    },
+    {
+      "type": "stat",
+      "title": "Worker up",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "targets": [{ "expr": "service_up{service=\"worker\"}", "refId": "A" }]
+    },
+    {
+      "type": "timeseries",
+      "title": "Outbox oldest age",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "targets": [{ "expr": "outbox_oldest_pending_age_seconds", "refId": "A" }]
+    },
+    {
+      "type": "timeseries",
+      "title": "Trace projection lag",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "targets": [{ "expr": "trace_projection_lag_seconds", "refId": "A" }]
+    }
+  ]
+}

@@ -489,5 +489,42 @@ services:
         limits:
           memory: 2g
 
+  prometheus:
+    profiles: ["observability"]
+    image: prom/prometheus:v2.55.1
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=24h
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./observability/rules.yml:/etc/prometheus/rules.yml:ro
+    networks: [internal]
+    depends_on:
+      - erp
+      - worker
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+
+  grafana:
+    profiles: ["observability"]
+    image: grafana/grafana:11.3.0
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-nexora-demo}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+    networks: [internal]
+    depends_on:
+      - prometheus
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+
   # local-admin host publishes: use overlay deploy/compose.local-admin.yml
   # (Compose v5 rejects ports on network_mode: service:* sidecars).

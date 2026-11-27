@@ -1,0 +1,28 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+groups:
+  - name: nexora-demo
+    rules:
+      - alert: ServiceDown
+        expr: service_up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Nexora service {{ $labels.service }} is down"
+          runbook: "deploy/observability/failure-runbook.md#service-down"
+      - alert: OutboxOldestPending
+        expr: outbox_oldest_pending_age_seconds > 900
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Outbox oldest pending age high"
+          runbook: "deploy/observability/failure-runbook.md#outbox-backlog"
+      - alert: WorkerProjectionLag
+        expr: trace_projection_lag_seconds > 300
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Trace projection lag elevated"
+          runbook: "deploy/observability/failure-runbook.md#kill-worker"
