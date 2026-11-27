@@ -9,9 +9,13 @@ const shared = [
 export function navigationForRoles(roles: readonly string[]) {
   const canOperate = roles.some((role) => ["administrator", "staff", "approver"].includes(role));
   const canAdmin = roles.includes("administrator");
-  return [shared[0],
+  const canReadPartners = roles.some((role) =>
+    ["administrator", "staff", "approver", "viewer"].includes(role));
+  return [
+    shared[0],
     ...(canOperate ? [{ href: "/operations", label: "P · Giao dịch" }] : []),
     ...shared.slice(1),
+    ...(canReadPartners ? [{ href: "/partners", label: "Đối tác" }] : []),
     ...(canAdmin ? [{ href: "/members", label: "Thành viên" }] : []),
   ];
 }

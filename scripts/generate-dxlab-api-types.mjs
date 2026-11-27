@@ -1,32 +1,85 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-/** Small, checked projection of the OpenAPI schemas used by DX-Lab T02. */
+/** Checked projection of OpenAPI schemas used by DX-Lab H/P/D/I clients. */
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { parse } from "yaml";
 
 const source = "contracts/openapi/nexora-v1.yaml";
 const output = "apps/dx-lab/lib/api-client/openapi-types.ts";
+const schemaNames = [
+  "Me",
+  "Organization",
+  "OrganizationPatch",
+  "Member",
+  "MemberCreate",
+  "MemberPatch",
+  "Partner",
+  "PartnerCreate",
+  "PartnerPatch",
+  "PartnerConnectionInput",
+  "PartnerConnectionView",
+  "ApprovalTask",
+  "FileMetadata",
+];
+
 const doc = parse(readFileSync(source, "utf8"));
 const operation = doc.paths?.["/api/v1/me"]?.get;
 const reference = operation?.responses?.["200"]?.content?.["application/json"]?.schema?.$ref;
 if (reference !== "#/components/schemas/Me") throw new Error("OpenAPI getMe must return Me directly");
 
-function tsType(schema) {
-  if (Array.isArray(schema.enum)) return schema.enum.map((value) => JSON.stringify(value)).join(" | ");
-  if (schema.type === "string") return "string";
-  if (schema.type === "integer" || schema.type === "number") return "number";
-  if (schema.type === "boolean") return "boolean";
-  if (schema.type === "array") return `(${tsType(schema.items)})[]`;
-  throw new Error(`Unsupported OpenAPI property type: ${schema.type ?? "missing"}`);
+const connectionGet = doc.paths?.["/api/v1/partners/{id}/connection"]?.get;
+if (!connectionGet) throw new Error("OpenAPI must document GET partner connection");
+
+function resolveRef(schema) {
+  if (!schema?.$ref) return schema;
+  const name = String(schema.$ref).replace("#/components/schemas/", "");
+  const resolved = doc.components?.schemas?.[name];
+  if (!resolved) throw new Error(`Missing OpenAPI schema ${name}`);
+  return resolved;
 }
 
-const schema = doc.components?.schemas?.Me;
-if (schema?.type !== "object" || !schema.properties || !Array.isArray(schema.required)) {
-  throw new Error("OpenAPI Me schema missing");
+function tsType(schema, depth = 0) {
+  const resolved = resolveRef(schema);
+  if (resolved.nullable && resolved.type) {
+    return `(${tsType({ ...resolved, nullable: undefined }, depth)}) | null`;
+  }
+  if (Array.isArray(resolved.enum)) {
+    return resolved.enum.map((value) => JSON.stringify(value)).join(" | ");
+  }
+  if (resolved.type === "string") return "string";
+  if (resolved.type === "integer" || resolved.type === "number") return "number";
+  if (resolved.type === "boolean") return "boolean";
+  if (resolved.type === "array") return `(${tsType(resolved.items, depth + 1)})[]`;
+  if (resolved.type === "object" && resolved.properties) {
+    if (depth > 0) {
+      const fields = Object.entries(resolved.properties).map(([name, property]) => {
+        const required = Array.isArray(resolved.required) && resolved.required.includes(name);
+        return `${name}${required ? "" : "?"}: ${tsType(property, depth + 1)}`;
+      });
+      return `{ ${fields.join("; ")} }`;
+    }
+  }
+  throw new Error(`Unsupported OpenAPI property type: ${resolved.type ?? "missing"}`);
 }
-const fields = Object.entries(schema.properties).map(([name, property]) =>
-  `  ${name}${schema.required.includes(name) ? "" : "?"}: ${tsType(property)};`).join("\n");
-const generated = `// SPDX-License-Identifier: AGPL-3.0-only\n// Generated from ${source} by scripts/generate-dxlab-api-types.mjs.\nexport interface Me {\n${fields}\n}\n`;
+
+function interfaceBlock(name) {
+  const schema = doc.components?.schemas?.[name];
+  if (schema?.type !== "object" || !schema.properties) {
+    throw new Error(`OpenAPI ${name} schema missing`);
+  }
+  const required = Array.isArray(schema.required) ? schema.required : [];
+  const fields = Object.entries(schema.properties).map(([field, property]) =>
+    `  ${field}${required.includes(field) ? "" : "?"}: ${tsType(property)};`).join("\n");
+  return `export interface ${name} {\n${fields}\n}`;
+}
+
+const generated = [
+  "// SPDX-License-Identifier: AGPL-3.0-only",
+  `// Generated from ${source} by scripts/generate-dxlab-api-types.mjs.`,
+  ...schemaNames.map(interfaceBlock),
+  "",
+].join("\n");
+
 if (process.argv.includes("--check")) {
   if (readFileSync(output, "utf8").replaceAll("\r\n", "\n") !== generated) {
     throw new Error("DX-Lab OpenAPI types are stale. Run npm run generate:dxlab-api");

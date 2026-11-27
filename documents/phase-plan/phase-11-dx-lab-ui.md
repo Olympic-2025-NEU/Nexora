@@ -19,10 +19,11 @@
 
 ## P11-T03 — H: tổ chức và người dùng
 
-- [ ] Trang công việc cá nhân có approval/receiving tasks, tệp/hồ sơ liên quan qua core file API, org profile, membership/role và partner connection dùng M01 API; trạng thái kết nối/rotation chỉ hiển thị metadata an toàn.
-- [ ] Form validation, optimistic conflict, save/error/permission-denied; Admin có thể mời/disable, Staff không truy cập route admin.
-- [ ] Handoff từ H sang P: actor và partner được chọn đúng trong giao dịch, không đổi org ID trong request.
+- [x] Trang công việc cá nhân có approval/receiving tasks, tệp/hồ sơ liên quan qua core file API, org profile, membership/role và partner connection dùng M01 API; trạng thái kết nối/rotation chỉ hiển thị metadata an toàn.
+- [x] Form validation, optimistic conflict, save/error/permission-denied; Admin có thể mời/disable, Staff không truy cập route admin.
+- [x] Handoff từ H sang P: actor và partner được chọn đúng trong giao dịch, không đổi org ID trong request.
 - **Đầu ra:** H journey; **kiểm chứng:** AC-02 qua UI trên A/B/C.
+  [Bằng chứng T03](evidence/p11-t03.md).
 
 ## P11-T04 — P: giao dịch, nhận hàng và approval inbox
 

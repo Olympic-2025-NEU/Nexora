@@ -9,9 +9,18 @@ assert.match(instance, /^[abc]$/, 'Expected instance a, b or c');
 const env = parseEnv(readFileSync(`deploy/instances/${instance}.env`, 'utf8'));
 assert.ok(env.KC_DEV_USERNAME && env.KC_DEV_USER_PASSWORD, 'Staff smoke account is not configured');
 const base = env.PUBLIC_BASE_URL;
+const keycloakHostPort = env.KEYCLOAK_HOST_PORT || '18080';
 const jars = new Map();
-async function request(url, options = {}) {
+function rewriteForHost(url) {
   const target = new URL(url, base);
+  if (target.hostname === 'keycloak') {
+    target.hostname = '127.0.0.1';
+    target.port = String(keycloakHostPort);
+  }
+  return target;
+}
+async function request(url, options = {}) {
+  const target = rewriteForHost(url);
   const jar = jars.get(target.origin) ?? new Map();
   jars.set(target.origin, jar);
   const headers = new Headers(options.headers);

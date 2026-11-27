@@ -5,9 +5,15 @@ import { navigationForRoles } from "./navigation";
 
 test("DX-Lab navigation follows server roles without granting admin links to staff or approver", () => {
   const links = (roles: string[]) => navigationForRoles(roles).map(({ href }) => href);
-  assert.deepEqual(links(["viewer"]), ["/work", "/data", "/assistant", "/profile"]);
-  assert.deepEqual(links(["staff"]), ["/work", "/operations", "/data", "/assistant", "/profile"]);
+  assert.deepEqual(links(["viewer"]), [
+    "/work", "/data", "/assistant", "/profile", "/partners",
+  ]);
+  assert.deepEqual(links(["staff"]), [
+    "/work", "/operations", "/data", "/assistant", "/profile", "/partners",
+  ]);
   assert.deepEqual(links(["approver"]), links(["staff"]));
-  assert.deepEqual(links(["administrator"]), [...links(["staff"]), "/members"]);
-  assert.deepEqual(links([]), links(["viewer"]));
+  assert.deepEqual(links(["administrator"]), [
+    "/work", "/operations", "/data", "/assistant", "/profile", "/partners", "/members",
+  ]);
+  assert.deepEqual(links([]), ["/work", "/data", "/assistant", "/profile"]);
 });
