@@ -294,25 +294,33 @@ async function main() {
   }
 
   // -------------------------------------------------------------------------
-  // Optional admin boot user (KC_ADMIN_USERNAME / KC_ADMIN_PASSWORD) — MFA required.
+  // Optional admin boot user (KC_ADMIN_USERNAME / KC_ADMIN_PASSWORD) — MFA required
+  // in normal deploys. Local DEMO_ONLY password-login skips CONFIGURE_TOTP so
+  // /auth/dev-token works without OTP enrollment (see fix-local-demo-users.mjs).
   // -------------------------------------------------------------------------
+  const demoLocalLogin = process.env.DEMO_ONLY === 'true';
   if (process.env.KC_ADMIN_PASSWORD) {
     const username = required('KC_ADMIN_USERNAME');
-    const userId = await ensureUser(token, username, process.env.KC_ADMIN_PASSWORD);
+    const userId = await ensureUser(token, username, process.env.KC_ADMIN_PASSWORD, {
+      temporary: false,
+    });
     await assignRole(token, userId, 'administrator');
-    await assignMfaRequiredAction(token, userId);
+    if (!demoLocalLogin) await assignMfaRequiredAction(token, userId);
     changes++;
   }
 
   // -------------------------------------------------------------------------
-  // Optional approver boot user → issue_approver + auditor — MFA required.
+  // Optional approver boot user → issue_approver + auditor — MFA required
+  // (skipped under DEMO_ONLY for the same local password-login reason).
   // -------------------------------------------------------------------------
   if (process.env.KC_APPROVER_PASSWORD) {
     const username = required('KC_APPROVER_USERNAME');
-    const userId = await ensureUser(token, username, process.env.KC_APPROVER_PASSWORD);
+    const userId = await ensureUser(token, username, process.env.KC_APPROVER_PASSWORD, {
+      temporary: false,
+    });
     await assignRole(token, userId, 'issue_approver');
     await assignRole(token, userId, 'auditor');
-    await assignMfaRequiredAction(token, userId);
+    if (!demoLocalLogin) await assignMfaRequiredAction(token, userId);
     changes++;
   }
 

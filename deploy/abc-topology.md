@@ -1,5 +1,7 @@
 # P09-T01 — three independent demo instances
 
+**Two-enterprise (A↔B) manual / UI scenario:** see [`scenarios/two-enterprise-ab.md`](./scenarios/two-enterprise-ab.md) (orders, issues, partner transfer, receiving).
+
 This local topology uses three Compose projects: `nexora-a`, `nexora-b`,
 `nexora-c`. Each project owns its PostgreSQL cluster (app, Keycloak and
 Flowable databases), Keycloak realm state, ERP, gateway, internal network and
