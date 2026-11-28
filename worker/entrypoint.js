@@ -89,7 +89,7 @@ async function ready(id) {
     const auth = Buffer.from(`${process.env.FLOWABLE_ADMIN_USER}:${process.env.FLOWABLE_ADMIN_PASSWORD}`).toString("base64");
     await Promise.all([
       timed(prisma.$queryRaw`SELECT 1`), timed(core.$queryRaw`SELECT 1`), redisPing(),
-      fetch(`${process.env.FLOWABLE_BASE_URL.replace(/\/$/, "")}/service/management/engine`, {
+      fetch(`${process.env.FLOWABLE_BASE_URL.replace(/\/$/, "")}/management/engine`, {
         headers: { authorization: `Basic ${auth}`, "x-request-id": id }, signal: AbortSignal.timeout(2000),
       }).then((result) => { if (!result.ok) throw Error("workflow"); }),
     ]);
