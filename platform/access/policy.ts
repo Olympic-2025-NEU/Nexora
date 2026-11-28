@@ -85,6 +85,10 @@ const ACTION_POLICIES: Record<string, ActionPolicy> = {
   "trading:receipt:edit": { roles: ["inventory_clerk"], adminAlwaysAllowed: true },
   "trading:receipt:confirm": { roles: ["inventory_clerk"], adminAlwaysAllowed: true },
   "trading:receipt:cancel": { roles: ["inventory_clerk"], adminAlwaysAllowed: true },
+  // ADR 0020 — retail / non-Nexora suppliers (not system.Partner)
+  "trading:local-supplier:read": { roles: READERS, adminAlwaysAllowed: true },
+  "trading:local-supplier:manage": { roles: ["inventory_clerk", "catalog_manager"], adminAlwaysAllowed: true },
+  "trading:inbound:read": { roles: READERS, adminAlwaysAllowed: true },
   "trading:issue:read": { roles: READERS, adminAlwaysAllowed: true },
   "trading:issue:create": { roles: ["inventory_clerk"], adminAlwaysAllowed: true },
   "trading:issue:edit": { roles: ["inventory_clerk"], adminAlwaysAllowed: true },

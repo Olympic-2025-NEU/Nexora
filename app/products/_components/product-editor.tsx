@@ -820,7 +820,7 @@ export function ProductEditor({ productId }: { productId?: string }) {
                         {t("catalog.colCategory")} <span className="text-destructive">*</span>
                       </Label>
                       <Link
-                        href="/catalog/categories"
+                        href="/categories"
                         className="text-xs font-medium text-primary hover:underline"
                       >
                         {t("catalog.manage")}
@@ -845,7 +845,7 @@ export function ProductEditor({ productId }: { productId?: string }) {
                         {t("catalog.baseUom")} <span className="text-destructive">*</span>
                       </Label>
                       <Link
-                        href="/catalog/uom"
+                        href="/uom"
                         className="text-xs font-medium text-primary hover:underline"
                       >
                         {t("catalog.manage")}

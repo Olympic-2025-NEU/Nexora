@@ -60,9 +60,29 @@ export const APP_NAV: NavGroup[] = [
   {
     id: "products",
     labelKey: "nav.products",
-    href: "/products",
     roles: OPS_READ,
     icon: "products",
+    flyoutTitleKey: "nav.flyoutProducts",
+    children: [
+      {
+        href: "/products",
+        labelKey: "nav.products",
+        roles: OPS_READ,
+        descriptionKey: "nav.descProducts",
+      },
+      {
+        href: "/categories",
+        labelKey: "nav.categories",
+        roles: OPS_READ,
+        descriptionKey: "nav.descCategories",
+      },
+      {
+        href: "/uom",
+        labelKey: "nav.uom",
+        roles: OPS_READ,
+        descriptionKey: "nav.descUom",
+      },
+    ],
   },
   {
     id: "warehouse",
@@ -90,10 +110,16 @@ export const APP_NAV: NavGroup[] = [
         descriptionKey: "nav.descStocktakes",
       },
       {
-        href: "/trading/receivings",
+        href: "/trading/inbound",
         labelKey: "nav.receivings",
         roles: ["administrator", "inventory_clerk", "auditor", "issue_approver"],
         descriptionKey: "nav.descReceivings",
+      },
+      {
+        href: "/trading/suppliers",
+        labelKey: "nav.suppliers",
+        roles: ["administrator", "inventory_clerk", "catalog_manager", "auditor"],
+        descriptionKey: "nav.descSuppliers",
       },
       {
         href: "/trading/issues",

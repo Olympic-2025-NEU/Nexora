@@ -167,7 +167,7 @@ export function DocumentsClient({ kind, id }: { kind: Kind; id?: string }) {
 
   return <main className="mx-auto max-w-5xl space-y-6">
     <h1 className="text-2xl font-semibold">{kind === "receipts" ? "Nhập kho" : "Xuất kho"}</h1>
-    <nav className="flex gap-4"><Link href="/trading/receipts">Nhập kho</Link><Link href="/trading/issues">Xuất kho</Link>
+    <nav className="flex gap-4"><Link href="/trading/inbound">Nhập hàng</Link><Link href="/trading/issues">Xuất kho</Link>
       {kind === "issues" && <Link href="/trading/approvals">Hộp duyệt</Link>}</nav>
     <form onSubmit={submit} className="grid gap-3 rounded border p-4 sm:grid-cols-2">
       <label>Sản phẩm / biến thể<select className="w-full border p-2" value={variantId} required

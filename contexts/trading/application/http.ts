@@ -37,11 +37,17 @@ function parseLines(raw: unknown, kind: TradingKind): LineInput[] {
 }
 
 function parseInput(raw: unknown, kind: TradingKind, edit = false) {
-  const body = assertBody(raw, edit ? ["lines", "note"] :
-    ["lines", "note", "purpose", "correctionOfDocumentId", "correctionReason"]);
+  const body = assertBody(raw, edit ? ["lines", "note", "localSupplierId"] :
+    ["lines", "note", "purpose", "correctionOfDocumentId", "correctionReason", "localSupplierId"]);
   if (!edit && body.lines === undefined) throw new DomainError("LINES_INVALID", 422);
   if (body.note !== undefined && (typeof body.note !== "string" || body.note.length > 2000)) {
     throw new DomainError("NOTE_INVALID", 422);
+  }
+  if (body.localSupplierId !== undefined && body.localSupplierId !== null) {
+    if (typeof body.localSupplierId !== "string" || !isUuid(body.localSupplierId)) {
+      throw new DomainError("LOCAL_SUPPLIER_ID_INVALID", 422);
+    }
+    if (kind === "goods_issue") throw new DomainError("FIELD_NOT_ALLOWED", 422);
   }
   if (!edit) {
     for (const key of ["correctionOfDocumentId", "correctionReason"]) {
@@ -114,7 +120,7 @@ export async function tradingRoute(request: NextRequest, kind: TradingKind,
         if (action && id && version !== null) return tradingService.action(args, kind, id,
           action as typeof actions[number], version);
         if (request.method === "PATCH" && id && version !== null) return tradingService.edit(args, kind, id,
-          version, body as { lines?: LineInput[]; note?: string });
+          version, body as { lines?: LineInput[]; note?: string; localSupplierId?: string | null });
         return tradingService.create(args, kind, body as DocumentInput);
       },
     });

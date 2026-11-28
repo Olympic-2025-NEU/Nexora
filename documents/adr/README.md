@@ -1,6 +1,6 @@
 # Nexora ADRs (P00)
 
-- **Canonical SoT:** numbered `0001`…`0019`.
+- **Canonical SoT:** numbered `0001`…`0020`.
 - **Evidence detail:** phase-00 `D0x-*.md` (spike write-ups). Mapping: `decision-log.md`.
 - **D03:** Prisma **CHỐT** — [`0003-database-prisma.md`](./0003-database-prisma.md). [`D03-database-transaction-migrations.md`](./D03-database-transaction-migrations.md) is **Superseded**.
 - G00 still required before treating P01 as unblocked.
@@ -26,3 +26,4 @@
 | D17 | [0017-catalog-variant-uom-price.md](./0017-catalog-variant-uom-price.md) (**Accepted design**; DDL chờ duyệt pack) | BRD/SRS product-catalog; pack `evidence/p065-schema-design.md` | P065 / G06.5 / trước P07 |
 | D18 | [0018-rbac-multi-job-roles.md](./0018-rbac-multi-job-roles.md) (**Accepted**) | security.md; supersedes single-role membership | Members / policy / Keycloak |
 | D19 | [0019-commercial-sales-order.md](./0019-commercial-sales-order.md) (**Accepted**) | BRD/SRS sales-order; BRD-Trace FR-01/02 | Commercial Order / POS checkout / invoice QR |
+| D20 | [0020-unified-inbound-local-supplier.md](./0020-unified-inbound-local-supplier.md) (**Accepted**) | BRD-partner-link; SRS-UI-surfaces inbound | Unified inbound UI + LocalSupplier ≠ Partner |

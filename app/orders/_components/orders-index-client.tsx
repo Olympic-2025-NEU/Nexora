@@ -9,15 +9,22 @@ import { ListFilters, type FilterField } from "@/app/components/ui/list-filters"
 import { PageHeader } from "@/app/components/ui/page-header";
 import { useT } from "@/app/i18n/LocaleProvider";
 import { adminApi } from "@/app/lib/admin-api";
+import { cn } from "@/app/lib/cn";
 
 type OrderRow = {
   id: string;
   orderNumber: string;
   status: string;
   version: number;
-  totalAmount: string;
   currency: string;
+  subtotalAmount: string;
+  discountAmount: string;
+  totalAmount: string;
+  paidAmount: string;
   soldAt: string;
+  sellerDisplayName?: string | null;
+  customerDisplayName?: string | null;
+  customerCode?: string | null;
   linkedIssueId: string | null;
   lines: { id: string; quantity: string }[];
   qrPath: string | null;
@@ -30,50 +37,89 @@ function formatWhen(iso: string | null | undefined): string {
   const d = new Date(iso);
   if (!Number.isFinite(d.getTime())) return iso;
   try {
-    return new Intl.DateTimeFormat(undefined, {
-      dateStyle: "short",
-      timeStyle: "short",
-    }).format(d);
+    return new Intl.DateTimeFormat("vi-VN", {
+      hour: "2-digit",
+      minute: "2-digit",
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour12: false,
+    })
+      .format(d)
+      .replace(",", "");
   } catch {
     return iso;
   }
 }
 
-function formatMoney(amount: string, currency: string): string {
+function formatAmount(amount: string): string {
   const n = Number(amount);
   if (!Number.isFinite(n)) return amount;
   try {
-    return new Intl.NumberFormat(undefined, {
-      style: "currency",
-      currency: currency || "VND",
+    return new Intl.NumberFormat("vi-VN", {
       maximumFractionDigits: 0,
     }).format(n);
   } catch {
-    return `${amount} ${currency}`;
+    return amount;
   }
 }
 
-function statusTone(status: string): string {
-  switch (status) {
-    case "fulfilled":
-      return "text-emerald-700 dark:text-emerald-400";
-    case "paid":
-      return "text-sky-700 dark:text-sky-400";
-    case "draft":
-      return "text-amber-700 dark:text-amber-400";
-    case "cancelled":
-      return "text-muted-foreground line-through";
-    default:
-      return "text-foreground";
-  }
+function debtAmount(total: string, paid: string): number {
+  const t = Number(total);
+  const p = Number(paid);
+  if (!Number.isFinite(t) || !Number.isFinite(p)) return 0;
+  return Math.max(0, t - p);
 }
 
-function statusLabel(status: string, t: (key: string) => string): string {
-  if (status === "draft") return t("orders.statusDraft");
-  if (status === "paid") return t("orders.statusPaid");
-  if (status === "fulfilled") return t("orders.statusFulfilled");
-  if (status === "cancelled") return t("orders.statusCancelled");
-  return status;
+function isFullyPaid(row: OrderRow): boolean {
+  const total = Number(row.totalAmount);
+  const paid = Number(row.paidAmount);
+  if (!Number.isFinite(total) || !Number.isFinite(paid)) return false;
+  return paid + 1e-9 >= total && total > 0;
+}
+
+function StatusBadges({
+  row,
+  t,
+}: {
+  row: OrderRow;
+  t: (key: string) => string;
+}) {
+  if (row.status === "cancelled") {
+    return (
+      <span className="inline-flex rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+        {t("orders.statusCancelled")}
+      </span>
+    );
+  }
+  if (row.status === "draft") {
+    return (
+      <span className="inline-flex rounded-md bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-800 dark:text-amber-300">
+        {t("orders.statusDraft")}
+      </span>
+    );
+  }
+
+  const sold =
+    row.status === "fulfilled" || row.status === "paid" || row.status === "confirmed";
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {sold ? (
+        <span className="inline-flex rounded-md bg-emerald-500/15 px-2 py-0.5 text-xs font-medium text-emerald-800 dark:text-emerald-300">
+          {t("orders.statusSold")}
+        </span>
+      ) : null}
+      {isFullyPaid(row) ? (
+        <span className="inline-flex rounded-md bg-teal-500/15 px-2 py-0.5 text-xs font-medium text-teal-800 dark:text-teal-300">
+          {t("orders.statusCollected")}
+        </span>
+      ) : Number(row.paidAmount) > 0 ? (
+        <span className="inline-flex rounded-md bg-sky-500/15 px-2 py-0.5 text-xs font-medium text-sky-800 dark:text-sky-300">
+          {t("orders.statusPartialPaid")}
+        </span>
+      ) : null}
+    </div>
+  );
 }
 
 export function OrdersIndexClient() {
@@ -189,47 +235,75 @@ export function OrdersIndexClient() {
             </div>
           ) : (
             <div className="overflow-x-auto rounded-lg border border-border bg-card">
-              <table className="w-full min-w-[48rem] text-left text-sm">
-                <thead className="border-b border-border bg-muted/40 text-muted-foreground">
+              <table className="w-full min-w-[72rem] text-left text-sm">
+                <thead className="border-b border-border bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
                   <tr>
-                    <th className="px-3 py-2.5 font-medium">{t("orders.colNumber")}</th>
-                    <th className="px-3 py-2.5 font-medium">{t("orders.colStatus")}</th>
-                    <th className="px-3 py-2.5 text-right font-medium">{t("orders.colTotal")}</th>
-                    <th className="px-3 py-2.5 font-medium">{t("orders.colSoldAt")}</th>
-                    <th className="px-3 py-2.5 font-medium">{t("orders.colTrace")}</th>
-                    <th className="px-3 py-2.5 font-medium">{t("admin.actions")}</th>
+                    <th className="px-3 py-2.5 font-semibold">{t("orders.colNumber")}</th>
+                    <th className="px-3 py-2.5 font-semibold">{t("orders.colTime")}</th>
+                    <th className="px-3 py-2.5 font-semibold">{t("orders.colCustomer")}</th>
+                    <th className="px-3 py-2.5 font-semibold">{t("orders.colSeller")}</th>
+                    <th className="px-3 py-2.5 text-right font-semibold">{t("orders.colGoodsTotal")}</th>
+                    <th className="px-3 py-2.5 text-right font-semibold">{t("orders.colDiscount")}</th>
+                    <th className="px-3 py-2.5 text-right font-semibold">{t("orders.colAfterDiscount")}</th>
+                    <th className="px-3 py-2.5 text-right font-semibold">{t("orders.colPaid")}</th>
+                    <th className="px-3 py-2.5 text-right font-semibold">{t("orders.colDebt")}</th>
+                    <th className="px-3 py-2.5 font-semibold">{t("orders.colStatus")}</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {items.map((row) => (
-                    <tr key={row.id} className="border-b border-border/70 hover:bg-muted/20">
-                      <td className="px-3 py-2.5 align-middle">
-                        <Link
-                          href={`/orders/${row.id}`}
-                          className="font-medium text-foreground hover:text-primary hover:underline"
+                  {items.map((row) => {
+                    const debt = debtAmount(row.totalAmount, row.paidAmount);
+                    const discount = Number(row.discountAmount);
+                    return (
+                      <tr key={row.id} className="border-b border-border/70 hover:bg-muted/20">
+                        <td className="px-3 py-2.5 align-middle">
+                          <Link
+                            href={`/orders/${row.id}`}
+                            className="font-medium text-orange-700 hover:underline dark:text-orange-400"
+                          >
+                            {row.orderNumber}
+                          </Link>
+                        </td>
+                        <td className="px-3 py-2.5 align-middle whitespace-nowrap text-muted-foreground">
+                          {formatWhen(row.soldAt)}
+                        </td>
+                        <td className="px-3 py-2.5 align-middle">
+                          {row.customerDisplayName || t("orders.walkInCustomer")}
+                        </td>
+                        <td className="px-3 py-2.5 align-middle text-muted-foreground">
+                          {row.sellerDisplayName || "—"}
+                        </td>
+                        <td className="px-3 py-2.5 align-middle text-right tabular-nums">
+                          {formatAmount(row.subtotalAmount)}
+                        </td>
+                        <td
+                          className={cn(
+                            "px-3 py-2.5 align-middle text-right tabular-nums",
+                            discount > 0 ? "text-red-600 dark:text-red-400" : "text-muted-foreground",
+                          )}
                         >
-                          {row.orderNumber}
-                        </Link>
-                      </td>
-                      <td className={`px-3 py-2.5 align-middle ${statusTone(row.status)}`}>
-                        {statusLabel(row.status, t)}
-                      </td>
-                      <td className="px-3 py-2.5 align-middle text-right tabular-nums">
-                        {formatMoney(row.totalAmount, row.currency)}
-                      </td>
-                      <td className="px-3 py-2.5 align-middle text-muted-foreground">
-                        {formatWhen(row.soldAt)}
-                      </td>
-                      <td className="px-3 py-2.5 align-middle font-mono text-xs text-muted-foreground">
-                        {row.qrPath ? t("orders.hasQr") : "—"}
-                      </td>
-                      <td className="px-3 py-2.5 align-middle">
-                        <Button type="button" size="sm" variant="secondary" asChild>
-                          <Link href={`/orders/${row.id}`}>{t("orders.open")}</Link>
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
+                          {formatAmount(row.discountAmount)}
+                        </td>
+                        <td className="px-3 py-2.5 align-middle text-right tabular-nums">
+                          {formatAmount(row.totalAmount)}
+                        </td>
+                        <td className="px-3 py-2.5 align-middle text-right tabular-nums">
+                          {formatAmount(row.paidAmount)}
+                        </td>
+                        <td
+                          className={cn(
+                            "px-3 py-2.5 align-middle text-right tabular-nums",
+                            debt > 0 ? "text-foreground" : "text-muted-foreground",
+                          )}
+                        >
+                          {formatAmount(String(debt))}
+                        </td>
+                        <td className="px-3 py-2.5 align-middle">
+                          <StatusBadges row={row} t={t} />
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

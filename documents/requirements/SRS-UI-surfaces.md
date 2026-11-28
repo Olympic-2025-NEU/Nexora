@@ -13,8 +13,18 @@
 | S-ERP | Primary nav | `/catalog`, `/inventory`, `/partners` | Products **index (table rows)**, product detail/variants; batches; warehouses; balances; unified partner connection hub |
 | S-CAT | Catalog masters | `/catalog` | Categories tree; UOM master; price lists + items (per product-catalog SRS) |
 | S-ADM | System admin (user-menu entry) | `/admin` | Hub (system only); Organization; Members (**index table** + invite/edit/assign-roles **modals**) |
-| S-TRD | Trading | `/trading` | From P07 |
+| S-TRD | Trading | `/trading` | From P07; **inbound** unified at `/trading/inbound` (ADR 0020) |
 | S-TRC | Trace | `/trace` | From P08 |
+
+### Inbound / local suppliers (ADR 0020)
+
+| Route | Requirement |
+| --- | --- |
+| `/trading/inbound` | Unified list: `sourceKind` local (`goods_receipt`) vs nexora (`receiving_confirmation`); filter by status / q |
+| `/trading/inbound/new`, `/trading/inbound/[id]` | **Same form** create/edit: segmented source type; local → LocalSupplier + free lines; nexora → inbound notice + mapped lots |
+| `/trading/suppliers` | CRUD **LocalSupplier** (retail / non-Nexora). Not `/partners`. |
+
+**LocalSupplier ≠ Partner:** do not put non-Nexora vendors on `system.partner`. Partner hub stays federation-only.
 
 ### Catalog routes (requirements — implement with API)
 
@@ -46,6 +56,8 @@ Default notice URL derived from partner system address: `https://{domain}/api/v1
 | `/admin/federation` | `/partners` |
 | `/partners/new` | `/partners` |
 | `/partners/[id]` | `/partners` |
+| `/trading/receivings`, `/trading/receivings/create`, `/trading/receivings/[id]` | `/trading/inbound` (+ `?kind=nexora` on detail) |
+| `/trading/receipts` | `/trading/inbound?sourceKind=local` |
 | `/admin/products` | `/products` (legacy `/catalog/products` also redirects) |
 | `/admin/batches` | `/catalog/batches` |
 | `/admin/warehouses` | `/inventory/warehouses` |

@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { ReceivingsClient } from "../_components/receivings-client";
-export const instant = false;
-export default async function ReceivingPage({ params }: { params: Promise<{ id: string }> }) {
-  return <ReceivingsClient id={(await params).id} />;
+import { redirect } from "next/navigation";
+
+export default async function ReceivingsDetailRedirectPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  redirect(`/trading/inbound/${id}?kind=nexora`);
 }

@@ -76,6 +76,16 @@ const nextConfig: NextConfig = {
         permanent: false,
       },
       {
+        source: "/catalog/categories",
+        destination: "/categories",
+        permanent: false,
+      },
+      {
+        source: "/catalog/uom",
+        destination: "/uom",
+        permanent: false,
+      },
+      {
         source: "/admin/batches",
         destination: "/catalog/batches",
         permanent: false,

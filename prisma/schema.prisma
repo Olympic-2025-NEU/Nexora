@@ -407,6 +407,27 @@ model Partner {
   @@schema("system")
 }
 
+/// Retail / non-Nexora supplier master (ADR 0020). Not system.Partner.
+model LocalSupplier {
+  id            String    @id @db.Uuid
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+  version       Int       @default(1)
+  code          String    @unique
+  displayName   String    @map("display_name")
+  status        String    @default("active")
+  contactPhone  String?   @map("contact_phone")
+  contactEmail  String?   @map("contact_email")
+  note          String?
+  createdBySub  String    @map("created_by_sub")
+
+  receipts ReceiptDetail[]
+
+  @@index([status, displayName], map: "idx_local_supplier_status_name")
+  @@map("local_supplier")
+  @@schema("catalog")
+}
+
 model PartnerConnection {
   id                   String    @id @db.Uuid
   createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -756,6 +777,7 @@ model Document {
   lines        DocumentLine[]
   transferDetail TransferDetail? @relation("TransferDocument")
   receivingDetail ReceivingDetail?
+  receiptDetail ReceiptDetail?
   saleDetail SaleDetail? @relation("SaleDocument")
   transferIssues TransferDetail[] @relation("TransferIssue")
   saleIssues SaleDetail[] @relation("SaleIssue")
@@ -770,6 +792,19 @@ model Document {
   @@index([documentType, createdAt(sort: Desc)], map: "idx_trading_document_type_time")
   @@index([correctionOfDocumentId], map: "idx_trading_document_correction")
   @@map("document")
+  @@schema("trading")
+}
+
+/// Optional header for goods_receipt — local retail supplier (ADR 0020).
+model ReceiptDetail {
+  documentId       String  @id @map("document_id") @db.Uuid
+  localSupplierId  String? @map("local_supplier_id") @db.Uuid
+
+  document       Document       @relation(fields: [documentId], references: [id])
+  localSupplier  LocalSupplier? @relation(fields: [localSupplierId], references: [id])
+
+  @@index([localSupplierId], map: "idx_receipt_detail_supplier")
+  @@map("receipt_detail")
   @@schema("trading")
 }
 

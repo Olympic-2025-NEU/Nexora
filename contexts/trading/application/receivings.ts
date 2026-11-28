@@ -123,13 +123,27 @@ export function createReceivingService(ports: ReceivingPorts, instanceId: string
         source(ctx).listInboundAnnouncements(), ctx.tx.warehouse.findMany({ where: { status: "active" },
           select: { id: true, name: true }, take: 100 }),
       ]);
+      const issuers = [...new Set(messages.map((m) => m.issuerInstanceId))];
+      const partners = issuers.length
+        ? await ctx.tx.partner.findMany({
+            where: { issuerInstanceId: { in: issuers } },
+            select: { issuerInstanceId: true, displayName: true, code: true },
+          })
+        : [];
+      const partnerByIssuer = new Map(partners.map((p) => [p.issuerInstanceId, p]));
       const notifications = await Promise.all(messages.map(async (message) => {
         const receipt = await ctx.tx.receivingDetail.findFirst({ where: {
           sourceIssuerInstanceId: message.issuerInstanceId,
           sourceTransferId: message.sourceDocument.id,
           document: { status: { not: "cancelled" } },
         }, select: { document: { select: { status: true } } } });
-        return { ...message, receivingStatus: receipt?.document.status ?? "pending_receipt" };
+        const partner = partnerByIssuer.get(message.issuerInstanceId);
+        return {
+          ...message,
+          receivingStatus: receipt?.document.status ?? "pending_receipt",
+          partnerDisplayName: partner?.displayName ?? null,
+          partnerCode: partner?.code ?? null,
+        };
       }));
       return { source: "verified_inbox_or_seeded_fixture", messages: notifications, warehouses: warehouses.filter((row) =>
         ctx.actor.roles.includes("administrator") || ctx.actor.unitIds.includes(row.id)) };

@@ -23,6 +23,8 @@ Trong thực tế, khi **một bên xuất hàng và một bên nhận hàng**, 
 
 **Không làm (MVP):** tách danh mục “Nhà cung cấp” và “Khách hàng” chỉ vì hai DN cùng dùng Nexora; không biến Partner thành master CRM khách/NCC thuần (không có instance Nexora) — xem [`BRD.md`](./BRD.md) §5.
 
+**NCC lẻ (ADR 0020):** nhà cung cấp không dùng Nexora là aggregate riêng `catalog.local_supplier`, UI `/trading/suppliers` và gắn trên phiếu nhập nội bộ (`goods_receipt` / `/trading/inbound`). Không tạo `partner_connection`, không giả `issuerInstanceId`.
+
 ## 2. Thuật ngữ UI (bắt buộc)
 
 | Không dùng trên UI người dùng | Dùng trên UI |

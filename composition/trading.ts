@@ -82,8 +82,16 @@ export const tradingPorts: TradingPorts & TransferPorts & ReceivingPorts = {
   },
 };
 export const tradingService = createDocumentService(tradingPorts);
-export const transferService = () => createTransferService(tradingPorts, process.env.NEXORA_ISSUER_INSTANCE_ID ?? "");
-export const receivingService = () => createReceivingService(tradingPorts, process.env.NEXORA_ISSUER_INSTANCE_ID ?? "");
+/** Prefer NEXORA_ISSUER_INSTANCE_ID; fall back to INSTANCE_ID so host Next.dev works without worker-only env. */
+function localIssuerInstanceId() {
+  return (
+    process.env.NEXORA_ISSUER_INSTANCE_ID?.trim() ||
+    (process.env.INSTANCE_ID?.trim() ? `nexora-${process.env.INSTANCE_ID.trim()}` : "") ||
+    ""
+  );
+}
+export const transferService = () => createTransferService(tradingPorts, localIssuerInstanceId());
+export const receivingService = () => createReceivingService(tradingPorts, localIssuerInstanceId());
 export const stocktakeService = () => createStocktakeService({ audit: tradingPorts.audit, adjust: adjustStock,
   event(input) {
     return serializeDomainEvent({ type: TRADING_EVENT_TYPES.stocktake, aggregateType: "document",

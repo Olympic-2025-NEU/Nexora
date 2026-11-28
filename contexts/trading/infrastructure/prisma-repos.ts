@@ -65,18 +65,20 @@ export function createTradingRepos(tx: Prisma.TransactionClient) {
     async attachDetail(input:
       | { type: "partner_transfer"; data: Prisma.TransferDetailUncheckedCreateInput }
       | { type: "receiving_confirmation"; data: Prisma.ReceivingDetailUncheckedCreateInput }
-      | { type: "sale_record"; data: Prisma.SaleDetailUncheckedCreateInput }) {
+      | { type: "sale_record"; data: Prisma.SaleDetailUncheckedCreateInput }
+      | { type: "goods_receipt"; data: Prisma.ReceiptDetailUncheckedCreateInput }) {
       switch (input.type) {
         case "partner_transfer": return tx.transferDetail.create({ data: input.data });
         case "receiving_confirmation": return tx.receivingDetail.create({ data: input.data });
         case "sale_record": return tx.saleDetail.create({ data: input.data });
+        case "goods_receipt": return tx.receiptDetail.create({ data: input.data });
       }
     },
 
     getAggregate(id: string) {
       return tx.document.findUnique({ where: { id }, include: {
         lines: { orderBy: { lineNo: "asc" }, include: { sourceAllocations: true } }, transferDetail: true,
-        receivingDetail: true, saleDetail: true,
+        receivingDetail: true, receiptDetail: { include: { localSupplier: true } }, saleDetail: true,
       } });
     },
     async lockDocument(id: string) {

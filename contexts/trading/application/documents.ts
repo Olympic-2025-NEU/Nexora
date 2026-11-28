@@ -14,7 +14,7 @@ export type TradingKind = "goods_receipt" | "goods_issue";
 export type LineInput = { warehouseId: string; productVariantId: string; batchId: string;
   quantity: string; uomId: string; sources?: { sourceLineId: string; quantity: string }[] };
 export type DocumentInput = { lines: LineInput[]; note?: string; purpose?: "partner_transfer" | "sale" | "other";
-  correctionOfDocumentId?: string; correctionReason?: string };
+  correctionOfDocumentId?: string; correctionReason?: string; localSupplierId?: string | null };
 type Context = { tx: Prisma.TransactionClient; actor: Actor; requestId: string; emit(event: OutboxEventInput): void };
 export type TradingPorts = {
   adjust(tx: Prisma.TransactionClient, input: { warehouseId: string; batchId: string; productId: string;
@@ -123,14 +123,27 @@ export function createDocumentService(ports: TradingPorts) {
     }));
     const approval = kind === "goods_issue" ? await repo.findApproval(id) : null;
     const approvalHistory = approval ? await repo.findApprovalHistory(approval.id) : [];
+    const receipt = kind === "goods_receipt" ? doc.receiptDetail : null;
     return { id: doc.id, documentType: doc.documentType, documentNumber: doc.documentNumber,
       status: doc.status, version: doc.version, note: doc.note, purpose: doc.issuePurpose,
       correctionOfDocumentId: doc.correctionOfDocumentId, correctionReason: doc.correctionReason,
+      localSupplierId: receipt?.localSupplierId ?? null,
+      localSupplier: receipt?.localSupplier
+        ? { id: receipt.localSupplier.id, code: receipt.localSupplier.code,
+          displayName: receipt.localSupplier.displayName }
+        : null,
       createdAt: doc.createdAt.toISOString(), confirmedAt: doc.confirmedAt?.toISOString() ?? null,
       approval: approval ? { id: approval.id, state: approval.state, lineHash: approval.lineSnapshotSha256,
         processInstanceId: approval.flowableProcessId, processDefinitionVersion: approval.flowableDefinitionVersion,
         history: approvalHistory.map((entry) => ({ action: entry.action, at: entry.createdAt.toISOString(),
           before: entry.beforeSummary, after: entry.afterSummary })) } : null, lines };
+  }
+
+  async function resolveLocalSupplier(ctx: Context, localSupplierId: string | null | undefined) {
+    if (localSupplierId === undefined || localSupplierId === null) return null;
+    const row = await ctx.tx.localSupplier.findUnique({ where: { id: localSupplierId } });
+    if (!row || row.status !== "active") throw new DomainError("LOCAL_SUPPLIER_NOT_FOUND", 422);
+    return row.id;
   }
 
   async function correction(ctx: Context, id: string, kind: TradingKind, input: DocumentInput) {
@@ -157,9 +170,18 @@ export function createDocumentService(ports: TradingPorts) {
     const repo = createTradingRepos(ctx.tx);
     if (allocations.length) await repo.checkSourceReferences(input.lines,
       prepared.map((item) => item.stockUomId));
+    if (kind === "goods_issue" && input.localSupplierId !== undefined && input.localSupplierId !== null) {
+      throw new DomainError("FIELD_NOT_ALLOWED", 422);
+    }
+    const localSupplierId = kind === "goods_receipt"
+      ? await resolveLocalSupplier(ctx, input.localSupplierId)
+      : null;
     await repo.createDocument({ id, documentType: kind, createdBySub: ctx.actor.userId,
       correlationId: ctx.requestId, note: input.note, issuePurpose: kind === "goods_issue" ? input.purpose : null,
       correctionOfDocumentId: input.correctionOfDocumentId, correctionReason: input.correctionReason });
+    if (kind === "goods_receipt") {
+      await repo.attachDetail({ type: "goods_receipt", data: { documentId: id, localSupplierId } });
+    }
     await repo.createLines(id, input.lines.map((line, i) => ({ id: lineIds[i]!, lineNo: i + 1,
       warehouseId: line.warehouseId, batchId: line.batchId, productVariantId: line.productVariantId,
       productId: prepared[i]!.productId, uomId: line.uomId, quantity: line.quantity })));
@@ -280,13 +302,16 @@ export function createDocumentService(ports: TradingPorts) {
       return { items: await Promise.all(page.items.map((doc) => view(ctx, doc.id, kind))), nextCursorId: page.nextCursorId };
     },
     async edit(ctx: Context, kind: TradingKind, id: string, expectedVersion: number,
-      input: { lines?: LineInput[]; note?: string }) {
+      input: { lines?: LineInput[]; note?: string; localSupplierId?: string | null }) {
       const repo = createTradingRepos(ctx.tx);
       const doc = await repo.getAggregate(id);
       if (!doc || doc.documentType !== kind) throw new DomainError("DOCUMENT_NOT_FOUND", 404);
       if (doc.version !== expectedVersion) throw new DomainError("VERSION_CONFLICT", 409);
       try { checkTransition(kind, doc.status, "edit"); } catch (err) { normalizeTransition(err); }
       doc.lines.forEach((line) => inScope(ctx.actor, line.warehouseId));
+      if (kind === "goods_issue" && input.localSupplierId !== undefined) {
+        throw new DomainError("FIELD_NOT_ALLOWED", 422);
+      }
       if (input.lines && input.lines.length > 100) throw new DomainError("TOO_MANY_LINES", 422);
       const prepared = await Promise.all((input.lines ?? []).map((line) => validateLine(ctx, line)));
       if (input.lines) {
@@ -301,6 +326,14 @@ export function createDocumentService(ports: TradingPorts) {
         if (allocations.length) await ctx.tx.issueSourceAllocation.createMany({ data: allocations });
       } else if (!await repo.updateDraft(id, expectedVersion, { note: input.note })) {
         throw new DomainError("VERSION_CONFLICT", 409);
+      }
+      if (kind === "goods_receipt" && input.localSupplierId !== undefined) {
+        const localSupplierId = await resolveLocalSupplier(ctx, input.localSupplierId);
+        await ctx.tx.receiptDetail.upsert({
+          where: { documentId: id },
+          create: { documentId: id, localSupplierId },
+          update: { localSupplierId },
+        });
       }
       await ports.audit(ctx.tx, { actorSub: ctx.actor.userId, action: "trading.document.edit",
         id, requestId: ctx.requestId, before: "draft", after: "draft", version: expectedVersion + 1 });

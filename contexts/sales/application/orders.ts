@@ -461,10 +461,40 @@ export function createSalesOrderService(ports: SalesOrderPorts) {
         ...(opts?.cursorId ? { cursor: { id: opts.cursorId }, skip: 1 } : {}),
       });
       const page = items.slice(0, limit);
+      const sellerIds = [...new Set(page.map((r) => r.sellerMembershipId).filter(Boolean))] as string[];
+      const customerIds = [...new Set(page.map((r) => r.customerPartnerId).filter(Boolean))] as string[];
+      const [sellers, customers] = await Promise.all([
+        sellerIds.length
+          ? ctx.tx.membership.findMany({
+              where: { id: { in: sellerIds } },
+              select: { id: true, displayName: true },
+            })
+          : Promise.resolve([] as { id: string; displayName: string }[]),
+        customerIds.length
+          ? ctx.tx.partner.findMany({
+              where: { id: { in: customerIds } },
+              select: { id: true, displayName: true, code: true },
+            })
+          : Promise.resolve([] as { id: string; displayName: string; code: string }[]),
+      ]);
+      const sellerById = new Map(sellers.map((s) => [s.id, s.displayName]));
+      const customerById = new Map(customers.map((c) => [c.id, c]));
       return {
         items: page.map((row) => {
           const active = row.tokens.find((t) => t.status === "active");
-          return toView(row, { qrUrl: resolveQrUrl(active?.qrPath ?? null) });
+          const customer = row.customerPartnerId
+            ? customerById.get(row.customerPartnerId)
+            : undefined;
+          return toView(row, {
+            qrUrl: resolveQrUrl(active?.qrPath ?? null),
+            display: {
+              sellerDisplayName: row.sellerMembershipId
+                ? sellerById.get(row.sellerMembershipId) ?? null
+                : null,
+              customerDisplayName: customer?.displayName ?? null,
+              customerCode: customer?.code ?? null,
+            },
+          });
         }),
         nextCursorId: items.length > limit ? page[page.length - 1]!.id : null,
       };
