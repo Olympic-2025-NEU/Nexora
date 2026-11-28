@@ -97,3 +97,5 @@
   }
   body:has(.qr-print-area) .qr-print-area .print\:hidden { display: none; }
 }
+
+:where(table tbody tr:nth-child(even)) { background-color: color-mix(in srgb, var(--muted) 35%, transparent); }

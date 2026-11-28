@@ -11,6 +11,7 @@ export type AppRole =
 export type NavItem = {
   href: string;
   labelKey: string;
+  section: string;
   /** Roles that may see this link. "*" = all authenticated. */
   roles: AppRole[] | "*";
 };
@@ -21,67 +22,132 @@ export type NavItem = {
  */
 export const APP_NAV: NavItem[] = [
   {
-    href: "/catalog/products",
-    labelKey: "nav.products",
+    href: "/trading/transfers",
+    labelKey: "nav.transfers",
+    section: "nav.groupTrading",
     roles: ["administrator", "staff", "approver", "viewer"],
   },
   {
-    href: "/catalog/categories",
-    labelKey: "nav.categories",
+    href: "/trading/receivings",
+    labelKey: "nav.receivings",
+    section: "nav.groupTrading",
     roles: ["administrator", "staff", "approver", "viewer"],
   },
   {
-    href: "/catalog/uom",
-    labelKey: "nav.uom",
+    href: "/trading/receipts",
+    labelKey: "nav.receipts",
+    section: "nav.groupTrading",
     roles: ["administrator", "staff", "approver", "viewer"],
   },
   {
-    href: "/catalog/pricing",
-    labelKey: "nav.pricing",
+    href: "/trading/issues",
+    labelKey: "nav.issues",
+    section: "nav.groupTrading",
     roles: ["administrator", "staff", "approver", "viewer"],
   },
   {
-    href: "/catalog/batches",
-    labelKey: "nav.batches",
+    href: "/trading/sales",
+    labelKey: "nav.sales",
+    section: "nav.groupTrading",
     roles: ["administrator", "staff", "approver", "viewer"],
   },
   {
-    href: "/inventory/warehouses",
-    labelKey: "nav.warehouses",
+    href: "/trading/approvals",
+    labelKey: "nav.approvals",
+    section: "nav.groupTrading",
     roles: ["administrator", "staff", "approver", "viewer"],
   },
   {
-    href: "/inventory/balances",
-    labelKey: "nav.inventory",
+    href: "/trading/stocktakes",
+    labelKey: "nav.stocktakes",
+    section: "nav.groupTrading",
+    roles: ["administrator", "staff", "approver", "viewer"],
+  },
+  {
+    href: "/trading/history",
+    labelKey: "nav.history",
+    section: "nav.groupTrading",
     roles: ["administrator", "staff", "approver", "viewer"],
   },
   {
     href: "/partners",
     labelKey: "nav.partners",
+    section: "nav.groupTrading",
     roles: "*",
+  },
+  {
+    href: "/catalog/products",
+    labelKey: "nav.products",
+    section: "nav.groupCatalog",
+    roles: ["administrator", "staff", "approver", "viewer"],
+  },
+  {
+    href: "/catalog/categories",
+    labelKey: "nav.categories",
+    section: "nav.groupCatalog",
+    roles: ["administrator", "staff", "approver", "viewer"],
+  },
+  {
+    href: "/catalog/uom",
+    labelKey: "nav.uom",
+    section: "nav.groupCatalog",
+    roles: ["administrator", "staff", "approver", "viewer"],
+  },
+  {
+    href: "/catalog/pricing",
+    labelKey: "nav.pricing",
+    section: "nav.groupCatalog",
+    roles: ["administrator", "staff", "approver", "viewer"],
+  },
+  {
+    href: "/catalog/batches",
+    labelKey: "nav.batches",
+    section: "nav.groupCatalog",
+    roles: ["administrator", "staff", "approver", "viewer"],
+  },
+  {
+    href: "/inventory/warehouses",
+    labelKey: "nav.warehouses",
+    section: "nav.groupInventory",
+    roles: ["administrator", "staff", "approver", "viewer"],
+  },
+  {
+    href: "/inventory/balances",
+    labelKey: "nav.inventory",
+    section: "nav.groupInventory",
+    roles: ["administrator", "staff", "approver", "viewer"],
   },
   {
     href: "/trace",
     labelKey: "nav.trace",
+    section: "nav.groupTrace",
     roles: ["administrator", "staff", "approver", "viewer"],
   },
   {
     href: "/assistant",
     labelKey: "nav.assistant",
+    section: "nav.groupTrace",
     roles: ["administrator", "staff", "approver", "viewer"],
   },
 ];
 
 export const ADMIN_NAV: NavItem[] = [
-  { href: "/admin/federation", labelKey: "nav.federationOperations", roles: ["administrator"] },
+  {
+    href: "/admin/federation",
+    labelKey: "nav.federationOperations",
+    section: "nav.admin",
+    roles: ["administrator"],
+  },
   {
     href: "/admin/organization",
     labelKey: "nav.organization",
+    section: "nav.admin",
     roles: ["administrator", "staff", "approver", "viewer"],
   },
   {
     href: "/admin/members",
     labelKey: "nav.members",
+    section: "nav.admin",
     roles: ["administrator"],
   },
 ];
