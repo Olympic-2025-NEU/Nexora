@@ -60,9 +60,20 @@ export const APP_NAV: NavItem[] = [
     labelKey: "nav.partners",
     roles: "*",
   },
+  {
+    href: "/trace",
+    labelKey: "nav.trace",
+    roles: ["administrator", "staff", "approver", "viewer"],
+  },
+  {
+    href: "/assistant",
+    labelKey: "nav.assistant",
+    roles: ["administrator", "staff", "approver", "viewer"],
+  },
 ];
 
 export const ADMIN_NAV: NavItem[] = [
+  { href: "/admin/federation", labelKey: "nav.federationOperations", roles: ["administrator"] },
   {
     href: "/admin/organization",
     labelKey: "nav.organization",

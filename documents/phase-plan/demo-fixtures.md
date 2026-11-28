@@ -1,6 +1,6 @@
 # Fixture và kịch bản kiểm chứng A → B → C
 
-Đây là **dữ liệu đích cho test/demo**, chưa được seed trong repo. ID bên dưới là nhãn logic, script thực phải ghi ID UUID do hệ thống cấp vào manifest test. Mọi số lượng dùng unit `EA` và decimal string; precision chính thức theo D07. Fixture synthetic, không có người/secret thật.
+Đây là **dữ liệu đích cho test/demo**. P09-T01 đã có seed idempotent cho topology, danh mục/lô/kho, vai trò và partner stub tại `deploy/scripts/seed-abc.mjs`; tồn vẫn bằng 0 và không có movement. Các bước giao dịch, mapping từ message và A→B→C E2E thuộc T03–T09. ID bên dưới là nhãn logic; script ghi UUID thực vào manifest test bị Git ignore. Mọi số lượng dùng unit `EA` và decimal string; precision chính thức theo D07. Fixture synthetic, không có người/secret thật.
 
 ## 1. Ba instance và định danh lô
 

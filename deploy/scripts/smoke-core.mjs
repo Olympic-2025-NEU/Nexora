@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { parseEnv } from 'node:util';
 
 const instance = process.argv[2] || 'a';
+const requireUiStopped = process.argv.includes('--assert-ui-stopped');
 const results = [];
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const mask = (id) => `…${id.slice(-6)}`;
@@ -73,7 +74,7 @@ try {
   if (!/^[a-z0-9-]+$/.test(instance)) throw new Error('Invalid instance');
   const deploy = fileURLToPath(new URL('../', import.meta.url));
   env = parseEnv(readFileSync(resolve(deploy, 'instances', `${instance}.env`), 'utf8'));
-  project = process.env.COMPOSE_PROJECT_NAME || "nexora";
+  project = process.env.COMPOSE_PROJECT_NAME || `nexora-${instance}`;
   // Gateway HTTP is bound to host loopback; HTTPS may use a private local CA.
   base = `http://127.0.0.1:${env.GATEWAY_HTTP_PORT || '19080'}`;
 } catch {
@@ -83,7 +84,23 @@ try {
 }
 
 if (env) {
+  if (requireUiStopped) {
+    const active = ['erp', 'dx-lab', 'worker'].filter((service) => {
+      try {
+        return execFileSync('docker', ['inspect', '--format', '{{.State.Running}}',
+          `${project}-${service}-1`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim() === 'true';
+      } catch { return false; }
+    });
+    if (active.length) {
+      console.error(`ui-boundary\tFAIL\tstop ${active.join(', ')} before headless smoke`);
+      process.exit(1);
+    }
+    console.log('ui-boundary\tPASS\tERP, DX-Lab and worker stopped');
+  }
   const request = (path, init) => fetch(`${base}${path}`, { ...init, signal: AbortSignal.timeout(10000) });
+  // This probe runs inside core-data; browser-facing 127.0.0.1 issuer is not
+  // reachable from that container. Keycloak's backchannel serves the same realm.
+  const keycloakIssuer = `${env.OIDC_BASE_URL}${new URL(env.OIDC_ISSUER_URL).pathname}`;
   let token;
   let fileId;
   let memberId;
@@ -97,13 +114,13 @@ if (env) {
     return `HTTP ${response.status}`;
   });
   await step('SSO discovery', () => {
-    const response = keycloak(`${env.OIDC_ISSUER_URL}/.well-known/openid-configuration`);
+    const response = keycloak(`${keycloakIssuer}/.well-known/openid-configuration`);
     expectStatus(response, 200);
     return `HTTP ${response.status}`;
   });
   await step('SSO dev token', () => {
     if (!env.KC_DEV_USERNAME || !env.KC_DEV_USER_PASSWORD) throw new Error('dev credentials missing');
-    const response = keycloak(`${env.OIDC_ISSUER_URL}/protocol/openid-connect/token`, {
+    const response = keycloak(`${keycloakIssuer}/protocol/openid-connect/token`, {
       grant_type: 'password', client_id: env.OIDC_CLIENT_ID_ERP || 'erp-browser',
       username: env.KC_DEV_USERNAME, password: env.KC_DEV_USER_PASSWORD,
     });

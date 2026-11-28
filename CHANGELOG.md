@@ -1,8 +1,16 @@
 # Changelog
 
-Các thay đổi của Nexora sẽ được ghi tại đây. Chưa có bản phát hành dự thi.
+Các thay đổi của Nexora sẽ được ghi tại đây. Tag contest/semver chỉ tạo khi owner chốt tên (P13-T06).
 
 ## Unreleased
+
+### Phase 13 — Release / nghiệm thu (P13-T01–T09 / G13)
+
+- Freeze AC/PoF traceability (`documents/phase-plan/evidence/release-traceability.md`); known limitations register.
+- Security refresh (`test:security:p12`, `check:secrets`) and AGPL SPDX/license inventory re-verify.
+- Clean-install and deploy runbooks; E2E A→B→C journey script; demo 15m runbook; submission checklist (BTC fields owner-owned).
+- Release artifact prep (`npm run prep:release-archive` → source `.tar.gz` + sha256); **no git tag until user confirms tag name**.
+- Gate package `evidence/G13.md` — conditional release-ready if BTC/AC-13 second-person/submission receipt still open.
 
 ### Phase 06 — M02 Catalog & Inventory (P06-T01–T08 / G06)
 

@@ -52,8 +52,13 @@ try {
       -key-file local-key.pem `
       localhost `
       "*.localhost" `
+      gateway-a.nexora.test `
+      gateway-b.nexora.test `
+      gateway-c.nexora.test `
       127.0.0.1 `
       "::1"
+    $caRoot = (mkcert -CAROOT).Trim()
+    Copy-Item -LiteralPath (Join-Path $caRoot "rootCA.pem") -Destination (Join-Path $CertsDir "rootCA.pem") -Force
 } finally {
     Pop-Location
 }
@@ -72,5 +77,4 @@ Write-Host "Set in .env:" -ForegroundColor Yellow
 Write-Host '  PUBLIC_BASE_URL=https://127.0.0.1:${GATEWAY_HTTPS_PORT:-19443}'
 Write-Host ""
 Write-Host "NODE_EXTRA_CA_CERTS (for Node.js to trust local CA):" -ForegroundColor Yellow
-$caRoot = (mkcert -CAROOT).Trim()
 Write-Host "  `$env:NODE_EXTRA_CA_CERTS = '$caRoot\rootCA.pem'"

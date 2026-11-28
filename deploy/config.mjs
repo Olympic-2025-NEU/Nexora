@@ -46,8 +46,11 @@ const groups = {
 };
 
 const runtime = {
-  erp: { DATABASE_URL: "database", OIDC_ISSUER_URL: "url", PUBLIC_BASE_URL: "url" },
-  worker: { DATABASE_URL: "database", FLOWABLE_BASE_URL: "url", REDIS_URL: "redis", FLOWABLE_ADMIN_USER: "id", FLOWABLE_ADMIN_PASSWORD: "secret" },
+  erp: { DATABASE_URL: "database", OIDC_ISSUER_URL: "url", PUBLIC_BASE_URL: "url",
+    AI_BASE_URL: "url", AI_PROVIDER: "id" },
+  worker: { DATABASE_URL: "database", CORE_DATABASE_URL: "database", NEXORA_ISSUER_INSTANCE_ID: "id",
+    FLOWABLE_BASE_URL: "url", REDIS_URL: "redis", FLOWABLE_ADMIN_USER: "id", FLOWABLE_ADMIN_PASSWORD: "secret",
+    S3_ENDPOINT: "url", S3_ACCESS_KEY: "secret", S3_SECRET_KEY: "secret", S3_BUCKET_PRIVATE: "bucket" },
   "core-data": {
     CORE_DATABASE_URL: "database", S3_ENDPOINT: "url", S3_ACCESS_KEY: "secret",
     S3_SECRET_KEY: "secret", S3_BUCKET_PRIVATE: "bucket",
@@ -106,8 +109,23 @@ export function validateConfig(env, service) {
   const fields = service ? runtime[service] : Object.assign({}, ...Object.values(groups));
   const config = {};
   for (const [name, type] of Object.entries(fields)) config[name] = check(name, env[name], type);
+  if (service === "erp") {
+    if (!["none", "ollama"].includes(env.AI_PROVIDER)) fail("AI_PROVIDER");
+    if (env.AI_PROVIDER === "ollama" && (!env.AI_INTERNAL_TOKEN ||
+        env.AI_INTERNAL_TOKEN.length < 32 || env.AI_INTERNAL_TOKEN.startsWith("CHANGE_ME_"))) {
+      fail("AI_INTERNAL_TOKEN");
+    }
+  }
   if (service) return config;
   if (!/^[abc]$/.test(env.INSTANCE_ID)) fail("INSTANCE_ID");
+  if (env.APISIX_RENDERED_PATH &&
+      env.APISIX_RENDERED_PATH !== `./instances/${env.INSTANCE_ID}/apisix.generated.yaml`)
+    fail("APISIX_RENDERED_PATH");
+  if (env.APISIX_RENDERED_PATH &&
+      (!env.KC_ADMIN_USERNAME || !env.KC_ADMIN_PASSWORD ||
+       !env.KC_APPROVER_USERNAME || !env.KC_APPROVER_PASSWORD ||
+       new Set([env.KC_DEV_USERNAME, env.KC_ADMIN_USERNAME, env.KC_APPROVER_USERNAME]).size !== 3))
+    fail("KC_APPROVER_USERNAME");
 
   for (const [name, user, password, database] of [
     ["APP_DATABASE_URL", "APP_DB_USER", "APP_DB_PASSWORD", "APP_DB_NAME"],
@@ -129,9 +147,16 @@ export function validateConfig(env, service) {
   if (env.APP_DB_USER === env.CORE_DB_USER ||
       env.APP_DB_NAME === env.KEYCLOAK_DB_NAME || env.APP_DB_NAME === env.FLOWABLE_DB_NAME ||
       env.KEYCLOAK_DB_NAME === env.FLOWABLE_DB_NAME) fail("KEYCLOAK_DATABASE_URL");
-  if (config.OIDC_ISSUER_URL.href !== `${config.OIDC_BASE_URL.href.replace(/\/$/, "")}/realms/nexora`)
+  const frontend = env.OIDC_FRONTEND_URL
+    ? url("OIDC_FRONTEND_URL", env.OIDC_FRONTEND_URL, ["http:", "https:"])
+    : config.OIDC_BASE_URL;
+  if (env.OIDC_FRONTEND_URL && frontend.protocol === "http:" &&
+      !["127.0.0.1", "localhost"].includes(frontend.hostname)) fail("OIDC_FRONTEND_URL");
+  if (env.OIDC_FRONTEND_URL && env.OIDC_BACKCHANNEL_DYNAMIC !== "true")
+    fail("OIDC_BACKCHANNEL_DYNAMIC");
+  if (config.OIDC_ISSUER_URL.href !== `${frontend.href.replace(/\/$/, "")}/realms/nexora`)
     fail("OIDC_ISSUER_URL");
-  if (config.OIDC_JWKS_URL.href !== `${config.OIDC_ISSUER_URL.href}/protocol/openid-connect/certs`)
+  if (config.OIDC_JWKS_URL.href !== `${config.OIDC_BASE_URL.href.replace(/\/$/, "")}/realms/nexora/protocol/openid-connect/certs`)
     fail("OIDC_JWKS_URL");
   for (const name of ["OIDC_REDIRECT_URI_ERP", "OIDC_REDIRECT_URI_DXLAB"]) {
     if (config[name].origin !== config.PUBLIC_BASE_URL.origin) fail(name);
@@ -162,7 +187,13 @@ export function validateConfig(env, service) {
     const key = env[name].slice(4);
     if (env[name].startsWith("env:") && (!env[key] || env[key].startsWith("CHANGE_ME_"))) fail(name);
   }
-  if (env.AI_KEY_REF || env.AI_PROVIDER !== "none") check("AI_KEY_REF", env.AI_KEY_REF, "ref");
+  if (!["none", "ollama"].includes(env.AI_PROVIDER)) fail("AI_PROVIDER");
+  if (!["none", "redacted"].includes(env.AI_PROMPT_RETENTION ?? "none")) fail("AI_PROMPT_RETENTION");
+  if (env.AI_KEY_REF) check("AI_KEY_REF", env.AI_KEY_REF, "ref");
+  if (env.AI_PROVIDER === "ollama" && (!env.AI_INTERNAL_TOKEN ||
+      env.AI_INTERNAL_TOKEN.length < 32 || env.AI_INTERNAL_TOKEN.startsWith("CHANGE_ME_"))) {
+    fail("AI_INTERNAL_TOKEN");
+  }
   if (env.KC_DEV_USER_PASSWORD) check("KC_DEV_USER_PASSWORD", env.KC_DEV_USER_PASSWORD, "secret");
   if (env.KC_DEV_USERNAME) check("KC_DEV_USERNAME", env.KC_DEV_USERNAME, "id");
   return config;

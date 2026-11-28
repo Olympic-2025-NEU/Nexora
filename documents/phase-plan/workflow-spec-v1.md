@@ -35,3 +35,7 @@ Process key `goods-issue-approval`; businessKey = `approval_request.id` UUID (m�
 | Engine restart | Không mất process/task vì PG | Poller tiếp tục, process ID giữ |
 
 Gate AC-12 cần Flowable deployment ID/version, process instance/task/history từ engine, local approval/document state, balance trước/sau và tests restart/retry/self-approval/reject. [Flowable REST official](https://www.flowable.com/open-source/docs/bpmn/ch14-REST) xác nhận endpoint start process, query businessKey và task action; pin version thực tế trong D06.
+
+## Expiry v1 (P07-T07)
+
+V1 has no approval expiry. BPMN has no boundary timer; an app-only expiry leaves a live engine task for a dead request. Auto-cancellation would add an unappointed second decision maker. Requests wait for a decision or creator cancellation; inbox displays request age. Any future expiry must include a BPMN boundary timer and app/engine synchronization in one designed protocol.

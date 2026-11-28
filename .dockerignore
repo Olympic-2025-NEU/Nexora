@@ -1,6 +1,7 @@
 .git
 .github
 .next
+apps/dx-lab/.next
 node_modules
 **/.env
 **/.env.*
@@ -8,6 +9,8 @@ node_modules
 deploy/instances/*.env
 documents/phase-plan/evidence/spikes
 **/.venv
+**/__pycache__/
+*.pyc
 **/generated
 *.md
 !README.md

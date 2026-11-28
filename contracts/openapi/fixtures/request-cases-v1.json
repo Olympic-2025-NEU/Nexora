@@ -1,29 +1,80 @@
 {
   "schemaVersion": 1,
   "cases": {
-    "AiChatInput": {
+    "OtReadingInput": {
       "valid": {
-        "message": "Show lot trace",
-        "lotRef": "A/A-L1"
+        "deviceId": "sim-temp-a1",
+        "readingId": "reading-1",
+        "batchId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        "value": "4.500",
+        "observedAt": "2026-11-27T00:00:00.000Z"
       },
       "invalid": {
-        "lotRef": "A/A-L1"
+        "deviceId": "sim-temp-a1",
+        "batchId": "not-a-uuid",
+        "value": "4.500"
       }
     },
-    "AiDraftInput": {
+    "OpsRetryInput": {
+      "valid": { "messageId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" },
+      "invalid": { "messageId": "not-a-uuid" }
+    },
+    "OpsReprocessInput": {
+      "valid": { "action": "reprocess", "inboxId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" },
+      "invalid": { "action": "reprocess", "inboxId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "payload": {} }
+    },
+    "FederationSummaryPublishInput": {
+      "valid": { "recipientInstanceId": "nexora-c" },
+      "invalid": { "recipientInstanceId": "" }
+    },
+    "FederationImpactPublishInput": {
+      "valid": { "recipientInstanceId": "nexora-b",
+        "sourceDocumentId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" },
+      "invalid": { "recipientInstanceId": "nexora-b" }
+    },
+    "AiChatInput": {
       "valid": {
-        "documentType": "goods_issue",
-        "instruction": "Prepare an outbound issue for 5 EA",
-        "purpose": "partner_transfer"
+        "question": "Lô LOT-A-001 của nexora-a?"
+      },
+      "invalid": {}
+    },
+    "AiDraftProposeInput": {
+      "valid": {
+        "request": "Tạo phiếu nhập 10 KG cho LOT-A-001 kho KHO-A1"
       },
       "invalid": {
-        "instruction": "Prepare an outbound issue for 5 EA",
-        "purpose": "partner_transfer"
+        "request": ""
+      }
+    },
+    "AiDraftCreateInput": {
+      "valid": {
+        "proposalId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "fields": {
+          "warehouseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          "batchId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+          "quantity": "10.000",
+          "unit": "KG"
+        }
+      },
+      "invalid": {
+        "proposalId": "short"
+      }
+    },
+    "AiRiskFeedbackInput": {
+      "valid": {
+        "alertFingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "ruleId": "NEAR_EXPIRY",
+        "ruleVersion": "risk-v1",
+        "verdict": "correct"
+      },
+      "invalid": {
+        "verdict": "maybe"
       }
     },
     "ApprovalDecisionInput": {
       "valid": {
-        "decision": "approved"
+        "decision": "approve",
+        "version": 1
       },
       "invalid": {}
     },
@@ -165,7 +216,11 @@
             "productVariantId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
             "batchId": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
             "quantity": "12",
-            "uomId": "dddddddd-dddd-4ddd-8ddd-dddddddddddd"
+            "uomId": "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+            "sources": [
+              { "sourceLineId": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee", "quantity": "7" },
+              { "sourceLineId": "ffffffff-ffff-4fff-8fff-ffffffffffff", "quantity": "5" }
+            ]
           }
         ]
       },
@@ -189,7 +244,7 @@
     },
     "MemberCreate": {
       "valid": {
-        "keycloakSub": "user-123",
+        "username": "staff.a",
         "displayName": "Staff A",
         "role": "staff"
       },
@@ -315,11 +370,43 @@
       },
       "invalid": {}
     },
+    "PassportPolicyAccess": {
+      "valid": {
+        "organization": "public",
+        "product": "public",
+        "batch": "public",
+        "timeline": "public",
+        "evidence": "private"
+      },
+      "invalid": {
+        "organization": "public",
+        "product": "public",
+        "batch": "public",
+        "timeline": "all",
+        "evidence": "private"
+      }
+    },
+    "PassportPolicyVersion": {
+      "valid": { "version": 1 },
+      "invalid": { "version": 0 }
+    },
     "QrCreate": {
       "valid": {
         "policyVersion": "v1"
       },
       "invalid": {}
+    },
+    "TraceEvidenceAttach": {
+      "valid": {
+        "eventId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        "attachmentId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        "visibility": "private"
+      },
+      "invalid": {
+        "eventId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        "attachmentId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        "visibility": "unsafe"
+      }
     },
     "Reason": {
       "valid": {

@@ -2,11 +2,67 @@ name: ci
 
 on:
   push:
-    branches: [develop, main, "chore/**", "spike/**", "phase-*/**", "phase01/**", "phase-03", "phase03/**", "phase-04", "phase04/**"]
+    branches: [develop, main, "chore/**", "spike/**", "phase-*/**", "phase01/**", "phase-03", "phase03/**", "phase-04", "phase04/**", "phase-07", "phase07/**", "phase-08", "phase08/**", "phase-09", "phase-10", "phase-11", "phase-12", "phase12/**", "phase-13", "phase13/**"]
   pull_request:
     branches: [develop, main]
 
 jobs:
+  platform-topology:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Validate independent A/B/C Compose topology
+        run: node --test deploy/config.test.mjs tests/e2e/abc-topology.test.mjs tests/e2e/abc-federation-topology.test.mjs
+
+  platform-trace:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Install and generate Prisma client
+        run: npm ci && npm run db:generate
+      - name: Trace schema upgrade, fresh DB, provenance and role tests
+        run: npm run test:platform:trace
+
+  platform-federation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Install and generate Prisma client
+        run: npm ci && npm run db:generate
+      - name: PostgreSQL inbound trust, dedupe, mapping and dependency tests
+        run: npm run test:platform:federation
+
+  platform-ai-tools:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Install and generate Prisma client
+        run: npm ci && npm run db:generate
+      - name: PostgreSQL AI tool quota and audit tests
+        run: npm run test:platform:ai-tools
+
   platform-schema:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -103,8 +159,12 @@ jobs:
         run: npm run db:generate
       - name: Build
         run: npm run build
+      - name: Python AI adapter boundary tests
+        run: cd services/ai && python -m unittest discover -s tests -v
       - name: Typecheck (after Next typegen)
         run: npm run typecheck
+      - name: DX-Lab OpenAPI client and auth boundary
+        run: npm run check:dxlab-api && npm run test:dxlab:auth
       - name: Provenance, secrets and static contracts
         run: npm test
 
@@ -117,6 +177,8 @@ jobs:
         run: docker build -t nexora-erp:ci -f Dockerfile .
       - name: Build core-data image
         run: docker build -t nexora-core-data:ci -f services/core-data/Dockerfile .
+      - name: Build DX-Lab image
+        run: docker build -t nexora-dx-lab:ci -f apps/dx-lab/Dockerfile .
 
   secret-scan:
     runs-on: ubuntu-latest

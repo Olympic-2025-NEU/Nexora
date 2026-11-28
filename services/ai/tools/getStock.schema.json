@@ -1,0 +1,11 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:nexora:ai:getStock:v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["batchId"],
+  "properties": {
+    "batchId": { "type": "string", "format": "uuid" },
+    "warehouseId": { "type": "string", "format": "uuid" }
+  }
+}

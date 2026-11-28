@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nexora.local/contracts/events/downstream-impact.schema.json",
+  "title": "DownstreamImpactV1",
+  "allOf": [
+    { "$ref": "envelope-v1.schema.json" },
+    {
+      "type": "object",
+      "required": ["originLot", "downstreamPartnerRef", "impactType", "sourceEventRefs", "disclosureScope"],
+      "properties": { "eventType": { "const": "downstream.impact.v1" } },
+      "not": { "anyOf": [
+        { "required": ["linkedIssueId"] }, { "required": ["sentQuantity"] },
+        { "required": ["sourceTransfer"] }, { "required": ["actualLines"] },
+        { "required": ["actualQuantity"] }, { "required": ["discrepancyQuantity"] },
+        { "required": ["discrepancyReason"] }
+      ] }
+    }
+  ]
+}

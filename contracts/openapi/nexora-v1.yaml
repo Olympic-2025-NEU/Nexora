@@ -90,16 +90,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: false
-                required:
-                  - data
-                  - requestId
-                properties:
-                  data:
-                    $ref: "#/components/schemas/Me"
-                  requestId:
-                    type: string
+                $ref: "#/components/schemas/Me"
         "401":
           $ref: "#/components/responses/Error"
         "403":
@@ -510,6 +501,53 @@ paths:
         "503":
           $ref: "#/components/responses/Error"
   /api/v1/partners/{id}/connection:
+    get:
+      tags:
+        - M01
+      operationId: getPartnersByIdConnection
+      summary: Read partner connection metadata
+      description: Returns safe connection view only (endpoint host, status, rotatedAt). outboundSecretRef is never included.
+      security:
+        - oidc: []
+      x-nexora-roles:
+        - administrator
+        - staff
+        - approver
+        - viewer
+      x-nexora-scope: resource
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - data
+                  - requestId
+                properties:
+                  data:
+                    $ref: "#/components/schemas/PartnerConnectionView"
+                  requestId:
+                    type: string
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
     put:
       tags:
         - M01
@@ -1379,6 +1417,10 @@ paths:
           schema:
             type: string
         - name: status
+          in: query
+          schema:
+            type: string
+        - name: q
           in: query
           schema:
             type: string
@@ -3715,6 +3757,69 @@ paths:
           $ref: "#/components/responses/Error"
         "503":
           $ref: "#/components/responses/Error"
+  /api/v1/lots/{id}/issue-sources:
+    get:
+      tags:
+        - M03
+      operationId: getLotsByIdIssueSources
+      summary: Available confirmed receipt sources
+      description: Warehouse-scoped confirmed receipt/receiving lines with remaining declarable quantity in stock UOM. Draft issues do not reserve a source. Cursor pages default to 20 and cap at 100 source lines.
+      security:
+        - oidc: []
+      x-nexora-roles:
+        - administrator
+        - staff
+        - approver
+        - viewer
+      x-nexora-scope: resource
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+        - name: warehouseId
+          in: query
+          schema:
+            type: string
+            format: uuid
+          required: true
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - data
+                  - requestId
+                  - page
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/IssueSourceAvailable"
+                  requestId:
+                    type: string
+                  page:
+                    $ref: "#/components/schemas/Page"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "422":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
   /api/v1/documents:
     get:
       tags:
@@ -3790,21 +3895,18 @@ paths:
           $ref: "#/components/responses/Error"
         "503":
           $ref: "#/components/responses/Error"
-  /api/v1/approvals/tasks:
+  /api/v1/approvals/inbox:
     get:
       tags:
         - M03
-      operationId: getApprovalsTasks
-      summary: List approval tasks
-      description: Target contract; runtime implementation is tracked by the owning phase.
+      operationId: getApprovalsInbox
+      summary: List actionable approval tasks
+      description: Candidate-group tasks in current warehouse scope, excluding creator. Age reflects submission time.
       security:
         - oidc: []
       x-nexora-roles:
         - approver
       x-nexora-scope: resource
-      parameters:
-        - $ref: "#/components/parameters/Cursor"
-        - $ref: "#/components/parameters/Limit"
       responses:
         "200":
           description: Success
@@ -3816,7 +3918,6 @@ paths:
                 required:
                   - data
                   - requestId
-                  - page
                 properties:
                   data:
                     type: array
@@ -3824,8 +3925,6 @@ paths:
                       $ref: "#/components/schemas/ApprovalTask"
                   requestId:
                     type: string
-                  page:
-                    $ref: "#/components/schemas/Page"
         "401":
           $ref: "#/components/responses/Error"
         "403":
@@ -3834,20 +3933,20 @@ paths:
           $ref: "#/components/responses/Error"
         "503":
           $ref: "#/components/responses/Error"
-  /api/v1/approvals/{approvalRequestId}/decision:
+  /api/v1/approvals/{id}/decisions:
     post:
       tags:
         - M03
-      operationId: postApprovalsByApprovalRequestIdDecision
+      operationId: postApprovalsByIdDecisions
       summary: Record approval decision intent
-      description: If-Match refers to approvalVersion. Creator cannot approve their own issue. Flowable completion occurs asynchronously.
+      description: Creator cannot decide own issue. Decision intent commits before Flowable completion; result is asynchronous. Clients must send If-Match / version from approvalVersion.
       security:
         - oidc: []
       x-nexora-roles:
         - approver
       x-nexora-scope: resource
       parameters:
-        - name: approvalRequestId
+        - name: id
           in: path
           required: true
           schema:
@@ -3893,6 +3992,45 @@ paths:
           $ref: "#/components/responses/Error"
         "503":
           $ref: "#/components/responses/Error"
+  /api/v1/trace/status:
+    get:
+      tags:
+        - M04
+      operationId: getTraceStatus
+      summary: Local trace projector status
+      description: Authenticated local outbox lag. A caught-up queue does not assert that remote partner history is complete.
+      security:
+        - oidc: []
+      x-nexora-roles:
+        - administrator
+        - staff
+        - approver
+        - viewer
+      x-nexora-scope: resource
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - data
+                  - requestId
+                properties:
+                  data:
+                    $ref: "#/components/schemas/TraceProjectorStatus"
+                  requestId:
+                    type: string
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
   /api/v1/lots/{id}/history:
     get:
       tags:
@@ -3915,6 +4053,8 @@ paths:
           schema:
             type: string
             format: uuid
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
       responses:
         "200":
           description: Success
@@ -3941,13 +4081,68 @@ paths:
           $ref: "#/components/responses/Error"
         "503":
           $ref: "#/components/responses/Error"
+  /api/v1/ot/readings:
+    post:
+      tags:
+        - Operations
+      operationId: postOtReadings
+      summary: Ingest a simulated device reading
+      description: Authenticated demo simulator through the gateway. Device is scoped to this instance; the local batch must exist. Duplicate reading IDs with identical input are reused. Readings never change stock or lot quality.
+      security:
+        - oidc: []
+      x-nexora-roles:
+        - administrator
+        - staff
+      x-nexora-scope: resource
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OtReadingInput"
+      responses:
+        "202":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - data
+                  - requestId
+                properties:
+                  data:
+                    $ref: "#/components/schemas/OtReadingAccepted"
+                  requestId:
+                    type: string
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "413":
+          $ref: "#/components/responses/Error"
+        "415":
+          $ref: "#/components/responses/Error"
+        "422":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
   /api/v1/lots/{id}/trace/backward:
     get:
       tags:
         - M04
       operationId: getLotsByIdTraceBackward
       summary: Trace backward
-      description: Target contract; runtime implementation is tracked by the owning phase.
+      description: Authenticated local backward graph. Only explicit confirmed source links imply causality. Same-batch events provide context; missing remote source, unknown local allocation and projector lag remain explicit gaps. Cursor freezes the recorded-at snapshot; depth counts source-link hops (1–10).
       security:
         - oidc: []
       x-nexora-roles:
@@ -3963,12 +4158,19 @@ paths:
           schema:
             type: string
             format: uuid
+        - name: documentId
+          in: query
+          schema:
+            type: string
+            format: uuid
         - name: depth
           in: query
           schema:
             type: integer
             minimum: 1
             maximum: 10
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
       responses:
         "200":
           description: Success
@@ -4001,7 +4203,7 @@ paths:
         - M04
       operationId: getLotsByIdTraceForward
       summary: Trace forward
-      description: Target contract; runtime implementation is tracked by the owning phase.
+      description: Authenticated local forward graph and per-document-line impact. Stored child-to-source links are traversed in reverse; sourceRelation preserves the original relationship. Confirmed local quantities are not additive across issue, transfer and sale. Partner downstream remains unknown until a verified report arrives in P09. No buyer reference or private partner contact is returned.
       security:
         - oidc: []
       x-nexora-roles:
@@ -4023,6 +4225,8 @@ paths:
             type: integer
             minimum: 1
             maximum: 10
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
       responses:
         "200":
           description: Success
@@ -4049,13 +4253,393 @@ paths:
           $ref: "#/components/responses/Error"
         "503":
           $ref: "#/components/responses/Error"
+  /api/v1/lots/{id}/federation-summary:
+    post:
+      tags:
+        - M04
+      operationId: postLotsByIdFederationSummary
+      summary: Queue allowlisted partner trace summary
+      description: Approved timeline policy limits direct sharing; only public remote assertions may be relayed. Queues an immutable outbox envelope and audits the recipient.
+      security:
+        - oidc: []
+      x-nexora-roles:
+        - administrator
+      x-nexora-scope: organization-admin
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FederationSummaryPublishInput"
+      responses:
+        "202":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - data
+                  - requestId
+                properties:
+                  data:
+                    $ref: "#/components/schemas/FederationSummaryQueued"
+                  requestId:
+                    type: string
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "422":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
+  /api/v1/lots/{id}/downstream-impact:
+    post:
+      tags:
+        - M04
+      operationId: postLotsByIdDownstreamImpact
+      summary: Queue downstream impact
+      description: Confirmed sale or verified public inbound impact from a known receiver batch; queues C to B or B to A assertion without stock change or buyer PII.
+      security:
+        - oidc: []
+      x-nexora-roles:
+        - administrator
+      x-nexora-scope: organization-admin
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FederationImpactPublishInput"
+      responses:
+        "202":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - data
+                  - requestId
+                properties:
+                  data:
+                    $ref: "#/components/schemas/FederationImpactQueued"
+                  requestId:
+                    type: string
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "422":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
+  /api/v1/lots/{id}/passport-policy:
+    get:
+      tags:
+        - M04
+      operationId: getLotsByIdPassportPolicy
+      summary: Read passport policy
+      description: Owner administrator reads versioned policy and projection status; default is no public policy.
+      security:
+        - oidc: []
+      x-nexora-roles:
+        - administrator
+      x-nexora-scope: organization-admin
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - data
+                  - requestId
+                properties:
+                  data:
+                    $ref: "#/components/schemas/PassportPolicyRead"
+                  requestId:
+                    type: string
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
+    post:
+      tags:
+        - M04
+      operationId: postLotsByIdPassportPolicy
+      summary: Draft passport policy
+      description: Create the next private-by-default visibility policy version. A draft does not publish.
+      security:
+        - oidc: []
+      x-nexora-roles:
+        - administrator
+      x-nexora-scope: organization-admin
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PassportPolicyAccess"
+      responses:
+        "201":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - data
+                  - requestId
+                properties:
+                  data:
+                    $ref: "#/components/schemas/PassportPolicyView"
+                  requestId:
+                    type: string
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "422":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
+  /api/v1/lots/{id}/passport-policy/approve:
+    post:
+      tags:
+        - M04
+      operationId: postLotsByIdPassportPolicyApprove
+      summary: Approve passport policy
+      description: Owner administrator approves one draft version and rebuilds the allowlisted projection atomically. Public projection is active only for an available batch with organization, product and batch visibility public.
+      security:
+        - oidc: []
+      x-nexora-roles:
+        - administrator
+      x-nexora-scope: organization-admin
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PassportPolicyVersion"
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - data
+                  - requestId
+                properties:
+                  data:
+                    $ref: "#/components/schemas/PassportPolicyApproved"
+                  requestId:
+                    type: string
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "422":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
+  /api/v1/lots/{id}/passport-policy/revoke:
+    post:
+      tags:
+        - M04
+      operationId: postLotsByIdPassportPolicyRevoke
+      summary: Revoke passport policy
+      description: Revoke approved policy and projection; public QR reading fails closed.
+      security:
+        - oidc: []
+      x-nexora-roles:
+        - administrator
+      x-nexora-scope: organization-admin
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Reason"
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - data
+                  - requestId
+                properties:
+                  data:
+                    $ref: "#/components/schemas/PassportPolicyState"
+                  requestId:
+                    type: string
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "422":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
+  /api/v1/lots/{id}/passport-policy/rebuild:
+    post:
+      tags:
+        - M04
+      operationId: postLotsByIdPassportPolicyRebuild
+      summary: Rebuild passport projection
+      description: Rebuild from confirmed trace source after stale event or quality change; never auto-publish restricted batches.
+      security:
+        - oidc: []
+      x-nexora-roles:
+        - administrator
+      x-nexora-scope: organization-admin
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - data
+                  - requestId
+                properties:
+                  data:
+                    $ref: "#/components/schemas/PassportPolicyState"
+                  requestId:
+                    type: string
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "422":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
   /api/v1/lots/{id}/qr:
     post:
       tags:
         - M04
       operationId: postLotsByIdQr
       summary: Issue QR token
-      description: Target contract; runtime implementation is tracked by the owning phase.
+      description: Administrator or unit-scoped staff issues a 256-bit opaque token for an active approved projection. Raw URL is returned once, expires in 30 days; repeating the Idempotency-Key returns 409.
       security:
         - oidc: []
       x-nexora-roles:
@@ -4114,7 +4698,7 @@ paths:
         - M04
       operationId: postLotsByIdQrByTokenIdRevoke
       summary: Revoke QR token
-      description: Target contract; runtime implementation is tracked by the owning phase.
+      description: Authenticated owner or unit-scoped staff revokes an issued token immediately and records an audit event.
       security:
         - oidc: []
       x-nexora-roles:
@@ -4159,13 +4743,171 @@ paths:
           $ref: "#/components/responses/Error"
         "503":
           $ref: "#/components/responses/Error"
+  /api/v1/lots/{id}/evidence:
+    get:
+      tags:
+        - M04
+      operationId: getLotsByIdEvidence
+      summary: List trace evidence
+      description: Authenticated trace scope; lists checksum, visibility, scan state and source linkage only.
+      security:
+        - oidc: []
+      x-nexora-roles:
+        - administrator
+        - staff
+        - approver
+        - viewer
+      x-nexora-scope: resource
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - data
+                  - requestId
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/TraceEvidenceView"
+                  requestId:
+                    type: string
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
+    post:
+      tags:
+        - M04
+      operationId: postLotsByIdEvidence
+      summary: Attach clean trace evidence
+      description: Bind a clean private-bucket attachment to a confirmed local trace event and document. Public visibility requires Administrator and approved public evidence/timeline policy; mutation marks projection stale.
+      security:
+        - oidc: []
+      x-nexora-roles:
+        - administrator
+        - staff
+      x-nexora-scope: resource
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TraceEvidenceAttach"
+      responses:
+        "201":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - data
+                  - requestId
+                properties:
+                  data:
+                    $ref: "#/components/schemas/TraceEvidenceAttached"
+                  requestId:
+                    type: string
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "422":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
+  /api/v1/lots/{id}/evidence/{evidenceId}/revoke:
+    post:
+      tags:
+        - M04
+      operationId: postLotsByIdEvidenceByEvidenceIdRevoke
+      summary: Revoke trace evidence
+      description: Revoke evidence link and invalidate the active Passport projection; existing access URLs are denied immediately.
+      security:
+        - oidc: []
+      x-nexora-roles:
+        - administrator
+        - staff
+      x-nexora-scope: resource
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: evidenceId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Reason"
+      responses:
+        "204":
+          description: No content
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "422":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
   /api/v1/public/passport/{token}:
     get:
       tags:
         - M04
       operationId: getPublicPassportByToken
       summary: Public product passport
-      description: Only allowlisted public fields; no member email, private stock, raw partner payload or unscanned files.
+      description: Only active, unexpired token, approved policy, available batch and verified allowlisted projection. Invalid, unknown and revoked are indistinguishable 404; no-store. Gateway rate limit 30 req/s, burst 15.
       security: []
       x-nexora-roles: []
       x-nexora-scope: anonymous
@@ -4175,7 +4917,9 @@ paths:
           required: true
           schema:
             type: string
-            minLength: 1
+            pattern: ^[A-Za-z0-9_-]{43}$
+            minLength: 43
+            maxLength: 43
       responses:
         "200":
           description: Success
@@ -4192,6 +4936,51 @@ paths:
                     $ref: "#/components/schemas/PassportPublic"
                   requestId:
                     type: string
+        "404":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
+  /api/v1/public/evidence/{token}:
+    get:
+      tags:
+        - M04
+      operationId: getPublicEvidenceByToken
+      summary: Short-lived public evidence download
+      description: 60-second application-signed capability issued only for clean public evidence. Core Data rechecks QR, policy, batch, projection, evidence and file state, then streams checksum-verified bytes with no-store.
+      security: []
+      x-nexora-roles: []
+      x-nexora-scope: anonymous
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: ^[A-Za-z0-9_-]{43}$
+            minLength: 43
+            maxLength: 43
+      responses:
+        "200":
+          description: Clean evidence bytes
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+            image/png:
+              schema:
+                type: string
+                format: binary
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            text/plain:
+              schema:
+                type: string
+                format: binary
         "404":
           $ref: "#/components/responses/Error"
         "429":
@@ -4351,8 +5140,8 @@ paths:
       tags:
         - AI01
       operationId: postAiChat
-      summary: AI chat with delegated tools
-      description: Target contract; runtime implementation is tracked by the owning phase.
+      summary: Lot lookup Q&A with sourced facts
+      description: Deterministic facts with optional connector text. No confirm tools.
       security:
         - oidc: []
       x-nexora-roles:
@@ -4397,29 +5186,27 @@ paths:
           $ref: "#/components/responses/Error"
         "503":
           $ref: "#/components/responses/Error"
-  /api/v1/ai/drafts:
+  /api/v1/ai/draft:
     post:
       tags:
         - AI01
-      operationId: postAiDrafts
-      summary: Create AI-assisted draft
-      description: Target contract; runtime implementation is tracked by the owning phase.
+      operationId: postAiDraft
+      summary: Propose receipt draft fields
+      description: Proposal only; does not create a trading document or change stock.
       security:
         - oidc: []
       x-nexora-roles:
         - administrator
         - staff
       x-nexora-scope: resource
-      parameters:
-        - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/AiDraftInput"
+              $ref: "#/components/schemas/AiDraftProposeInput"
       responses:
-        "201":
+        "200":
           description: Success
           content:
             application/json:
@@ -4431,7 +5218,7 @@ paths:
                   - requestId
                 properties:
                   data:
-                    $ref: "#/components/schemas/AiDraftResult"
+                    $ref: "#/components/schemas/AiDraftProposeResult"
                   requestId:
                     type: string
         "400":
@@ -4448,28 +5235,25 @@ paths:
           $ref: "#/components/responses/Error"
         "503":
           $ref: "#/components/responses/Error"
-  /api/v1/ai/tool-calls/{id}:
-    get:
+  /api/v1/ai/draft/create:
+    post:
       tags:
         - AI01
-      operationId: getAiToolCallsById
-      summary: Get redacted AI tool call
-      description: Target contract; runtime implementation is tracked by the owning phase.
+      operationId: postAiDraftCreate
+      summary: Create receipt draft from reviewed proposal
+      description: Creates M03 draft after human review; never confirms stock.
       security:
         - oidc: []
       x-nexora-roles:
         - administrator
         - staff
-        - approver
-        - viewer
       x-nexora-scope: resource
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AiDraftCreateInput"
       responses:
         "200":
           description: Success
@@ -4483,14 +5267,69 @@ paths:
                   - requestId
                 properties:
                   data:
-                    $ref: "#/components/schemas/AiToolCall"
+                    $ref: "#/components/schemas/AiDraftCreateResult"
                   requestId:
                     type: string
+        "400":
+          $ref: "#/components/responses/Error"
         "401":
           $ref: "#/components/responses/Error"
         "403":
           $ref: "#/components/responses/Error"
-        "404":
+        "409":
+          $ref: "#/components/responses/Error"
+        "422":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
+  /api/v1/ai/risk/feedback:
+    post:
+      tags:
+        - AI01
+      operationId: postAiRiskFeedback
+      summary: Record risk alert feedback
+      description: Audit-only feedback; does not change stock or approvals.
+      security:
+        - oidc: []
+      x-nexora-roles:
+        - administrator
+        - staff
+        - approver
+        - viewer
+      x-nexora-scope: resource
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AiRiskFeedbackInput"
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - data
+                  - requestId
+                properties:
+                  data:
+                    $ref: "#/components/schemas/AiRiskFeedbackResult"
+                  requestId:
+                    type: string
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "422":
           $ref: "#/components/responses/Error"
         "429":
           $ref: "#/components/responses/Error"
@@ -4911,6 +5750,144 @@ paths:
         "401":
           $ref: "#/components/responses/Error"
         "403":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
+  /api/v1/admin/retries:
+    get:
+      tags:
+        - Operations
+      operationId: getAdminRetries
+      summary: List dead letters and halted approvals
+      description: Administrator-only redacted operations list; no payload or token.
+      security:
+        - oidc: []
+      x-nexora-roles:
+        - administrator
+      x-nexora-scope: resource
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpsRetriesView"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
+    post:
+      tags:
+        - Operations
+      operationId: postAdminRetries
+      summary: Retry one dead-letter outbox message
+      description: Only dead_letter may be reset; immutable envelope is retried and action audited.
+      security:
+        - oidc: []
+      x-nexora-roles:
+        - administrator
+      x-nexora-scope: resource
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OpsRetryInput"
+      responses:
+        "202":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpsRetryResult"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
+  /api/v1/admin/federation/operations:
+    get:
+      tags:
+        - Operations
+      operationId: getAdminFederationOperations
+      summary: Inspect local federation operations
+      description: Find sender outbox/attempts or receiver inbox by envelope message ID. Redacted response, no payload, no-store.
+      security:
+        - oidc: []
+      x-nexora-roles:
+        - administrator
+      x-nexora-scope: resource
+      parameters:
+        - name: messageId
+          in: query
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpsFederationView"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
+    post:
+      tags:
+        - Operations
+      operationId: postAdminFederationOperations
+      summary: Reprocess one pending federation inbox
+      description: Re-evaluate one pending_dependency row under lock and audit state before/after.
+      security:
+        - oidc: []
+      x-nexora-roles:
+        - administrator
+      x-nexora-scope: resource
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OpsReprocessInput"
+      responses:
+        "202":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpsReprocessResult"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
           $ref: "#/components/responses/Error"
         "429":
           $ref: "#/components/responses/Error"
@@ -5413,30 +6390,33 @@ components:
       type: object
       additionalProperties: false
       required:
-        - sub
+        - userId
+        - organizationId
+        - roles
+        - unitIds
         - displayName
-        - role
-        - status
-        - warehouseIds
       properties:
-        sub:
+        userId:
           type: string
-        displayName:
+        organizationId:
           type: string
-        role:
-          type: string
-          enum:
-            - administrator
-            - staff
-            - approver
-            - viewer
-        status:
-          type: string
-        warehouseIds:
+          format: uuid
+        roles:
+          type: array
+          items:
+            type: string
+            enum:
+              - administrator
+              - staff
+              - approver
+              - viewer
+        unitIds:
           type: array
           items:
             type: string
             format: uuid
+        displayName:
+          type: string
     Organization:
       type: object
       additionalProperties: false
@@ -5468,6 +6448,10 @@ components:
         contactEmail:
           type: string
           format: email
+        contactPhone:
+          type: string
+        address:
+          type: string
     OrganizationPatch:
       type: object
       additionalProperties: false
@@ -5478,8 +6462,18 @@ components:
         contactEmail:
           type: string
           format: email
+          nullable: true
+        contactPhone:
+          type: string
+          nullable: true
+        address:
+          type: string
+          nullable: true
         timezone:
           type: string
+        version:
+          type: integer
+          minimum: 1
       minProperties: 1
     Member:
       type: object
@@ -5519,15 +6513,20 @@ components:
         version:
           type: integer
           minimum: 1
+        provisionalPassword:
+          type: string
+          description: Present only on invite response; never persisted for later GET.
+        keycloakCreated:
+          type: boolean
     MemberCreate:
       type: object
       additionalProperties: false
       required:
-        - keycloakSub
+        - username
         - displayName
         - role
       properties:
-        keycloakSub:
+        username:
           type: string
           minLength: 1
         displayName:
@@ -5548,6 +6547,10 @@ components:
           items:
             type: string
             format: uuid
+        temporaryPassword:
+          type: string
+          minLength: 8
+      description: Admin invite provisions (or reuses) a Keycloak user by username. Clients must not send keycloakSub — the IdP allocates or resolves the subject.
     MemberPatch:
       type: object
       additionalProperties: false
@@ -5564,11 +6567,21 @@ components:
           enum:
             - active
             - disabled
+        displayName:
+          type: string
+          minLength: 1
+        email:
+          type: string
+          format: email
+          nullable: true
         warehouseIds:
           type: array
           items:
             type: string
             format: uuid
+        version:
+          type: integer
+          minimum: 1
       minProperties: 1
     Partner:
       type: object
@@ -5635,6 +6648,10 @@ components:
         contactEmail:
           type: string
           format: email
+          nullable: true
+        version:
+          type: integer
+          minimum: 1
       minProperties: 1
     PartnerConnectionInput:
       type: object
@@ -5660,12 +6677,19 @@ components:
           type: string
         outboundSecretRef:
           type: string
+          description: Write-only secret reference; never returned by GET/PUT responses.
         outboundAudience:
           type: string
         inboundClientId:
           type: string
         allowedInboundScope:
           type: string
+        status:
+          type: string
+          enum:
+            - active
+            - rotating
+            - disabled
     PartnerConnectionView:
       type: object
       additionalProperties: false
@@ -5684,6 +6708,7 @@ components:
         rotatedAt:
           type: string
           format: date-time
+      description: Safe connection metadata. outboundSecretRef is never included.
     Product:
       type: object
       additionalProperties: false
@@ -6223,6 +7248,85 @@ components:
         uomId:
           type: string
           format: uuid
+    IssueSource:
+      type: object
+      additionalProperties: false
+      required:
+        - sourceLineId
+        - quantity
+      properties:
+        sourceLineId:
+          type: string
+          format: uuid
+        quantity:
+          type: string
+          pattern: ^(?!0(?:\.0{1,3})?$)(0|[1-9][0-9]*)(\.[0-9]{1,3})?$
+    IssueSourceAvailable:
+      type: object
+      additionalProperties: false
+      required:
+        - sourceLineId
+        - documentNumber
+        - documentType
+        - confirmedAt
+        - receivedQuantity
+        - availableQuantity
+        - uomId
+      properties:
+        sourceLineId:
+          type: string
+          format: uuid
+        documentNumber:
+          type: string
+        documentType:
+          type: string
+          enum:
+            - goods_receipt
+            - receiving_confirmation
+        confirmedAt:
+          type: string
+          format: date-time
+          nullable: true
+        receivedQuantity:
+          type: string
+          pattern: ^(0|[1-9][0-9]*)(\.[0-9]{1,3})?$
+        availableQuantity:
+          type: string
+          pattern: ^(0|[1-9][0-9]*)(\.[0-9]{1,3})?$
+        uomId:
+          type: string
+          format: uuid
+    IssueLine:
+      type: object
+      additionalProperties: false
+      required:
+        - warehouseId
+        - productVariantId
+        - batchId
+        - quantity
+        - uomId
+      properties:
+        warehouseId:
+          type: string
+          format: uuid
+        productVariantId:
+          type: string
+          format: uuid
+        batchId:
+          type: string
+          format: uuid
+        quantity:
+          type: string
+          pattern: ^(?!0(?:\.0{1,3})?$)(0|[1-9][0-9]*)(\.[0-9]{1,3})?$
+        uomId:
+          type: string
+          format: uuid
+        sources:
+          type: array
+          items:
+            $ref: "#/components/schemas/IssueSource"
+          minItems: 1
+          maxItems: 100
     CountLine:
       type: object
       additionalProperties: false
@@ -6313,6 +7417,10 @@ components:
         sourceLineRef:
           type: string
           format: uuid
+        sources:
+          type: array
+          items:
+            $ref: "#/components/schemas/IssueSource"
     Document:
       type: object
       additionalProperties: false
@@ -6449,7 +7557,7 @@ components:
         lines:
           type: array
           items:
-            $ref: "#/components/schemas/QuantityLine"
+            $ref: "#/components/schemas/IssueLine"
           minItems: 1
         note:
           type: string
@@ -6543,7 +7651,7 @@ components:
         lines:
           type: array
           items:
-            $ref: "#/components/schemas/QuantityLine"
+            $ref: "#/components/schemas/IssueLine"
           minItems: 1
         note:
           type: string
@@ -6577,31 +7685,56 @@ components:
       additionalProperties: false
       required:
         - approvalRequestId
-        - approvalVersion
         - documentId
-        - taskId
+        - documentNumber
+        - documentType
         - creatorSub
         - submittedAt
-        - state
+        - ageSeconds
+        - warehouseIds
+        - lineHash
+        - approvalState
+        - processDefinitionVersion
+        - approvalVersion
       properties:
         approvalRequestId:
           type: string
           format: uuid
-        approvalVersion:
-          type: integer
-          minimum: 1
         documentId:
           type: string
           format: uuid
-        taskId:
+        documentNumber:
+          type: string
+        documentType:
           type: string
         creatorSub:
           type: string
         submittedAt:
           type: string
           format: date-time
-        state:
+        ageSeconds:
+          type: integer
+          minimum: 0
+        warehouseIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        lineHash:
           type: string
+        approvalState:
+          type: string
+        processDefinitionVersion:
+          type: integer
+          minimum: 1
+        approvalVersion:
+          type: integer
+          minimum: 1
+        evidenceFileIds:
+          type: array
+          items:
+            type: string
+            format: uuid
     ApprovalDecisionInput:
       type: object
       additionalProperties: false
@@ -6611,16 +7744,20 @@ components:
         decision:
           type: string
           enum:
-            - approved
-            - rejected
-        reason:
+            - approve
+            - reject
+        note:
           type: string
+        version:
+          type: integer
+          minimum: 1
     ApprovalDecisionResult:
       type: object
       additionalProperties: false
       required:
         - approvalRequestId
         - state
+        - decision
       properties:
         approvalRequestId:
           type: string
@@ -6629,12 +7766,42 @@ components:
           type: string
           enum:
             - decision_pending
+        decision:
+          type: string
+          enum:
+            - approve
+            - reject
+    TraceProjectorStatus:
+      type: object
+      additionalProperties: false
+      required:
+        - state
+        - pendingEvents
+        - lagSeconds
+        - checkedAt
+      properties:
+        state:
+          type: string
+          enum:
+            - caught_up
+            - pending
+            - lagging
+        pendingEvents:
+          type: integer
+          minimum: 0
+        lagSeconds:
+          type: number
+          minimum: 0
+        checkedAt:
+          type: string
+          format: date-time
     TraceHistory:
       type: object
       additionalProperties: false
       required:
         - lot
         - events
+        - otReadings
       properties:
         lot:
           $ref: "#/components/schemas/Batch"
@@ -6667,62 +7834,324 @@ components:
                 type: string
               gap:
                 type: boolean
+        otReadings:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required:
+              - id
+              - deviceId
+              - readingId
+              - metric
+              - value
+              - unit
+              - observedAt
+              - qualityState
+              - simulated
+              - asOf
+              - lagSeconds
+            properties:
+              id:
+                type: string
+                format: uuid
+              deviceId:
+                type: string
+              readingId:
+                type: string
+              metric:
+                type: string
+              value:
+                type: string
+              unit:
+                type: string
+              observedAt:
+                type: string
+                format: date-time
+              qualityState:
+                type: string
+                enum:
+                  - accepted
+                  - stale
+              simulated:
+                type: boolean
+              asOf:
+                type: string
+                format: date-time
+              lagSeconds:
+                type: integer
+                minimum: 0
         nextCursor:
           type: string
     TraceGraph:
       type: object
       additionalProperties: false
       required:
+        - root
         - nodes
         - edges
         - gaps
         - asOf
+        - localProjection
+        - truncated
       properties:
+        root:
+          type: object
+          additionalProperties: false
+          required:
+            - batchId
+          properties:
+            batchId:
+              type: string
+              format: uuid
+            documentId:
+              type: string
+              format: uuid
         nodes:
           type: array
           items:
             type: object
             additionalProperties: false
             required:
-              - issuer
-              - lotId
               - eventId
-              - state
+              - issuerInstanceId
+              - batchId
+              - originLot
+              - eventType
+              - occurredAt
+              - recordedAt
+              - verificationState
+              - depth
+              - source
             properties:
-              issuer:
-                type: string
-              lotId:
-                type: string
-                format: uuid
               eventId:
                 type: string
                 format: uuid
-              state:
+              issuerInstanceId:
                 type: string
+              batchId:
+                type: string
+                format: uuid
+                nullable: true
+              originLot:
+                type: object
+                additionalProperties: false
+                required:
+                  - issuerInstanceId
+                  - lotId
+                properties:
+                  issuerInstanceId:
+                    type: string
+                  lotId:
+                    type: string
+              eventType:
+                type: string
+              occurredAt:
+                type: string
+                format: date-time
+              recordedAt:
+                type: string
+                format: date-time
+              verificationState:
+                type: string
+              depth:
+                type: integer
+                minimum: 0
+              source:
+                type: object
+                additionalProperties: false
+                required:
+                  - documentId
+                  - eventId
+                  - payloadVersion
+                properties:
+                  documentId:
+                    type: string
+                    format: uuid
+                    nullable: true
+                  eventId:
+                    type: string
+                  payloadVersion:
+                    type: string
         edges:
           type: array
           items:
             type: object
             additionalProperties: false
             required:
-              - from
+              - fromEventId
               - relation
+              - verificationState
             properties:
-              from:
+              fromEventId:
                 type: string
                 format: uuid
-              to:
+              toEventId:
                 type: string
                 format: uuid
+              sourceRelation:
+                type: string
+              missingRef:
+                type: object
+                additionalProperties: false
+                required:
+                  - issuerInstanceId
+                  - eventId
+                properties:
+                  issuerInstanceId:
+                    type: string
+                  eventId:
+                    type: string
               relation:
                 type: string
+              verificationState:
+                type: string
+              allocationDetail:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: false
+                  required:
+                    - issueLineId
+                    - sourceLineId
+                    - quantity
+                  properties:
+                    issueLineId:
+                      type: string
+                      format: uuid
+                    sourceLineId:
+                      type: string
+                      format: uuid
+                    quantity:
+                      type: string
+                      pattern: ^(?!0(?:\.0{1,3})?$)(0|[1-9][0-9]*)(\.[0-9]{1,3})?$
         gaps:
           type: array
           items:
-            type: string
+            type: object
+            additionalProperties: false
+            required:
+              - state
+              - reason
+            properties:
+              fromEventId:
+                type: string
+                format: uuid
+              missingRef:
+                type: object
+                additionalProperties: false
+                required:
+                  - issuerInstanceId
+                  - eventId
+                properties:
+                  issuerInstanceId:
+                    type: string
+                  eventId:
+                    type: string
+              partnerIssuerInstanceId:
+                type: string
+              state:
+                type: string
+                enum:
+                  - missing
+                  - pending
+                  - unknown
+              reason:
+                type: string
+                enum:
+                  - local_allocation_unknown
+                  - remote_source_unavailable
+                  - local_source_unavailable
+                  - projection_pending
+                  - depth_limit
+                  - node_limit
+                  - downstream_unreported
+        impact:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required:
+              - eventId
+              - sourceDocumentId
+              - sourceLineId
+              - kind
+              - quantity
+              - uomId
+              - verificationState
+            properties:
+              eventId:
+                type: string
+                format: uuid
+              sourceDocumentId:
+                type: string
+                format: uuid
+              sourceLineId:
+                type: string
+                format: uuid
+              kind:
+                type: string
+                enum:
+                  - issue
+                  - transfer
+                  - receiving
+                  - sale
+              quantity:
+                type: string
+                pattern: ^(0|[1-9][0-9]*)(\.[0-9]{1,3})?$
+              uomId:
+                type: string
+                format: uuid
+              uomCode:
+                type: string
+              verificationState:
+                type: string
+                enum:
+                  - confirmed
+                  - partner_asserted
+              sourceIssueLineId:
+                type: string
+                format: uuid
+              sentQuantity:
+                type: string
+                pattern: ^(0|[1-9][0-9]*)(\.[0-9]{1,3})?$
+              actualQuantity:
+                type: string
+                pattern: ^(0|[1-9][0-9]*)(\.[0-9]{1,3})?$
+              partner:
+                type: object
+                additionalProperties: false
+                required:
+                  - issuerInstanceId
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  issuerInstanceId:
+                    type: string
         asOf:
           type: string
           format: date-time
+        localProjection:
+          type: object
+          additionalProperties: false
+          required:
+            - state
+            - pendingEvents
+          properties:
+            state:
+              type: string
+              enum:
+                - caught_up
+                - pending
+                - lagging
+            pendingEvents:
+              type: integer
+              minimum: 0
+        truncated:
+          type: boolean
+        nextCursor:
+          type: string
     QrCreate:
       type: object
       additionalProperties: false
@@ -6731,7 +8160,8 @@ components:
       properties:
         policyVersion:
           type: string
-          minLength: 1
+          pattern: ^v[1-9][0-9]{0,10}$
+          maxLength: 12
     QrIssued:
       type: object
       additionalProperties: false
@@ -6745,6 +8175,310 @@ components:
         tokenId:
           type: string
           format: uuid
+    TraceEvidenceAttach:
+      type: object
+      additionalProperties: false
+      required:
+        - eventId
+        - attachmentId
+        - visibility
+      properties:
+        eventId:
+          type: string
+          format: uuid
+        attachmentId:
+          type: string
+          format: uuid
+        visibility:
+          type: string
+          enum:
+            - private
+            - partner
+            - public
+    TraceEvidenceAttached:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - eventId
+        - attachmentId
+        - checksum
+        - visibility
+        - state
+      properties:
+        id:
+          type: string
+          format: uuid
+        eventId:
+          type: string
+          format: uuid
+        attachmentId:
+          type: string
+          format: uuid
+        checksum:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+        visibility:
+          type: string
+          enum:
+            - private
+            - partner
+            - public
+        state:
+          type: string
+          enum:
+            - active
+    TraceEvidenceView:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - eventId
+        - documentId
+        - attachmentId
+        - checksumHex
+        - visibility
+        - state
+        - createdAt
+        - attachment
+      properties:
+        id:
+          type: string
+          format: uuid
+        eventId:
+          type: string
+          format: uuid
+        documentId:
+          type: string
+          format: uuid
+        attachmentId:
+          type: string
+          format: uuid
+        checksumHex:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+        visibility:
+          type: string
+          enum:
+            - private
+            - partner
+            - public
+        state:
+          type: string
+          enum:
+            - active
+            - revoked
+        createdAt:
+          type: string
+          format: date-time
+        attachment:
+          type: object
+          additionalProperties: false
+          required:
+            - scanState
+            - mimeType
+          properties:
+            scanState:
+              type: string
+            mimeType:
+              type: string
+    PassportPolicyAccess:
+      type: object
+      additionalProperties: false
+      required:
+        - organization
+        - product
+        - batch
+        - timeline
+        - evidence
+      properties:
+        organization:
+          type: string
+          enum:
+            - private
+            - partner
+            - public
+        product:
+          type: string
+          enum:
+            - private
+            - partner
+            - public
+        batch:
+          type: string
+          enum:
+            - private
+            - partner
+            - public
+        timeline:
+          type: string
+          enum:
+            - private
+            - partner
+            - public
+        evidence:
+          type: string
+          enum:
+            - private
+            - partner
+            - public
+    PassportPolicyVersion:
+      type: object
+      additionalProperties: false
+      required:
+        - version
+      properties:
+        version:
+          type: integer
+          minimum: 1
+    PassportPolicyView:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - batchId
+        - policyVersion
+        - createdAt
+        - state
+        - organizationVisibility
+        - productVisibility
+        - batchVisibility
+        - timelineVisibility
+        - evidenceVisibility
+        - createdBySub
+        - approvedBySub
+        - approvedAt
+        - revokedBySub
+        - revokedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        batchId:
+          type: string
+          format: uuid
+        policyVersion:
+          type: integer
+          minimum: 1
+        createdAt:
+          type: string
+          format: date-time
+        state:
+          type: string
+          enum:
+            - draft
+            - approved
+            - revoked
+        organizationVisibility:
+          type: string
+          enum:
+            - private
+            - partner
+            - public
+        productVisibility:
+          type: string
+          enum:
+            - private
+            - partner
+            - public
+        batchVisibility:
+          type: string
+          enum:
+            - private
+            - partner
+            - public
+        timelineVisibility:
+          type: string
+          enum:
+            - private
+            - partner
+            - public
+        evidenceVisibility:
+          type: string
+          enum:
+            - private
+            - partner
+            - public
+        createdBySub:
+          type: string
+        approvedBySub:
+          type: string
+          nullable: true
+        approvedAt:
+          type: string
+          format: date-time
+          nullable: true
+        revokedBySub:
+          type: string
+          nullable: true
+        revokedAt:
+          type: string
+          format: date-time
+          nullable: true
+    PassportPolicyRead:
+      type: object
+      additionalProperties: false
+      required:
+        - policies
+        - projection
+      properties:
+        policies:
+          type: array
+          items:
+            $ref: "#/components/schemas/PassportPolicyView"
+        projection:
+          type: object
+          additionalProperties: false
+          required:
+            - state
+            - policyVersion
+            - builtAt
+            - version
+          properties:
+            state:
+              type: string
+              enum:
+                - active
+                - stale
+                - revoked
+            policyVersion:
+              type: string
+            builtAt:
+              type: string
+              format: date-time
+            version:
+              type: integer
+              minimum: 1
+          nullable: true
+    PassportPolicyApproved:
+      type: object
+      additionalProperties: false
+      required:
+        - policy
+        - projectionState
+      properties:
+        policy:
+          $ref: "#/components/schemas/PassportPolicyView"
+        projectionState:
+          type: string
+          enum:
+            - active
+            - stale
+            - revoked
+    PassportPolicyState:
+      type: object
+      additionalProperties: false
+      required:
+        - state
+      properties:
+        state:
+          type: string
+          enum:
+            - active
+            - stale
+            - revoked
+        policyVersion:
+          type: string
     Reason:
       type: object
       additionalProperties: false
@@ -6780,17 +8514,59 @@ components:
             required:
               - type
               - occurredAt
+              - recordedAt
+              - issuer
+              - sourceId
               - verificationState
+              - evidence
             properties:
               type:
                 type: string
               occurredAt:
                 type: string
                 format: date-time
+              recordedAt:
+                type: string
+                format: date-time
+              issuer:
+                type: string
+              sourceId:
+                type: string
               verificationState:
                 type: string
+                enum:
+                  - confirmed
+                  - partial
+              sentQuantity:
+                type: string
+                pattern: ^(0|[1-9][0-9]*)(\.[0-9]{1,3})?$
+              actualQuantity:
+                type: string
+                pattern: ^(0|[1-9][0-9]*)(\.[0-9]{1,3})?$
+              evidence:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: false
+                  required:
+                    - id
+                    - checksum
+                  properties:
+                    id:
+                      type: string
+                      format: uuid
+                    checksum:
+                      type: string
+                      pattern: ^[0-9a-f]{64}$
+                    url:
+                      type: string
+                      format: uri
         verificationState:
           type: string
+          enum:
+            - unknown
+            - partial
+            - confirmed
         gaps:
           type: array
           items:
@@ -6821,6 +8597,69 @@ components:
           enum:
             - validated
             - pending_dependency
+    FederationSummaryPublishInput:
+      type: object
+      additionalProperties: false
+      required:
+        - recipientInstanceId
+      properties:
+        recipientInstanceId:
+          type: string
+          minLength: 1
+          maxLength: 64
+    FederationSummaryQueued:
+      type: object
+      additionalProperties: false
+      required:
+        - messageId
+        - eventCount
+        - policyVersion
+        - state
+      properties:
+        messageId:
+          type: string
+          format: uuid
+        eventCount:
+          type: integer
+          minimum: 1
+        policyVersion:
+          type: integer
+          minimum: 1
+        state:
+          type: string
+          enum:
+            - pending
+    FederationImpactPublishInput:
+      type: object
+      additionalProperties: false
+      required:
+        - recipientInstanceId
+        - sourceDocumentId
+      properties:
+        recipientInstanceId:
+          type: string
+          minLength: 1
+          maxLength: 64
+        sourceDocumentId:
+          type: string
+          format: uuid
+        sourceInboxMessageId:
+          type: string
+          format: uuid
+    FederationImpactQueued:
+      type: object
+      additionalProperties: false
+      required:
+        - messageId
+        - state
+      properties:
+        messageId:
+          type: string
+          format: uuid
+        state:
+          type: string
+          enum:
+            - pending
     FederationDelivery:
       type: object
       additionalProperties: false
@@ -6860,128 +8699,523 @@ components:
           type: string
           enum:
             - retry_due
+    OpsRetryInput:
+      type: object
+      additionalProperties: false
+      required:
+        - messageId
+      properties:
+        messageId:
+          type: string
+          format: uuid
+    OpsRetryResult:
+      type: object
+      additionalProperties: false
+      required:
+        - requestId
+        - status
+        - auditId
+      properties:
+        requestId:
+          type: string
+        status:
+          type: string
+          enum:
+            - pending
+        auditId:
+          type: string
+          format: uuid
+    OpsReprocessInput:
+      type: object
+      additionalProperties: false
+      required:
+        - action
+        - inboxId
+      properties:
+        action:
+          type: string
+          enum:
+            - reprocess
+        inboxId:
+          type: string
+          format: uuid
+    OpsReprocessResult:
+      type: object
+      additionalProperties: false
+      required:
+        - requestId
+        - state
+        - auditId
+      properties:
+        requestId:
+          type: string
+        state:
+          type: string
+          enum:
+            - pending_dependency
+            - applied_to_trace
+            - rejected
+        code:
+          type: string
+        auditId:
+          type: string
+          format: uuid
+    OpsRetriesView:
+      type: object
+      additionalProperties: false
+      required:
+        - requestId
+        - deadLetters
+        - haltedApprovals
+      properties:
+        requestId:
+          type: string
+        deadLetters:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              id:
+                type: string
+                format: uuid
+              eventType:
+                type: string
+              destination:
+                type: string
+              aggregateId:
+                type: string
+                format: uuid
+              attemptCount:
+                type: integer
+              lastErrorCode:
+                type: string
+                nullable: true
+              correlationId:
+                type: string
+              ageSeconds:
+                type: integer
+        haltedApprovals:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              id:
+                type: string
+                format: uuid
+              documentId:
+                type: string
+                format: uuid
+              haltReason:
+                type: string
+              flowableProcessId:
+                type: string
+                nullable: true
+              ageSeconds:
+                type: integer
+    OpsFederationView:
+      type: object
+      additionalProperties: false
+      required:
+        - requestId
+        - instanceId
+        - queue
+        - queueOldestAgeSeconds
+        - attempts
+        - inbox
+        - receipts
+        - deadLetters
+        - mappingGaps
+        - receiptCases
+        - lookup
+      properties:
+        requestId:
+          type: string
+        instanceId:
+          type: string
+        queue:
+          type: object
+          additionalProperties:
+            type: integer
+        queueOldestAgeSeconds:
+          type: integer
+        attempts:
+          type: object
+          additionalProperties:
+            type: integer
+        inbox:
+          type: object
+          additionalProperties:
+            type: integer
+        receipts:
+          type: object
+          additionalProperties:
+            type: integer
+        deadLetters:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              messageId:
+                type: string
+                format: uuid
+              eventType:
+                type: string
+              correlationId:
+                type: string
+                nullable: true
+              attempts:
+                type: integer
+              errorCode:
+                type: string
+                nullable: true
+              ageSeconds:
+                type: integer
+        mappingGaps:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              inboxId:
+                type: string
+                format: uuid
+              issuerInstanceId:
+                type: string
+              messageId:
+                type: string
+                format: uuid
+              eventType:
+                type: string
+              state:
+                type: string
+              errorCode:
+                type: string
+                nullable: true
+              ageSeconds:
+                type: integer
+        receiptCases:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              transferId:
+                type: string
+                format: uuid
+              state:
+                type: string
+              ageSeconds:
+                type: integer
+              businessReceiptAt:
+                type: string
+                format: date-time
+                nullable: true
+        lookup:
+          type: object
+          additionalProperties: false
+          required:
+            - outbox
+            - inbox
+          properties:
+            outbox:
+              type: array
+              items:
+                type: object
+                additionalProperties: false
+                properties:
+                  outboxId:
+                    type: string
+                    format: uuid
+                  envelopeMessageId:
+                    type: string
+                    format: uuid
+                    nullable: true
+                  eventType:
+                    type: string
+                  status:
+                    type: string
+                  correlationId:
+                    type: string
+                    nullable: true
+                  attemptCount:
+                    type: integer
+                  errorCode:
+                    type: string
+                    nullable: true
+                  ageSeconds:
+                    type: integer
+                  deliveredAt:
+                    type: string
+                    format: date-time
+                    nullable: true
+                  attempts:
+                    type: array
+                    items:
+                      type: object
+                      additionalProperties: false
+                      properties:
+                        number:
+                          type: integer
+                        result:
+                          type: string
+                        httpStatus:
+                          type: integer
+                          nullable: true
+                        errorCode:
+                          type: string
+                          nullable: true
+                        durationMs:
+                          type: integer
+                          nullable: true
+                        ackStatus:
+                          type: string
+                          nullable: true
+                        at:
+                          type: string
+                          format: date-time
+            inbox:
+              type: array
+              items:
+                type: object
+                additionalProperties: false
+                properties:
+                  inboxId:
+                    type: string
+                    format: uuid
+                  issuerInstanceId:
+                    type: string
+                  messageId:
+                    type: string
+                    format: uuid
+                  eventType:
+                    type: string
+                  state:
+                    type: string
+                  errorCode:
+                    type: string
+                    nullable: true
+                  ackStatus:
+                    type: string
+                    nullable: true
+                  ageSeconds:
+                    type: integer
+                  appliedAt:
+                    type: string
+                    format: date-time
+                    nullable: true
+          nullable: true
     AiChatInput:
       type: object
       additionalProperties: false
       required:
-        - message
+        - question
       properties:
-        message:
+        question:
           type: string
           minLength: 1
-        conversationId:
+        batchId:
           type: string
           format: uuid
-        lotRef:
+        lotCode:
+          type: string
+        issuer:
           type: string
     AiChatResult:
       type: object
       additionalProperties: false
       required:
-        - answer
-        - sources
-        - toolCallIds
-        - needsClarification
+        - status
+        - requestId
       properties:
+        status:
+          type: string
+          enum:
+            - answered
+            - ambiguous
+            - not_found
+        requestId:
+          type: string
         answer:
           type: string
         sources:
           type: array
           items:
             type: object
-            additionalProperties: false
-            required:
-              - type
-              - id
-              - verificationState
-            properties:
-              type:
-                type: string
-              id:
-                type: string
-              verificationState:
-                type: string
-              asOf:
-                type: string
-                format: date-time
-        toolCallIds:
+        candidates:
           type: array
           items:
-            type: string
-            format: uuid
-        needsClarification:
+            type: object
+        hint:
+          type: string
+        aiUnavailable:
           type: boolean
-    AiDraftInput:
+        riskAlerts:
+          type: array
+          items:
+            type: object
+      description: Discriminated by status; answered includes answer/sources, ambiguous includes candidates.
+    AiDraftProposeInput:
       type: object
       additionalProperties: false
-      required:
-        - documentType
-        - instruction
       properties:
-        documentType:
-          type: string
-          enum:
-            - goods_receipt
-            - goods_issue
-        instruction:
+        request:
           type: string
           minLength: 1
-        purpose:
+        question:
           type: string
-          enum:
-            - partner_transfer
-            - sale
-            - other
-        proposedFields:
+        batchId:
+          type: string
+          format: uuid
+        lotCode:
+          type: string
+        issuer:
+          type: string
+        fields:
           type: object
-    AiDraftResult:
+    AiDraftProposeResult:
       type: object
       additionalProperties: false
       required:
-        - draftDocumentId
         - status
-        - proposedFields
-        - sources
-        - warnings
+        - requestId
       properties:
-        draftDocumentId:
-          type: string
-          format: uuid
         status:
           type: string
           enum:
-            - draft
-        proposedFields:
+            - proposed
+            - ambiguous
+            - incomplete
+            - empty
+        requestId:
+          type: string
+        proposalId:
+          type: string
+          nullable: true
+        fields:
           type: object
         sources:
           type: array
           items:
-            type: string
+            type: object
         warnings:
           type: array
           items:
-            type: string
-    AiToolCall:
+            type: object
+        candidates:
+          type: array
+          items:
+            type: object
+        hint:
+          type: string
+    AiDraftCreateInput:
       type: object
       additionalProperties: false
       required:
-        - id
-        - toolName
-        - actorSub
-        - outcome
+        - proposalId
+        - fields
       properties:
-        id:
+        proposalId:
+          type: string
+          minLength: 1
+        fields:
+          type: object
+          additionalProperties: false
+          required:
+            - warehouseId
+            - batchId
+            - quantity
+            - unit
+          properties:
+            warehouseId:
+              type: string
+              format: uuid
+            batchId:
+              type: string
+              format: uuid
+            quantity:
+              type: string
+            unit:
+              type: string
+        note:
+          type: string
+    AiDraftCreateResult:
+      type: object
+      additionalProperties: false
+      required:
+        - status
+        - proposalId
+        - draftDocumentId
+        - fields
+        - sourceIds
+      properties:
+        status:
+          type: string
+          enum:
+            - created
+        proposalId:
+          type: string
+        draftDocumentId:
           type: string
           format: uuid
-        toolName:
-          type: string
-        actorSub:
-          type: string
+        fields:
+          type: object
         sourceIds:
           type: array
           items:
             type: string
-        outcome:
+        requestId:
+          type: string
+    AiRiskFeedbackInput:
+      type: object
+      additionalProperties: false
+      required:
+        - alertFingerprint
+        - ruleId
+        - ruleVersion
+        - verdict
+      properties:
+        alertFingerprint:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+        ruleId:
+          type: string
+          minLength: 1
+        ruleVersion:
+          type: string
+          minLength: 1
+        verdict:
+          type: string
+          enum:
+            - correct
+            - incorrect
+    AiRiskFeedbackResult:
+      type: object
+      additionalProperties: false
+      required:
+        - alertFingerprint
+        - ruleId
+        - ruleVersion
+        - verdict
+        - actorId
+        - requestId
+      properties:
+        alertFingerprint:
+          type: string
+        ruleId:
+          type: string
+        ruleVersion:
+          type: string
+        verdict:
+          type: string
+          enum:
+            - correct
+            - incorrect
+        actorId:
+          type: string
+        requestId:
           type: string
     CoreRecordCreate:
       type: object
@@ -7326,6 +9560,49 @@ components:
         lastDetectedAt:
           type: string
           format: date-time
+    OtReadingInput:
+      type: object
+      additionalProperties: false
+      required:
+        - deviceId
+        - readingId
+        - batchId
+        - value
+        - observedAt
+      properties:
+        deviceId:
+          type: string
+          minLength: 1
+          maxLength: 128
+        readingId:
+          type: string
+          minLength: 1
+          maxLength: 128
+        batchId:
+          type: string
+          format: uuid
+        value:
+          type: string
+          pattern: ^-?(0|[1-9][0-9]{0,2})(\.[0-9]{1,3})?$
+        observedAt:
+          type: string
+          format: date-time
+    OtReadingAccepted:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - checksumHex
+        - reused
+      properties:
+        id:
+          type: string
+          format: uuid
+        checksumHex:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+        reused:
+          type: boolean
     EvidenceMetadataPayload:
       title: evidence_metadata
       type: object
@@ -7389,7 +9666,7 @@ components:
               minLength: 1
             lotId:
               type: string
-              format: uuid
+              minLength: 1
         sourceEventIds:
           type: array
           items:
@@ -7456,6 +9733,26 @@ components:
               relation:
                 type: string
                 minLength: 1
+              allocationDetail:
+                type: array
+                minItems: 1
+                items:
+                  type: object
+                  additionalProperties: false
+                  required:
+                    - issueLineId
+                    - sourceLineId
+                    - quantity
+                  properties:
+                    issueLineId:
+                      type: string
+                      format: uuid
+                    sourceLineId:
+                      type: string
+                      format: uuid
+                    quantity:
+                      type: string
+                      pattern: ^(?!0(?:\.0{1,3})?$)(0|[1-9][0-9]*)(\.[0-9]{1,3})?$
             oneOf:
               - required:
                   - toEventId
@@ -7600,6 +9897,7 @@ components:
             - transfer.announced.v1
             - receipt.confirmed.v1
             - downstream.impact.v1
+            - trace.summary.v1
         issuerInstanceId:
           type: string
           minLength: 1
@@ -7634,6 +9932,7 @@ components:
                 - partner_transfer
                 - receiving_confirmation
                 - sale_record
+                - trace_summary
             id:
               type: string
               format: uuid
@@ -7860,4 +10159,118 @@ components:
           enum:
             - partner
             - public
+        targetLot:
+          type: object
+          additionalProperties: false
+          required:
+            - originLot
+            - senderBatch
+          properties:
+            originLot:
+              type: object
+              additionalProperties: false
+              required:
+                - issuerInstanceId
+                - lotId
+              properties:
+                issuerInstanceId:
+                  type: string
+                  minLength: 1
+                  maxLength: 64
+                lotId:
+                  type: string
+                  format: uuid
+            senderBatch:
+              type: object
+              additionalProperties: false
+              required:
+                - instanceId
+                - batchId
+              properties:
+                instanceId:
+                  type: string
+                  minLength: 1
+                  maxLength: 64
+                batchId:
+                  type: string
+                  format: uuid
+        traceSummaries:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items:
+            type: object
+            additionalProperties: false
+            required:
+              - issuerInstanceId
+              - externalEventId
+              - eventType
+              - occurredAt
+              - disclosureScope
+              - policyVersion
+              - state
+              - parents
+            properties:
+              issuerInstanceId:
+                type: string
+                minLength: 1
+                maxLength: 64
+              externalEventId:
+                type: string
+                minLength: 1
+                maxLength: 200
+              eventType:
+                type: string
+                minLength: 1
+                maxLength: 80
+              occurredAt:
+                type: string
+                format: date-time
+              disclosureScope:
+                enum:
+                  - partner
+                  - public
+              policyVersion:
+                type: integer
+                minimum: 1
+              state:
+                enum:
+                  - active
+                  - revoked
+              sourceMessageRef:
+                type: object
+                additionalProperties: false
+                required:
+                  - issuerInstanceId
+                  - messageId
+                  - eventId
+                properties:
+                  issuerInstanceId:
+                    type: string
+                    minLength: 1
+                    maxLength: 64
+                  messageId:
+                    type: string
+                    format: uuid
+                  eventId:
+                    type: string
+                    format: uuid
+              parents:
+                type: array
+                maxItems: 20
+                items:
+                  type: object
+                  additionalProperties: false
+                  required:
+                    - issuerInstanceId
+                    - externalEventId
+                  properties:
+                    issuerInstanceId:
+                      type: string
+                      minLength: 1
+                      maxLength: 64
+                    externalEventId:
+                      type: string
+                      minLength: 1
+                      maxLength: 200
       description: Cross-field event rules are enforced by contracts/events/envelope-v1.schema.json.

@@ -8,45 +8,46 @@ Document lines / Inventory confirm: tham chiếu **`product_variant_id`** + qty 
 
 ## P07-T01 — Loại chứng từ và transition contract
 
-- [ ] Chốt field/status/action cho goods receipt, goods issue, partner transfer, receiving confirmation, stocktake và sale record; chỉ loại cần trong kịch bản MVP được phép đi tới confirm.
+- [x] Chốt field/status/action cho goods receipt, goods issue, partner transfer, receiving confirmation, stocktake và sale record; chỉ loại cần trong kịch bản MVP được phép đi tới confirm.
 - [ ] Draft không đổi stock và được sửa với version; Confirmed bất biến, sửa sai bằng chứng từ bù mới có `correction_of_document_id`/reason và movement theo loại chứng từ bù. Không cho PATCH status hay xóa confirmed; không làm generic reversal xuyên instance trong MVP.
 - [ ] V1 mọi GoodsIssue cần approval Flowable, Approver khác creator; chốt timeout/từ chối/quá hạn theo D06, transition invalid có test.
-- [ ] Đóng D14: GoodsReceipt nhập nội bộ +, GoodsIssue −, ReceivingConfirmation + actual, Stocktake ± variance; PartnerTransfer và SaleRecord chỉ tham chiếu issue đã confirm. Một issue outbound ↔ một transfer khớp lot/qty trong MVP; không tạo receipt nhập thứ hai cho cùng receiving.
+- [x] Đóng D14: GoodsReceipt nhập nội bộ +, GoodsIssue −, ReceivingConfirmation + actual, Stocktake ± variance; PartnerTransfer và SaleRecord chỉ tham chiếu issue đã confirm. Một issue outbound ↔ một transfer khớp lot/qty trong MVP; không tạo receipt nhập thứ hai cho cùng receiving.
 - **Đầu ra:** state machine và API contract cập nhật; **kiểm chứng:** Draft/cancel/reject không tạo movement.
 
 ## P07-T02 — Migration và repository chứng từ
 
-- [ ] Versioned `trading.document` + `document_line` chung và `transfer_detail`/`receiving_detail`/`sale_detail` theo `database-schema-v1.md`; sáu loại chứng từ là `document_type`, line bắt buộc batch/product/qty/unit/warehouse đúng loại.
-- [ ] FK/version/unique document number trong instance, snapshot giá trị cần bất biến, link source/partner/approver và timestamp. Index query theo status, batch, partner, time.
-- [ ] Repository dùng transaction client P03, không ẩn transaction riêng; migration chạy từ DB trống và backup restore.
+- [x] Versioned `trading.document` + `document_line` chung và `transfer_detail`/`receiving_detail`/`sale_detail` theo `database-schema-v1.md`; sáu loại chứng từ là `document_type`, line bắt buộc batch/product/qty/unit/warehouse đúng loại.
+- [x] FK/version/unique document number trong instance, snapshot giá trị cần bất biến, link source/partner/approver và timestamp. Index query theo status, batch, partner, time.
+- [x] Repository dùng transaction client P03, không ẩn transaction riêng; migration chạy từ DB trống và backup restore.
 - **Đầu ra:** schema/repository; **kiểm chứng:** DB chặn line sai hoặc confirmed thiếu required fields.
 
 ## P07-T03 — Goods receipt và issue
 
 - [ ] API/use case tạo/edit/submit/confirm receipt và issue; validate issuer/product/batch/warehouse/expiry/quality, unit, quantity và permission.
-- [ ] Confirm receipt tăng stock, issue giảm stock; trong cùng transaction cập nhật status/version, movement/balance, audit, outbox. Idempotency key + source uniqueness chống double click/retry.
+- [x] Confirm receipt tăng stock, issue giảm stock; trong cùng transaction cập nhật status/version, movement/balance, audit, outbox. Idempotency key + source uniqueness chống double click/retry.
 - [ ] UI nhập/xuất từ batch picker và hiển thị balance trước/sau; lỗi thiếu hàng/đã sửa version rõ.
 - **Đầu ra:** hai luồng end-to-end; **kiểm chứng:** AC-03/04, rollback và hai issue cạnh tranh trên PG thật.
 
 ## P07-T04 — Partner transfer và liên kết issue
 
-- [ ] Tạo transfer chỉ tới partner active, tham chiếu **một** confirmed issue/lot/quantity khớp chính xác và chưa transfer; outbound issue trừ tồn, transfer không trừ lần hai.
-- [ ] Confirm transfer sinh domain event/outbox federation sau commit, không gọi partner đồng bộ và không ghi stock movement. Technical ACK và trạng thái giao hàng tách biệt.
+- [x] Tạo transfer chỉ tới partner active, tham chiếu **một** confirmed issue/lot/quantity khớp chính xác và chưa transfer; outbound issue trừ tồn, transfer không trừ lần hai.
+- [x] Confirm transfer sinh domain event/outbox federation sau commit, không gọi partner đồng bộ và không ghi stock movement. Technical ACK và trạng thái giao hàng tách biệt.
 - [ ] UI xem trạng thái pending/retry/technical ACK/business receipt/dispute với source IDs; A vẫn xem được lịch sử local khi B offline.
 - **Đầu ra:** transfer local; **kiểm chứng:** Draft không gửi, Confirmed một outbox, B down không rollback stock A.
 
 ## P07-T05 — Receiving confirmation thực tế
 
-- [ ] B/C tạo receiving Draft từ message đã xác thực hoặc nhập tham chiếu có quy tắc; hiển thị sent quantity, actual quantity, lot mapping và reason chênh lệch.
-- [ ] Confirm tăng stock theo **actual**, không theo sent/ACK; không confirm GoodsReceipt nhập cùng hàng lần nữa. Partial/zero receipt hợp lệ và reason bắt buộc nếu khác; over-receipt ở v1 vào dispute/422, không cộng vượt. Duplicate confirm không nhân tồn. Ghi discrepancy, event mới và audit trong transaction.
+- [x] B/C tạo receiving Draft từ nguồn seeded kiểm schema/hash/recipient (chưa xác thực chữ ký); hiển thị sent quantity, actual quantity, lot mapping và reason chênh lệch. Xem `evidence/p07-t05.md`; browser journey chưa chạy.
+- [x] Confirm tăng stock theo **actual**, không theo sent/ACK; không confirm GoodsReceipt nhập cùng hàng lần nữa. Partial/zero receipt hợp lệ và reason bắt buộc nếu khác; over-receipt ở v1 trả 422, không cộng vượt. Duplicate confirm không nhân tồn. Ghi discrepancy, event mới và audit trong transaction; test PG/Flowable ở `evidence/p07-t05.md`.
 - [ ] Không tự sửa phiếu nguồn A; trạng thái đối chiếu của sender qua federation event ở P09. UI bắt người nhận xác nhận số lượng thực.
 - **Đầu ra:** receipt use case; **kiểm chứng:** A gửi 12, B nhận 10 thì B +10, chênh 2 có nguồn; AC-06 hoàn chỉnh ở P09.
 
 ## P07-T06 — Stocktake và sale record tối thiểu
 
-- [ ] Stocktake Draft ghi count theo batch/warehouse, variance và người kiểm; confirm tạo movement điều chỉnh có lý do, không overwrite balance. Quy tắc approval cho điều chỉnh lớn nếu D06 chọn.
-- [ ] Sale record link **một** confirmed issue/lot đã trừ tồn và bên mua nếu được phép; sale không trừ tồn lần hai. Chỉ lưu dữ liệu cần cho forward trace, không làm POS/payment/finance. Confirm/cancel theo invariant bất biến.
+- [x] Stocktake Draft ghi count theo batch/warehouse, variance và người kiểm; confirm tạo movement điều chỉnh có lý do, không overwrite balance. D06 không chọn ngưỡng hay workflow stocktake cho v1; không có approval stocktake. Rủi ro chấp nhận: người đếm có thể tự confirm; xem `evidence/p07-t06.md`.
+- [x] Sale record link **một** confirmed issue/lot đã trừ tồn và bên mua nếu được phép; sale không trừ tồn lần hai. Chỉ lưu dữ liệu cần cho forward trace, không làm POS/payment/finance. Confirm/cancel theo invariant bất biến.
 - [ ] API/UI tối thiểu tạo/xem, audit và outbox trace; test variance âm/dương và không âm balance.
+- API/UI và test PostgreSQL/Flowable có tại `evidence/p07-t06.md`; chưa chạy browser journey nên giữ ô API/UI trên chưa tick.
 - **Đầu ra:** dữ liệu phục vụ trace C bán lô; **kiểm chứng:** sale link tới batch/movement/source document.
 
 ## P07-T07 — Flowable gắn với chứng từ thật
@@ -55,6 +56,7 @@ Document lines / Inventory confirm: tham chiếu **`product_variant_id`** + qty 
 - [ ] Approver khác creator thao tác qua gateway/UI; kết quả engine được đồng bộ idempotent về app. Confirm phải kiểm local approval state + quyền hiện thời, không dựa vào client tự khai `approved=true`.
 - [ ] Test Flowable down, kết quả task lặp/đến muộn qua poller, rejected rồi confirm, process version upgrade; không tạo stock khi chưa duyệt.
 - **Đầu ra:** process + UI + integration; **kiểm chứng:** Flowable process history và AC-12 end-to-end.
+- P07-T07 evidence: `evidence/p07-t07.md`. Disposable PostgreSQL/Flowable battery and UI build verify integration paths; gateway HTTP journey remains open until a configured live stack and distinct user fixtures are available. Checkboxes above remain open at HTTP end-to-end level.
 
 ## P07-T08 — Cross-module transaction và query lịch sử
 
@@ -76,7 +78,7 @@ Document lines / Inventory confirm: tham chiếu **`product_variant_id`** + qty 
 | P07-T01 | `contexts/trading/domain/document.ts` type/status/action matrix; D14 fixed trong schema/API: receipt+, issue−, receiving+actual, stocktake variance; transfer/sale no movement; correction là document mới có source/reason. | Draft/cancel/reject không stock; confirmed immutable; correction link hợp lệ nhưng không hoàn tác tự động; transition invalid 409/422; issue link chỉ một transfer/sale theo loại. |
 | P07-T02 | `0006_trading.sql`: **unified** `trading.document`, `document_line`, `transfer_detail`, `receiving_detail`, `sale_detail` theo `database-schema-v1.md`, thêm FK muộn, deferred confirmed checks và trigger immutable; repositories nhận shared tx. | DB chặn duplicate number/line, invalid FK, confirmed thiếu actor/time/required line; UPDATE/DELETE confirmed line bị DB từ chối; migration empty/upgrade pass. |
 | P07-T03 | `/receipts` và `/issues` DTO `api-payloads-v1.md`, application use cases, UI forms; issue submit qua Flowable. | Receipt 20→A balance20; issue12 approved→A8; mỗi confirm 1 movement/line+audit/outbox, concurrent overdraw fail. |
-| P07-T04 | `/transfers` copy exact lines từ confirmed issue, `transfer_detail.linked_issue_id UNIQUE`; outbox `transfer.announced.v1` chỉ sau confirm. | Transfer12 giữ A8, một issue không transfer hai lần, B offline vẫn A8/outbox retry. |
+| P07-T04 | `/transfers` copy exact lines từ confirmed issue; deferred trigger bảo đảm một transfer chưa huỷ mỗi issue; outbox `transfer.announced.v1` chỉ sau confirm. | Transfer12 giữ A8; cancel draft giải phóng issue; B offline vẫn A8/outbox giữ pending đến P09 (dispatcher dead-letter ngay nếu thiếu consumer). |
 | P07-T05 | `/receivings` từ verified inbox/source ref, `document_line.source_line_ref` từng transfer line và quantity=sent/actual_quantity=actual, `receiving_detail` totals + movement; discrepancy reason. | B ACK vẫn 0; actual10/12→B10, discrepancy2, duplicate confirm→B10; bỏ sót/nhân đôi source line bị reject; actual>sent v1 dispute, không cộng vượt. |
 | P07-T06 | `/stocktakes` count−balance under lock, `/sales-records` link confirmed issue, UI history; no POS/payment. | Stocktake delta0 không movement, delta± cập nhật balance; sale2 sau issue2 giữ C balance4, không double decrease. |
 | P07-T07 | `workflow-spec-v1.md` BPMN/bridge + `/issues/{id}/submit` và Approver inbox/decision API, decision intent/outbox 202 trước engine. | Creator self-approve 403, reject chặn confirm, Flowable down giữ pending, approval line hash cũ không dùng sau sửa line; engine process history có ID. |

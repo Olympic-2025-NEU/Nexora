@@ -70,6 +70,7 @@ export function partnerConnectionRepository() {
         id: row.id,
         partnerId: row.partnerId,
         partnerCode: row.partnerCode,
+        issuerInstanceId: row.issuerInstanceId,
         partnerStatus: row.partnerStatus,
         inboundClientId: row.inboundClientId,
         allowedInboundScope: row.allowedInboundScope,

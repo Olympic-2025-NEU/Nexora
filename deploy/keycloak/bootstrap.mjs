@@ -13,8 +13,9 @@ const required = (name) => {
 const base = 'http://keycloak:8080';
 const realm = JSON.parse(readFileSync('/bootstrap/realm-template.json', 'utf8'));
 const issuer = new URL(required('OIDC_ISSUER_URL'));
-if (issuer.href.replace(/\/$/, '') !== `${required('OIDC_BASE_URL')}/realms/${realm.realm}`) {
-  throw new Error('OIDC_ISSUER_URL must match OIDC_BASE_URL and realm');
+if (issuer.href.replace(/\/$/, '') !==
+    `${required('OIDC_FRONTEND_URL').replace(/\/$/, '')}/realms/${realm.realm}`) {
+  throw new Error('OIDC_ISSUER_URL must match OIDC_FRONTEND_URL and realm');
 }
 for (const [client, idVar, redirectVar] of [
   [realm.clients[0], 'OIDC_CLIENT_ID_ERP', 'OIDC_REDIRECT_URI_ERP'],
@@ -25,6 +26,10 @@ for (const [client, idVar, redirectVar] of [
   if (!['http:', 'https:'].includes(redirect.protocol)) throw new Error(`Invalid ${redirectVar}`);
   client.redirectUris = [redirect.href];
   client.webOrigins = [redirect.origin];
+  if (idVar === 'OIDC_CLIENT_ID_DXLAB') {
+    // Keycloak validates RP-initiated logout against a separate allowlist.
+    client.attributes['post.logout.redirect.uris'] = new URL('/dxlab', redirect).href;
+  }
 }
 // Local smoke uses Resource-Owner password grant against erp-browser (G02 curl matrix).
 // Browser production path remains auth-code + PKCE; do not expose ROPC on public internet demos.
@@ -88,11 +93,14 @@ async function assignRole(token, userId, roleName) {
 /**
  * Assign CONFIGURE_TOTP required action (MFA) to a user.
  * Required for administrator and approver roles per security.md / ADR 0004.
+ * A configured OTP credential satisfies setup; restarts must not re-add the action.
  */
 async function assignMfaRequiredAction(token, userId) {
   const user = await request(`/admin/realms/${realm.realm}/users/${userId}`, token);
   const existing = user.requiredActions ?? [];
-  if (!existing.includes('CONFIGURE_TOTP')) {
+  const credentials = await request(`/admin/realms/${realm.realm}/users/${userId}/credentials`, token);
+  if (!credentials.some((credential) => credential.type === 'otp') &&
+      !existing.includes('CONFIGURE_TOTP')) {
     await request(`/admin/realms/${realm.realm}/users/${userId}`, token, 'PUT', {
       ...user,
       requiredActions: [...existing, 'CONFIGURE_TOTP'],
@@ -173,6 +181,71 @@ async function main() {
         }
       } else {
         await request(`/admin/realms/${realm.realm}/clients`, token, 'POST', client);
+        changes++;
+      }
+    }
+  }
+
+  // Receiver-issued M2M clients are supplied only by the ignored A/B/C env files.
+  // The dedicated scope and audience are both required by the ERP inbound route.
+  const inbound = [1, 2].flatMap((slot) => {
+    const id = process.env[`FEDERATION_INBOUND_CLIENT_${slot}_ID`];
+    const secret = process.env[`FEDERATION_INBOUND_CLIENT_${slot}_SECRET`];
+    if (!id && !secret) return [];
+    if (!id || !secret) throw new Error(`Incomplete federation inbound client ${slot}`);
+    return [{ id, secret }];
+  });
+  if (inbound.length) {
+    const scopeName = 'federation:write';
+    let scopes = await request(`/admin/realms/${realm.realm}/client-scopes`, token);
+    let scope = scopes.find((item) => item.name === scopeName);
+    if (!scope) {
+      await request(`/admin/realms/${realm.realm}/client-scopes`, token, 'POST', {
+        name: scopeName, protocol: 'openid-connect',
+        attributes: { 'include.in.token.scope': 'true', 'display.on.consent.screen': 'false' },
+      });
+      changes++;
+      scopes = await request(`/admin/realms/${realm.realm}/client-scopes`, token);
+      scope = scopes.find((item) => item.name === scopeName);
+      if (!scope) throw new Error('Federation scope creation failed');
+    }
+    for (const entry of inbound) {
+      const path = `/admin/realms/${realm.realm}/clients`;
+      let found = await request(`${path}?clientId=${encodeURIComponent(entry.id)}`, token);
+      const client = { clientId: entry.id, name: `Federation inbound ${entry.id}`,
+        enabled: true, protocol: 'openid-connect', publicClient: false,
+        standardFlowEnabled: false, directAccessGrantsEnabled: false,
+        serviceAccountsEnabled: true, secret: entry.secret };
+      if (!found.length) {
+        await request(path, token, 'POST', client);
+        changes++;
+        found = await request(`${path}?clientId=${encodeURIComponent(entry.id)}`, token);
+      } else {
+        const current = await request(`${path}/${found[0].id}`, token);
+        const currentSecret = await request(`${path}/${found[0].id}/client-secret`, token);
+        if (!current.enabled || !current.serviceAccountsEnabled || current.publicClient ||
+            current.standardFlowEnabled || current.directAccessGrantsEnabled ||
+            currentSecret.value !== entry.secret) {
+          await request(`${path}/${found[0].id}`, token, 'PUT', { ...current, ...client });
+          changes++;
+        }
+      }
+      const clientId = found[0].id;
+      const attached = await request(`${path}/${clientId}/default-client-scopes`, token);
+      if (!attached.some((item) => item.id === scope.id)) {
+        await request(`${path}/${clientId}/default-client-scopes/${scope.id}`, token, 'PUT');
+        changes++;
+      }
+      const mappersPath = `${path}/${clientId}/protocol-mappers/models`;
+      const mappers = await request(mappersPath, token);
+      if (!mappers.some((item) => item.name === 'nexora-erp-audience')) {
+        await request(mappersPath, token, 'POST', {
+          name: 'nexora-erp-audience', protocol: 'openid-connect',
+          protocolMapper: 'oidc-audience-mapper',
+          config: { 'included.custom.audience': required('OIDC_CLIENT_ID_ERP'),
+            'access.token.claim': 'true', 'id.token.claim': 'false',
+            'introspection.token.claim': 'true' },
+        });
         changes++;
       }
     }

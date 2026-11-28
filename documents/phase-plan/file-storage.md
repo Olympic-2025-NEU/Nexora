@@ -17,7 +17,7 @@
 
 - `GET /api/v1/files/{id}` trả metadata cho uploader hoặc Administrator; người khác nhận 404 để không lộ sự tồn tại. `?download=1` chỉ stream khi row `clean`, bucket `private`, visibility `private`, actor có quyền và SHA-256/kích thước khớp metadata. Pending/infected/error nhận 423. Bytes trả với `Content-Disposition: attachment`, `nosniff`, CSP sandbox và `no-store`; successful download có audit. Không có presigned URL public ở v1.
 - Backup DB và SeaweedFS phải cùng tập snapshot/manifest ở T06; attachment chứa checksum để so sau restore. T04 integration test dùng DB + bucket tạm riêng và volume tạm, kiểm compensation và restart. `npm run test:platform:files` chạy bài test đó; không dùng credential instance thật.
-- T07 phải bổ sung owner link/resource policy, structured records và smoke qua gateway khi UI tắt. Cho tới lúc đó, file chưa gắn chứng từ/lô và không được gọi là evidence công khai.
+- P08-T07 đã bổ sung `traceability.trace_evidence`: link riêng từ attachment sạch tới trace event/chứng từ confirmed, giữ `platform.attachment` trong bucket private và không sửa `trace_event` append-only. Link có checksum/visibility và quyền actor theo batch/unit; public chỉ Administrator khi evidence/timeline policy public. Passport trả capability URL 60 giây, không trả S3 URL. Core Data chỉ SELECT view `public_evidence_download`, kiểm lại quyền và checksum bytes; gateway rate limit và `no-store`. Quyền tải private theo uploader/Administrator của P03 vẫn áp dụng qua `/api/v1/files/{id}?download=1`.
 
 ## T05 — kiểm dịch và xử lý lỗi
 

@@ -43,7 +43,6 @@ export async function recordDecisionIntent(tx: Prisma.TransactionClient, resolve
   if (!actor?.active || actor.role !== "approver") throw new ApprovalScopeError("Approver membership inactive or missing");
   const row = await getApproval(tx, input.approvalRequestId);
   if (!row) throw new ApprovalNotReadyError("Approval request missing");
-  if (actor.sub === row.creatorSub) throw new SelfApprovalError("Creator cannot approve own request");
   if (!hasScope(actor, row.warehouseIds, "approver")) throw new ApprovalScopeError("Warehouse scope incomplete");
   if (row.state === "decision_pending") {
     if (row.decisionRequestedBySub === actor.sub && row.decisionIntent === input.decision &&
@@ -51,6 +50,7 @@ export async function recordDecisionIntent(tx: Prisma.TransactionClient, resolve
     throw new DecisionConflictError("Another decision is pending");
   }
   if (row.state !== "pending") throw new ApprovalNotReadyError("Approval not pending");
+  if (actor.sub === row.creatorSub) throw new SelfApprovalError("Creator cannot approve own request");
   if (row.version !== input.expectedVersion) throw new VersionConflictError("Approval version changed");
   if (!["approved", "rejected"].includes(input.decision) || !input.flowableTaskId ||
       (input.decision === "rejected" && !input.reason?.trim())) throw new Error("Invalid approval decision");
@@ -79,6 +79,19 @@ export async function cancelRequest(tx: Prisma.TransactionClient, input: {
   if (!row) throw new ApprovalNotReadyError("Approval request missing");
   const changed = await transition(tx, row.id, ["requested", "starting", "pending", "decision_pending"],
     "cancelled", { cancelReason: input.reason.trim() }, row.version);
+  if (!changed) throw new VersionConflictError("Approval version changed");
+  await auditApproval(tx, changed, "workflow.approval.cancelled", input.actorSub, row.state);
+  return changed;
+}
+
+export async function cancelApprovedRequest(tx: Prisma.TransactionClient, input: {
+  approvalRequestId: string; actorSub: string; reason: string;
+}) {
+  if (!input.reason.trim()) throw new Error("Cancellation reason required");
+  const row = await getApproval(tx, input.approvalRequestId);
+  if (!row || row.state !== "approved") throw new ApprovalNotReadyError("Approval not approved");
+  const changed = await transition(tx, row.id, ["approved"], "cancelled",
+    { cancelReason: input.reason.trim(), engineCleanupAt: new Date() }, row.version);
   if (!changed) throw new VersionConflictError("Approval version changed");
   await auditApproval(tx, changed, "workflow.approval.cancelled", input.actorSub, row.state);
   return changed;

@@ -17,11 +17,11 @@ Chọn công nghệ qua spike **không** nghĩa app/core đã triển khai. Hai 
 | [D07](../adr/D07-quantity-unit-lot.md) → [0007](../adr/0007-decimal-unit-lot.md) | `numeric(20,3)`/unit/lot **đã chốt thiết kế** | P06/P07 schema thật |
 | [D08](../adr/D08-federation-envelope.md) → [0008](../adr/0008-trace-federation-envelope.md) | Envelope/ACK v1 **đã chốt thiết kế** | P00-T05 schema + Node/Python vectors pass; P09 E2E |
 | [D09](../adr/D09-ai-provider-boundary.md) → [0009](../adr/0009-ai-provider.md) | Ranh giới AI **đã chốt**; model hoãn P10 | P10 license/policy |
-| [D10](../adr/D10-dx-lab-hpdi.md) → [0010](../adr/0010-hpdi-dx-lab.md) | DX-Lab H-P-D-I **đã chốt thiết kế** | P11 UI thật |
-| [D11](../adr/D11-dxos-principles-evidence.md) → [0011](../adr/0011-four-principles-proof.md) | Bốn nguyên lý **đã chốt thiết kế** | BTC + P12 |
-| [D12](../adr/D12-gitops-demo.md) → [0012](../adr/0012-gitops-demo.md) | k3s/Argo **có điều kiện** | P12 drift/reconcile |
+| [D10](../adr/D10-dx-lab-hpdi.md) → [0010](../adr/0010-hpdi-dx-lab.md) | DX-Lab runtime riêng **đã chứng minh P11-T01**; shell, SSO và vai trò **đã chứng minh P11-T02**; H/P/D/I UX và G11 còn mở | [T01](./evidence/p11-t01.md), [T02](./evidence/p11-t02.md) |
+| [D11](../adr/D11-dxos-principles-evidence.md) → [0011](../adr/0011-four-principles-proof.md) + [D11-dxos-proof.md](../adr/D11-dxos-proof.md) | Thiết kế chốt; **proof map P12-T01 2026-11-27**; BTC depth còn mở | P12 T02+ / G12 |
+| [D12](../adr/D12-gitops-demo.md) → [0012](../adr/0012-gitops-demo.md) | k3s/Argo **có điều kiện**; **gap máy demo 2026-11-27** (RAM free ~2.2 GiB) | P12-T06 hoặc BTC alternate |
 | [D13](../adr/D13-versions-licenses-resources.md) → [0013](../adr/0013-versions-licenses.md) | Digest/license/RAM snapshot **đã ghi** | P00-T04 npm inventory pass; P01 peak, P13 release SBOM |
-| [D14](../adr/D14-stock-movement-ownership.md) → [0014](../adr/0014-movement-ownership.md) | Movement ownership **đã chốt thiết kế** | P07/P09 tests |
+| [D14](../adr/D14-stock-movement-ownership.md) → [0014](../adr/0014-movement-ownership.md) | **Closed at P07-T01 contract level**: [matrix, guards, evidence](./evidence/p07-t01.md) | Runtime DB/HTTP/Flowable tests P07-T02/T03/T07/T08; cross-instance P09 |
 | [D15](../adr/D15-headless-core-boundary.md) → [0015](../adr/0015-headless-tier2-boundary.md) | Ba runtime **đã chốt**; headless spike pass | Core Data/File API sản phẩm chưa có |
 | **D16** → [0016](../adr/0016-ui-surface-partitioning.md) | UI surfaces **đã chốt** (`/admin` hệ thống; `/catalog` `/inventory` `/partners`; trading/trace sau) | Migrate legacy `/admin/products…`; P07–P11 route maps |
 
@@ -39,12 +39,12 @@ Smoke: [infra](./evidence/spikes/infra/README.md), [pg semantics spike](./eviden
 | D06 Workflow | P04/P07 | **Accepted** (spike) | [0006](../adr/0006-workflow-flowable-goods-issue.md) | Evidence: `D06-workflow-engine.md` |
 | D07 Decimal/lot | P00/P06 | **Accepted P00 design** | [0007](../adr/0007-decimal-unit-lot.md) | SQL/contract pass; app constraints P06/P07 |
 | D08 Envelope | P00/P08 | **Accepted P00 design** | [0008](../adr/0008-trace-federation-envelope.md) | Schema + Node/Python vectors pass; P09 E2E |
-| D09 AI | P10 | Deferred model | [0009](../adr/0009-ai-provider.md) | Evidence: `D09-ai-provider-boundary.md` |
-| D10 H-P-D-I | P00/P11 | Design locked | [0010](../adr/0010-hpdi-dx-lab.md) | Evidence: `D10-dx-lab-hpdi.md` |
+| D09 AI | P10 | **Accepted P10-T01** local Ollama + Qwen3 0.6B; live quality G10 | [0009](../adr/0009-ai-provider.md) | Data/fail boundary: [P10-T01 evidence](./evidence/p10-t01.md); earlier boundary: `D09-ai-provider-boundary.md` |
+| D10 H-P-D-I | P00/P11 | Runtime boundary verified P11-T01; UX gate open | [0010](../adr/0010-hpdi-dx-lab.md) | [P11-T01 evidence](./evidence/p11-t01.md) |
 | D11 Principles | P00/P12 | Design locked | [0011](../adr/0011-four-principles-proof.md) | Evidence: `D11-dxos-principles-evidence.md` |
 | D12 GitOps | P12 | Conditional | [0012](../adr/0012-gitops-demo.md) | Evidence: `D12-gitops-demo.md` |
 | D13 Versions | P01/P13 | Snapshot recorded | [0013](../adr/0013-versions-licenses.md) | Evidence: `D13-versions-licenses-resources.md` |
-| D14 Movement | P00/P07 | **Accepted P00 design** | [0014](../adr/0014-movement-ownership.md) | D03 primitive/static contract pass; P07 real confirms |
+| D14 Movement | P00/P07 | **Closed P07-T01 contract; runtime pending** | [0014](../adr/0014-movement-ownership.md) | [T01 evidence](./evidence/p07-t01.md); real confirms and movements P07-T02/T03/T08, bridge P07-T07, A/B/C P09 |
 | D15 Headless | P00/P01 | **Accepted** (spike) | [0015](../adr/0015-headless-tier2-boundary.md) | Evidence: `D15-headless-core-boundary.md` |
 | D16 UI surfaces | ERP UI / P07–P11 | **Accepted** 2026-11-22 | [0016](../adr/0016-ui-surface-partitioning.md) | BRD/SRS: `documents/requirements/` |
 | D17 Catalog upgrade | **P065** (trước P07) | **ADR Accepted design** 2026-11-22; **DDL chờ Dev duyệt pack** | [0017](../adr/0017-catalog-variant-uom-price.md) | Pack [`evidence/p065-schema-design.md`](./evidence/p065-schema-design.md); BRD/SRS product-catalog; plan [`phase-06.5`](./phase-06.5-catalog-business-upgrade.md); G06.5 |

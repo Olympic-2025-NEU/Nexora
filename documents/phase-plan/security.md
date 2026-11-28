@@ -17,7 +17,7 @@ Internet chỉ đến Gateway HTTPS. User token từ Keycloak, partner token t�
 | Approver | OIDC user (Bearer) | **Bắt buộc TOTP** | Approve/reject task; không đồng nghĩa tự confirm document |
 | Partner client | Client credentials cấp ở receiver | N/A | Chỉ federation endpoints/phạm vi partner, không xem ERP private |
 | Public consumer | Không đăng nhập | N/A | Chỉ Passport projection theo QR/policy/rate limit |
-| AI service | Internal service identity | N/A | Chỉ inference/tool request allowlist, không có DB credential ghi |
+| AI service | Internal secret, không có user/Admin/DB credential | N/A | Chỉ inference từ fact allowlist; ERP kiểm quyền từng tool theo actor, không chuyển raw token/PII cho model |
 
 M01 quản lý mapping `Keycloak sub -> membership/role/scope` qua **admin invite** (không open JIT). Invite nhận `username` (không nhận `keycloakSub` từ client): ERP dùng Keycloak Admin API tạo/tái sử dụng user, gán realm role, ghi membership; mật khẩu tạm chỉ trả một lần trên response tạo mới, không lưu app DB. Vai membership v1: `administrator`, `staff`, `approver`, `viewer` (DB authoritative; không dùng alias `admin`). Approver gắn Flowable task; không đồng nghĩa quyền confirm document.
 
@@ -39,7 +39,8 @@ Threat-test tối thiểu: XSS reflection trên field text chứng từ/Passport
 - Gateway đặt default deny, route allowlist; OIDC bearer cho private/federation, auth-code+PKCE cho browser theo ADR; public route giới hạn method/size/rate. Header do gateway thêm phải được xóa từ request bên ngoài trước khi set lại.
 - Keycloak admin, Flowable REST, storage console, metrics nội bộ và gateway admin API không public. Secret trong env/secret store dev, không commit; rotate test cho partner credential.
 - File upload: MIME/extension/size allowlist, key ngẫu nhiên, bucket quarantine, ClamAV scan theo phiên bản signature; chỉ chuyển trạng thái `clean` mới cho tải/chia sẻ. Scan lỗi = fail closed, không tạo public URL. Chứng từ private không đi qua QR policy mặc định.
-- QR token opaque, không mã hóa raw DB ID; revoke/rotate được; projection allowlist, không PII, giá, credential, ghi chú nội bộ. Cache public phải invalidated khi chính sách/batch status đổi.
+- QR token opaque 256 bit, không mã hóa raw DB ID; DB chỉ lưu hash, raw URL trả một lần, hết hạn sau 30 ngày. Revoke/rotate được; policy/version hoặc quality đổi làm token cũ vô hiệu. Endpoint API và trang `/passport/*` đều đi qua gateway rate limit 30 req/s burst 15; 404 đồng nhất khi token sai/hết hạn/revoked. Projection allowlist, không PII, giá, credential, ghi chú nội bộ. Public API và HTML dùng `no-store`, `no-referrer`, không index để chính sách/batch status đổi có hiệu lực ngay.
+- Evidence public (P08-T07) chỉ tạo từ attachment scan `clean` trong bucket private, checksum snapshot trùng bytes metadata, event local confirmed, policy timeline/evidence public đã duyệt và Administrator. URL capability 256 bit chỉ sống 60 giây; Core Data kiểm lại QR/policy/quality/projection/link/file qua view hạn chế quyền và đối chiếu checksum bytes trước khi stream. Không trả raw S3 URL hoặc credential. Private/infected/pending/revoked file không có link Passport; thay scan/checksum hay revoke làm projection stale, URL cũ 404. Access grant hết hạn được worker dọn; response `no-store`, `no-referrer`, `nosniff`, CSP sandbox.
 - AI: tool input schema, output limit, log redacted, không SQL tùy ý; kết quả dữ liệu có ID nguồn và quyền của user; prompt injection từ document/partner event không được biến thành lệnh hệ thống.
 
 ## 4. Các tình huống đe dọa phải test

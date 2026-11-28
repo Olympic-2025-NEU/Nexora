@@ -6,57 +6,57 @@
 
 ## P08-T01 — Mô hình provenance và liên kết lô
 
-- [ ] Migration `trace_event`, `trace_link`, `passport_projection`, `qr_token`; mỗi event có issuer-qualified batch ID, source document/event, occurred/recorded time, event version, evidence refs, verification status.
-- [ ] Link goods receipt/issue/transfer/receiving/stocktake/sale bằng quan hệ có hướng; phân biệt nguồn local verified với partner-asserted và missing/pending.
-- [ ] Chốt uniqueness `(issuer, eventId)` và source action để retry handler không tạo event trùng; không tạo event từ Draft/rollback.
+- [x] Migration `trace_event`, `trace_link`, `passport_projection`, `qr_token`; mỗi event có issuer-qualified batch ID, source document/event, occurred/recorded time, event version, evidence refs, verification status. [Bằng chứng T01](evidence/p08-t01.md).
+- [x] Link goods receipt/issue có phân bổ nguồn tường minh và lượng theo dòng; transfer/receiving/stocktake/sale giữ provenance nguồn đã xác nhận. Dữ liệu issue không khai báo phân bổ vẫn hiện `local_allocation_unknown`, remote vẫn `missing/pending`, không tự suy diễn. [Bằng chứng đóng T01](evidence/p08-t01-allocation.md).
+- [x] Chốt uniqueness `(issuer, eventId)` và source action để retry handler không tạo event trùng; không tạo event từ Draft/rollback. [Bằng chứng T01](evidence/p08-t01.md).
 - **Đầu ra:** schema và trace port; **kiểm chứng:** movement/event truy được tới chứng từ nguồn.
 
 ## P08-T02 — Projector từ domain event
 
-- [ ] Consumer outbox xây trace event sau commit, có lease/retry/dead-letter, version handler; rebuild projection từ log nguồn deterministic.
-- [ ] Nếu consumer down, nghiệp vụ local vẫn confirm; UI hiển thị projection lag thay vì báo lịch sử đầy đủ sai. Alert khi lag vượt ngưỡng.
-- [ ] Test duplicate/out-of-order event, missing source và replay sau restore; không cho actor sửa tay lịch sử confirmed.
+- [x] Consumer outbox xây trace event sau commit, có lease/retry/dead-letter, version handler; rebuild projection từ log nguồn deterministic. [Bằng chứng T02](evidence/p08-t02.md).
+- [x] Nếu consumer down, nghiệp vụ local vẫn confirm; UI hiển thị projection lag thay vì báo lịch sử đầy đủ sai. Alert khi lag vượt ngưỡng. [Bằng chứng T02](evidence/p08-t02.md).
+- [x] Test duplicate/out-of-order event, missing source và replay sau restore; không cho actor sửa tay lịch sử confirmed. [Bằng chứng T02](evidence/p08-t02.md).
 - **Đầu ra:** projector + metrics; **kiểm chứng:** cùng nguồn phát lại cho cùng trace, không mất event.
 
 ## P08-T03 — Backward trace
 
-- [ ] Từ batch/document tại C truy ngược theo receipt → transfer/issue → batch nguồn, có depth/cycle limit, pagination và quyền xem.
-- [ ] Trong P08 chỉ có local links; node upstream chưa có federation hiển thị `pending/missing`, không tự bịa producer hoặc xác nhận partner. P09 nối thêm verified summaries A/B.
-- [ ] API trả node/edge/source/verification/occurredAt rõ để UI dựng timeline; test cycle, branch và cùng lot code khác issuer.
+- [x] Từ batch hoặc chứng từ tại C truy ngược qua link nguồn tường minh; có depth 1–10, visited set chống cycle, snapshot cursor, phân trang và quyền `trace:read`. Phiếu nhập/xuất cùng lô là bối cảnh, không tự gán phân bổ lượng. [Bằng chứng T03](evidence/p08-t03.md).
+- [x] Trong P08 chỉ có local links; nguồn remote chưa có federation hiển thị `missing`, projector chưa bắt kịp hiển thị `pending`; không tự bịa producer hoặc xác nhận partner. P09 nối thêm verified summaries A/B. [Bằng chứng T03](evidence/p08-t03.md).
+- [x] API trả node/edge/source/verification/occurredAt/recordedAt và gap rõ để UI dựng timeline; test cycle, branch và cùng lot code khác issuer. [Bằng chứng T03](evidence/p08-t03.md).
 - **Đầu ra:** backward query; **kiểm chứng:** chain local đúng và gap rõ.
 
 ## P08-T04 — Forward trace và impact list
 
-- [ ] Từ batch cần kiểm tra tìm issue, transfer, receiver và sale record downstream; dedupe theo issuer-qualified IDs, không tiết lộ bên mua/private field nếu thiếu quyền.
-- [ ] Báo affected quantity/partner theo dữ liệu biết được, tách `confirmed`, `partner-asserted`, `unknown`; kết quả có thời gian dữ liệu và gap markers.
-- [ ] Test lô chia nhiều nhánh, partial receiving, sale tại C; P09 chạy lại xuyên instance cho AC-09.
+- [x] Từ batch cần kiểm tra tìm issue, transfer, receiver và sale record downstream; dedupe theo issuer-qualified IDs, không tiết lộ bên mua/private field nếu thiếu quyền. [Bằng chứng T04](evidence/p08-t04.md).
+- [x] Báo affected quantity/partner theo dữ liệu biết được, tách `confirmed`, `partner-asserted`, `unknown`; kết quả có thời gian dữ liệu và gap markers. [Bằng chứng T04](evidence/p08-t04.md).
+- [x] Test lô chia nhiều nhánh, partial receiving, sale tại C; P09 chạy lại xuyên instance cho AC-09. [Bằng chứng T04](evidence/p08-t04.md).
 - **Đầu ra:** impact API/UI tối thiểu; **kiểm chứng:** nguồn ID và số lượng khớp chứng từ.
 
 ## P08-T05 — Chính sách công bố Passport
 
-- [ ] Allowlist field public/partner/private cho organization, product, batch, timeline, evidence; version policy và owner phê duyệt; mặc định private.
-- [ ] Projection công khai chỉ từ dữ liệu đã confirm + evidence `clean` có quyền public; không trả secret, PII, giá, tồn nội bộ, file private hoặc toàn bộ raw event.
-- [ ] Rebuild và revoke projection khi policy/quality thay đổi; retention/caching và invalidation có test. Audit ai đổi policy.
+- [x] Allowlist field public/partner/private cho organization, product, batch, timeline, evidence; version policy và owner phê duyệt; mặc định private. [Bằng chứng T05](evidence/p08-t05.md).
+- [x] Projection công khai chỉ từ dữ liệu đã confirm + evidence `clean` có quyền public; không trả secret, PII, giá, tồn nội bộ, file private hoặc toàn bộ raw event. T05 chưa công bố evidence nào; T07 mới gắn file clean/public. [Bằng chứng T05](evidence/p08-t05.md).
+- [x] Rebuild và revoke projection khi policy/quality thay đổi; retention/caching và invalidation có test. Audit ai đổi policy. T06 sẽ kiểm trạng thái active ở public endpoint với `no-store`. [Bằng chứng T05](evidence/p08-t05.md).
 - **Đầu ra:** policy engine/projection; **kiểm chứng:** snapshot public contract không chứa field cấm.
 
 ## P08-T06 — QR token và endpoint public
 
-- [ ] QR chứa URL/token opaque ngắn gọn, không chứa ID đoán được hay dữ liệu nhạy cảm. Token có lifecycle active/revoked, rate limit và kiểm tra input.
-- [ ] Gateway public route chỉ GET Passport; private route trace yêu cầu auth; anti-enumeration, cache header và lỗi revoked/unknown không lộ metadata.
-- [ ] UI in/tải QR và trang mobile Passport hiển thị nguồn/tình trạng xác minh/gap, không gắn nhãn chứng nhận không có bằng chứng.
+- [x] QR chứa URL/token opaque ngắn gọn, không chứa ID đoán được hay dữ liệu nhạy cảm. Token có lifecycle active/revoked, rate limit và kiểm tra input. [Bằng chứng T06](evidence/p08-t06.md).
+- [x] Gateway public route chỉ GET/HEAD Passport; private route trace yêu cầu auth; anti-enumeration, cache header và lỗi revoked/unknown không lộ metadata. [Bằng chứng T06](evidence/p08-t06.md).
+- [x] UI in/tải QR và trang mobile Passport hiển thị nguồn/tình trạng xác minh/gap, không gắn nhãn chứng nhận không có bằng chứng. [Bằng chứng T06](evidence/p08-t06.md).
 - **Đầu ra:** QR + Passport UI/API; **kiểm chứng:** scan thật, revoke, guessing và private leak tests.
 
 ## P08-T07 — Evidence và chất lượng lịch sử
 
-- [ ] Gắn attachment đã scan với document/trace event bằng checksum và visibility; presigned URL chỉ sau policy check, giới hạn hạn sống.
-- [ ] Timeline thể hiện date, issuer, source ID, actual/sent discrepancy, verification status; kiểm tra timezone và thứ tự occurred vs recorded.
-- [ ] Dữ liệu nguồn sai/missing đánh dấu trạng thái điều tra; không âm thầm chuẩn hóa hay xóa provenance.
+- [x] Gắn attachment đã scan với document/trace event bằng checksum và visibility; URL capability 60 giây chỉ sau policy check, kiểm lại quyền tại thời điểm tải. [Bằng chứng T07](evidence/p08-t07.md).
+- [x] Timeline thể hiện date, issuer, source ID, actual/sent discrepancy, verification status; kiểm tra timezone và thứ tự occurred vs recorded. [Bằng chứng T07](evidence/p08-t07.md).
+- [x] Dữ liệu nguồn sai/missing đánh dấu trạng thái điều tra; không âm thầm chuẩn hóa hay xóa provenance. [Bằng chứng T07](evidence/p08-t07.md).
 - **Đầu ra:** evidence viewer/provenance fields; **kiểm chứng:** file infected/private không xuất hiện trên Passport.
 
 ## P08-T08 — Gate G08
 
-- [ ] Trace local và Passport/QR chạy từ chứng từ M03 thật; AC-08 pass. Backward/forward local, duplicate event, policy/revoke/privacy tests pass.
-- [ ] AC-07/09 cross-instance chưa đánh dấu Done cho tới G09; ghi rõ những gap trước khi nhận federation.
+- [x] Trace local và Passport/QR chạy từ chứng từ M03 thật; AC-08 pass ở gate tự động local. Backward/forward local, duplicate event, policy/revoke/privacy tests pass. [Bằng chứng G08](evidence/G08.md).
+- [x] AC-07/09 cross-instance chưa đánh dấu Done cho tới G09; ghi rõ những gap trước khi nhận federation. [Bằng chứng G08](evidence/G08.md).
 - **Bằng chứng:** event→source links, API graph fixture, QR scan, policy snapshot, projector retry logs.
 
 ## Hồ sơ giao AI theo từng task

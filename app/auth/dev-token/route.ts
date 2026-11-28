@@ -9,6 +9,7 @@ import { NextResponse } from "next/server";
 type Body = {
   username?: string;
   password?: string;
+  totp?: string;
   refreshToken?: string;
   grantType?: "password" | "refresh_token";
 };
@@ -51,6 +52,11 @@ export async function POST(req: Request) {
     }
     form.set("username", username);
     form.set("password", password);
+    if (body.totp) {
+      if (typeof body.totp !== "string" || !/^\d{6,8}$/.test(body.totp))
+        return NextResponse.json({ error: "TOTP_INVALID" }, { status: 400 });
+      form.set("totp", body.totp);
+    }
   }
 
   const tokenUrl = `${base}/realms/nexora/protocol/openid-connect/token`;

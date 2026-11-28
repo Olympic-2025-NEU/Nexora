@@ -99,7 +99,7 @@ Schema: `platform`, `system`, `catalog`, `inventory`, `trading`, `traceability`,
 
 ## Triển khai
 
-Kiến trúc đích của Docker Compose: ERP app, DX-Lab frontend, core data/file API, API Gateway, PostgreSQL, Redis, Keycloak, object storage, Flowable (và AI service khi bật). **Compose hiện tại chỉ có PostgreSQL**; chưa thể dùng để chứng minh lõi DX-OS hoặc demo ba instance. Demo đích: ba stack A/B/C, DB riêng, chỉ nói chuyện qua Federation API.
+Docker Compose triển khai ERP app, DX-Lab frontend riêng, core data/file API, API Gateway, PostgreSQL, Redis, Keycloak, object storage, Flowable (và AI service khi bật). A/B/C là ba Compose project với DB riêng và giao tiếp qua Federation API. P11-T01 đã smoke lõi headless trên instance A khi ERP, DX-Lab và worker dừng; xem [bằng chứng](./documents/phase-plan/evidence/p11-t01.md). Phần UX và gate G11 vẫn phải kiểm chứng.
 
 ## Tài liệu liên quan
 

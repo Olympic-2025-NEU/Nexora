@@ -11,10 +11,12 @@ ERP canonical surfaces (ADR 0016): `/admin` (org/members only), `/partners`, `/c
 | H | `/work`, `/profile`, members/partners management views | Task inbox của tôi, org/role, partner connection metadata; Admin quản user/partner, không hiện secret | `/me`, organization/members; partners surface; core files |
 | P | `/operations/receipts`, `/operations/issues`, `/operations/transfers`, `/operations/receivings`, `/work/approvals` | Draft forms có batch picker/quantity; sent-vs-actual; approver khác creator; pending/retry/dispute | M02/M03; ERP `/trading/*` when present |
 | D | `/data/inventory`, `/data/lots/[id]`, `/data/impact/[id]` | balance theo lot/kho, timeline A→B→C, backward/forward, provenance/gap/asOf, document/attachment link | inventory/trace; ERP `/inventory/*`, `/catalog/*`, `/trace/*` |
-| I | `/assistant` và panel trên lot/document | Q&A nguồn, disambiguation lô, nguồn trích, AI Draft review, provider-down fallback | AI chat/drafts/tool calls |
+| I | `/assistant` (chat T03, DraftReview **SHIP T04**); panel trên lot/document **HOÃN (R8)** sang T03b hoặc gộp T06 | Q&A nguồn, disambiguation lô, nguồn trích, AI Draft review, provider-down fallback | AI chat/drafts/tool calls |
 | Public | `/passport/[token]` | QR mobile, public field allowlist, revoke/expired/unknown state | public Passport only |
 
 `apps/dx-lab/app/(workspace)/...` tổ chức route group, `components/{shell,forms,tables,trace,ai}/` chỉ UI, `lib/api-client/` typed từ OpenAPI. Mỗi route có loading/empty/error/403/409/503; form disable double submit và giữ draft khi request retryable; ETag/version hiển thị conflict và reload. Keyboard focus/labels, mobile 360px, decimal/unit/timezone đúng. Route authorization ở server/API, ẩn navigation chỉ là UX.
+
+P11 deploy path là `/dxlab/*` qua APISIX tới runtime Next riêng; các route ở bảng là đường dẫn **bên trong** ứng dụng (ví dụ `/work` thành `/dxlab/work`). `basePath` giữ cả asset và callback dưới prefix này. Gateway đưa `/api/v1/core/*`, `/api/v1/files*` tới Core Data/File API, `/api/v1/*` còn lại tới ERP business API; DX-Lab không kết nối PostgreSQL, SeaweedFS hoặc Flowable REST trực tiếp. Route/service ownership và trường hợp dừng hai UI được ghi trong [P11-T01](evidence/p11-t01.md).
 
 ## Component contract theo hành trình
 
@@ -24,11 +26,11 @@ ERP canonical surfaces (ADR 0016): `/admin` (org/members only), `/partners`, `/c
 - `ApprovalInbox`: task Flowable qua backend, approve/reject reason, creator bị chặn server; engine down hiện chờ, không nút bypass.
 - `TraceTimeline/ImpactGraph`: mỗi node có issuer/source ID/occurredAt/verificationState, gap/stale rõ; cycle/depth limit, không suy diễn A verified chỉ từ B assertion.
 - `PassportView`: request public projection, không render field raw/private vào DOM/network; QR revoked → 404/expired message an toàn.
-- `AiPanel/DraftReview`: sources có timestamp/verification, AI suggestion editable; Draft chỉ sau user review mới mở nút submit/confirm nghiệp vụ thường.
+- `AiPanel/DraftReview`: sources có timestamp/verification, AI suggestion editable; Draft chỉ sau user review mới mở nút submit/confirm nghiệp vụ thường. Phần `AiPanel` trên lot/document **hoãn theo R8** (T03b hoặc T06); T03 chỉ ship `/assistant` với chip nguồn dạng cấu trúc và fallback `/trace`. `DraftReview` **đã ship trong T04** theo R1–R10: tab riêng trên `/assistant`, receipt only; issue Draft hoãn T04b. Bằng chứng: `evidence/p10-t04.md`.
 
 ## AI tool registry và dữ liệu
 
-`services/ai/` nhận `{actorDelegation,requestId,message}` từ backend; `actorDelegation` scoped, short-lived, không phải Admin token chung. Tools có JSON Schema `additionalProperties:false`, tối đa 1–20 records/response, timeout và ghi mỗi tool call vào `platform.audit_log` với action `ai.tool.<name>`/source IDs/outcome đã redacted; không đòi bảng `ai_tool_call` ngoài `database-schema-v1.md`.
+P10-T02 chọn nhánh **app kiểm quyền từng call**: ERP xác minh Bearer user và membership DB, sau đó gọi API M02/M03/M04 nội bộ bằng chính Bearer đó; mỗi API kiểm lại role và warehouse scope. Python AI chỉ nhận facts đã lọc, không nhận user/Admin token. Registry nội bộ nằm tại `contexts/ai/application/` với năm JSON Schema ở `services/ai/tools/`; không mở public `/ai/tools` route. Mỗi kết quả tối đa 20 record, mỗi call có timeout và ghi `platform.audit_log` action `ai.tool.<name>`/UUID source IDs/outcome đã redacted; quota được giữ bằng audit reservation có PG advisory lock, không tạo bảng `ai_tool_call` mới. P10-T03/T04 sẽ nối chat/Draft route vào registry này.
 
 | Tool | Input | Output | Side effect/quyền |
 | --- | --- | --- | --- |
@@ -40,4 +42,6 @@ ERP canonical surfaces (ADR 0016): `/admin` (org/members only), `/partners`, `/c
 
 Không đăng ký `confirm`, `approve`, `changePolicy`, `retryFederation` hay SQL tool. Model output là **đề xuất**, số liệu lấy từ tool output; nếu source thiếu, trả `unknown`/gap thay vì tự tạo số. AI service down/quota hết → 503 an toàn + UI link tra cứu trực tiếp, ERP vẫn làm việc.
 
-Risk rules deterministic v1: `expires_on <= today+30d` (near expiry), `quality_status != available` (restricted/inspect), receiving actual<sent (discrepancy), trace có gap/partner_asserted; mỗi alert có `{ruleId,ruleVersion,sourceIds,asOf,severity,explanation}`. Rule không tự đổi status/tồn. Test prompt injection nằm trong product description/partner payload/file text, user không quyền, same lot code khác issuer, provider timeout, AI yêu cầu confirm; output Draft vẫn chưa đổi stock.
+P10-T06 **đã ship** theo [bằng chứng](evidence/p10-t06.md): `/assistant` có disclaimer thường trực, trạng thái provider-down kèm nút thử lại và deep link “Xem dữ liệu trực tiếp” tới `/inventory/balances`; adapter Python có circuit breaker in-memory (3 lỗi liên tiếp → open 60s → 1 probe half-open); log/audit bị capture và đối chiếu canary, không lưu raw prompt/token. Panel trên lot/document vẫn **hoãn theo R8**; retention chỉ có cờ operator `AI_PROMPT_RETENTION`, không có settings UI; repository chưa có bề mặt upload file nên text file chỉ mô phỏng qua fixture partner event. `test:ai:security` = 48 ca là số duy nhất cho Gate G10.
+
+Risk rules deterministic v1 **đã ship trong T05**: `expires_on <= today+30d` (near expiry), `quality_status != available` (restricted/inspect), receiving actual<sent (discrepancy), trace có gap/partner_asserted; mỗi alert có `{ruleId,ruleVersion,sourceIds,asOf,severity,explanation}`. Rule không tự đổi status/tồn; thiếu dữ liệu trả `unknown`, `REPEATED_RETRY` hoãn T05b. Bằng chứng: `evidence/p10-t05.md`. Test prompt injection nằm trong product description/partner payload/file text, user không quyền, same lot code khác issuer, provider timeout, AI yêu cầu confirm; output Draft vẫn chưa đổi stock.

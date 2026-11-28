@@ -86,3 +86,14 @@
     font-family: var(--font-sans);
   }
 }
+@media print {
+  body:has(.qr-print-area) * { visibility: hidden; }
+  body:has(.qr-print-area) .qr-print-area,
+  body:has(.qr-print-area) .qr-print-area * { visibility: visible; }
+  body:has(.qr-print-area) .qr-print-area {
+    position: absolute;
+    inset: 0 auto auto 0;
+    border: 0;
+  }
+  body:has(.qr-print-area) .qr-print-area .print\:hidden { display: none; }
+}

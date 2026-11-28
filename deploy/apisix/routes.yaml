@@ -27,6 +27,23 @@ x-strip-identity-headers: &strip-identity-headers
         end
 
 routes:
+  # The local federation network reaches Keycloak only through this exact
+  # token route on the receiver gateway. Keycloak itself stays on internal.
+  - id: federation-client-token-v1
+    uri: /realms/nexora/protocol/openid-connect/token
+    methods: [POST]
+    upstream:
+      type: roundrobin
+      nodes:
+        "keycloak:8080": 1
+    plugins:
+      request-id: {}
+      limit-req:
+        rate: 10
+        burst: 5
+        key: remote_addr
+        rejected_code: 429
+
   # -------------------------------------------------------------------------
   # 0. Gateway liveness ping (public, no upstream)
   # -------------------------------------------------------------------------
@@ -60,9 +77,8 @@ routes:
       <<: *strip-identity-headers
       openid-connect:
         # Bearer-only: gateway verifies token; core verifies Authorization again.
-        # OIDC_ISSUER_URL placeholder — substitute actual value from instance env.
-        # Internal Keycloak URL for Docker Compose: http://keycloak:8080/realms/nexora
-        discovery: "${OIDC_ISSUER_URL}/.well-known/openid-configuration"
+        # Discover through the private Keycloak backchannel; metadata issuer is the frontend URL.
+        discovery: "${OIDC_BASE_URL}/realms/nexora/.well-known/openid-configuration"
         client_id: "${OIDC_GATEWAY_CLIENT_ID}"
         client_secret: "${OIDC_GATEWAY_CLIENT_SECRET}"
         bearer_only: true
@@ -94,7 +110,7 @@ routes:
       request-id: {}
       <<: *strip-identity-headers
       openid-connect:
-        discovery: "${OIDC_ISSUER_URL}/.well-known/openid-configuration"
+        discovery: "${OIDC_BASE_URL}/realms/nexora/.well-known/openid-configuration"
         client_id: "${OIDC_GATEWAY_CLIENT_ID}"
         client_secret: "${OIDC_GATEWAY_CLIENT_SECRET}"
         bearer_only: true
@@ -130,6 +146,24 @@ routes:
         key: remote_addr
         rejected_code: 429
 
+  - id: public-evidence-v1
+    uri: /api/v1/public/evidence/*
+    methods: [GET, HEAD]
+    upstream:
+      type: roundrobin
+      nodes:
+        "core-data:8080": 1
+    plugins:
+      request-id: {}
+      <<: *strip-identity-headers
+      limit-req:
+        rate: 30
+        burst: 15
+        key: remote_addr
+        rejected_code: 429
+      proxy-rewrite:
+        regex_uri: ["^/api/v1/public/evidence/(.*)", "/public/evidence/$1"]
+
   # -------------------------------------------------------------------------
   # 4. Federation M2M events — POST only, bearer + required scope
   # -------------------------------------------------------------------------
@@ -144,7 +178,7 @@ routes:
       request-id: {}
       <<: *strip-identity-headers
       openid-connect:
-        discovery: "${OIDC_ISSUER_URL}/.well-known/openid-configuration"
+        discovery: "${OIDC_BASE_URL}/realms/nexora/.well-known/openid-configuration"
         client_id: "${OIDC_GATEWAY_CLIENT_ID}"
         client_secret: "${OIDC_GATEWAY_CLIENT_SECRET}"
         bearer_only: true
@@ -176,7 +210,7 @@ routes:
       request-id: {}
       <<: *strip-identity-headers
       openid-connect:
-        discovery: "${OIDC_ISSUER_URL}/.well-known/openid-configuration"
+        discovery: "${OIDC_BASE_URL}/realms/nexora/.well-known/openid-configuration"
         client_id: "${OIDC_GATEWAY_CLIENT_ID}"
         client_secret: "${OIDC_GATEWAY_CLIENT_SECRET}"
         bearer_only: true
@@ -206,7 +240,7 @@ routes:
       request-id: {}
       <<: *strip-identity-headers
       openid-connect:
-        discovery: "${OIDC_ISSUER_URL}/.well-known/openid-configuration"
+        discovery: "${OIDC_BASE_URL}/realms/nexora/.well-known/openid-configuration"
         client_id: "${OIDC_GATEWAY_CLIENT_ID}"
         client_secret: "${OIDC_GATEWAY_CLIENT_SECRET}"
         bearer_only: true
@@ -223,7 +257,35 @@ routes:
         rejected_code: 429
 
   # -------------------------------------------------------------------------
-  # 6. ERP app API catch-all /api/v1/* — MUST be AFTER specific prefixes above
+  # 6. Simulated OT ingest — authenticated user, tightly rate-limited; the ERP
+  #    also checks role, device allowlist and local batch ownership.
+  - id: ot-readings-v1
+    uri: /api/v1/ot/readings
+    methods: [POST]
+    upstream:
+      type: roundrobin
+      nodes:
+        "${ERP_UPSTREAM}": 1
+    plugins:
+      request-id: {}
+      <<: *strip-identity-headers
+      openid-connect:
+        discovery: "${OIDC_BASE_URL}/realms/nexora/.well-known/openid-configuration"
+        client_id: "${OIDC_GATEWAY_CLIENT_ID}"
+        client_secret: "${OIDC_GATEWAY_CLIENT_SECRET}"
+        bearer_only: true
+        use_jwks: true
+        realm: nexora
+        set_access_token_header: false
+        set_userinfo_header: false
+        access_token_in_authorization_header: true
+      limit-req:
+        rate: 5
+        burst: 5
+        key: remote_addr
+        rejected_code: 429
+
+  # 7. ERP app API catch-all /api/v1/* — MUST be AFTER specific prefixes above
   # -------------------------------------------------------------------------
   - id: erp-api-v1
     uri: /api/v1/*
@@ -237,10 +299,8 @@ routes:
       <<: *strip-identity-headers
       openid-connect:
         # NOTE: If APISIX standalone does not support env-var substitution in
-        # routes.yaml, replace ${OIDC_ISSUER_URL} with the literal internal URL:
-        #   http://keycloak:8080/realms/nexora
-        # Match the value of OIDC_ISSUER_URL in deploy/instances/*.env.example.
-        discovery: "${OIDC_ISSUER_URL}/.well-known/openid-configuration"
+        # Render the private OIDC_BASE_URL; validate tokens against metadata's frontend issuer.
+        discovery: "${OIDC_BASE_URL}/realms/nexora/.well-known/openid-configuration"
         client_id: "${OIDC_GATEWAY_CLIENT_ID}"
         client_secret: "${OIDC_GATEWAY_CLIENT_SECRET}"
         bearer_only: true
@@ -253,6 +313,24 @@ routes:
       limit-req:
         rate: 200
         burst: 100
+        key: remote_addr
+        rejected_code: 429
+
+  # DX-Lab is a separate Next runtime. Its built-in /dxlab basePath keeps
+  # assets, callbacks and application routes on this upstream.
+  - id: dx-lab-app
+    uris: [/dxlab, /dxlab/*]
+    methods: [GET, HEAD, POST, PUT, PATCH, DELETE]
+    upstream:
+      type: roundrobin
+      nodes:
+        "dx-lab:3001": 1
+    plugins:
+      request-id: {}
+      <<: *strip-identity-headers
+      limit-req:
+        rate: 100
+        burst: 50
         key: remote_addr
         rejected_code: 429
 
@@ -357,6 +435,54 @@ routes:
       limit-req:
         rate: 100
         burst: 50
+        key: remote_addr
+        rejected_code: 429
+
+  - id: erp-trading-ui
+    uri: /trading*
+    methods: [GET, HEAD]
+    upstream:
+      type: roundrobin
+      nodes:
+        "${ERP_UPSTREAM}": 1
+    plugins:
+      request-id: {}
+      <<: *strip-identity-headers
+      limit-req:
+        rate: 100
+        burst: 50
+        key: remote_addr
+        rejected_code: 429
+
+  - id: erp-trace-ui
+    uri: /trace*
+    methods: [GET, HEAD]
+    upstream:
+      type: roundrobin
+      nodes:
+        "${ERP_UPSTREAM}": 1
+    plugins:
+      request-id: {}
+      <<: *strip-identity-headers
+      limit-req:
+        rate: 100
+        burst: 50
+        key: remote_addr
+        rejected_code: 429
+
+  - id: erp-passport-ui
+    uri: /passport/*
+    methods: [GET, HEAD]
+    upstream:
+      type: roundrobin
+      nodes:
+        "${ERP_UPSTREAM}": 1
+    plugins:
+      request-id: {}
+      <<: *strip-identity-headers
+      limit-req:
+        rate: 30
+        burst: 15
         key: remote_addr
         rejected_code: 429
 

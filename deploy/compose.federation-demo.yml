@@ -1,0 +1,32 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Local A/B/C federation transport. Only gateways and workers join this network;
+# databases, Keycloak and internal service ports stay project-private.
+services:
+  gateway:
+    networks:
+      edge:
+      internal:
+      federation:
+        aliases:
+          - gateway-${INSTANCE_ID}.nexora.test
+  worker:
+    networks:
+      internal:
+      federation:
+    environment:
+      NODE_EXTRA_CA_CERTS: /usr/local/share/nexora-certs/rootCA.pem
+      FEDERATION_OUTBOUND_SECRET_1: ${FEDERATION_OUTBOUND_SECRET_1:-}
+      FEDERATION_OUTBOUND_SECRET_2: ${FEDERATION_OUTBOUND_SECRET_2:-}
+    volumes:
+      - ./certs:/usr/local/share/nexora-certs:ro
+  keycloak-bootstrap:
+    environment:
+      FEDERATION_INBOUND_CLIENT_1_ID: ${FEDERATION_INBOUND_CLIENT_1_ID:-}
+      FEDERATION_INBOUND_CLIENT_1_SECRET: ${FEDERATION_INBOUND_CLIENT_1_SECRET:-}
+      FEDERATION_INBOUND_CLIENT_2_ID: ${FEDERATION_INBOUND_CLIENT_2_ID:-}
+      FEDERATION_INBOUND_CLIENT_2_SECRET: ${FEDERATION_INBOUND_CLIENT_2_SECRET:-}
+
+networks:
+  federation:
+    external: true
+    name: ${FEDERATION_NETWORK_NAME:-nexora-federation}

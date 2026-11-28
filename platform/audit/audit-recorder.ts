@@ -10,6 +10,7 @@ export type AuditEntry = {
   targetType: string;
   targetId: string;
   requestId: string;
+  outcome?: "success" | "deny" | "failure";
   correlationId?: string;
   before?: unknown;
   after?: unknown;

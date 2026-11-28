@@ -1,0 +1,855 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+import assert from "node:assert/strict";
+import { createHash, randomUUID } from "node:crypto";
+import { after, test } from "node:test";
+import { PrismaClient } from "@prisma/client";
+import canonicalize from "canonicalize";
+import QRCode from "qrcode";
+import jsQR from "jsqr";
+import { PNG } from "pngjs";
+import { buildHandlerMap } from "../../composition/event-handlers";
+import { createOutboxDispatcher } from "../../platform/outbox/dispatcher";
+import { TRADING_EVENT_TYPES, serializeDomainEvent } from "../../contracts/events/registry";
+import { createPrismaTraceProjectorPort } from "../../contexts/traceability/infrastructure/projector-repos";
+import { traceConsumers, traceLag } from "../../workers/trace-projector";
+import { backwardTrace } from "../../contexts/traceability/application/backward";
+import { createPrismaBackwardPort } from "../../contexts/traceability/infrastructure/backward-repo";
+import { forwardTrace } from "../../contexts/traceability/application/forward";
+import { createPrismaForwardPort } from "../../contexts/traceability/infrastructure/forward-repo";
+import { createPassportService } from "../../contexts/traceability/application/passport-service";
+import { createQrService } from "../../contexts/traceability/application/qr-token";
+import { createTraceEvidenceService } from "../../contexts/traceability/application/evidence-service";
+import { tradingService } from "../../composition/trading";
+import { appendOutbox } from "../../platform/outbox/writer";
+import type { Actor } from "../../platform/identity/actor";
+import type { OutboxEventInput } from "../../platform/outbox/message";
+
+if (process.env.NEXORA_TEST_TRACE !== "1" || !process.env.OWNER_DATABASE_URL ||
+    !process.env.APP_DATABASE_URL || !process.env.CORE_DATABASE_URL) {
+  throw new Error("Disposable trace database required");
+}
+const connect = (url: string) => new PrismaClient({ datasources: { db: { url } } });
+const owner = connect(process.env.OWNER_DATABASE_URL);
+const app = connect(process.env.APP_DATABASE_URL);
+const core = connect(process.env.CORE_DATABASE_URL);
+after(async () => { await Promise.all([owner.$disconnect(), app.$disconnect(), core.$disconnect()]); });
+const issuer = "trace-local";
+const productId = randomUUID();
+const variantId = randomUUID();
+const warehouseId = randomUUID();
+const batches: string[] = [randomUUID(), randomUUID(), randomUUID()];
+const origins = [randomUUID(), randomUUID(), randomUUID()];
+const uom = "aaaaaaaa-0001-4000-8000-000000000001";
+const sha = (value: unknown) => createHash("sha256").update(canonicalize(value)!).digest("hex");
+
+async function receipt(batchIds: string[], occurredAt: string) {
+  const documentId = randomUUID();
+  await app.document.create({ data: { id: documentId, documentType: "goods_receipt",
+    documentNumber: randomUUID(), status: "draft", createdBySub: "fixture",
+    correlationId: randomUUID() } });
+  const lines = batchIds.map((batchId, index) => ({ id: randomUUID(), documentId,
+    lineNo: index + 1, warehouseId, batchId, productVariantId: variantId,
+    productId, uomId: uom, quantity: "5" }));
+  await app.documentLine.createMany({ data: lines });
+  const document = await app.document.update({ where: { id: documentId }, data: {
+    status: "confirmed", confirmedAt: new Date(), confirmedBySub: "fixture" } });
+  const payload = { eventId: randomUUID(), documentId, documentVersion: document.version,
+    lines: lines.map((line) => ({ lineId: line.id, batchId: line.batchId,
+      warehouseId, originLot: { issuerInstanceId: issuer,
+        lotId: origins[batches.indexOf(line.batchId)] }, quantity: "5", unit: "EA" })),
+    actorSub: "fixture", occurredAt };
+  const [serialized] = serializeDomainEvent({ type: TRADING_EVENT_TYPES.receipt,
+    aggregateType: "document", aggregateId: documentId, aggregateVersion: document.version,
+    correlationId: randomUUID(), payload });
+  const outbox = await app.outboxMessage.create({ data: { ...serialized, id: randomUUID(),
+    createdAt: new Date(Date.now() - 10 * 60_000),
+    nextAttemptAt: new Date(Date.now() - 60_000) } });
+  return { documentId, payload, outbox };
+}
+
+test("P08 projector handles worker lag, multi-batch replay and deterministic rebuild", async () => {
+  await owner.$executeRaw`INSERT INTO inventory.warehouse(id,code,name,status,created_by_sub)
+    VALUES (${warehouseId}::uuid,${randomUUID()},'Trace projector warehouse','active','fixture')`;
+  await owner.$executeRaw`INSERT INTO catalog.product(id,name,category_id,created_by_sub)
+    VALUES (${productId}::uuid,'Trace projector product','bbbbbbbb-0001-4000-8000-000000000001','fixture')`;
+  await owner.$executeRaw`INSERT INTO catalog.product_variant(id,product_id,sku,created_by_sub)
+    VALUES (${variantId}::uuid,${productId}::uuid,${randomUUID()},'fixture')`;
+  await owner.$executeRaw`INSERT INTO catalog.product_variant_uom(id,product_variant_id,uom_id,is_stock_keeping,factor_to_stock_uom)
+    VALUES (${randomUUID()}::uuid,${variantId}::uuid,${uom}::uuid,true,1)`;
+  for (let index = 0; index < batches.length; index++) {
+    await owner.$executeRaw`INSERT INTO catalog.batch(id,product_id,product_variant_id,local_code,
+      origin_issuer_instance_id,origin_lot_id,quality_status,created_by_sub)
+      VALUES (${batches[index]}::uuid,${productId}::uuid,${variantId}::uuid,${randomUUID()},
+        ${issuer},${origins[index]},'available','fixture')`;
+  }
+  const later = await receipt(batches.slice(0, 2), new Date().toISOString());
+  assert.equal((await app.document.findUniqueOrThrow({ where: { id: later.documentId } })).status, "confirmed");
+  assert.equal(await app.traceEvent.count({ where: { documentId: later.documentId } }), 0);
+  const lag = await traceLag(app);
+  assert.equal(lag.pending, 1);
+  assert.ok(lag.seconds > 300);
+  const dispatcher = createOutboxDispatcher({ client: app, workerId: `trace-test-${randomUUID()}`,
+    handlers: buildHandlerMap({ traceability: traceConsumers(app, core, issuer) }) });
+  assert.equal((await dispatcher.tick()).delivered, 1);
+  assert.equal(await app.traceEvent.count({ where: { documentId: later.documentId } }), 2);
+  for (const batchId of batches.slice(0, 2)) {
+    const row = await core.coreRecord.findUniqueOrThrow({ where: { kind_sourceType_sourceId: {
+      kind: "trace_projection", sourceType: "lot", sourceId: batchId } } });
+    assert.equal(row.version, 1);
+    assert.equal(row.visibility, "private");
+    assert.equal(row.checksumHex, sha(row.payload));
+    assert.equal((row.payload as { sourceEventIds: string[] }).sourceEventIds.length, 1);
+  }
+  await app.outboxMessage.update({ where: { id: later.outbox.id }, data: {
+    status: "retry_due", nextAttemptAt: new Date(Date.now() - 1000), deliveredAt: null } });
+  assert.equal((await dispatcher.tick()).delivered, 1);
+  assert.equal(await app.traceEvent.count({ where: { documentId: later.documentId } }), 2);
+  assert.equal((await core.coreRecord.findUniqueOrThrow({ where: { kind_sourceType_sourceId: {
+    kind: "trace_projection", sourceType: "lot", sourceId: batches[0] } } })).version, 1);
+
+  const earlier = await receipt([batches[0]], new Date(Date.now() - 60 * 60_000).toISOString());
+  assert.equal((await dispatcher.tick()).delivered, 1);
+  const record = await core.coreRecord.findUniqueOrThrow({ where: { kind_sourceType_sourceId: {
+    kind: "trace_projection", sourceType: "lot", sourceId: batches[0] } } });
+  const snapshot = record.payload as { sourceEventIds: string[]; nodes: { occurredAt: string }[] };
+  assert.equal(snapshot.sourceEventIds.length, 2);
+  assert.ok(snapshot.nodes[0].occurredAt < snapshot.nodes[1].occurredAt);
+  const before = record.checksumHex;
+  const projector = createPrismaTraceProjectorPort(app, core, issuer);
+  await Promise.all([projector.rebuild(batches[0]), projector.rebuild(batches[0])]);
+  const rebuilt = await core.coreRecord.findUniqueOrThrow({ where: { id: record.id } });
+  assert.equal(rebuilt.checksumHex, before);
+  assert.equal(rebuilt.version, record.version);
+  assert.equal((await traceLag(app)).pending, 0);
+  assert.equal((await app.outboxMessage.findUniqueOrThrow({ where: { id: earlier.outbox.id } })).status,
+    "delivered");
+});
+
+test("P08 transfer waits for its confirmed issue source, then links and replays once", async () => {
+  const issueId = randomUUID();
+  const issueLineId = randomUUID();
+  const transferId = randomUUID();
+  const partnerId = randomUUID();
+  await app.partner.create({ data: { id: partnerId, issuerInstanceId: "trace-remote",
+    code: randomUUID(), displayName: "Trace remote", createdBySub: "fixture" } });
+  await app.document.create({ data: { id: issueId, documentType: "goods_issue",
+    issuePurpose: "partner_transfer", documentNumber: randomUUID(), status: "draft",
+    createdBySub: "fixture", correlationId: randomUUID() } });
+  await app.documentLine.create({ data: { id: issueLineId, documentId: issueId, lineNo: 1,
+    warehouseId, batchId: batches[0], productVariantId: variantId, productId,
+    uomId: uom, quantity: "2" } });
+  const issue = await app.document.update({ where: { id: issueId }, data: {
+    status: "confirmed", confirmedAt: new Date(), confirmedBySub: "fixture" } });
+  await app.document.create({ data: { id: transferId, documentType: "partner_transfer",
+    documentNumber: randomUUID(), status: "draft", createdBySub: "fixture",
+    correlationId: randomUUID() } });
+  const transferLineId = randomUUID();
+  await app.documentLine.create({ data: { id: transferLineId, documentId: transferId, lineNo: 1,
+    warehouseId, batchId: batches[0], productVariantId: variantId, productId,
+    uomId: uom, quantity: "2", sourceIssueLineId: issueLineId } });
+  await app.transferDetail.create({ data: { documentId: transferId, linkedIssueId: issueId,
+    destinationPartnerId: partnerId } });
+  const transfer = await app.document.update({ where: { id: transferId }, data: {
+    status: "confirmed", confirmedAt: new Date(), confirmedBySub: "fixture" } });
+  const occurredAt = new Date().toISOString();
+  const originLot = { issuerInstanceId: issuer, lotId: origins[0] };
+  const [transferMessage] = serializeDomainEvent({ type: TRADING_EVENT_TYPES.transfer,
+    aggregateType: "document", aggregateId: transferId, aggregateVersion: transfer.version,
+    correlationId: randomUUID(), payload: { eventId: randomUUID(), transferId,
+      linkedIssueId: issueId, destinationPartnerId: partnerId,
+      lines: [{ sourceLineId: transferLineId, batchId: batches[0], originLot,
+        quantity: "2", unit: "EA" }], occurredAt } });
+  const pending = await app.outboxMessage.create({ data: { ...transferMessage, id: randomUUID(),
+    nextAttemptAt: new Date(Date.now() - 60_000) } });
+  const dispatcher = createOutboxDispatcher({ client: app, workerId: `trace-test-${randomUUID()}`,
+    handlers: buildHandlerMap({ traceability: traceConsumers(app, core, issuer) }) });
+  assert.equal((await dispatcher.tick()).retried, 1);
+  assert.equal(await app.traceEvent.count({ where: { documentId: transferId } }), 0);
+
+  const [issueMessage] = serializeDomainEvent({ type: TRADING_EVENT_TYPES.issue,
+    aggregateType: "document", aggregateId: issueId, aggregateVersion: issue.version,
+    correlationId: randomUUID(), payload: { eventId: randomUUID(), documentId: issueId,
+      documentVersion: issue.version, lines: [{ lineId: issueLineId, batchId: batches[0],
+        warehouseId, originLot, quantity: "2", unit: "EA" }], movementIds: [randomUUID()],
+      actorSub: "fixture", occurredAt } });
+  await app.outboxMessage.create({ data: { ...issueMessage, id: randomUUID(),
+    nextAttemptAt: new Date(Date.now() - 60_000) } });
+  assert.equal((await dispatcher.tick()).delivered, 1);
+  await app.outboxMessage.update({ where: { id: pending.id }, data: {
+    nextAttemptAt: new Date(Date.now() - 1000) } });
+  assert.equal((await dispatcher.tick()).delivered, 1);
+  const issueEvent = await app.traceEvent.findFirstOrThrow({ where: { documentId: issueId } });
+  const transferEvent = await app.traceEvent.findFirstOrThrow({ where: { documentId: transferId } });
+  assert.equal((await app.traceLink.findFirstOrThrow({ where: { fromEventId: transferEvent.id } })).toEventId,
+    issueEvent.id);
+  await app.outboxMessage.update({ where: { id: pending.id }, data: {
+    status: "retry_due", nextAttemptAt: new Date(Date.now() - 1000), deliveredAt: null } });
+  assert.equal((await dispatcher.tick()).delivered, 1);
+  assert.equal(await app.traceLink.count({ where: { fromEventId: transferEvent.id } }), 1);
+});
+
+test("P08 receiving keeps a verified local source and an explicit remote gap", async () => {
+  const receivingId = randomUUID();
+  const remoteTransferId = randomUUID();
+  const remoteEventId = randomUUID();
+  const sourceLineId = randomUUID();
+  const messageId = randomUUID();
+  const remoteIssuer = "trace-remote-receiving";
+  const partnerId = randomUUID();
+  await app.partner.create({ data: { id: partnerId, issuerInstanceId: remoteIssuer,
+    code: randomUUID(), displayName: "Trace receiving source", createdBySub: "fixture" } });
+  const inbound = { eventId: randomUUID(), issuerInstanceId: remoteIssuer,
+    sourceDocument: { id: remoteTransferId } };
+  await app.inboundMessage.create({ data: { messageId, eventType: "transfer.announced.v1",
+    issuerInstanceId: remoteIssuer, recipientInstanceId: issuer,
+    payload: inbound, payloadHash: sha(inbound) } });
+  const verified = { ...inbound, eventId: remoteEventId };
+  await app.inboxMessage.create({ data: { id: randomUUID(), messageId,
+    eventId: remoteEventId, eventType: "transfer.announced.v1", schemaVersion: "1.0",
+    issuerInstanceId: remoteIssuer, payload: verified, payloadSha256: sha(verified),
+    partnerId, state: "applied_to_trace" } });
+  await app.document.create({ data: { id: receivingId, documentType: "receiving_confirmation",
+    documentNumber: randomUUID(), status: "draft", createdBySub: "fixture",
+    correlationId: randomUUID() } });
+  await app.documentLine.create({ data: { id: randomUUID(), documentId: receivingId,
+    lineNo: 1, warehouseId, batchId: batches[1], productVariantId: variantId,
+    productId, uomId: uom, quantity: "2", actualQuantity: "1", sourceLineRef: sourceLineId } });
+  await app.receivingDetail.create({ data: { documentId: receivingId,
+    sourceIssuerInstanceId: remoteIssuer, sourceTransferId: remoteTransferId,
+    inboundMessageId: messageId, sentQuantity: "2", actualQuantity: "1",
+    discrepancyReason: "one unit missing" } });
+  const receiving = await app.document.update({ where: { id: receivingId }, data: {
+    status: "confirmed", confirmedAt: new Date(), confirmedBySub: "fixture" } });
+  const [serialized] = serializeDomainEvent({ type: TRADING_EVENT_TYPES.receiving,
+    aggregateType: "document", aggregateId: receivingId, aggregateVersion: receiving.version,
+    correlationId: randomUUID(), payload: { eventId: randomUUID(), receivingId,
+      sourceIssuerInstanceId: remoteIssuer, sourceTransferId: remoteTransferId,
+      sentLines: [{ sourceLineId, originLot: { issuerInstanceId: issuer, lotId: origins[1] },
+        sentQuantity: "2", unit: "EA" }],
+      actualLines: [{ sourceLineId, localBatchId: batches[1], actualQuantity: "1", unit: "EA" }],
+      discrepancyReason: "one unit missing", occurredAt: new Date().toISOString() } });
+  await app.outboxMessage.create({ data: { ...serialized, id: randomUUID(),
+    nextAttemptAt: new Date(Date.now() - 60_000) } });
+  const dispatcher = createOutboxDispatcher({ client: app, workerId: `trace-test-${randomUUID()}`,
+    handlers: buildHandlerMap({ traceability: traceConsumers(app, core, issuer) }) });
+  assert.equal((await dispatcher.tick()).delivered, 1);
+  const event = await app.traceEvent.findFirstOrThrow({ where: { documentId: receivingId } });
+  assert.equal(event.verificationState, "local_verified");
+  const link = await app.traceLink.findFirstOrThrow({ where: { fromEventId: event.id } });
+  assert.equal(link.verificationState, "missing");
+  assert.deepEqual(link.missingRef, { issuerInstanceId: remoteIssuer, eventId: remoteEventId });
+  const row = await core.coreRecord.findUniqueOrThrow({ where: { kind_sourceType_sourceId: {
+    kind: "trace_projection", sourceType: "lot", sourceId: batches[1] } } });
+  const edges = (row.payload as { edges: { missingRef?: unknown }[] }).edges;
+  assert.ok(edges.some((edge) => JSON.stringify(edge.missingRef) === JSON.stringify(link.missingRef)));
+});
+
+test("P08 sale and stocktake project from confirmed document sources", async () => {
+  const issueId = randomUUID();
+  const issueLineId = randomUUID();
+  const saleId = randomUUID();
+  const stocktakeId = randomUUID();
+  await app.document.create({ data: { id: issueId, documentType: "goods_issue",
+    issuePurpose: "sale", documentNumber: randomUUID(), status: "draft",
+    createdBySub: "fixture", correlationId: randomUUID() } });
+  await app.documentLine.create({ data: { id: issueLineId, documentId: issueId,
+    lineNo: 1, warehouseId, batchId: batches[0], productVariantId: variantId,
+    productId, uomId: uom, quantity: "1" } });
+  const issue = await app.document.update({ where: { id: issueId }, data: {
+    status: "confirmed", confirmedAt: new Date(), confirmedBySub: "fixture" } });
+  await app.document.create({ data: { id: saleId, documentType: "sale_record",
+    documentNumber: randomUUID(), status: "draft", createdBySub: "fixture",
+    correlationId: randomUUID() } });
+  await app.documentLine.create({ data: { id: randomUUID(), documentId: saleId,
+    lineNo: 1, warehouseId, batchId: batches[0], productVariantId: variantId,
+    productId, uomId: uom, quantity: "1", sourceIssueLineId: issueLineId } });
+  await app.saleDetail.create({ data: { documentId: saleId, linkedIssueId: issueId,
+    soldAt: new Date(), buyerRef: "PRIVATE_BUYER_REF" } });
+  const sale = await app.document.update({ where: { id: saleId }, data: {
+    status: "confirmed", confirmedAt: new Date(), confirmedBySub: "fixture" } });
+  await app.document.create({ data: { id: stocktakeId, documentType: "stocktake",
+    documentNumber: randomUUID(), status: "draft", createdBySub: "fixture",
+    correlationId: randomUUID() } });
+  const stockLineId = randomUUID();
+  await app.documentLine.create({ data: { id: stockLineId, documentId: stocktakeId,
+    lineNo: 1, warehouseId, batchId: batches[0], productVariantId: variantId,
+    productId, uomId: uom, countedQuantity: "4" } });
+  const stock = await app.document.update({ where: { id: stocktakeId }, data: {
+    status: "confirmed", confirmedAt: new Date(), confirmedBySub: "fixture" } });
+  const originLot = { issuerInstanceId: issuer, lotId: origins[0] };
+  const emitted = [
+    serializeDomainEvent({ type: TRADING_EVENT_TYPES.issue, aggregateType: "document",
+      aggregateId: issueId, aggregateVersion: issue.version, correlationId: randomUUID(),
+      payload: { eventId: randomUUID(), documentId: issueId, documentVersion: issue.version,
+        lines: [{ lineId: issueLineId, batchId: batches[0], warehouseId, originLot,
+          quantity: "1", unit: "EA" }], movementIds: [randomUUID()],
+        actorSub: "fixture", occurredAt: new Date().toISOString() } })[0],
+    serializeDomainEvent({ type: TRADING_EVENT_TYPES.sale, aggregateType: "document",
+      aggregateId: saleId, aggregateVersion: sale.version, correlationId: randomUUID(),
+      payload: { eventId: randomUUID(), saleId, linkedIssueId: issueId,
+        lines: [{ sourceLineId: issueLineId, batchId: batches[0], originLot,
+          quantity: "1", unit: "EA" }], occurredAt: new Date().toISOString() } })[0],
+    serializeDomainEvent({ type: TRADING_EVENT_TYPES.stocktake, aggregateType: "document",
+      aggregateId: stocktakeId, aggregateVersion: stock.version, correlationId: randomUUID(),
+      payload: { eventId: randomUUID(), documentId: stocktakeId, documentVersion: stock.version,
+        lines: [{ lineId: stockLineId, batchId: batches[0], warehouseId,
+          systemQuantity: "5", countedQuantity: "4", delta: "-1", unit: "EA" }],
+        actorSub: "fixture", reason: "counted", occurredAt: new Date().toISOString() } })[0],
+  ];
+  for (const event of emitted) await app.outboxMessage.create({ data: { ...event, id: randomUUID(),
+    nextAttemptAt: new Date(Date.now() - 60_000) } });
+  const dispatcher = createOutboxDispatcher({ client: app, workerId: `trace-test-${randomUUID()}`,
+    handlers: buildHandlerMap({ traceability: traceConsumers(app, core, issuer) }) });
+  const first = await dispatcher.tick();
+  assert.equal(first.delivered + first.retried, 3);
+  if (first.retried) {
+    await app.outboxMessage.updateMany({ where: { status: "retry_due", eventType: TRADING_EVENT_TYPES.sale },
+      data: { nextAttemptAt: new Date(Date.now() - 1000) } });
+    assert.equal((await dispatcher.tick()).delivered, first.retried);
+  }
+  const saleEvent = await app.traceEvent.findFirstOrThrow({ where: { documentId: saleId } });
+  const source = await app.traceEvent.findFirstOrThrow({ where: { documentId: issueId } });
+  assert.equal((await app.traceLink.findFirstOrThrow({ where: { fromEventId: saleEvent.id } })).toEventId,
+    source.id);
+  assert.equal((await app.traceEvent.findFirstOrThrow({ where: { documentId: stocktakeId } })).eventType,
+    TRADING_EVENT_TYPES.stocktake);
+});
+
+test("P08-T03 backward query keeps source links, remote gap and pages distinct", async () => {
+  const actor = { userId: "fixture", organizationId: "fixture", unitIds: [warehouseId], roles: ["viewer"] };
+  const port = createPrismaBackwardPort(app, actor);
+  const transfer = await app.traceEvent.findFirstOrThrow({ where: {
+    batchId: batches[0], eventType: TRADING_EVENT_TYPES.transfer } });
+  const focused = await backwardTrace(port, actor, { batchId: batches[0],
+    documentId: transfer.documentId!, depth: 2 });
+  assert.equal(focused.nodes.length, 2);
+  assert.equal(focused.edges.length, 1);
+  assert.equal(focused.edges[0].toEventId, focused.nodes[1].eventId);
+  assert.equal(focused.nodes[0].source.documentId, transfer.documentId);
+  assert.equal(focused.nodes.some((node) => node.eventType === TRADING_EVENT_TYPES.receipt), false);
+  const first = await backwardTrace(port, actor, { batchId: batches[0], limit: 2 });
+  assert.equal(first.nodes.length, 2);
+  assert.ok(first.nextCursor);
+  const second = await backwardTrace(port, actor, { batchId: batches[0],
+    limit: 2, cursor: first.nextCursor });
+  assert.equal(second.asOf, first.asOf);
+  assert.equal(first.nodes.some((node) => second.nodes.some((other) =>
+    other.eventId === node.eventId)), false);
+  const remote = await backwardTrace(port, actor, { batchId: batches[1] });
+  assert.ok(remote.gaps.some((gap) => gap.reason === "remote_source_unavailable" &&
+    gap.missingRef?.issuerInstanceId === "trace-remote-receiving"));
+  assert.equal(remote.nodes.some((node) => node.issuerInstanceId === "trace-remote"), false);
+});
+
+test("P08-T04 forward impact keeps two transfer branches, partial receiving and sale private", async () => {
+  const secondPartnerId = randomUUID();
+  const issueId = randomUUID();
+  const issueLineId = randomUUID();
+  const transferId = randomUUID();
+  await app.partner.create({ data: { id: secondPartnerId, issuerInstanceId: "trace-remote-2",
+    code: randomUUID(), displayName: "Second downstream", createdBySub: "fixture" } });
+  await app.document.create({ data: { id: issueId, documentType: "goods_issue",
+    issuePurpose: "partner_transfer", documentNumber: randomUUID(), status: "draft",
+    createdBySub: "fixture", correlationId: randomUUID() } });
+  await app.documentLine.create({ data: { id: issueLineId, documentId: issueId,
+    lineNo: 1, warehouseId, batchId: batches[0], productVariantId: variantId,
+    productId, uomId: uom, quantity: "3" } });
+  const issue = await app.document.update({ where: { id: issueId }, data: {
+    status: "confirmed", confirmedAt: new Date(), confirmedBySub: "fixture" } });
+  await app.document.create({ data: { id: transferId, documentType: "partner_transfer",
+    documentNumber: randomUUID(), status: "draft", createdBySub: "fixture",
+    correlationId: randomUUID() } });
+  await app.documentLine.create({ data: { id: randomUUID(), documentId: transferId,
+    lineNo: 1, warehouseId, batchId: batches[0], productVariantId: variantId,
+    productId, uomId: uom, quantity: "3", sourceIssueLineId: issueLineId } });
+  await app.transferDetail.create({ data: { documentId: transferId, linkedIssueId: issueId,
+    destinationPartnerId: secondPartnerId } });
+  const transfer = await app.document.update({ where: { id: transferId }, data: {
+    status: "confirmed", confirmedAt: new Date(), confirmedBySub: "fixture" } });
+  const originLot = { issuerInstanceId: issuer, lotId: origins[0] };
+  const [issueEvent] = serializeDomainEvent({ type: TRADING_EVENT_TYPES.issue,
+    aggregateType: "document", aggregateId: issueId, aggregateVersion: issue.version,
+    correlationId: randomUUID(), payload: { eventId: randomUUID(), documentId: issueId,
+      documentVersion: issue.version, lines: [{ lineId: issueLineId, batchId: batches[0],
+        warehouseId, originLot, quantity: "3", unit: "EA" }], movementIds: [randomUUID()],
+      actorSub: "fixture", occurredAt: new Date().toISOString() } });
+  await app.outboxMessage.create({ data: { ...issueEvent, id: randomUUID(),
+    nextAttemptAt: new Date(Date.now() - 60_000) } });
+  const dispatcher = createOutboxDispatcher({ client: app, workerId: `trace-test-${randomUUID()}`,
+    handlers: buildHandlerMap({ traceability: traceConsumers(app, core, issuer) }) });
+  assert.equal((await dispatcher.tick()).delivered, 1);
+  const [transferEvent] = serializeDomainEvent({ type: TRADING_EVENT_TYPES.transfer,
+    aggregateType: "document", aggregateId: transferId, aggregateVersion: transfer.version,
+    correlationId: randomUUID(), payload: { eventId: randomUUID(), transferId,
+      linkedIssueId: issueId, destinationPartnerId: secondPartnerId,
+      lines: [{ sourceLineId: issueLineId, batchId: batches[0], originLot,
+        quantity: "3", unit: "EA" }], occurredAt: new Date().toISOString() } });
+  await app.outboxMessage.create({ data: { ...transferEvent, id: randomUUID(),
+    nextAttemptAt: new Date(Date.now() - 60_000) } });
+  assert.equal((await dispatcher.tick()).delivered, 1);
+
+  const actor = { userId: "fixture", organizationId: "fixture", unitIds: [warehouseId], roles: ["viewer"] };
+  const graph = await forwardTrace(createPrismaForwardPort(app, actor), actor,
+    { batchId: batches[0], depth: 10, limit: 100 });
+  const transfers = graph.impact.filter((row) => row.kind === "transfer");
+  assert.equal(transfers.length, 2);
+  assert.deepEqual(new Set(transfers.map((row) => row.quantity)), new Set(["2", "3"]));
+  assert.deepEqual(new Set(transfers.map((row) => row.partner?.issuerInstanceId)),
+    new Set(["trace-remote", "trace-remote-2"]));
+  assert.equal(graph.gaps.filter((gap) => gap.reason === "downstream_unreported").length, 2);
+  assert.ok(graph.impact.some((row) => row.kind === "sale" && row.quantity === "1"));
+  assert.equal(JSON.stringify(graph).includes("PRIVATE_BUYER_REF"), false);
+  const receiving = await forwardTrace(createPrismaForwardPort(app, actor), actor,
+    { batchId: batches[1], depth: 10 });
+  assert.ok(receiving.impact.some((row) => row.kind === "receiving" &&
+    row.sentQuantity === "2" && row.actualQuantity === "1" && row.quantity === "1"));
+  assert.equal(receiving.impact.some((row) => row.kind === "transfer"), false);
+  const cIssueId = randomUUID();
+  const cIssueLineId = randomUUID();
+  const cSaleId = randomUUID();
+  await app.document.create({ data: { id: cIssueId, documentType: "goods_issue",
+    issuePurpose: "sale", documentNumber: randomUUID(), status: "draft",
+    createdBySub: "fixture", correlationId: randomUUID() } });
+  await app.documentLine.create({ data: { id: cIssueLineId, documentId: cIssueId,
+    lineNo: 1, warehouseId, batchId: batches[1], productVariantId: variantId,
+    productId, uomId: uom, quantity: "1" } });
+  const cIssue = await app.document.update({ where: { id: cIssueId }, data: {
+    status: "confirmed", confirmedAt: new Date(), confirmedBySub: "fixture" } });
+  await app.document.create({ data: { id: cSaleId, documentType: "sale_record",
+    documentNumber: randomUUID(), status: "draft", createdBySub: "fixture",
+    correlationId: randomUUID() } });
+  await app.documentLine.create({ data: { id: randomUUID(), documentId: cSaleId,
+    lineNo: 1, warehouseId, batchId: batches[1], productVariantId: variantId,
+    productId, uomId: uom, quantity: "1", sourceIssueLineId: cIssueLineId } });
+  await app.saleDetail.create({ data: { documentId: cSaleId, linkedIssueId: cIssueId,
+    soldAt: new Date(), buyerRef: "PRIVATE_C_BUYER" } });
+  const cSale = await app.document.update({ where: { id: cSaleId }, data: {
+    status: "confirmed", confirmedAt: new Date(), confirmedBySub: "fixture" } });
+  const cOriginLot = { issuerInstanceId: issuer, lotId: origins[1] };
+  const [cIssueEvent] = serializeDomainEvent({ type: TRADING_EVENT_TYPES.issue,
+    aggregateType: "document", aggregateId: cIssueId, aggregateVersion: cIssue.version,
+    correlationId: randomUUID(), payload: { eventId: randomUUID(), documentId: cIssueId,
+      documentVersion: cIssue.version, lines: [{ lineId: cIssueLineId,
+        batchId: batches[1], warehouseId, originLot: cOriginLot, quantity: "1", unit: "EA" }],
+      movementIds: [randomUUID()], actorSub: "fixture", occurredAt: new Date().toISOString() } });
+  await app.outboxMessage.create({ data: { ...cIssueEvent, id: randomUUID(),
+    nextAttemptAt: new Date(Date.now() - 60_000) } });
+  assert.equal((await dispatcher.tick()).delivered, 1);
+  const [cSaleEvent] = serializeDomainEvent({ type: TRADING_EVENT_TYPES.sale,
+    aggregateType: "document", aggregateId: cSaleId, aggregateVersion: cSale.version,
+    correlationId: randomUUID(), payload: { eventId: randomUUID(), saleId: cSaleId,
+      linkedIssueId: cIssueId, lines: [{ sourceLineId: cIssueLineId,
+        batchId: batches[1], originLot: cOriginLot, quantity: "1", unit: "EA" }],
+      occurredAt: new Date().toISOString() } });
+  await app.outboxMessage.create({ data: { ...cSaleEvent, id: randomUUID(),
+    nextAttemptAt: new Date(Date.now() - 60_000) } });
+  assert.equal((await dispatcher.tick()).delivered, 1);
+  const cGraph = await forwardTrace(createPrismaForwardPort(app, actor), actor,
+    { batchId: batches[1], depth: 10 });
+  assert.ok(cGraph.impact.some((row) => row.kind === "sale" && row.quantity === "1" &&
+    row.sourceDocumentId === cSaleId));
+  assert.equal(JSON.stringify(cGraph).includes("PRIVATE_C_BUYER"), false);
+  const cIssueImpact = cGraph.impact.find((row) => row.sourceDocumentId === cIssueId);
+  const cReceivingImpact = cGraph.impact.find((row) => row.kind === "receiving");
+  assert.ok(cIssueImpact && cReceivingImpact);
+  assert.equal(cGraph.edges.some((edge) => edge.fromEventId === cReceivingImpact.eventId &&
+    edge.toEventId === cIssueImpact.eventId), false);
+  const deniedActor = { ...actor, unitIds: [randomUUID()] };
+  const denied = await forwardTrace(createPrismaForwardPort(app, deniedActor), deniedActor,
+    { batchId: batches[0] });
+  assert.equal(denied.nodes.length, 0);
+  assert.equal(denied.impact.length, 0);
+  const backwardDenied = await backwardTrace(createPrismaBackwardPort(app, deniedActor), deniedActor,
+    { batchId: batches[0] });
+  assert.equal(backwardDenied.nodes.length, 0);
+});
+
+test("P08-T05 owner approval builds only allowlisted public data and invalidates on source or quality change", async () => {
+  const admin = { userId: "fixture-owner", organizationId: "fixture",
+    unitIds: [], roles: ["administrator"] };
+  const viewer = { ...admin, roles: ["viewer"] };
+  const service = createPassportService(app);
+  const privateAccess = { organization: "private", product: "private", batch: "private",
+    timeline: "private", evidence: "private" };
+  await assert.rejects(service.createDraft(viewer, batches[0], privateAccess, randomUUID()),
+    { code: "POLICY_DENIED" });
+  const draft = await service.createDraft(admin, batches[0], privateAccess, randomUUID());
+  assert.equal(draft.state, "draft");
+  assert.equal(draft.policyVersion, 1);
+  assert.equal((await service.approve(admin, batches[0], 1, randomUUID())).projectionState,
+    "revoked");
+  const publicAccess = { organization: "public", product: "public", batch: "public",
+    timeline: "public", evidence: "private" };
+  const second = await service.createDraft(admin, batches[0], publicAccess, randomUUID());
+  assert.equal(second.policyVersion, 2);
+  assert.equal((await service.approve(admin, batches[0], 2, randomUUID())).projectionState,
+    "active");
+  const firstProjection = await app.passportProjection.findUniqueOrThrow({ where: {
+    batchId: batches[0] } });
+  assert.deepEqual(Object.keys(firstProjection.publicPayload as object).sort(), ["productName",
+    "publicLotCode", "originIssuer", "timeline", "verificationState", "gaps", "asOf"].sort());
+  assert.equal(firstProjection.policyVersion, "v2");
+  assert.equal(JSON.stringify(firstProjection.publicPayload).includes("PRIVATE_BUYER_REF"), false);
+  assert.equal(JSON.stringify(firstProjection.publicPayload).includes("PRIVATE_C_BUYER"), false);
+  assert.ok(firstProjection.sourceEventIds.length > 0);
+  assert.equal(await app.passportPolicy.count({ where: { batchId: batches[0],
+    state: "approved" } }), 1);
+
+  const newSource = await receipt([batches[0]], new Date().toISOString());
+  assert.equal((await app.passportProjection.findUniqueOrThrow({ where: {
+    batchId: batches[0] } })).state, "stale");
+  assert.equal((await service.rebuild(admin, batches[0], randomUUID())).state, "stale");
+  const pendingPayload = (await app.passportProjection.findUniqueOrThrow({ where: {
+    batchId: batches[0] } })).publicPayload;
+  assert.ok(JSON.stringify(pendingPayload).includes("projection_pending"));
+  await app.outboxMessage.update({ where: { id: newSource.outbox.id }, data: {
+    nextAttemptAt: new Date(Date.now() - 60_000) } });
+  const dispatcher = createOutboxDispatcher({ client: app, workerId: `trace-test-${randomUUID()}`,
+    handlers: buildHandlerMap({ traceability: traceConsumers(app, core, issuer) }) });
+  assert.equal((await dispatcher.tick()).delivered, 1);
+  assert.equal((await app.passportProjection.findUniqueOrThrow({ where: {
+    batchId: batches[0] } })).state, "stale");
+  assert.equal((await service.rebuild(admin, batches[0], randomUUID())).state, "active");
+  assert.notEqual((await app.passportProjection.findUniqueOrThrow({ where: {
+    batchId: batches[0] } })).checksumHex, firstProjection.checksumHex);
+
+  await app.batch.update({ where: { id: batches[0] }, data: { qualityStatus: "restricted" } });
+  assert.equal((await app.passportProjection.findUniqueOrThrow({ where: {
+    batchId: batches[0] } })).state, "revoked");
+  assert.equal((await service.rebuild(admin, batches[0], randomUUID())).state, "revoked");
+  await app.batch.update({ where: { id: batches[0] }, data: { qualityStatus: "available" } });
+  assert.equal((await service.rebuild(admin, batches[0], randomUUID())).state, "active");
+  await service.revoke(admin, batches[0], "owner decision", randomUUID());
+  assert.equal((await app.passportProjection.findUniqueOrThrow({ where: {
+    batchId: batches[0] } })).state, "revoked");
+  await assert.rejects(service.rebuild(admin, batches[0], randomUUID()),
+    { code: "PASSPORT_POLICY_NOT_ACTIVE" });
+  assert.ok(await app.auditLog.count({ where: { targetType: "passport_policy" } }) >= 6);
+  const revokeAudit = await app.auditLog.findFirstOrThrow({ where: {
+    action: "passport.policy.revoke", targetType: "passport_policy" } });
+  assert.equal((revokeAudit.afterSummary as { status: string }).status, "revoked");
+});
+
+test("P08-T06 real projected lot QR remains private, expires and revokes with policy or quality", async () => {
+  const admin = { userId: "fixture-owner", organizationId: "fixture",
+    unitIds: [], roles: ["administrator"] };
+  const viewer = { ...admin, roles: ["viewer"] };
+  const scopedOut = { ...admin, unitIds: [randomUUID()], roles: ["staff"] };
+  const publication = createPassportService(app);
+  const access = { organization: "public", product: "public", batch: "public",
+    timeline: "public", evidence: "private" };
+  const policy = await publication.createDraft(admin, batches[1], access, randomUUID());
+  assert.equal(policy.policyVersion, 1);
+  assert.equal((await publication.approve(admin, batches[1], 1, randomUUID())).projectionState,
+    "active");
+  const qr = createQrService(app, "https://passport.example");
+  const key = randomUUID();
+  const first = await qr.issue(admin, batches[1], "v1", key, randomUUID());
+  assert.equal(first.qrUrl.includes(batches[1]), false);
+  const token = new URL(first.qrUrl).pathname.split("/").at(-1)!;
+  assert.equal(token.length, 43);
+  const row = await app.qrToken.findUniqueOrThrow({ where: { id: first.tokenId } });
+  assert.equal(row.tokenHash.length, 64);
+  assert.equal(row.tokenHash.includes(token), false);
+  assert.equal(row.policyVersion, "v1");
+  assert.equal((await qr.publicPassport(token))?.publicLotCode,
+    (await app.batch.findUniqueOrThrow({ where: { id: batches[1] } })).localCode);
+  assert.equal(await qr.publicPassport("A".repeat(43)), null);
+  assert.equal(await qr.publicPassport("../secret"), null);
+  await assert.rejects(qr.issue(admin, batches[1], "v1", key, randomUUID()),
+    { code: "QR_ALREADY_ISSUED" });
+  await assert.rejects(qr.issue(viewer, batches[1], "v1", randomUUID(), randomUUID()),
+    { code: "POLICY_DENIED" });
+  await assert.rejects(qr.issue(scopedOut, batches[1], "v1", randomUUID(), randomUUID()),
+    { code: "BATCH_NOT_FOUND" });
+
+  await qr.revoke(admin, batches[1], first.tokenId, "test revoke", randomUUID());
+  assert.equal(await qr.publicPassport(token), null);
+  assert.equal((await app.qrToken.findUniqueOrThrow({ where: { id: first.tokenId } })).state,
+    "revoked");
+  const second = await qr.issue(admin, batches[1], "v1", randomUUID(), randomUUID());
+  const secondToken = new URL(second.qrUrl).pathname.split("/").at(-1)!;
+  await app.qrToken.update({ where: { id: second.tokenId },
+    data: { expiresAt: new Date(Date.now() - 1000) } });
+  assert.equal(await qr.publicPassport(secondToken), null);
+  const third = await qr.issue(admin, batches[1], "v1", randomUUID(), randomUUID());
+  const thirdToken = new URL(third.qrUrl).pathname.split("/").at(-1)!;
+  const next = await publication.createDraft(admin, batches[1], access, randomUUID());
+  assert.equal(next.policyVersion, 2);
+  await publication.approve(admin, batches[1], 2, randomUUID());
+  assert.equal(await qr.publicPassport(thirdToken), null);
+  assert.equal((await app.qrToken.findUniqueOrThrow({ where: { id: third.tokenId } })).state,
+    "revoked");
+  const fourth = await qr.issue(admin, batches[1], "v2", randomUUID(), randomUUID());
+  const fourthToken = new URL(fourth.qrUrl).pathname.split("/").at(-1)!;
+  await app.batch.update({ where: { id: batches[1] }, data: { qualityStatus: "restricted" } });
+  assert.equal(await qr.publicPassport(fourthToken), null);
+  assert.equal((await app.qrToken.findUniqueOrThrow({ where: { id: fourth.tokenId } })).state,
+    "revoked");
+  assert.ok(await app.auditLog.count({ where: { targetType: "qr_token" } }) >= 5);
+});
+
+test("P08-T07 clean public evidence is linked by checksum and short-lived access rechecks policy", async () => {
+  const admin = { userId: "fixture-owner", organizationId: "fixture",
+    unitIds: [], roles: ["administrator"] };
+  const staff = { ...admin, roles: ["staff"], unitIds: [warehouseId] };
+  const evidence = createTraceEvidenceService(app);
+  const publication = createPassportService(app);
+  const qr = createQrService(app, "https://passport.example");
+  const event = await app.traceEvent.findFirstOrThrow({ where: { batchId: batches[1],
+    eventType: TRADING_EVENT_TYPES.receipt } });
+  const bytes = Buffer.from("clean public evidence fixture");
+  const checksum = createHash("sha256").update(bytes).digest("hex");
+  const fileId = randomUUID();
+  const privateId = randomUUID();
+  const infectedId = randomUUID();
+  for (const [id, state, bucket] of [
+    [fileId, "clean", "private"], [privateId, "clean", "private"],
+    [infectedId, "infected", "quarantine"]] as const) {
+    await owner.attachment.create({ data: { id, ownerType: "core_record", bucket,
+      objectKey: `${bucket}/${randomUUID()}`, sha256Hex: checksum, mimeType: "text/plain",
+      sizeBytes: BigInt(bytes.length), scanState: state, visibility: "private",
+      createdBySub: admin.userId, ...(state === "clean" ? {
+        scannedAt: new Date(), scanEngineVersion: "ClamAV test" } : {}) } });
+  }
+  await app.batch.update({ where: { id: batches[1] }, data: { qualityStatus: "available" } });
+  const access = { organization: "public", product: "public", batch: "public",
+    timeline: "public", evidence: "public" };
+  const draft = await publication.createDraft(admin, batches[1], access, randomUUID());
+  assert.equal(draft.policyVersion, 3);
+  await publication.approve(admin, batches[1], 3, randomUUID());
+  await assert.rejects(evidence.attach({ ...staff, unitIds: [randomUUID()] }, batches[1],
+    event.id, privateId, "private", randomUUID()), { code: "BATCH_NOT_FOUND" });
+  await assert.rejects(evidence.attach(staff, batches[1], event.id, fileId,
+    "public", randomUUID()), { code: "POLICY_DENIED" });
+  await assert.rejects(evidence.attach(admin, batches[1], event.id, infectedId,
+    "public", randomUUID()), { code: "FILE_NOT_CLEAN" });
+  const publicLink = await evidence.attach(admin, batches[1], event.id, fileId,
+    "public", randomUUID());
+  await evidence.attach(admin, batches[1], event.id, privateId, "private", randomUUID());
+  assert.equal((await app.passportProjection.findUniqueOrThrow({ where: {
+    batchId: batches[1] } })).state, "stale");
+  assert.equal((await publication.rebuild(admin, batches[1], randomUUID())).state, "active");
+  const issued = await qr.issue(admin, batches[1], "v3", randomUUID(), randomUUID());
+  const token = new URL(issued.qrUrl).pathname.split("/").at(-1)!;
+  const passport = await qr.publicPassport(token);
+  assert.ok(passport);
+  const timeline = passport.timeline.find((item) => item.sourceId === event.externalEventId);
+  assert.ok(timeline);
+  assert.equal(timeline.issuer, issuer);
+  assert.ok(timeline.recordedAt.endsWith("Z"));
+  assert.deepEqual(timeline.evidence.map((ref) => ref.id), [publicLink.id]);
+  assert.equal(timeline.evidence[0].checksum, checksum);
+  assert.equal(JSON.stringify(passport).includes(privateId), false);
+  const receiving = passport.timeline.find((item) => item.type === TRADING_EVENT_TYPES.receiving);
+  assert.equal(receiving?.sentQuantity, "2.000");
+  assert.equal(receiving?.actualQuantity, "1.000");
+  assert.ok(passport.gaps.includes("receiving_discrepancy"));
+  const capability = new URL(timeline.evidence[0].url!).pathname.split("/").at(-1)!;
+  const accessHash = createHash("sha256").update(capability).digest("hex");
+  const view = await core.$queryRaw<{ attachment_id: string }[]>`
+    SELECT attachment_id FROM traceability.public_evidence_download
+    WHERE token_hash = ${accessHash}`;
+  assert.deepEqual(view.map((row) => row.attachment_id), [fileId]);
+  const accessRow = await app.traceEvidenceAccess.findFirstOrThrow({ where: {
+    tokenHash: accessHash } });
+  await owner.traceEvidenceAccess.update({ where: { id: accessRow.id }, data: {
+    createdAt: new Date(Date.now() - 120_000), expiresAt: new Date(Date.now() - 60_000) } });
+  assert.equal((await core.$queryRaw<{ attachment_id: string }[]>`
+    SELECT attachment_id FROM traceability.public_evidence_download
+    WHERE token_hash = ${accessHash}`).length, 0);
+  const renewed = await qr.publicPassport(token);
+  assert.ok(renewed?.timeline.flatMap((item) => item.evidence).some((ref) => ref.id === publicLink.id));
+  await evidence.revoke(admin, batches[1], publicLink.id, "withdraw evidence", randomUUID());
+  assert.equal((await core.$queryRaw<{ attachment_id: string }[]>`
+    SELECT attachment_id FROM traceability.public_evidence_download
+    WHERE token_hash = ${accessHash}`).length, 0);
+  assert.equal(await qr.publicPassport(token), null);
+  await publication.rebuild(admin, batches[1], randomUUID());
+  const after = await qr.publicPassport(token);
+  assert.ok(after);
+  assert.equal(after.timeline.flatMap((item) => item.evidence).length, 0);
+  await assert.rejects(evidence.attach(admin, batches[1], event.id, privateId,
+    "public", randomUUID()), { code: "TRACE_EVIDENCE_EXISTS" });
+  const anotherId = randomUUID();
+  await owner.attachment.create({ data: { id: anotherId, ownerType: "core_record",
+    bucket: "private", objectKey: `clean/${randomUUID()}`, sha256Hex: checksum,
+    mimeType: "text/plain", sizeBytes: BigInt(bytes.length), scanState: "clean",
+    visibility: "private", createdBySub: admin.userId, scannedAt: new Date(),
+    scanEngineVersion: "ClamAV test" } });
+  await evidence.attach(admin, batches[1], event.id, anotherId, "public", randomUUID());
+  await publication.rebuild(admin, batches[1], randomUUID());
+  await owner.attachment.update({ where: { id: anotherId }, data: {
+    scanState: "infected", bucket: "quarantine" } });
+  assert.equal(await qr.publicPassport(token), null);
+  await publication.rebuild(admin, batches[1], randomUUID());
+  const investigated = await qr.publicPassport(token);
+  assert.ok(investigated);
+  assert.ok(investigated.gaps.includes("evidence_investigation"));
+  assert.equal(investigated.timeline.flatMap((item) => item.evidence).length, 0);
+  assert.ok(await app.auditLog.count({ where: { targetType: "trace_evidence" } }) >= 3);
+});
+
+test("P08-T08 M03 confirm flows through outbox to local trace and public QR", async () => {
+  const batchId = randomUUID();
+  const originLotId = randomUUID();
+  const actor: Actor = { userId: "gate-staff", organizationId: "fixture",
+    roles: ["staff"], unitIds: [warehouseId] };
+  const ownerActor: Actor = { ...actor, userId: "gate-owner",
+    roles: ["administrator"], unitIds: [] };
+  await owner.batch.create({ data: { id: batchId, productId, productVariantId: variantId,
+    localCode: randomUUID(), originIssuerInstanceId: issuer, originLotId,
+    qualityStatus: "available", createdBySub: actor.userId } });
+  const create = await app.$transaction(async (tx) => tradingService.create({ tx, actor,
+    requestId: randomUUID(), emit: () => { throw new Error("Draft emitted event"); } },
+  "goods_receipt", { lines: [{ warehouseId, productVariantId: variantId,
+    batchId, quantity: "7", uomId: uom }] }));
+  assert.equal(create.status, "draft");
+  assert.equal(await app.outboxMessage.count({ where: { aggregateId: create.id } }), 0);
+  const events: OutboxEventInput[] = [];
+  const confirm = await app.$transaction(async (tx) => {
+    const result = await tradingService.action({ tx, actor, requestId: randomUUID(),
+      emit: (event) => { events.push(event); } }, "goods_receipt", create.id,
+    "confirm", create.version);
+    await appendOutbox(tx, events);
+    return result;
+  });
+  assert.equal(confirm.status, "confirmed");
+  assert.equal(events.length, 1);
+  assert.equal((await app.stockBalance.findUniqueOrThrow({ where: {
+    warehouseId_batchId: { warehouseId, batchId } } })).quantity.toFixed(3), "7.000");
+  const source = await app.outboxMessage.findFirstOrThrow({ where: {
+    aggregateId: create.id, eventType: TRADING_EVENT_TYPES.receipt } });
+  assert.equal(source.status, "pending");
+  assert.equal(await app.traceEvent.count({ where: { documentId: create.id } }), 0);
+  const dispatcher = createOutboxDispatcher({ client: app, workerId: `gate-${randomUUID()}`,
+    handlers: buildHandlerMap({ traceability: traceConsumers(app, core, issuer) }) });
+  assert.equal((await dispatcher.tick()).delivered, 1);
+  const projected = await app.traceEvent.findFirstOrThrow({ where: { documentId: create.id } });
+  assert.equal(projected.batchId, batchId);
+  assert.equal(projected.verificationState, "local_verified");
+  assert.equal(projected.originLotId, originLotId);
+  assert.equal((await app.document.findUniqueOrThrow({ where: { id: projected.documentId! } })).status,
+    "confirmed");
+  const backward = await backwardTrace(createPrismaBackwardPort(app, actor), actor,
+    { batchId, documentId: create.id });
+  const forward = await forwardTrace(createPrismaForwardPort(app, actor), actor,
+    { batchId });
+  for (const graph of [backward, forward]) {
+    assert.equal(graph.nodes.length, 1);
+    assert.equal(graph.nodes[0].source.documentId, create.id);
+    assert.equal(graph.nodes[0].verificationState, "local_verified");
+    assert.equal(graph.localProjection.state, "caught_up");
+  }
+  const publication = createPassportService(app);
+  const policy = await publication.createDraft(ownerActor, batchId,
+    { organization: "public", product: "public", batch: "public",
+      timeline: "public", evidence: "private" }, randomUUID());
+  assert.equal((await publication.approve(ownerActor, batchId, policy.policyVersion,
+    randomUUID())).projectionState, "active");
+  const qr = createQrService(app, "https://passport.example");
+  const issued = await qr.issue(ownerActor, batchId, `v${policy.policyVersion}`,
+    randomUUID(), randomUUID());
+  const qrPng = PNG.sync.read(await QRCode.toBuffer(issued.qrUrl,
+    { type: "png", errorCorrectionLevel: "M", margin: 4, width: 320 }));
+  assert.equal(jsQR(new Uint8ClampedArray(qrPng.data), qrPng.width,
+    qrPng.height)?.data, issued.qrUrl);
+  const token = new URL(issued.qrUrl).pathname.split("/").at(-1)!;
+  const passport = await qr.publicPassport(token);
+  assert.ok(passport);
+  assert.equal(passport.timeline.length, 1);
+  assert.equal(passport.timeline[0].sourceId, projected.externalEventId);
+  assert.equal(passport.timeline[0].verificationState, "confirmed");
+  assert.equal(issued.qrUrl.includes(batchId), false);
+  assert.equal(JSON.stringify(passport).includes(batchId), false);
+  assert.equal(JSON.stringify(passport).includes(warehouseId), false);
+  await app.outboxMessage.update({ where: { id: source.id }, data: {
+    status: "retry_due", nextAttemptAt: new Date(Date.now() - 1000), deliveredAt: null } });
+  assert.equal((await dispatcher.tick()).delivered, 1);
+  assert.equal(await app.traceEvent.count({ where: { documentId: create.id } }), 1);
+  await qr.revoke(ownerActor, batchId, issued.tokenId, "gate revoke", randomUUID());
+  assert.equal(await qr.publicPassport(token), null);
+});
+
+test("P08-T01 explicit issue sources produce two quantity-backed local provenance links", async () => {
+  const first = await receipt([batches[2]], new Date(Date.now() - 120_000).toISOString());
+  const second = await receipt([batches[2]], new Date(Date.now() - 60_000).toISOString());
+  const dispatcher = createOutboxDispatcher({ client: app, workerId: `allocation-${randomUUID()}`,
+    handlers: buildHandlerMap({ traceability: traceConsumers(app, core, issuer) }) });
+  assert.equal((await dispatcher.tick()).delivered, 2);
+  const issueId = randomUUID();
+  const issueLineId = randomUUID();
+  await app.document.create({ data: { id: issueId, documentType: "goods_issue", issuePurpose: "other",
+    documentNumber: randomUUID(), status: "draft", createdBySub: "fixture",
+    correlationId: randomUUID() } });
+  await app.documentLine.create({ data: { id: issueLineId, documentId: issueId, lineNo: 1,
+    warehouseId, batchId: batches[2], productVariantId: variantId, productId,
+    uomId: uom, quantity: "6" } });
+  const sources = [{ sourceLineId: first.payload.lines[0]!.lineId, quantity: "2" },
+    { sourceLineId: second.payload.lines[0]!.lineId, quantity: "4" }];
+  await app.issueSourceAllocation.createMany({ data: sources.map((row) => ({ id: randomUUID(),
+    issueLineId, ...row })) });
+  const issue = await app.document.update({ where: { id: issueId }, data: {
+    status: "confirmed", confirmedAt: new Date(), confirmedBySub: "fixture" } });
+  const [serialized] = serializeDomainEvent({ type: TRADING_EVENT_TYPES.issue,
+    aggregateType: "document", aggregateId: issueId, aggregateVersion: issue.version,
+    correlationId: randomUUID(), payload: { eventId: randomUUID(), documentId: issueId,
+      documentVersion: issue.version, lines: [{ lineId: issueLineId, batchId: batches[2],
+        warehouseId, originLot: { issuerInstanceId: issuer, lotId: origins[2] },
+        quantity: "6", unit: "EA" }], movementIds: [randomUUID()],
+      actorSub: "fixture", occurredAt: new Date().toISOString() } });
+  const message = await app.outboxMessage.create({ data: { ...serialized, id: randomUUID(),
+    nextAttemptAt: new Date(Date.now() - 1000) } });
+  assert.equal((await dispatcher.tick()).delivered, 1);
+  const graph = await backwardTrace(createPrismaBackwardPort(app, {
+    userId: "fixture", organizationId: "fixture", roles: ["administrator"], unitIds: [] }),
+  { userId: "fixture", organizationId: "fixture", roles: ["administrator"], unitIds: [] },
+  { batchId: batches[2], documentId: issueId });
+  assert.equal(graph.nodes.length, 3);
+  assert.equal(graph.edges.length, 2);
+  assert.deepEqual(graph.edges.flatMap((edge) => edge.allocationDetail ?? [])
+    .map((row) => row.quantity).sort(), ["2.000", "4.000"]);
+  assert.deepEqual(new Set(graph.nodes.map((node) => node.source.documentId)),
+    new Set([issueId, first.documentId, second.documentId]));
+  assert.equal(graph.gaps.some((gap) => gap.reason === "local_allocation_unknown"), false);
+  const forward = await forwardTrace(createPrismaForwardPort(app, {
+    userId: "fixture", organizationId: "fixture", roles: ["administrator"], unitIds: [] }),
+  { userId: "fixture", organizationId: "fixture", roles: ["administrator"], unitIds: [] },
+  { batchId: batches[2] });
+  assert.equal(forward.edges.filter((edge) => edge.sourceRelation === "derived_from").length, 2);
+  const projection = await core.coreRecord.findUniqueOrThrow({ where: { kind_sourceType_sourceId: {
+    kind: "trace_projection", sourceType: "lot", sourceId: batches[2] } } });
+  assert.equal((projection.payload as { edges: unknown[] }).edges.length, 2);
+  const admin: Actor = { userId: "fixture", organizationId: "fixture",
+    roles: ["administrator"], unitIds: [] };
+  const publication = createPassportService(app);
+  const policy = await publication.createDraft(admin, batches[2], {
+    organization: "public", product: "public", batch: "public",
+    timeline: "public", evidence: "private",
+  }, randomUUID());
+  assert.equal((await publication.approve(admin, batches[2], policy.policyVersion,
+    randomUUID())).projectionState, "active");
+  const qr = createQrService(app, "https://passport.example");
+  const issued = await qr.issue(admin, batches[2], `v${policy.policyVersion}`,
+    randomUUID(), randomUUID());
+  const publicView = await qr.publicPassport(new URL(issued.qrUrl).pathname.split("/").at(-1)!);
+  assert.ok(publicView);
+  assert.equal(publicView.gaps.includes("local_allocation_unknown"), false);
+  await app.outboxMessage.update({ where: { id: message.id }, data: {
+    status: "retry_due", nextAttemptAt: new Date(Date.now() - 1000), deliveredAt: null } });
+  assert.equal((await dispatcher.tick()).delivered, 1);
+  assert.equal(await app.traceLink.count({ where: { fromEvent: { documentId: issueId } } }), 2);
+  const invalidId = randomUUID();
+  const invalidLineId = randomUUID();
+  await app.document.create({ data: { id: invalidId, documentType: "goods_issue", issuePurpose: "other",
+    documentNumber: randomUUID(), status: "draft", createdBySub: "fixture",
+    correlationId: randomUUID() } });
+  await app.documentLine.create({ data: { id: invalidLineId, documentId: invalidId,
+    lineNo: 1, warehouseId, batchId: batches[2], productVariantId: variantId,
+    productId, uomId: uom, quantity: "5" } });
+  await app.issueSourceAllocation.create({ data: { id: randomUUID(), issueLineId: invalidLineId,
+    sourceLineId: first.payload.lines[0]!.lineId, quantity: "5" } });
+  await assert.rejects(app.document.update({ where: { id: invalidId }, data: {
+    status: "confirmed", confirmedAt: new Date(), confirmedBySub: "fixture" } }));
+  assert.equal((await app.document.findUniqueOrThrow({ where: { id: invalidId } })).status, "draft");
+});

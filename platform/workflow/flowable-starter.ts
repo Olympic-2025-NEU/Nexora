@@ -52,6 +52,8 @@ export function createFlowableStarter(db: PrismaClient, engine: FlowableClient) 
       let bound = await findBoundProcess(engine, current);
       if (bound && "halt" in bound) { await haltApproval(db, current, bound.halt); return true; }
       if (!bound) {
+        const beforeStart = await getApproval(db, id);
+        if (beforeStart?.state !== "starting" || beforeStart.version !== current.version) return true;
         try {
           const instance = await engine.startProcess({ businessKey: id, variables: {
             approvalRequestId: id, documentId: current.documentId, creatorSub: current.creatorSub,

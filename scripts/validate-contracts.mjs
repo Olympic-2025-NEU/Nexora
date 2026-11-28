@@ -135,15 +135,24 @@ function checkOpenApi() {
       if (method === "patch" || /\/(?:confirm|cancel|submit|decision|acknowledge|resolve|quality-actions)$/.test(path)) {
         assert(headers.includes("IfMatch"), `Missing If-Match: ${name}`);
       }
-      if (/\/(?:confirm|submit|decision|retry|acknowledge|resolve|quality-actions|qr)$/.test(path) ||
+      if (/\/(?:confirm|submit|decision|decisions|retry|acknowledge|resolve|quality-actions|qr)$/.test(path) ||
         path === "/api/v1/ai/drafts" || path === "/api/v1/core/records") {
         assert(headers.includes("IdempotencyKey"), `Missing Idempotency-Key: ${name}`);
       }
       for (const code of success) {
         if (code === "204") continue;
+        if (path === "/api/v1/public/evidence/{token}") {
+          assert(op.responses[code].content?.["application/pdf"]?.schema?.format === "binary",
+            `Evidence download must be binary: ${name}`);
+          continue;
+        }
         const schema = op.responses[code].content?.["application/json"]?.schema;
         assert(schema && !JSON.stringify(schema).includes("Generic"), `Untyped response: ${name}`);
-        if (path === "/api/v1/federation/events" || path.startsWith("/api/v1/health/")) {
+        if (path === "/api/v1/me") {
+          assert(schema.$ref === "#/components/schemas/Me", `Actor projection must be raw: ${name}`);
+        } else if (path === "/api/v1/federation/events" || path.startsWith("/api/v1/health/") ||
+            path.startsWith("/api/v1/admin/retries") ||
+            path.startsWith("/api/v1/admin/federation/operations")) {
           assert(schema.$ref, `Protocol response must be raw: ${name}`);
         } else assert(schema.properties?.data && schema.properties?.requestId, `Envelope missing: ${name}`);
       }

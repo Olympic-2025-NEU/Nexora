@@ -2,7 +2,7 @@
 # Nexora P01 — single Compose entrypoint (instances A/B/C via env file).
 # Project/containers use prefix nexora- (e.g. nexora-postgres). Profiles: apps | core | dxlab | ai
 # Host PG/Keycloak publish: -f deploy/compose.local-admin.yml (see deploy/scripts/dev-up.*)
-# Default project is nexora; fixed container_name means one such stack per Docker host.
+# Use -p nexora-a|nexora-b|nexora-c for isolated Compose projects.
 name: nexora
 
 networks:
@@ -15,10 +15,10 @@ volumes:
   seaweed_data:
   seaweed_config:
   clamav_data:
+  ollama_models:
 
 services:
   postgres:
-    container_name: nexora-postgres
     image: postgres:17.6@sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
@@ -39,7 +39,6 @@ services:
           memory: 1g
 
   db-bootstrap:
-    container_name: nexora-db-bootstrap
     image: postgres:17.6@sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929
     entrypoint: ["sh", "/bootstrap.sh"]
     environment:
@@ -67,7 +66,7 @@ services:
     restart: "no"
 
   db-migrate:
-    container_name: nexora-db-migrate
+    image: nexora-migrator:${NEXORA_IMAGE_TAG:-p09-local}
     build:
       context: ..
       dockerfile: Dockerfile
@@ -81,7 +80,6 @@ services:
     restart: "no"
 
   redis:
-    container_name: nexora-redis
     image: redis:7.4-alpine@sha256:7f7d30b7fdd09467bac58198a1f166dd69789d348d4fe859cccb20e0cf287fbe
     command: ["redis-server", "--save", "", "--appendonly", "no"]
     volumes:
@@ -98,7 +96,6 @@ services:
           memory: 256m
 
   keycloak:
-    container_name: nexora-keycloak
     image: quay.io/keycloak/keycloak:26.8.2@sha256:c68e286cacd87b942ac1939a0a1481461109d6acd3a57dc496969a319a76bbf0
     command: ["start-dev", "--http-port=8080"]
     environment:
@@ -107,7 +104,8 @@ services:
       KC_HEALTH_ENABLED: "true"
       KC_HTTP_ENABLED: "true"
       KC_HOSTNAME_STRICT: "false"
-      KC_HOSTNAME: ${OIDC_BASE_URL}
+      KC_HOSTNAME: ${OIDC_FRONTEND_URL:-${OIDC_BASE_URL}}
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: ${OIDC_BACKCHANNEL_DYNAMIC:-false}
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://postgres:5432/${KEYCLOAK_DB_NAME}
       KC_DB_USERNAME: ${KEYCLOAK_DB_USER}
@@ -115,7 +113,10 @@ services:
     depends_on:
       db-bootstrap:
         condition: service_completed_successfully
-    networks: [internal]
+    networks:
+      internal:
+        aliases:
+          - keycloak-${INSTANCE_ID}
     healthcheck:
       test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/8080"]
       interval: 10s
@@ -128,13 +129,13 @@ services:
           memory: 1g
 
   keycloak-bootstrap:
-    container_name: nexora-keycloak-bootstrap
     image: node:22-bookworm-slim@sha256:e9f565d32859f0cbfb52125eafe8be39390f24dac302dc3cdf566e8ba3ab21ee
     command: ["node", "/bootstrap/bootstrap.mjs"]
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME}
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD}
       OIDC_BASE_URL: ${OIDC_BASE_URL}
+      OIDC_FRONTEND_URL: ${OIDC_FRONTEND_URL:-${OIDC_BASE_URL}}
       OIDC_ISSUER_URL: ${OIDC_ISSUER_URL}
       OIDC_CLIENT_ID_ERP: ${OIDC_CLIENT_ID_ERP}
       OIDC_CLIENT_ID_DXLAB: ${OIDC_CLIENT_ID_DXLAB}
@@ -144,6 +145,10 @@ services:
       OIDC_GATEWAY_CLIENT_SECRET: ${OIDC_GATEWAY_CLIENT_SECRET}
       KC_DEV_USERNAME: ${KC_DEV_USERNAME:-}
       KC_DEV_USER_PASSWORD: ${KC_DEV_USER_PASSWORD:-}
+      KC_ADMIN_USERNAME: ${KC_ADMIN_USERNAME:-}
+      KC_ADMIN_PASSWORD: ${KC_ADMIN_PASSWORD:-}
+      KC_APPROVER_USERNAME: ${KC_APPROVER_USERNAME:-}
+      KC_APPROVER_PASSWORD: ${KC_APPROVER_PASSWORD:-}
     volumes:
       - ./keycloak:/bootstrap:ro,z
     depends_on:
@@ -153,12 +158,11 @@ services:
     restart: "no"
 
   gateway:
-    container_name: nexora-gateway
     image: apache/apisix:3.20.0-debian@sha256:013de62a9dfba7d8e6006b3e85b524c28c9f1c3549fca3b91d5b258b0b9e759a
     volumes:
       - ./apisix/config.yaml:/usr/local/apisix/conf/config.yaml:ro,z
       # Rendered from routes.yaml via deploy/scripts/render-apisix-routes.mjs (placeholders substituted).
-      - ./apisix/apisix.generated.yaml:/usr/local/apisix/conf/apisix.yaml:ro,z
+      - ${APISIX_RENDERED_PATH:-./apisix/apisix.generated.yaml}:/usr/local/apisix/conf/apisix.yaml:ro,z
       # TLS certs (gitignored). Generate with scripts/gen-local-certs.ps1 / .sh
       # If certs are absent, the HTTP port still works for smoke tests.
       - ./certs:/usr/local/apisix/conf/certs:ro,z
@@ -178,7 +182,6 @@ services:
           memory: 512m
 
   storage-bootstrap:
-    container_name: nexora-storage-bootstrap
     image: node:22-bookworm-slim@sha256:e9f565d32859f0cbfb52125eafe8be39390f24dac302dc3cdf566e8ba3ab21ee
     command: ["node", "/bootstrap/bootstrap.mjs"]
     environment:
@@ -198,7 +201,6 @@ services:
     restart: "no"
 
   seaweedfs:
-    container_name: nexora-seaweedfs
     image: chrislusf/seaweedfs:4.53@sha256:ccad23e18639c8b98cee17e7100b95830a06077b56d8e5b006d6dcf8ec5e94a0
     command: ["mini", "-dir=/data", "-ip.bind=0.0.0.0", "-s3.config=/config/s3.json", "-bucket=${S3_BUCKET_PRIVATE},${S3_BUCKET_QUARANTINE},${S3_BUCKET_PUBLIC}"]
     volumes:
@@ -219,7 +221,6 @@ services:
           memory: 512m
 
   flowable:
-    container_name: nexora-flowable
     image: flowable/flowable-rest:8.0.0@sha256:708dfa32f27b93180bb6e7a30684d881d995fe257f5b8413e14b20a55c25672d
     environment:
       SERVER_PORT: "8080"
@@ -252,7 +253,6 @@ services:
           memory: 1g
 
   clamav:
-    container_name: nexora-clamav
     image: clamav/clamav:1.4@sha256:4cc4350d3fded380caf1799e76c0d1c93f3fa40af99c0cb2862ec0c9b117718a
     volumes:
       - clamav_data:/var/lib/clamav
@@ -263,20 +263,27 @@ services:
           memory: 2g
 
   erp:
-    container_name: nexora-erp
     profiles: ["apps"]
+    image: nexora-erp:${NEXORA_IMAGE_TAG:-p09-local}
     build:
       context: ..
       dockerfile: Dockerfile
       target: runner
     environment:
       DATABASE_URL: ${APP_DATABASE_URL}
+      CORE_DATABASE_URL: ${CORE_DATABASE_URL}
       INSTANCE_ID: ${INSTANCE_ID}
+      NEXORA_ISSUER_INSTANCE_ID: nexora-${INSTANCE_ID}
       OIDC_ISSUER_URL: ${OIDC_ISSUER_URL}
       OIDC_BASE_URL: ${OIDC_BASE_URL}
       OIDC_JWKS_URL: ${OIDC_JWKS_URL}
       OIDC_AUDIENCE: ${OIDC_AUDIENCE}
       OIDC_CLIENT_ID_ERP: ${OIDC_CLIENT_ID_ERP}
+      # ERP's actor-scoped AI orchestration talks only to the private adapter.
+      # The same token is injected into ai; neither service depends on a model.
+      AI_PROVIDER: ${AI_PROVIDER:-none}
+      AI_BASE_URL: ${AI_BASE_URL:-http://ai:8080}
+      AI_INTERNAL_TOKEN: ${AI_INTERNAL_TOKEN:-}
       ALLOW_DEV_PASSWORD_LOGIN: ${ALLOW_DEV_PASSWORD_LOGIN:-true}
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL}
       # Browser reset-password page links to Keycloak Account (needs local-admin publish).
@@ -285,6 +292,9 @@ services:
       # Membership invite provisions users via Keycloak Admin (same creds as bootstrap).
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME}
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD}
+      FLOWABLE_BASE_URL: 
+      FLOWABLE_ADMIN_USER: 
+      FLOWABLE_ADMIN_PASSWORD: 
     depends_on:
       db-migrate:
         condition: service_completed_successfully
@@ -295,8 +305,8 @@ services:
           memory: 1g
 
   worker:
-    container_name: nexora-worker
     profiles: ["apps"]
+    image: nexora-erp:${NEXORA_IMAGE_TAG:-p09-local}
     build:
       context: ..
       dockerfile: Dockerfile
@@ -304,10 +314,20 @@ services:
     command: ["node", "worker/entrypoint.js"]
     environment:
       DATABASE_URL: ${APP_DATABASE_URL}
+      CORE_DATABASE_URL: ${CORE_DATABASE_URL}
+      NEXORA_ISSUER_INSTANCE_ID: nexora-${INSTANCE_ID}
       FLOWABLE_BASE_URL: ${FLOWABLE_BASE_URL}
       REDIS_URL: ${REDIS_URL}
       FLOWABLE_ADMIN_USER: ${FLOWABLE_ADMIN_USER}
       FLOWABLE_ADMIN_PASSWORD: ${FLOWABLE_ADMIN_PASSWORD}
+      S3_ENDPOINT: ${S3_ENDPOINT}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY}
+      S3_BUCKET_PRIVATE: ${S3_BUCKET_PRIVATE}
+      S3_REGION: ${S3_REGION}
+      # Local demo only: resolve env:PARTNER_OUTBOUND_CLIENT_SECRET in worker.
+      # Production may mount secret:name at /run/secrets/name via an override.
+      PARTNER_OUTBOUND_CLIENT_SECRET: ${PARTNER_OUTBOUND_CLIENT_SECRET:-}
     depends_on:
       db-migrate:
         condition: service_completed_successfully
@@ -320,8 +340,8 @@ services:
           memory: 512m
 
   core-data:
-    container_name: nexora-core-data
     profiles: ["apps", "core"]
+    image: nexora-core-data:${NEXORA_IMAGE_TAG:-p09-local}
     build:
       context: ..
       dockerfile: services/core-data/Dockerfile
@@ -351,8 +371,8 @@ services:
           memory: 512m
 
   file-reconciler:
-    container_name: nexora-file-reconciler
     profiles: ["apps", "core"]
+    image: nexora-core-data:${NEXORA_IMAGE_TAG:-p09-local}
     build:
       context: ..
       dockerfile: services/core-data/Dockerfile
@@ -378,8 +398,8 @@ services:
           memory: 512m
 
   file-scanner:
-    container_name: nexora-file-scanner
     profiles: ["apps", "core"]
+    image: nexora-core-data:${NEXORA_IMAGE_TAG:-p09-local}
     build:
       context: ..
       dockerfile: services/core-data/Dockerfile
@@ -409,14 +429,25 @@ services:
           memory: 512m
 
   dx-lab:
-    container_name: nexora-dx-lab
     profiles: ["dxlab"]
+    image: nexora-dx-lab:${NEXORA_IMAGE_TAG:-p11-local}
     build:
-      context: ../apps/dx-lab
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: apps/dx-lab/Dockerfile
     environment:
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL}
       OIDC_ISSUER_URL: ${OIDC_ISSUER_URL}
+      OIDC_BASE_URL: ${OIDC_BASE_URL}
+      OIDC_JWKS_URL: ${OIDC_JWKS_URL}
+      OIDC_CLIENT_ID_DXLAB: ${OIDC_CLIENT_ID_DXLAB}
+      OIDC_REDIRECT_URI_DXLAB: ${OIDC_REDIRECT_URI_DXLAB}
+      GATEWAY_INTERNAL_URL: http://gateway:9080
+      DXLAB_SESSION_SECRET: ${DXLAB_SESSION_SECRET:-}
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/dxlab/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
     networks: [internal]
     deploy:
       resources:
@@ -424,16 +455,73 @@ services:
           memory: 512m
 
   ai:
-    container_name: nexora-ai
     profiles: ["ai"]
-    image: python:3.12-slim@sha256:78387bc3881b8273120a12ebe6c1ab22b018ccc2c9adf565ae1ac9b536e184ea
-    command:
-      [
-        "python",
-        "-c",
-        "import http.server; http.server.HTTPServer(('0.0.0.0', 8080), type('H', (http.server.BaseHTTPRequestHandler,), {'do_GET': lambda s: (s.send_response(200), s.end_headers(), s.wfile.write(b'ok'))})).serve_forever()",
-      ]
+    image: nexora-ai:${NEXORA_IMAGE_TAG:-p10-local}
+    build:
+      context: ..
+      dockerfile: services/ai/Dockerfile
+    environment:
+      AI_PROVIDER: ${AI_PROVIDER:-none}
+      AI_MODEL: ${AI_MODEL:-qwen3:0.6b}
+      AI_MODEL_BASE_URL: ${AI_MODEL_BASE_URL:-http://ollama:11434}
+      AI_INTERNAL_TOKEN: ${AI_INTERNAL_TOKEN:-}
+      AI_REQUEST_TIMEOUT_SECONDS: ${AI_REQUEST_TIMEOUT_SECONDS:-30}
+      AI_MAX_OUTPUT_TOKENS: ${AI_MAX_OUTPUT_TOKENS:-256}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
     networks: [internal]
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+
+  ollama:
+    profiles: ["ai"]
+    image: ollama/ollama:0.40.18@sha256:1cabd20e1762a7a8444bf4a7110b346d923cd77ab6c97c984434140638c913ec
+    volumes:
+      - ollama_models:/root/.ollama
+    networks: [internal]
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+
+  prometheus:
+    profiles: ["observability"]
+    image: prom/prometheus:v2.55.1
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=24h
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./observability/rules.yml:/etc/prometheus/rules.yml:ro
+    networks: [internal]
+    depends_on:
+      - erp
+      - worker
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+
+  grafana:
+    profiles: ["observability"]
+    image: grafana/grafana:11.3.0
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      # Demo placeholder only — override via GRAFANA_ADMIN_PASSWORD in instance env for real use.
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-CHANGE_ME_GRAFANA}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+    networks: [internal]
+    depends_on:
+      - prometheus
     deploy:
       resources:
         limits:

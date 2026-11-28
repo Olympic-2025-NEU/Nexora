@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nexora.local/contracts/events/receipt.schema.json",
+  "title": "ReceiptConfirmedV1",
+  "allOf": [
+    { "$ref": "envelope-v1.schema.json" },
+    {
+      "type": "object",
+      "required": ["sourceTransfer", "actualLines", "sentQuantity", "actualQuantity", "discrepancyQuantity"],
+      "properties": {
+        "eventType": { "const": "receipt.confirmed.v1" },
+        "sourceDocument": { "properties": { "type": { "const": "receiving_confirmation" } } }
+      },
+      "not": { "anyOf": [
+        { "required": ["linkedIssueId"] }, { "required": ["originLot"] },
+        { "required": ["downstreamPartnerRef"] }, { "required": ["impactType"] },
+        { "required": ["sourceEventRefs"] }, { "required": ["disclosureScope"] }
+      ] }
+    }
+  ]
+}

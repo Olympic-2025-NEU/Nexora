@@ -17,10 +17,14 @@ const scripts = {
   workflow: "tests/platform/run-workflow.sh",
   "workflow-bridge": "tests/platform/run-workflow-bridge.sh",
   ops: "tests/platform/run-ops.sh",
+  trading: "tests/platform/run-trading.sh",
+  trace: "tests/platform/run-trace.sh",
+  federation: "tests/platform/run-federation.sh",
+  "ai-tools": "tests/platform/run-ai-tools.sh",
 };
 const script = scripts[process.argv[2]];
 if (!script) {
-  console.error("Expected platform test: schema, transaction, audit, records, evidence, files, scan, idempotency, outbox, events, workflow, workflow-bridge or ops");
+  console.error("Expected a known platform test (including trading or trace)");
   process.exit(2);
 }
 

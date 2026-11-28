@@ -7,6 +7,7 @@ import { createAuthenticator } from "./auth.mjs";
 import { createFileService } from "./files/upload-service.mjs";
 import { createS3FileStore } from "./files/s3-store.mjs";
 import { handleFileRequest } from "./files/http.mjs";
+import { handlePublicEvidenceRequest } from "./files/public-evidence.mjs";
 import { createClamAvScanner } from "./files/clamav.mjs";
 import { createRecordService } from "./records/service.mjs";
 import { handleRecordRequest } from "./records/http.mjs";
@@ -39,6 +40,7 @@ const server = http.createServer(async (req, res) => {
     res.end(`# TYPE service_up gauge\nservice_up{service="core-data"} ${Number(up)}\n`);
     return;
   }
+  if (await handlePublicEvidenceRequest(req, res, { db: prisma, store })) return;
   if (await handleFileRequest(req, res, fileHandler)) return;
   if (await handleRecordRequest(req, res, recordHandler)) return;
   res.writeHead(404, { "content-type": "application/json", "x-request-id": id });

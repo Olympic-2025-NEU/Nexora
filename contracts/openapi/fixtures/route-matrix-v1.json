@@ -18,7 +18,7 @@
     },
     {
       "method": "POST",
-      "path": "/api/v1/ai/drafts",
+      "path": "/api/v1/ai/draft",
       "auth": "protected",
       "roles": [
         "administrator",
@@ -26,12 +26,25 @@
       ],
       "scope": "resource",
       "success": [
-        "201"
+        "200"
       ]
     },
     {
-      "method": "GET",
-      "path": "/api/v1/ai/tool-calls/{id}",
+      "method": "POST",
+      "path": "/api/v1/ai/draft/create",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/ai/risk/feedback",
       "auth": "protected",
       "roles": [
         "administrator",
@@ -45,8 +58,40 @@
       ]
     },
     {
+      "method": "GET",
+      "path": "/api/v1/admin/federation/operations",
+      "auth": "protected",
+      "roles": ["administrator"],
+      "scope": "resource",
+      "success": ["200"]
+    },
+    {
       "method": "POST",
-      "path": "/api/v1/approvals/{approvalRequestId}/decision",
+      "path": "/api/v1/admin/federation/operations",
+      "auth": "protected",
+      "roles": ["administrator"],
+      "scope": "resource",
+      "success": ["202"]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/retries",
+      "auth": "protected",
+      "roles": ["administrator"],
+      "scope": "resource",
+      "success": ["200"]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/retries",
+      "auth": "protected",
+      "roles": ["administrator"],
+      "scope": "resource",
+      "success": ["202"]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/approvals/{id}/decisions",
       "auth": "protected",
       "roles": [
         "approver"
@@ -58,7 +103,7 @@
     },
     {
       "method": "GET",
-      "path": "/api/v1/approvals/tasks",
+      "path": "/api/v1/approvals/inbox",
       "auth": "protected",
       "roles": [
         "approver"
@@ -407,6 +452,36 @@
     },
     {
       "method": "GET",
+      "path": "/api/v1/lots/{id}/issue-sources",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff",
+        "approver",
+        "viewer"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/trace/status",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff",
+        "approver",
+        "viewer"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "GET",
       "path": "/api/v1/lots/{id}/history",
       "auth": "protected",
       "roles": [
@@ -419,6 +494,70 @@
       "success": [
         "200"
       ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/ot/readings",
+      "auth": "protected",
+      "roles": ["administrator", "staff"],
+      "scope": "resource",
+      "success": ["202"]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/lots/{id}/passport-policy",
+      "auth": "protected",
+      "roles": ["administrator"],
+      "scope": "organization-admin",
+      "success": ["200"]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/lots/{id}/federation-summary",
+      "auth": "protected",
+      "roles": ["administrator"],
+      "scope": "organization-admin",
+      "success": ["202"]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/lots/{id}/downstream-impact",
+      "auth": "protected",
+      "roles": ["administrator"],
+      "scope": "organization-admin",
+      "success": ["202"]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/lots/{id}/passport-policy",
+      "auth": "protected",
+      "roles": ["administrator"],
+      "scope": "organization-admin",
+      "success": ["201"]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/lots/{id}/passport-policy/approve",
+      "auth": "protected",
+      "roles": ["administrator"],
+      "scope": "organization-admin",
+      "success": ["200"]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/lots/{id}/passport-policy/revoke",
+      "auth": "protected",
+      "roles": ["administrator"],
+      "scope": "organization-admin",
+      "success": ["200"]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/lots/{id}/passport-policy/rebuild",
+      "auth": "protected",
+      "roles": ["administrator"],
+      "scope": "organization-admin",
+      "success": ["200"]
     },
     {
       "method": "POST",
@@ -445,6 +584,30 @@
       "success": [
         "204"
       ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/lots/{id}/evidence",
+      "auth": "protected",
+      "roles": ["administrator", "staff", "approver", "viewer"],
+      "scope": "resource",
+      "success": ["200"]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/lots/{id}/evidence",
+      "auth": "protected",
+      "roles": ["administrator", "staff"],
+      "scope": "resource",
+      "success": ["201"]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/lots/{id}/evidence/{evidenceId}/revoke",
+      "auth": "protected",
+      "roles": ["administrator", "staff"],
+      "scope": "resource",
+      "success": ["204"]
     },
     {
       "method": "GET",
@@ -587,6 +750,21 @@
       "auth": "protected",
       "roles": [
         "administrator"
+      ],
+      "scope": "resource",
+      "success": [
+        "200"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/partners/{id}/connection",
+      "auth": "protected",
+      "roles": [
+        "administrator",
+        "staff",
+        "approver",
+        "viewer"
       ],
       "scope": "resource",
       "success": [
@@ -823,6 +1001,14 @@
       "success": [
         "200"
       ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/public/evidence/{token}",
+      "auth": "public",
+      "roles": [],
+      "scope": "anonymous",
+      "success": ["200"]
     },
     {
       "method": "GET",

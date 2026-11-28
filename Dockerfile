@@ -45,6 +45,9 @@ COPY --from=builder --chown=nexora:nexora /app/prisma ./prisma
 COPY --from=builder --chown=nexora:nexora /app/worker ./worker
 COPY --from=builder --chown=nexora:nexora /app/deploy/config.mjs ./deploy/config.mjs
 COPY --from=builder --chown=nexora:nexora /app/deploy/health.mjs ./deploy/health.mjs
+COPY --from=builder --chown=nexora:nexora /app/deploy/ot/device-registry.example.json ./deploy/ot/device-registry.example.json
+COPY --from=builder --chown=nexora:nexora /app/deploy/scripts/archive-query.mjs ./deploy/scripts/archive-query.mjs
+COPY --from=builder --chown=nexora:nexora /app/deploy/scripts/archive-query-lib.mjs ./deploy/scripts/archive-query-lib.mjs
 USER nexora
 EXPOSE 3000
 CMD ["npm", "run", "start"]

@@ -1,78 +1,34 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-/**
- * GET /api/v1/public/passport/:token
- *
- * Returns a safe public projection of a passport QR token.
- * Anonymous access — no authentication required.
- *
- * Security requirements:
- * - Returns only safe fields; never exposes batch IDs, internal IDs, or PII.
- * - Unknown or revoked tokens return 404 (not 403) to prevent enumeration.
- * - POST/PUT/DELETE/PATCH are blocked at the gateway; app also rejects them.
- * - Response includes cache-control headers to prevent proxy caching of 404s.
- */
-
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
+import { getPrismaClient } from "@/platform/persistence/prisma";
+import { createQrService } from "@/contexts/traceability/application/qr-token";
 
-// ---------------------------------------------------------------------------
-// Route handler
-// ---------------------------------------------------------------------------
+type Context = { params: Promise<{ token: string }> };
+const headers = { "cache-control": "no-store, max-age=0", "x-content-type-options": "nosniff",
+  "referrer-policy": "no-referrer", "x-robots-tag": "noindex, nofollow" };
+const notFound = () => NextResponse.json({ error: "NOT_FOUND" }, { status: 404, headers });
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ token: string }> },
-): Promise<NextResponse> {
-  void request; // The first route argument is required when reading dynamic params.
-  const { token } = await params;
-
-  // Validate token format: alphanumeric + hyphens, 10-128 chars.
-  // Rejects path traversal, SQL injection attempts, etc.
-  if (!/^[a-zA-Z0-9_-]{10,128}$/.test(token)) {
-    // Return 404 (not 400) to avoid leaking validation rules.
-    return NextResponse.json(
-      { error: "NOT_FOUND" },
-      {
-        status: 404,
-        headers: {
-          "cache-control": "no-store",
-          "x-content-type-options": "nosniff",
-        },
-      },
-    );
+export async function GET(_request: NextRequest, context: Context): Promise<NextResponse> {
+  try {
+    const { token } = await context.params;
+    const passport = await createQrService(getPrismaClient(), process.env.PUBLIC_BASE_URL)
+      .publicPassport(token);
+    return passport ? NextResponse.json({ data: passport, requestId: crypto.randomUUID() },
+      { headers }) : notFound();
+  } catch {
+    return NextResponse.json({ error: "SERVICE_UNAVAILABLE" }, { status: 503, headers });
   }
-
-  // TODO (P06+): Query actual passport/batch from DB via public projection service.
-  // For now, return 404 for all unknown tokens — safe default.
-  // The projection must NOT include: batch ID, lot numbers, internal IDs, sub, PII.
-
-  // Stub: always 404 until passport registry is implemented in P08/P09.
-  return NextResponse.json(
-    { error: "NOT_FOUND" },
-    {
-      status: 404,
-      headers: {
-        "cache-control": "no-store",
-        "x-content-type-options": "nosniff",
-      },
-    },
-  );
 }
 
-// Explicit method handlers — Next.js will return 405 for other methods automatically,
-// but explicit denial makes the intent clear and allows custom response bodies.
-export async function POST(): Promise<NextResponse> {
-  return NextResponse.json({ error: "METHOD_NOT_ALLOWED" }, { status: 405 });
+export async function HEAD(request: NextRequest, context: Context): Promise<Response> {
+  const result = await GET(request, context);
+  return new Response(null, { status: result.status, headers: result.headers });
 }
 
-export async function PUT(): Promise<NextResponse> {
-  return NextResponse.json({ error: "METHOD_NOT_ALLOWED" }, { status: 405 });
-}
-
-export async function PATCH(): Promise<NextResponse> {
-  return NextResponse.json({ error: "METHOD_NOT_ALLOWED" }, { status: 405 });
-}
-
-export async function DELETE(): Promise<NextResponse> {
-  return NextResponse.json({ error: "METHOD_NOT_ALLOWED" }, { status: 405 });
-}
+const methodNotAllowed = () => NextResponse.json({ error: "METHOD_NOT_ALLOWED" },
+  { status: 405, headers });
+export async function POST() { return methodNotAllowed(); }
+export async function PUT() { return methodNotAllowed(); }
+export async function PATCH() { return methodNotAllowed(); }
+export async function DELETE() { return methodNotAllowed(); }

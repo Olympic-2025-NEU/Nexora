@@ -11,6 +11,8 @@ import { PermanentDeliveryError, type OutboxEventInput, type OutboxHandler } fro
 import { createPrismaIdempotency } from "../../platform/http/idempotency";
 import { runCommand, type CommandOptions } from "../../platform/http/pipeline";
 import { createTransaction } from "../../platform/persistence/transaction";
+import { createFederationOutboundHandler } from "../../workers/federation-outbound";
+import { readFileSync } from "node:fs";
 
 if (process.env.NEXORA_TEST_DB !== "1" || !process.env.APP_DATABASE_URL) throw Error("Isolated DB required");
 const client = new PrismaClient({ datasources: { db: { url: process.env.APP_DATABASE_URL } } });
@@ -299,4 +301,45 @@ test("SIGKILL/restart real worker process preserves 20 messages across before/af
       } finally { healthy.kill("SIGKILL"); }
     } finally { after.kill("SIGKILL"); }
   } finally { before.kill("SIGKILL"); }
+});
+
+test("federation outbound persists retry and matching ACK attempts in PostgreSQL", async () => {
+  const payload = JSON.parse(readFileSync("contracts/events/fixtures/a-to-b-transfer-announced.json", "utf8"));
+  const partnerId = randomUUID();
+  await client.partner.create({ data: { id: partnerId, issuerInstanceId: "B", code: randomUUID(),
+    displayName: "Receiver B", createdBySub: "fixture" } });
+  await client.partnerConnection.create({ data: { id: randomUUID(), partnerId,
+    endpointUrl: "https://partner.example/api/v1/federation/events",
+    outboundTokenUrl: "https://identity.example/token", outboundClientId: "client-a",
+    outboundSecretRef: "env:PARTNER_SECRET", outboundAudience: "partner-b",
+    inboundClientId: randomUUID(), status: "active" } });
+  const input: OutboxEventInput = { aggregateType: "document", aggregateId: payload.sourceDocument.id,
+    aggregateVersion: 2, eventType: payload.eventType, schemaVersion: "1", payload,
+    destination: "federation", correlationId: payload.correlationId };
+  await enqueue(input);
+  const message = await row(input.aggregateId);
+  let sends = 0;
+  const handler = createFederationOutboundHandler(client, "A", { resolveSecret: async () => "fixture-secret",
+    fetcher: async (url) => {
+      if (String(url).includes("identity")) return new Response(JSON.stringify({ access_token: "token",
+        token_type: "Bearer" }), { status: 200 });
+      sends++;
+      if (sends === 1) throw new Error("B offline");
+      return new Response(JSON.stringify({ messageId: payload.messageId, ackId: randomUUID(),
+        acceptedAt: new Date().toISOString(), status: "validated" }), { status: 202 });
+    } });
+  const worker = createOutboxDispatcher({ client, workerId: randomUUID(),
+    handlers: new Map([["federation", handler]]) });
+  assert.equal((await worker.tick()).retried, 1);
+  const first = await client.deliveryAttempt.findFirstOrThrow({ where: { outboxId: message.id } });
+  assert.equal(first.result, "retry");
+  assert.equal(first.errorCode, "OUTBOUND_UNAVAILABLE");
+  assert.equal(first.endpointHost, "partner.example");
+  await due(message.id);
+  assert.equal((await worker.tick()).delivered, 1);
+  const attempts = await client.deliveryAttempt.findMany({ where: { outboxId: message.id },
+    orderBy: { attemptNo: "asc" } });
+  assert.deepEqual(attempts.map((item) => [item.attemptNo, item.result]), [[1, "retry"], [2, "ack"]]);
+  assert.equal(attempts[1].ackMessageId, payload.messageId);
+  assert.equal((await row(input.aggregateId)).status, "delivered");
 });

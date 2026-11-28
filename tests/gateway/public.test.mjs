@@ -22,7 +22,7 @@ const routesYaml = readFileSync(join(__dirname, "../../deploy/apisix/routes.yaml
 
 describe("public route auth matrix — documented expectations", () => {
   const matrix = [
-    { scenario: "GET /api/v1/public/passport/:token (valid) → 404 (stub, not 200 yet)", method: "GET", path: "/api/v1/public/passport/abc123xyz456", token: "none", expectedApp: 404 },
+    { scenario: "GET /api/v1/public/passport/:token (active) → 200", method: "GET", path: "/api/v1/public/passport/" + "a".repeat(43), token: "none", expectedApp: 200 },
     { scenario: "GET /api/v1/public/passport/:token (invalid format) → 404", method: "GET", path: "/api/v1/public/passport/../secret", token: "none", expectedApp: 404 },
     { scenario: "POST /api/v1/public/passport/:token → 405", method: "POST", path: "/api/v1/public/passport/tok", token: "none", expectedApp: 405 },
     { scenario: "PUT /api/v1/public/passport/:token → 405", method: "PUT", path: "/api/v1/public/passport/tok", token: "none", expectedApp: 405 },
@@ -38,12 +38,30 @@ describe("public route auth matrix — documented expectations", () => {
     });
   }
 });
-
 // ---------------------------------------------------------------------------
 // routes.yaml static assertions for public route
 // ---------------------------------------------------------------------------
 
 describe("routes.yaml public route assertions", () => {
+  it("public evidence bytes go only to Core Data through GET/HEAD with rate limits", () => {
+    const block = routesYaml.split("- id: public-evidence-v1")[1]?.split("\n  - id:")[0];
+    assert.match(block ?? "", /uri:\s*\/api\/v1\/public\/evidence\/\*/);
+    assert.match(block, /methods:\s*\[GET, HEAD\]/);
+    assert.match(block, /core-data:8080/);
+    assert.match(block, /rate:\s*30\b/);
+    assert.match(block, /rejected_code:\s*429\b/);
+    assert.doesNotMatch(block, /openid-connect/);
+  });
+  it("gateway exposes the QR destination and trace UI with bounded methods", () => {
+    const passport = routesYaml.split("- id: erp-passport-ui")[1]?.split("\n  - id:")[0];
+    const trace = routesYaml.split("- id: erp-trace-ui")[1]?.split("\n  - id:")[0];
+    assert.match(passport ?? "", /uri:\s*\/passport\/\*/);
+    assert.match(passport, /methods:\s*\[GET, HEAD\]/);
+    assert.match(passport, /rate:\s*30\b/);
+    assert.match(passport, /rejected_code:\s*429\b/);
+    assert.match(trace ?? "", /uri:\s*\/trace\*/);
+    assert.match(trace, /methods:\s*\[GET, HEAD\]/);
+  });
   it("has public-passport-v1 route", () => {
     assert.ok(routesYaml.includes("public-passport-v1"), "must have public-passport-v1 route");
   });
@@ -70,6 +88,10 @@ describe("routes.yaml public route assertions", () => {
     const idx = routesYaml.indexOf("id: public-passport-v1");
     const block = routesYaml.slice(idx, idx + 800);
     assert.ok(block.includes("limit-req"), "public route must have limit-req");
+    assert.match(block, /rate:\s*30\b/);
+    assert.match(block, /burst:\s*15\b/);
+    assert.match(block, /key:\s*remote_addr\b/);
+    assert.match(block, /rejected_code:\s*429\b/);
   });
 
   it("public-passport-v1 does NOT have openid-connect plugin", () => {
@@ -79,55 +101,5 @@ describe("routes.yaml public route assertions", () => {
     const nextRouteIdx = block.indexOf("- id:", 10);
     const relevantBlock = nextRouteIdx > 0 ? block.slice(0, nextRouteIdx) : block;
     assert.ok(!relevantBlock.includes("openid-connect"), "public route must NOT require OIDC auth");
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Unit test: passport token format validation (mirrors route handler logic)
-// ---------------------------------------------------------------------------
-
-describe("passport token format validation", () => {
-  function isValidTokenFormat(token) {
-    return /^[a-zA-Z0-9_-]{10,128}$/.test(token);
-  }
-
-  it("accepts valid alphanumeric token", () => {
-    assert.ok(isValidTokenFormat("abc123xyz456"));
-  });
-
-  it("accepts token with hyphens and underscores", () => {
-    assert.ok(isValidTokenFormat("token-abc_123-xyz"));
-  });
-
-  it("rejects path traversal attempt", () => {
-    assert.ok(!isValidTokenFormat("../secret"));
-  });
-
-  it("rejects token with spaces", () => {
-    assert.ok(!isValidTokenFormat("token with spaces"));
-  });
-
-  it("rejects too-short token (< 10 chars)", () => {
-    assert.ok(!isValidTokenFormat("short"));
-  });
-
-  it("rejects too-long token (> 128 chars)", () => {
-    assert.ok(!isValidTokenFormat("a".repeat(129)));
-  });
-
-  it("rejects token with SQL injection attempt", () => {
-    assert.ok(!isValidTokenFormat("'; DROP TABLE"));
-  });
-
-  it("rejects token with angle brackets (XSS attempt)", () => {
-    assert.ok(!isValidTokenFormat("<script>alert(1)</script>"));
-  });
-
-  it("accepts 10-char minimum token", () => {
-    assert.ok(isValidTokenFormat("0123456789"));
-  });
-
-  it("accepts 128-char maximum token", () => {
-    assert.ok(isValidTokenFormat("a".repeat(128)));
   });
 });

@@ -22,7 +22,7 @@ test("versioned schema contains platform tables, expected constraints and migrat
   const tables = await migrator.$queryRaw`
     SELECT table_name FROM information_schema.tables
     WHERE table_schema = 'platform' ORDER BY table_name`;
-  assert.deepEqual(tables.map((row) => row.table_name), ["approval_request", "attachment", "audit_log", "core_record", "idempotency_record", "outbox_message"]);
+  assert.deepEqual(tables.map((row) => row.table_name), ["approval_request", "attachment", "audit_log", "core_record", "idempotency_record", "inbound_message", "outbox_message"]);
 
   const columns = await migrator.$queryRaw`
     SELECT table_name, column_name FROM information_schema.columns
@@ -52,6 +52,8 @@ test("versioned schema contains platform tables, expected constraints and migrat
     "schema_version", "payload", "destination", "correlation_id", "status", "attempt_count",
     "next_attempt_at", "lease_owner", "lease_until", "last_error_code", "delivered_at",
   ]);
+  assert.deepEqual(byTable("inbound_message"), ["message_id", "event_type", "issuer_instance_id",
+    "recipient_instance_id", "payload", "payload_hash", "received_at"]);
 
   const constraints = await migrator.$queryRaw`
     SELECT conname FROM pg_constraint
@@ -80,6 +82,22 @@ test("versioned schema contains platform tables, expected constraints and migrat
   assert.ok(migrations.some((row) => row.migration_name === "20261119010000_file_scan_retry"));
   assert.ok(migrations.some((row) => row.migration_name === "20261120000000_platform_delivery_idempotency"));
   assert.ok(migrations.some((row) => row.migration_name === "20261120010000_platform_delivery_outbox"));
+  assert.ok(migrations.some((row) => row.migration_name === "20261124040000_federation_delivery_attempt"));
+  const delivery = await migrator.$queryRaw`
+    SELECT column_name FROM information_schema.columns
+    WHERE table_schema = 'federation' AND table_name = 'delivery_attempt'
+    ORDER BY ordinal_position`;
+  assert.deepEqual(delivery.map((row) => row.column_name), ["id", "created_at", "outbox_id",
+    "attempt_no", "endpoint_host", "http_status", "result", "error_code", "duration_ms",
+    "ack_message_id", "ack_id", "ack_status"]);
+  const deliveryConstraints = await migrator.$queryRaw`
+    SELECT conname FROM pg_constraint WHERE conrelid = 'federation.delivery_attempt'::regclass`;
+  for (const name of ["ck_delivery_attempt_no", "ck_delivery_result", "ck_delivery_ack_fields",
+    "uq_delivery_outbox_attempt"]) assert.ok(deliveryConstraints.some((row) => row.conname === name));
+  const deliveryGrants = await migrator.$queryRaw`
+    SELECT has_table_privilege('app_runtime','federation.delivery_attempt','INSERT') AS app_insert,
+      has_table_privilege('core_data','federation.delivery_attempt','SELECT') AS core_read`;
+  assert.deepEqual(deliveryGrants[0], { app_insert: true, core_read: false });
   const indexes = await migrator.$queryRaw`
     SELECT indexname, indexdef FROM pg_indexes WHERE schemaname = 'platform' AND tablename = 'outbox_message'`;
   assert.match(indexes.find((row) => row.indexname === "outbox_message_due_idx").indexdef,
@@ -93,6 +111,49 @@ test("versioned schema contains platform tables, expected constraints and migrat
   const catalog = await migrator.$queryRaw`
     SELECT to_regclass('catalog.product')::text AS relation`;
   assert.equal(catalog[0].relation, "catalog.product", "P06 creates catalog.product");
+  const trading = await migrator.$queryRaw`
+    SELECT table_name FROM information_schema.tables WHERE table_schema = 'trading' ORDER BY table_name`;
+  assert.deepEqual(trading.map((row) => row.table_name),
+    ["document", "document_line", "issue_source_allocation", "receiving_detail", "sale_detail", "transfer_detail"]);
+  assert.ok(migrations.some((row) => row.migration_name === "20261124040000_issue_source_allocation"));
+  const allocation = await migrator.$queryRaw`
+    SELECT column_name FROM information_schema.columns
+    WHERE table_schema='trading' AND table_name='issue_source_allocation'
+    ORDER BY ordinal_position`;
+  assert.deepEqual(allocation.map((row) => row.column_name),
+    ["id", "issue_line_id", "source_line_id", "quantity"]);
+  assert.ok(migrations.some((row) => row.migration_name === "20261123010000_trading_documents"));
+  assert.ok(migrations.some((row) => row.migration_name === "20261123020000_transfer_active_link"));
+  const transferConstraints = await migrator.$queryRaw`
+    SELECT conname FROM pg_constraint WHERE conrelid='trading.transfer_detail'::regclass`;
+  assert.ok(!transferConstraints.some((row) => row.conname === "uq_trading_transfer_issue"));
+  assert.ok(transferConstraints.some((row) => row.conname === "trg_trading_active_transfer_detail"));
+  const receivingConstraints = await migrator.$queryRaw`
+    SELECT conname FROM pg_constraint WHERE conrelid='trading.receiving_detail'::regclass`;
+  assert.ok(!receivingConstraints.some((row) => row.conname === "uq_trading_receiving_source"));
+  assert.ok(receivingConstraints.some((row) => row.conname === "trg_trading_active_receiving_detail"));
+  assert.ok(migrations.some((row) => row.migration_name === "20261123030000_receiving_active_source"));
+  const saleConstraints = await migrator.$queryRaw`
+    SELECT conname FROM pg_constraint WHERE conrelid='trading.sale_detail'::regclass`;
+  assert.ok(!saleConstraints.some((row) => row.conname === "uq_trading_sale_issue"));
+  assert.ok(saleConstraints.some((row) => row.conname === "trg_trading_active_sale_detail"));
+  const saleDocumentTrigger = await migrator.$queryRaw`
+    SELECT tgname FROM pg_trigger WHERE tgrelid='trading.document'::regclass
+      AND tgname='trg_trading_active_sale_document'`;
+  assert.equal(saleDocumentTrigger.length, 1);
+  assert.ok(migrations.some((row) => row.migration_name === "20261123050000_sale_active_issue"));
+  const tradingConstraints = await migrator.$queryRaw`
+    SELECT conname FROM pg_constraint WHERE conname IN
+      ('batch_id_variant_key','fk_trading_movement_line','fk_trading_approval_document',
+       'fk_trading_line_batch_variant','uq_trading_document_number')`;
+  assert.deepEqual(tradingConstraints.map((row) => row.conname).sort(),
+    ["batch_id_variant_key", "fk_trading_approval_document", "fk_trading_line_batch_variant",
+      "fk_trading_movement_line", "uq_trading_document_number"].sort());
+  const tradingIndexes = await migrator.$queryRaw`
+    SELECT indexname FROM pg_indexes WHERE schemaname='trading' AND indexname IN
+      ('idx_trading_document_status_time','idx_trading_document_type_time',
+       'idx_trading_line_batch_document','idx_trading_transfer_partner','uq_trading_one_active_correction')`;
+  assert.equal(tradingIndexes.length, 5);
 });
 
 test("runtime roles are separate, least privilege and fail closed", async () => {

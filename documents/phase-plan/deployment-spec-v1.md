@@ -40,7 +40,7 @@ Không commit `.env`, realm export có secret, token, DB dump thật, private fi
 | `seaweedfs` S3 | `internal`, volume object riêng | S3 HEAD bucket/upload probe | không console public |
 | `clamav` | `internal`, signature volume | daemon + signature age check | không |
 | `redis` | `internal`, volume tùy use case | PING; mất Redis không mất outbox PG | không |
-| `ai` Python | `internal`, optional profile | `/health`, provider check có timeout | không |
+| `ai` Python + `ollama` | `internal`, optional `ai` profile; model cache volume riêng | adapter `/health` độc lập, `/ready` chỉ pass khi model đã pull; timeout 30 giây | không |
 
 APISIX, Keycloak, Flowable, SeaweedFS, ClamAV có admin/management API chỉ internal. Không publish PG/Redis/etcd/storage/Flowable lên `0.0.0.0`. Test `docker compose config` và inspect `ports`/network; app và core tự verify token, không dựa mỗi gateway.
 
@@ -50,11 +50,11 @@ APISIX, Keycloak, Flowable, SeaweedFS, ClamAV có admin/management API chỉ int
 | --- | --- | --- |
 | `INSTANCE_ID`, `ORG_CODE`, `PUBLIC_BASE_URL`, `GATEWAY_HTTPS_PORT` | mỗi A/B/C | unique, URL HTTPS cho demo Internet, port không trùng |
 | `APP_DATABASE_URL`, `CORE_DATABASE_URL`, `KEYCLOAK_DATABASE_URL`, `FLOWABLE_DATABASE_URL` | app/core cùng **app DB** nhưng role khác; Keycloak và Flowable mỗi bên DB/role riêng | app/core URL khác role, Keycloak/Flowable không trỏ app DB; không log URL credential |
-| `OIDC_ISSUER_URL`, `OIDC_CLIENT_ID_ERP`, `OIDC_CLIENT_ID_DXLAB`, `OIDC_AUDIENCE`, `OIDC_JWKS_URL` | app/gateway | issuer exact, allowed redirect/callback |
+| `OIDC_FRONTEND_URL`, `OIDC_BACKCHANNEL_DYNAMIC`, `OIDC_BASE_URL`, `OIDC_ISSUER_URL`, `OIDC_JWKS_URL`, `OIDC_CLIENT_ID_ERP`, `OIDC_CLIENT_ID_DXLAB`, `OIDC_AUDIENCE` | Keycloak/app/gateway | Browser frontend URL tạo issuer exact; APISIX và app đọc discovery/JWKS qua `OIDC_BASE_URL` private. A/B/C local dùng `127.0.0.1:18080/18081/18082` cho frontend và `keycloak-a/b/c:8080` cho backchannel; `KC_HOSTNAME_BACKCHANNEL_DYNAMIC=true`. Không đưa hostname Docker private vào HTML/iframe cho trình duyệt. Production đặt hostname HTTPS public và route private theo DNS/TLS thực tế. |
 | `PARTNER_OUTBOUND_CLIENT_ID`, `PARTNER_OUTBOUND_SECRET_REF`, `PARTNER_OUTBOUND_TOKEN_URL`, `PARTNER_OUTBOUND_AUDIENCE`, `PARTNER_INBOUND_CLIENT_ID` | từng connection/bootstrap; mapping ở `system.partner_connection` | chiều outbound lấy token từ realm receiver, chiều inbound map client do realm local cấp; secret external, scope tối thiểu; không đưa secret vào env example |
 | `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET_QUARANTINE`, `S3_BUCKET_PRIVATE`, `S3_BUCKET_PUBLIC`, `S3_SECRET_REF` | core API | bucket/namespace riêng, least privilege |
 | `FLOWABLE_BASE_URL`, `FLOWABLE_AUTH_REF`, `FLOWABLE_PROCESS_KEY` | worker/app | URL nội bộ, process definition tồn tại |
-| `REDIS_URL`, `AI_BASE_URL`, `AI_PROVIDER`, `AI_KEY_REF` | theo profile | Redis không là source of truth, AI optional/fail isolated |
+| `REDIS_URL`, `AI_BASE_URL`, `AI_PROVIDER`, `AI_MODEL`, `AI_MODEL_BASE_URL`, `AI_INTERNAL_TOKEN`, `AI_REQUEST_TIMEOUT_SECONDS`, `AI_MAX_OUTPUT_TOKENS` | theo profile | Redis không là source of truth; AI mặc định `none`, provider `ollama` chỉ nội bộ, token ngoài Git, ERP/trace hoạt động khi AI tắt; D09 quy định quota và fallback |
 
 Biến thực tế có thể được nhóm đặt tên khác theo code, nhưng bảng mapping trong `.env.example` phải đầy đủ. Config parser fail-fast nếu thiếu URL/issuer/secret ref; output lỗi chỉ tên biến, không giá trị. Test một trường hợp thiếu/sai cho mỗi nhóm.
 
@@ -68,7 +68,7 @@ docker compose -f deploy/compose.yml --env-file deploy/instances/a.env -p nexora
 docker compose -f deploy/compose.yml --env-file deploy/instances/a.env -p nexora-a ps
 ```
 
-Lặp tương tự B/C với project name/port/volume/realm/credential khác. Script reset chỉ chấp nhận `DEMO_ONLY=true` và project name allowlist `nexora-a|b|c`; không xóa volume production. CI stages: install/lint/typecheck/build → migration empty+upgrade → PG integration → gateway/Keycloak/Flowable/storage/scan → A/B/C federation + Playwright → license/secret scan → image digest/SBOM release. Fail gate nếu stage bắt buộc chưa có.
+P09-T01 dùng `-p nexora-a|nexora-b|nexora-c` và `deploy/abc-topology.md` cho ba project. Các instance có cluster PostgreSQL, Docker network/volume, issuer Keycloak `keycloak-a/b/c`, file APISIX render và cổng host riêng. Script reset chỉ chấp nhận `DEMO_ONLY=true` và project name allowlist `nexora-a|b|c`; không xóa volume production. CI stages: install/lint/typecheck/build → migration empty+upgrade → PG integration → gateway/Keycloak/Flowable/storage/scan → A/B/C federation + Playwright → license/secret scan → image digest/SBOM release. Fail gate nếu stage bắt buộc chưa có.
 
 ## Health, backup và GitOps
 

@@ -34,14 +34,16 @@ Các mục chấm 50 điểm PoF (Point of Failure) và 50 điểm sản phẩm 
 
 ## 3. Bốn nguyên lý kỹ thuật ở mục 4 đề thi
 
-| Nguyên lý | Minh chứng tối thiểu đề xuất | Điều không được tuyên bố quá mức |
-| --- | --- | --- |
-| Vòng đời/tốc độ dữ liệu | PG xử lý OLTP; sau commit xuất event lịch sử có checksum, version và source IDs sang object storage ở định dạng truy vấn được; truy vấn D/report từ projection/archived data không chặn confirm | Không gọi một JSON export chưa được truy vấn là lakehouse hoàn chỉnh |
-| Hội tụ IT/OT | Nhận một luồng scanner/temperature simulated có timestamp, device ID và lot; validate, lưu evidence, tạo trace/alert liên quan đến giao nhận và lot digital representation có lag; hiển thị bên cạnh event ERP | Không gọi dữ liệu giả là sensor production hoặc digital twin toàn diện |
-| Dòng dữ liệu/lineage/chất lượng | Mỗi projection/Passport/report ghi source event IDs, transform/policy version, thời điểm, status verified/partner-asserted/missing; test dữ liệu sai/out-of-order | Không suy diễn rằng partner-asserted là chứng nhận độc lập |
-| Zero-trust + GitOps/kiểm dịch | Gateway OIDC, scope, default deny, scan upload, network isolation; cấu hình triển khai trong Git, một môi trường GitOps reconcile drift nếu D12 chốt yêu cầu nghiêm ngặt | Compose + CI thuần túy không được gọi là GitOps controller |
+SoT minh chứng P12: [`../adr/D11-dxos-proof.md`](../adr/D11-dxos-proof.md) (P12-T01). Pin đo tài nguyên: [`../adr/0011-four-principles-proof.md`](../adr/0011-four-principles-proof.md).
 
-Nhóm cần kiểm tra với BTC mức mong đợi của bốn nguyên lý. Nếu BTC yêu cầu hạ tầng tham chiếu đầy đủ hơn, ghi thay đổi scope/ADR và thêm gate trước release; không tự đánh dấu đạt bằng lập luận trên giấy.
+| Nguyên lý | Phase task | Minh chứng tối thiểu đề xuất | Artifact / lệnh (hiện có → P12) | Điều không được tuyên bố quá mức |
+| --- | --- | --- | --- | --- |
+| Vòng đời/tốc độ dữ liệu | P12-T02, T07 | PG OLTP; sau commit archive event checksum/version/source IDs; report không chặn confirm | `workers/archive-export.ts`, `archive_manifest`, verified `archive-query.mjs` và unit failure checks có trong source; chờ live worker restart/corruption rebuild trên image Phase 12 | Không gọi JSONL archive là lakehouse |
+| Hội tụ IT/OT | P12-T03 | Scanner/temperature **simulated** + device allowlist → `ot_reading`; UI D cạnh event ERP | Gateway `POST /api/v1/ot/readings`, simulator OIDC, device allowlist và unit checks có trong source; chờ deploy/rehearsal stale/offline/UI | Không gọi simulator là sensor production / digital twin |
+| Dòng dữ liệu/lineage/chất lượng | P12-T04 | source IDs + policy/transform version; `quality_issue` 6 rules; partner_asserted ≠ verified | Migration và Admin quality API đã có trong source; DB demo mới áp dụng 31/32 migration khi kiểm tra 2026-11-28, chờ live quality workflow | Không suy partner-asserted thành chứng nhận độc lập |
+| Zero-trust + GitOps/kiểm dịch | P12-T05…T08 | Gateway OIDC/default deny, ClamAV fail-closed, backup/restore; GitOps **controller** nếu đủ tài nguyên | Có security matrix, observability profile và post-restore asserts; fresh-project restore, live Phase 12 và GitOps controller/BTC alternate còn mở (D12) | Compose + CI ≠ GitOps controller |
+
+Nhóm cần kiểm tra với BTC mức mong đợi của bốn nguyên lý (mục follow-up trong `D11-dxos-proof.md`). Nếu BTC yêu cầu hạ tầng tham chiếu đầy đủ hơn, ghi thay đổi scope/ADR và thêm gate trước release; không tự đánh dấu đạt bằng lập luận trên giấy.
 
 ## 4. Cấp kiểm thử và failure matrix
 
