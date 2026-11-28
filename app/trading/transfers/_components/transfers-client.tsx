@@ -99,7 +99,7 @@ export function TransfersClient({ id, creating = false }: { id?: string; creatin
     row.announcement?.status === "retry_due" ? "Đang chờ thử lại" :
       row.deliveryState === "technical_ack" || row.announcement?.status === "delivered"
         ? "Đã ACK kỹ thuật · chờ nhận hàng" : row.status === "confirmed" ? "Đang chờ gửi" : "Chưa gửi";
-  return <main className="mx-auto max-w-5xl space-y-6 p-6">
+  return <main className="mx-auto max-w-5xl space-y-6">
     <h1 className="text-2xl font-semibold">Chuyển hàng cho đối tác</h1>
     <nav className="flex gap-4"><Link href="/trading/issues">Issue</Link><Link href="/trading/transfers">Transfers</Link>
       <Link href="/trading/transfers/create">Tạo transfer</Link></nav>

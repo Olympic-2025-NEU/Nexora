@@ -28,7 +28,7 @@ const owner = new PrismaClient({ datasources: { db: { url: process.env.OWNER_DAT
 const db = getPrismaClient();
 const warehouseId = randomUUID(), productId = randomUUID(), variantId = randomUUID(), batchId = randomUUID();
 const stockUomId = "aaaaaaaa-0001-4000-8000-000000000001";
-const actor: Actor = { userId: "conformance-creator", organizationId: "fixture-org", roles: ["staff"], unitIds: [warehouseId] };
+const actor: Actor = { userId: "conformance-creator", organizationId: "fixture-org", roles: ["inventory_clerk"], unitIds: [warehouseId] };
 process.env.NEXORA_ISSUER_INSTANCE_ID = "local-instance";
 let partnerId = "";
 const line = (quantity: string, batch = batchId) => ({ warehouseId, productVariantId: variantId, batchId: batch, quantity, uomId: stockUomId });
@@ -47,10 +47,11 @@ before(async () => {
     VALUES (${randomUUID()}::uuid,${variantId}::uuid,${stockUomId}::uuid,true,1)`;
   await owner.$executeRaw`INSERT INTO catalog.batch(id,product_id,product_variant_id,local_code,origin_issuer_instance_id,origin_lot_id,quality_status,created_by_sub)
     VALUES (${batchId}::uuid,${productId}::uuid,${variantId}::uuid,${randomUUID()},'issuer',${randomUUID()}::uuid,'available','fixture')`;
-  for (const [sub, role] of [[actor.userId, "staff"], ["fixture-approver", "approver"]]) {
+  for (const [sub, role] of [[actor.userId, "inventory_clerk"], ["fixture-approver", "issue_approver"]]) {
     const member = (await owner.membership.findUnique({ where: { keycloakSub: sub } })) ??
       (await owner.membership.create({ data: {
         id: randomUUID(), organizationId: org.id, keycloakSub: sub, displayName: sub, role, status: "active",
+        roles: { create: [{ role }] },
       } }));
     await owner.membershipWarehouse.create({ data: { membershipId: member.id, warehouseId } })
       .catch(() => {});
@@ -128,7 +129,7 @@ async function approve(id: string) {
   const row = await db.approvalRequest.findUniqueOrThrow({ where: { documentId: id } });
   const task = (await engine.queryTasks({ processInstanceId: row.flowableProcessId! }))[0]!;
   const resolver = async (sub: string) => ({ sub, active: true,
-    role: sub === "fixture-approver" ? "approver" : "staff", warehouseIds: [warehouseId] });
+    role: sub === "fixture-approver" ? "issue_approver" : "inventory_clerk", warehouseIds: [warehouseId] });
   const intent = await db.$transaction((tx) => recordDecisionIntent(tx, resolver, {
     approvalRequestId: row.id, actorSub: "fixture-approver", decision: "approved",
     flowableTaskId: task.id, expectedVersion: row.version,

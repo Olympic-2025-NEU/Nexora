@@ -9,7 +9,12 @@ import {
   parseIfMatchVersion,
   projectMember,
 } from "@/contexts/system/application/http";
-import { isMembershipRole, type MembershipRole } from "@/contexts/system/domain/types";
+import {
+  expandLegacyMembershipRole,
+  isMembershipRole,
+  normalizeMembershipRoles,
+  type MembershipRole,
+} from "@/contexts/system/domain/types";
 import { keycloakAdmin, resolveUserActor, systemAuditRecorder } from "@/composition/system";
 import { createInventoryRepos } from "@/contexts/inventory/infrastructure/prisma-repos";
 import {
@@ -20,6 +25,28 @@ import { DomainError } from "@/platform/kernel/errors";
 import { isUuid } from "@/contexts/catalog/application/http";
 
 type Params = { params: Promise<{ id: string }> };
+
+function parseOptionalRoles(body: Record<string, unknown>): MembershipRole[] | undefined {
+  if (body.roles === undefined && body.role === undefined) return undefined;
+  if (Array.isArray(body.roles)) {
+    const roles = normalizeMembershipRoles(
+      body.roles.filter((r): r is string => typeof r === "string"),
+    );
+    if (roles.length === 0) throw new DomainError("INVALID_ROLE", 422);
+    return roles;
+  }
+  if (typeof body.role === "string") {
+    const expanded = expandLegacyMembershipRole(body.role);
+    const roles = normalizeMembershipRoles(
+      expanded.length > 0 ? expanded : [body.role],
+    );
+    if (roles.length === 0 || !roles.every(isMembershipRole)) {
+      throw new DomainError("INVALID_ROLE", 422);
+    }
+    return roles;
+  }
+  throw new DomainError("INVALID_ROLE", 422);
+}
 
 export async function PATCH(request: NextRequest, context: Params): Promise<Response> {
   const requestId = request.headers.get("x-request-id") ?? crypto.randomUUID();
@@ -32,9 +59,7 @@ export async function PATCH(request: NextRequest, context: Params): Promise<Resp
     const body = (await request.json()) as Record<string, unknown>;
     const warehouseIds =
       body.warehouseIds !== undefined ? parseWarehouseIds(body.warehouseIds) : undefined;
-    if (body.role !== undefined && (typeof body.role !== "string" || !isMembershipRole(body.role))) {
-      throw new DomainError("INVALID_ROLE", 422);
-    }
+    const nextRoles = parseOptionalRoles(body);
     if (
       body.status !== undefined &&
       body.status !== "active" &&
@@ -77,26 +102,23 @@ export async function PATCH(request: NextRequest, context: Params): Promise<Resp
           const before = await repos.findMembershipById(id);
           if (!before) throw new DomainError("MEMBER_NOT_FOUND", 404);
 
-          const nextRole =
-            typeof body.role === "string" ? (body.role as typeof before.role) : before.role;
+          const rolesAfter = nextRoles ?? before.roles;
           const nextStatus =
             typeof body.status === "string"
               ? (body.status as typeof before.status)
               : before.status;
 
-          const demotingLastAdmin =
-            before.role === "administrator" &&
-            before.status === "active" &&
-            (nextRole !== "administrator" || nextStatus === "disabled");
-          if (demotingLastAdmin) {
+          const wasAdmin =
+            before.roles.includes("administrator") && before.status === "active";
+          const staysAdmin =
+            rolesAfter.includes("administrator") && nextStatus === "active";
+          if (wasAdmin && !staysAdmin) {
             const admins = await repos.countActiveAdministrators();
             if (admins <= 1) throw new DomainError("LAST_ADMIN_PROTECTED", 409);
           }
 
           const updated = await repos.updateMembership(id, expectedVersion, {
-            ...(body.role !== undefined
-              ? { role: body.role as MembershipRole }
-              : {}),
+            ...(nextRoles ? { roles: nextRoles } : {}),
             ...(body.status !== undefined
               ? { status: body.status as "active" | "disabled" }
               : {}),
@@ -116,7 +138,7 @@ export async function PATCH(request: NextRequest, context: Params): Promise<Resp
 
           let scope = updated.warehouseIds ?? [];
           const changed: string[] = ["version"];
-          if (body.role !== undefined) changed.push("role");
+          if (nextRoles) changed.push("roles");
           if (body.status !== undefined) changed.push("status");
           if (typeof body.displayName === "string") changed.push("displayName");
           if (body.email === null || typeof body.email === "string") changed.push("email");
@@ -140,6 +162,7 @@ export async function PATCH(request: NextRequest, context: Params): Promise<Resp
             requestId: ctx.requestId,
             before: {
               role: before.role,
+              roles: before.roles,
               status: before.status,
               version: before.version,
               warehouseIds: before.warehouseIds ?? [],
@@ -147,6 +170,7 @@ export async function PATCH(request: NextRequest, context: Params): Promise<Resp
             },
             after: {
               role: updated.role,
+              roles: updated.roles,
               status: updated.status,
               version: updated.version,
               warehouseIds: scope,
@@ -159,10 +183,9 @@ export async function PATCH(request: NextRequest, context: Params): Promise<Resp
       },
     );
 
-    // Best-effort IdP sync after DB commit (DB remains source of truth for app authz).
     const kc = keycloakAdmin();
-    if (body.role !== undefined) {
-      await kc.replaceRealmRoles(data.keycloakSub, data.role as MembershipRole);
+    if (nextRoles) {
+      await kc.replaceRealmRoles(data.keycloakSub, data.roles);
     }
     if (body.status === "disabled") {
       await kc.setEnabled(data.keycloakSub, false);

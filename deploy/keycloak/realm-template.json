@@ -15,9 +15,13 @@
   "roles": {
     "realm": [
       { "name": "administrator" },
-      { "name": "staff" },
-      { "name": "approver" },
-      { "name": "viewer" }
+      { "name": "catalog_manager" },
+      { "name": "inventory_clerk" },
+      { "name": "sales_clerk" },
+      { "name": "stocktake_clerk" },
+      { "name": "issue_approver" },
+      { "name": "quality_officer" },
+      { "name": "auditor" }
     ]
   },
 

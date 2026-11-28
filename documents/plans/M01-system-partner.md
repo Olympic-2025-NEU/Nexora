@@ -50,9 +50,9 @@ Canonical routes (ADR 0016 / `documents/requirements/SRS-UI-surfaces.md`):
 
 - `/admin/organization` — hồ sơ doanh nghiệp
 - `/admin/members` — danh sách member / gán `administrator|staff|approver|viewer`
-- `/partners` — danh sách federated partner + form kết nối (URL, client id, secret **reference**)
+- `/partners` — hub kết nối đối tác: CRUD Partner (modal) + liên kết (modal) + theo dõi gửi/nhận; một thực thể Partner, không tách master NCC/KH (vai trò theo chiều xuất–nhận — `BRD-partner-link.md` §1.1)
 
-`/admin` is **system-only** (org/members). Do not place catalog/inventory under `/admin`. Legacy `/admin/partners` redirects to `/partners`.
+`/admin` is **system-only** (org/members). Do not place catalog/inventory under `/admin`. Legacy `/admin/partners`, `/admin/federation`, `/partners/new`, `/partners/[id]` redirect to `/partners`.
 
 ## 7. Kiểm thử tối thiểu
 

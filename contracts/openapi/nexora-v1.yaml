@@ -7629,9 +7629,18 @@ components:
           format: uuid
         buyerRef:
           type: string
+          description: Opaque external buyer code (max 64). Not a display name or PII.
         soldAt:
           type: string
           format: date-time
+        sellerMembershipId:
+          type: string
+          format: uuid
+          description: Active membership (administrator|staff) who recorded the sale.
+        customerPartnerId:
+          type: string
+          format: uuid
+          description: Optional active partner; walk-in sales omit this.
     ReceiptPatch:
       type: object
       additionalProperties: false

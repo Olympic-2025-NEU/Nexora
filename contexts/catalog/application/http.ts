@@ -11,6 +11,7 @@ import type {
   CategoryRecord,
   PriceListItemRecord,
   PriceListRecord,
+  ProductImageRecord,
   ProductListItem,
   ProductRecord,
   ProductVariantRecord,
@@ -125,8 +126,15 @@ export function projectProduct(product: ProductRecord | ProductListItem) {
     ...(typeof list.variantCount === "number"
       ? {
           variantCount: list.variantCount,
+          primaryVariantId: list.primaryVariantId ?? null,
           primarySku: list.primarySku,
           primaryBarcode: list.primaryBarcode,
+          baseUomId: list.baseUomId ?? null,
+          baseUomName: list.baseUomName,
+          pricePurchase: list.pricePurchase,
+          priceRetail: list.priceRetail,
+          priceWholesale: list.priceWholesale,
+          primaryImageAttachmentId: list.primaryImageAttachmentId ?? null,
         }
       : {}),
   };
@@ -142,6 +150,18 @@ export function projectVariant(variant: ProductVariantRecord) {
     isActive: variant.isActive,
     deletedAt: variant.deletedAt,
     version: variant.version,
+  };
+}
+
+export function projectProductImage(image: ProductImageRecord) {
+  return {
+    id: image.id,
+    productId: image.productId,
+    attachmentId: image.attachmentId,
+    sortOrder: image.sortOrder,
+    isPrimary: image.isPrimary,
+    createdAt: image.createdAt,
+    updatedAt: image.updatedAt,
   };
 }
 

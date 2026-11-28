@@ -62,7 +62,7 @@ const staffActor: Actor = {
   userId: SEED.devStaff,
   organizationId: "nexora-a",
   unitIds: [SEED.warehouseA],
-  roles: ["staff"],
+  roles: ["inventory_clerk"],
   displayName: SEED.devStaff,
 };
 

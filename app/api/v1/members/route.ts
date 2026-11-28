@@ -11,7 +11,12 @@ import {
   ok,
   projectMember,
 } from "@/contexts/system/application/http";
-import { isMembershipRole } from "@/contexts/system/domain/types";
+import {
+  expandLegacyMembershipRole,
+  isMembershipRole,
+  normalizeMembershipRoles,
+  type MembershipRole,
+} from "@/contexts/system/domain/types";
 import { keycloakAdmin, resolveUserActor, systemAuditRecorder } from "@/composition/system";
 import { createInventoryRepos } from "@/contexts/inventory/infrastructure/prisma-repos";
 import {
@@ -19,6 +24,27 @@ import {
   parseWarehouseIds,
 } from "@/contexts/inventory/application/warehouse-scope";
 import { DomainError } from "@/platform/kernel/errors";
+
+function parseRolesBody(body: Record<string, unknown>): MembershipRole[] {
+  if (Array.isArray(body.roles)) {
+    const roles = normalizeMembershipRoles(
+      body.roles.filter((r): r is string => typeof r === "string"),
+    );
+    if (roles.length === 0) throw new DomainError("INVALID_ROLE", 422);
+    return roles;
+  }
+  if (typeof body.role === "string") {
+    const expanded = expandLegacyMembershipRole(body.role);
+    const roles = normalizeMembershipRoles(
+      expanded.length > 0 ? expanded : [body.role],
+    );
+    if (roles.length === 0 || !roles.every(isMembershipRole)) {
+      throw new DomainError("INVALID_ROLE", 422);
+    }
+    return roles;
+  }
+  throw new DomainError("INVALID_ROLE", 422);
+}
 
 export async function GET(request: NextRequest): Promise<Response> {
   const requestId = request.headers.get("x-request-id");
@@ -30,7 +56,7 @@ export async function GET(request: NextRequest): Promise<Response> {
     const status = request.nextUrl.searchParams.get("status") ?? undefined;
     if (role && !isMembershipRole(role)) throw new DomainError("INVALID_ROLE", 422);
     const rows = await createSystemRepos(getPrismaClient()).listMemberships({
-      role: role as "administrator" | "staff" | "approver" | "viewer" | undefined,
+      role: role as MembershipRole | undefined,
       status: status as "invited" | "active" | "disabled" | undefined,
     });
     return ok(rows.map(projectMember), requestId);
@@ -40,9 +66,8 @@ export async function GET(request: NextRequest): Promise<Response> {
 }
 
 /**
- * Admin invite: provision (or reuse) Keycloak user by username, then insert membership.
- * Body: { username, displayName, email?, role, warehouseIds?, temporaryPassword? }
- * Do not send keycloakSub — IdP allocates / resolves the sub.
+ * Admin invite: provision Keycloak user by username, then insert membership.
+ * Body: { username, displayName, email?, roles[] | role, warehouseIds?, temporaryPassword? }
  */
 export async function POST(request: NextRequest): Promise<Response> {
   const requestId = request.headers.get("x-request-id") ?? crypto.randomUUID();
@@ -57,28 +82,24 @@ export async function POST(request: NextRequest): Promise<Response> {
     if (typeof body.displayName !== "string" || !body.displayName.trim()) {
       throw new DomainError("DISPLAY_NAME_REQUIRED", 422);
     }
-    if (typeof body.role !== "string" || !isMembershipRole(body.role)) {
-      throw new DomainError("INVALID_ROLE", 422);
-    }
     if (body.keycloakSub !== undefined) {
       throw new DomainError("KEYCLOAK_SUB_NOT_ALLOWED", 422);
     }
+    const roles = parseRolesBody(body);
     const warehouseIds = parseWarehouseIds(body.warehouseIds);
     const username = body.username.trim();
     const displayName = body.displayName.trim();
     const email = typeof body.email === "string" ? body.email.trim() : null;
-    const role = body.role as "administrator" | "staff" | "approver" | "viewer";
     const temporaryPassword =
       typeof body.temporaryPassword === "string" && body.temporaryPassword.trim()
         ? body.temporaryPassword.trim()
         : undefined;
 
-    // External IdP I/O stays outside the DB transaction.
     const provisioned = await keycloakAdmin().provisionUser({
       username,
       displayName,
       email,
-      role,
+      roles,
       temporaryPassword,
     });
 
@@ -96,7 +117,7 @@ export async function POST(request: NextRequest): Promise<Response> {
         payload: {
           username,
           displayName,
-          role,
+          roles,
           email: email ? "[redacted]" : null,
           keycloakSub: "[redacted]",
           keycloakCreated: provisioned.created,
@@ -117,7 +138,7 @@ export async function POST(request: NextRequest): Promise<Response> {
             keycloakSub: provisioned.keycloakSub,
             displayName,
             email,
-            role,
+            roles,
             status: "active",
           });
           await assertActiveWarehouses(ctx.tx, warehouseIds);
@@ -137,11 +158,12 @@ export async function POST(request: NextRequest): Promise<Response> {
             after: {
               status: created.status,
               role: created.role,
+              roles: created.roles,
               version: created.version,
               warehouseIds: scope,
               warehouseCount: scope.length,
               keycloakCreated: provisioned.created,
-              changedFields: ["role", "status", "version", "warehouseIds"],
+              changedFields: ["roles", "status", "version", "warehouseIds"],
             },
           });
           return { ...created, warehouseIds: scope };

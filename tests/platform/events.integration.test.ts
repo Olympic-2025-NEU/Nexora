@@ -37,8 +37,8 @@ const dispatch = (handlers = buildHandlerMap(), maxAttempts = 8) =>
 
 function command(domain: CommandOptions<{ id: string }>["domain"]) {
   return runCommand({ requestId: randomUUID() }, {
-    authenticate: async () => ({ userId: "events-user", organizationId: "test-org", unitIds: [], roles: ["staff"] }),
-    resolveTenant: async () => "test-org", action: "trading:goods-issue:create",
+    authenticate: async () => ({ userId: "events-user", organizationId: "test-org", unitIds: [], roles: ["inventory_clerk"] }),
+    resolveTenant: async () => "test-org", action: "trading:issue:create",
     unitOfWork: () => createTransaction(client), domain,
   });
 }

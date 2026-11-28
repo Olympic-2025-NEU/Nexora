@@ -21,8 +21,17 @@ export type ProductRecord = {
 /** List projection with variant summary for index UI. */
 export type ProductListItem = ProductRecord & {
   variantCount: number;
+  primaryVariantId: string | null;
   primarySku: string | null;
   primaryBarcode: string | null;
+  /** Base UOM id / display name (from attributes.baseUomId or stock-keeping UOM). */
+  baseUomId: string | null;
+  baseUomName: string | null;
+  pricePurchase: string | null;
+  priceRetail: string | null;
+  priceWholesale: string | null;
+  /** Primary (or first) product image attachment for list thumbnails. */
+  primaryImageAttachmentId: string | null;
 };
 
 export type ProductVariantRecord = {
@@ -35,6 +44,17 @@ export type ProductVariantRecord = {
   deletedAt: string | null;
   version: number;
   createdBySub: string;
+};
+
+export type ProductImageRecord = {
+  id: string;
+  productId: string;
+  attachmentId: string;
+  sortOrder: number;
+  isPrimary: boolean;
+  deletedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type CategoryRecord = {

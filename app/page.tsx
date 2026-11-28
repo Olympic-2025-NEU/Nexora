@@ -43,10 +43,10 @@ export default function Home() {
         {signedIn ? (
           <>
             <Button asChild size="lg">
-              <Link href="/admin">{t("home.ctaAdmin")}</Link>
+              <Link href="/dashboard">{t("home.ctaDashboard")}</Link>
             </Button>
             <Button asChild size="lg" variant="outline">
-              <Link href="/catalog/products">{t("home.ctaCatalog")}</Link>
+              <Link href="/products">{t("home.ctaCatalog")}</Link>
             </Button>
           </>
         ) : (

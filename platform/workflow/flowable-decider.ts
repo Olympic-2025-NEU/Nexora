@@ -57,7 +57,7 @@ export function createFlowableDecider(db: PrismaClient, engine: FlowableClient, 
         await haltApproval(db, row, "DECISION_CONFLICT"); return true;
       }
       const actor = await resolveActor(row.decisionRequestedBySub);
-      if (!hasScope(actor, row.warehouseIds, "approver") || actor?.sub === row.creatorSub) {
+      if (!hasScope(actor, row.warehouseIds, "issue_approver") || actor?.sub === row.creatorSub) {
         await transitionAudited(db, row.id, ["decision_pending"], "pending", {
           decisionIntent: null, decisionIntentReason: null, decisionRequestedBySub: null,
           decisionRequestedAt: null, flowableTaskId: null,

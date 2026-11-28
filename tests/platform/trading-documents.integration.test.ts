@@ -40,7 +40,7 @@ const emptyBatchId = randomUUID();
 const stockUomId = "aaaaaaaa-0001-4000-8000-000000000001";
 const packUomId = randomUUID();
 const orgId = randomUUID();
-const actor: Actor = { userId: "receipt-creator", organizationId: "fixture-org", roles: ["staff"], unitIds: [warehouseId] };
+const actor: Actor = { userId: "receipt-creator", organizationId: "fixture-org", roles: ["inventory_clerk"], unitIds: [warehouseId] };
 process.env.NEXORA_ISSUER_INSTANCE_ID = "local-instance";
 const partnerId = randomUUID();
 const line = (quantity: string, uomId = stockUomId) => ({ warehouseId, productVariantId: variantId, batchId, quantity, uomId });
@@ -65,9 +65,10 @@ before(async () => {
     VALUES (${batchId}::uuid,${productId}::uuid,${variantId}::uuid,${randomUUID()},'issuer',${randomUUID()}::uuid,'available','fixture')`;
   await owner.$executeRaw`INSERT INTO catalog.batch(id,product_id,product_variant_id,local_code,origin_issuer_instance_id,origin_lot_id,quality_status,created_by_sub)
     VALUES (${emptyBatchId}::uuid,${productId}::uuid,${variantId}::uuid,${randomUUID()},'issuer',${randomUUID()}::uuid,'available','fixture')`;
-  for (const [sub, role] of [[actor.userId, "staff"], ["fixture-approver", "approver"]]) {
+  for (const [sub, role] of [[actor.userId, "inventory_clerk"], ["fixture-approver", "issue_approver"]]) {
     const member = await owner.membership.create({ data: {
       id: randomUUID(), organizationId: orgId, keycloakSub: sub, displayName: sub, role, status: "active",
+      roles: { create: [{ role }] },
     } });
     await owner.membershipWarehouse.create({ data: { membershipId: member.id, warehouseId } });
   }
@@ -354,7 +355,7 @@ async function approve(id: string, decision: "approved" | "rejected" = "approved
   const row = await db.approvalRequest.findUniqueOrThrow({ where: { documentId: id } });
   const task = (await engine.queryTasks({ processInstanceId: row.flowableProcessId! }))[0]!;
   const resolver = async (sub: string) => ({ sub, active: true,
-    role: sub === "fixture-approver" ? "approver" : "staff", warehouseIds: [warehouseId] });
+    role: sub === "fixture-approver" ? "issue_approver" : "inventory_clerk", warehouseIds: [warehouseId] });
   if (decision === "approved") {
     await assert.rejects(db.$transaction((tx) => recordDecisionIntent(tx, resolver, {
       approvalRequestId: row.id, actorSub: actor.userId, decision, flowableTaskId: task.id,
@@ -705,7 +706,7 @@ test("cancel supersedes an unsent decision intent", { timeout: 120_000 }, async 
   await createFlowableStarter(db, engine)(requested as OutboxMessage);
   const row = await db.approvalRequest.findUniqueOrThrow({ where: { documentId: doc.id } });
   const task = (await engine.queryTasks({ processInstanceId: row.flowableProcessId! }))[0]!;
-  const resolver = async (sub: string) => ({ sub, active: true, role: "approver", warehouseIds: [warehouseId] });
+  const resolver = async (sub: string) => ({ sub, active: true, roles: ["issue_approver"], warehouseIds: [warehouseId] });
   const intent = await db.$transaction((tx) => recordDecisionIntent(tx, resolver, {
     approvalRequestId: row.id, actorSub: "fixture-approver", decision: "approved",
     flowableTaskId: task.id, expectedVersion: row.version,
@@ -741,7 +742,7 @@ test("engine outage preserves submit and intent; recovery converges without stoc
   await createFlowableStarter(db, engine)(request as OutboxMessage);
   await reconcileApproval(db, engine, row.id, applyApprovalResult);
   const pending = await db.approvalRequest.findUniqueOrThrow({ where: { id: row.id } });
-  const resolver = async (sub: string) => ({ sub, active: true, role: "approver", warehouseIds: [warehouseId] });
+  const resolver = async (sub: string) => ({ sub, active: true, roles: ["issue_approver"], warehouseIds: [warehouseId] });
   const intent = await db.$transaction((tx) => recordDecisionIntent(tx, resolver, {
     approvalRequestId: row.id, actorSub: "fixture-approver", decision: "approved",
     flowableTaskId: pending.flowableTaskId!, expectedVersion: pending.version,
@@ -793,7 +794,7 @@ test("isolated engine upgrade keeps v1 and v2 decisions bound to their own issue
   const second = await make();
   assert.equal(second.row.flowableDefinitionVersion, 2);
   const inbox = await approvalInbox({ userId: "fixture-approver", organizationId: "fixture-org",
-    roles: ["approver"], unitIds: [warehouseId] });
+    roles: ["issue_approver"], unitIds: [warehouseId] });
   assert.ok([first, second].every(({ row }) => inbox.some((item) => item.approvalRequestId === row.id)));
   for (const { doc, row } of [first, second]) {
     const history = await engine.getHistory(row.flowableProcessId!);

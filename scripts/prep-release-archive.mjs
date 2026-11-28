@@ -47,12 +47,16 @@ const sha256 = createHash("sha256").update(readFileSync(tarPath)).digest("hex");
 const sumPath = resolve(outDir, `${base}.tar.gz.sha256`);
 writeFileSync(sumPath, `${sha256}  ${base}.tar.gz\n`, "utf8");
 
+const pkg = JSON.parse(readFileSync(resolve(nexoraRoot, "package.json"), "utf8"));
+const appVersion = typeof pkg.version === "string" && pkg.version ? pkg.version : "0.1.0";
+
 const meta = {
   createdAt: new Date().toISOString(),
   stamp,
   branch,
   commit,
   short,
+  appVersion,
   archive: tarPath,
   sha256,
   bytes: statSync(tarPath).size,
@@ -72,7 +76,7 @@ const meta = {
     migrator: "sha256:37a9ccf30a02622cad97a5796f8a7b482d04e69c856f406acddf54b4b50a44b5",
   },
   tagStatus:
-    "NOT_CREATED — confirm name with owner (suggested: v0.13.0-contest or contest-2026-p13)",
+    `NOT_CREATED — confirm with owner (product semver tag: v${appVersion}; contest aliases still optional)`,
 };
 writeFileSync(resolve(outDir, `${base}.meta.json`), `${JSON.stringify(meta, null, 2)}\n`);
 console.log(JSON.stringify({ result: "PASS", ...meta }, null, 2));

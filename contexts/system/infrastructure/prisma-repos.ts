@@ -11,6 +11,10 @@ import type {
   PartnerRecord,
   PartnerStatus,
 } from "../domain/types";
+import {
+  normalizeMembershipRoles,
+  primaryMembershipRole,
+} from "../domain/types";
 
 type Db = PrismaClient | Prisma.TransactionClient;
 
@@ -50,21 +54,44 @@ function mapMember(row: {
   status: string;
   version: number;
   warehouses?: { warehouseId: string }[];
+  roles?: { role: string }[];
 }): MembershipRecord {
+  const roles =
+    row.roles && row.roles.length > 0
+      ? normalizeMembershipRoles(row.roles.map((r) => r.role))
+      : normalizeMembershipRoles([row.role]);
   return {
     id: row.id,
     organizationId: row.organizationId,
     keycloakSub: row.keycloakSub,
     displayName: row.displayName,
     email: row.email,
-    role: row.role as MembershipRole,
+    role: (roles[0] ?? row.role) as MembershipRole,
+    roles,
     status: row.status as MembershipStatus,
     version: row.version,
     warehouseIds: (row.warehouses ?? []).map((w) => w.warehouseId),
   };
 }
 
-const membershipInclude = { warehouses: { select: { warehouseId: true } } } as const;
+const membershipInclude = {
+  warehouses: { select: { warehouseId: true } },
+  roles: { select: { role: true } },
+} as const;
+
+async function replaceMembershipRoles(
+  db: Db,
+  membershipId: string,
+  roles: MembershipRole[],
+): Promise<MembershipRole[]> {
+  const normalized = normalizeMembershipRoles(roles);
+  if (normalized.length === 0) throw new Error("MEMBERSHIP_ROLES_REQUIRED");
+  await db.membershipRoleRow.deleteMany({ where: { membershipId } });
+  await db.membershipRoleRow.createMany({
+    data: normalized.map((role) => ({ membershipId, role })),
+  });
+  return normalized;
+}
 
 export function createSystemRepos(db: Db) {
   return {
@@ -107,7 +134,9 @@ export function createSystemRepos(db: Db) {
     }): Promise<MembershipRecord[]> {
       const rows = await db.membership.findMany({
         where: {
-          ...(filters?.role ? { role: filters.role } : {}),
+          ...(filters?.role
+            ? { roles: { some: { role: filters.role } } }
+            : {}),
           ...(filters?.status ? { status: filters.status } : {}),
         },
         include: membershipInclude,
@@ -134,7 +163,10 @@ export function createSystemRepos(db: Db) {
 
     async countActiveAdministrators(): Promise<number> {
       return db.membership.count({
-        where: { role: "administrator", status: "active" },
+        where: {
+          status: "active",
+          roles: { some: { role: "administrator" } },
+        },
       });
     },
 
@@ -144,9 +176,11 @@ export function createSystemRepos(db: Db) {
       keycloakSub: string;
       displayName: string;
       email?: string | null;
-      role: MembershipRole;
+      roles: MembershipRole[];
       status: MembershipStatus;
     }): Promise<MembershipRecord> {
+      const roles = normalizeMembershipRoles(input.roles);
+      const primary = primaryMembershipRole(roles);
       await db.membership.create({
         data: {
           id: input.id,
@@ -154,11 +188,12 @@ export function createSystemRepos(db: Db) {
           keycloakSub: input.keycloakSub,
           displayName: input.displayName,
           email: input.email ?? null,
-          role: input.role,
+          role: primary,
           status: input.status,
           lastSyncedAt: new Date(),
         },
       });
+      await replaceMembershipRoles(db, input.id, roles);
       const row = await db.membership.findUniqueOrThrow({
         where: { id: input.id },
         include: membershipInclude,
@@ -170,7 +205,7 @@ export function createSystemRepos(db: Db) {
       id: string,
       expectedVersion: number,
       patch: {
-        role?: MembershipRole;
+        roles?: MembershipRole[];
         status?: MembershipStatus;
         displayName?: string;
         email?: string | null;
@@ -178,10 +213,15 @@ export function createSystemRepos(db: Db) {
     ): Promise<MembershipRecord | null> {
       const current = await db.membership.findUnique({ where: { id } });
       if (!current || current.version !== expectedVersion) return null;
+      const nextRoles =
+        patch.roles !== undefined ? normalizeMembershipRoles(patch.roles) : null;
+      if (patch.roles !== undefined && (!nextRoles || nextRoles.length === 0)) {
+        throw new Error("MEMBERSHIP_ROLES_REQUIRED");
+      }
       const updated = await db.membership.updateMany({
         where: { id, version: expectedVersion },
         data: {
-          ...(patch.role !== undefined ? { role: patch.role } : {}),
+          ...(nextRoles ? { role: primaryMembershipRole(nextRoles) } : {}),
           ...(patch.status !== undefined ? { status: patch.status } : {}),
           ...(patch.displayName !== undefined ? { displayName: patch.displayName } : {}),
           ...(patch.email !== undefined ? { email: patch.email } : {}),
@@ -191,6 +231,7 @@ export function createSystemRepos(db: Db) {
         },
       });
       if (updated.count !== 1) return null;
+      if (nextRoles) await replaceMembershipRoles(db, id, nextRoles);
       const row = await db.membership.findUniqueOrThrow({
         where: { id },
         include: membershipInclude,

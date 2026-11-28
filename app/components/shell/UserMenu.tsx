@@ -2,7 +2,7 @@
 "use client";
 
 import Link from "next/link";
-import { LogOut, Settings, User } from "lucide-react";
+import { Building2, LogOut, Settings, Shield, User } from "lucide-react";
 import { useT } from "@/app/i18n/LocaleProvider";
 import { Button } from "@/app/components/ui/button";
 import {
@@ -16,6 +16,15 @@ import {
 import { LanguageToggle } from "./LanguageToggle";
 import { ThemeToggle } from "./ThemeToggle";
 import { isAdministrator, primaryRole } from "./nav-config";
+
+function initials(name: string | null | undefined, userId: string | null): string {
+  const raw = (name && name.trim()) || userId || "?";
+  const parts = raw.split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) {
+    return `${parts[0]![0] ?? ""}${parts[1]![0] ?? ""}`.toUpperCase();
+  }
+  return raw.slice(0, 2).toUpperCase();
+}
 
 export function UserMenu({
   userId,
@@ -42,9 +51,11 @@ export function UserMenu({
       {userId ? (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" className="max-w-[16rem] gap-2">
-              <User className="h-4 w-4 shrink-0" />
-              <span className="flex min-w-0 flex-col items-start leading-tight">
+            <Button variant="outline" className="max-w-[16rem] gap-2 rounded-full px-2">
+              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground">
+                {initials(displayName, userId)}
+              </span>
+              <span className="hidden min-w-0 flex-col items-start leading-tight sm:flex">
                 <span className="truncate font-medium">{label}</span>
                 <span className="truncate text-xs font-normal text-muted-foreground">
                   {roleLabel}
@@ -52,26 +63,62 @@ export function UserMenu({
               </span>
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
+          <DropdownMenuContent
+            align="end"
+            className="w-72 shadow-[var(--overlay-shadow)]"
+            data-purpose="user-menu-popover"
+          >
             <DropdownMenuLabel className="font-normal">
-              <div className="flex flex-col gap-0.5">
-                <span className="truncate font-medium">{label}</span>
-                <span className="text-xs text-muted-foreground">
-                  {t("shell.role")}: {roleLabel}
+              <div className="flex items-center gap-3">
+                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
+                  {initials(displayName, userId)}
                 </span>
+                <div className="min-w-0 flex flex-col gap-0.5">
+                  <span className="truncate font-medium">{label}</span>
+                  <span className="inline-flex w-fit rounded-md bg-amber-50 px-1.5 py-0.5 text-[11px] font-medium text-amber-800 dark:bg-amber-950 dark:text-amber-200">
+                    {t("shell.role")}: {roleLabel}
+                  </span>
+                </div>
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
+            <DropdownMenuItem asChild>
+              <Link href="/admin/organization" className="cursor-pointer">
+                <User className="mr-2 h-4 w-4" />
+                {t("shell.profile")}
+              </Link>
+            </DropdownMenuItem>
             {showAdmin ? (
               <DropdownMenuItem asChild>
-                <Link href="/admin" className="cursor-pointer">
-                  <Settings className="mr-2 h-4 w-4" />
-                  {t("nav.openAdmin")}
+                <Link href="/admin/members" className="cursor-pointer">
+                  <Shield className="mr-2 h-4 w-4" />
+                  {t("shell.rolesAndPermissions")}
                 </Link>
               </DropdownMenuItem>
             ) : null}
             <DropdownMenuItem asChild>
-              <Link href="/logout" className="cursor-pointer">
+              <Link href="/admin" className="cursor-pointer">
+                <Settings className="mr-2 h-4 w-4" />
+                {t("shell.accountSettings")}
+              </Link>
+            </DropdownMenuItem>
+            {showAdmin ? (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  {t("shell.enterpriseSection")}
+                </DropdownMenuLabel>
+                <DropdownMenuItem asChild>
+                  <Link href="/admin/organization" className="cursor-pointer">
+                    <Building2 className="mr-2 h-4 w-4" />
+                    {t("shell.enterpriseManage")}
+                  </Link>
+                </DropdownMenuItem>
+              </>
+            ) : null}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem asChild>
+              <Link href="/logout" className="cursor-pointer text-destructive focus:text-destructive">
                 <LogOut className="mr-2 h-4 w-4" />
                 {t("nav.logout")}
               </Link>

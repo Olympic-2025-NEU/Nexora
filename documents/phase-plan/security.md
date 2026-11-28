@@ -8,20 +8,39 @@ Internet chỉ đến Gateway HTTPS. User token từ Keycloak, partner token t�
 
 **Auth model (D04 P02-T01):** Bearer API auth — browser lấy token qua authorization-code + PKCE; mọi API call dùng `Authorization: Bearer <token>`. Không có BFF/cookie session trên API layer ở P02. `organizationId` lấy từ DB membership row, không bao giờ từ token body hoặc payload.
 
-**MFA bắt buộc cho Administrator và Approver:** Keycloak gán required action `CONFIGURE_TOTP` khi tạo user có role administrator/approver. Staff và viewer không yêu cầu MFA mặc định.
+**MFA bắt buộc cho `administrator` và `issue_approver`:** Keycloak gán `CONFIGURE_TOTP` khi membership chứa các role này (ADR 0018). Các job role khác không bắt buộc MFA mặc định.
 
-| Chủ thể | Xác thực | MFA | Quyền mẫu |
+| Chủ thể / job role | Xác thực | MFA | Quyền mẫu |
 | --- | --- | --- | --- |
-| Administrator | OIDC user (Bearer) | **Bắt buộc TOTP** | Org, members, partner connection, retry, policy; không tự duyệt nếu separation-of-duties cấm |
-| Staff | OIDC user (Bearer) | Không bắt buộc | Tạo Draft, confirm trong kho được cấp, xem lot/trace và file theo scope |
-| Approver | OIDC user (Bearer) | **Bắt buộc TOTP** | Approve/reject task; không đồng nghĩa tự confirm document |
-| Partner client | Client credentials cấp ở receiver | N/A | Chỉ federation endpoints/phạm vi partner, không xem ERP private |
-| Public consumer | Không đăng nhập | N/A | Chỉ Passport projection theo QR/policy/rate limit |
-| AI service | Internal secret, không có user/Admin/DB credential | N/A | Chỉ inference từ fact allowlist; ERP kiểm quyền từng tool theo actor, không chuyển raw token/PII cho model |
+| `administrator` | OIDC Bearer | **TOTP** | Org, members, partners, warehouse master, ops retry; bypass hầu hết (trừ M2M partner) |
+| `catalog_manager` | OIDC Bearer | Không | Catalog/UOM/category/price/batch create+quality |
+| `inventory_clerk` | OIDC Bearer | Không | Receipt/issue/transfer/receiving; stock read; issue submit/confirm |
+| `sales_clerk` | OIDC Bearer | Không | Sale record + POS |
+| `stocktake_clerk` | OIDC Bearer | Không | Stocktake CRUD/confirm |
+| `issue_approver` | OIDC Bearer | **TOTP** | `workflow:approval:read\|decide` (SoD: không tự duyệt; **không** confirm document) |
+| `quality_officer` | OIDC Bearer | Không | `ops:quality:*` |
+| `auditor` | OIDC Bearer | Không | Read-only rộng (catalog/inventory/trading/trace/org) |
+| Partner client | Client credentials | N/A | Chỉ federation endpoints |
+| Public consumer | Không đăng nhập | N/A | Passport projection |
+| AI service | Internal secret | N/A | Tool theo quyền actor |
 
-M01 quản lý mapping `Keycloak sub -> membership/role/scope` qua **admin invite** (không open JIT). Invite nhận `username` (không nhận `keycloakSub` từ client): ERP dùng Keycloak Admin API tạo/tái sử dụng user, gán realm role, ghi membership; mật khẩu tạm chỉ trả một lần trên response tạo mới, không lưu app DB. Vai membership v1: `administrator`, `staff`, `approver`, `viewer` (DB authoritative; không dùng alias `admin`). Approver gắn Flowable task; không đồng nghĩa quyền confirm document.
+M01: mapping `Keycloak sub → membership + membership_role + warehouse scope` qua **admin invite** (không open JIT). Invite/PATCH nhận `roles: string[]` (min 1; fixed codes). DB authoritative; Keycloak realm roles mirror tập job roles. `issue_approver` gắn Flowable / workflow decisions; không đồng nghĩa quyền confirm chứng từ.
 
-Permission keys M01 trong `platform/access/policy.ts`: `admin:organization:read|manage`, `admin:membership:read|manage`, `admin:partner:read|manage`, `admin:partner:connection:manage`, `federation:connectivity:probe` (M2M; inbox = P09). Permission keys M02: `catalog:product:read|create|manage`, `catalog:batch:read|create|quality`, `inventory:warehouse:read|manage`, `inventory:stock:read`. Warehouse scope: Administrator = toàn instance; Staff/Approver/Viewer = `system.membership_warehouse` (revoke hiệu lực request sau). Gán scope qua `admin:membership:manage` + `warehouseIds` trên member invite/PATCH. Resource authz document đầy đủ ở P07+. Mọi 403 phải có audit an toàn; tránh phân biệt tài nguyên không tồn tại với không được phép nếu gây lộ ID.
+Permission keys: `platform/access/policy.ts` (ADR 0018). Warehouse scope: `administrator` = toàn instance; các role khác = `system.membership_warehouse`. Mọi 403 có audit an toàn.
+
+### Ma trận job-role × chứng từ (state machine)
+
+| Document | create/edit | submit | approve/reject | confirm/cancel |
+|----------|-------------|--------|----------------|----------------|
+| receipt | `inventory_clerk` | — | — | `inventory_clerk` |
+| issue | `inventory_clerk` | `inventory_clerk` | `issue_approver` (`workflow:approval:*`) | `inventory_clerk` (sau approved) |
+| transfer / receiving | `inventory_clerk` | — | — | `inventory_clerk` |
+| stocktake | `stocktake_clerk` | — | — | `stocktake_clerk` |
+| sale | `sales_clerk` | — | — | `sales_clerk` |
+
+Catalog manage → `catalog_manager` (+ admin); warehouse manage → `administrator` only. Legacy keys `trading:goods-issue:*` removed — use `trading:issue:*` + `workflow:approval:*`.
+
+Migrate: `staff` → clerks bundle; `approver` → `issue_approver`+`auditor`; `viewer` → `auditor`.
 
 ## 2.1. XSS, CSRF, SQL Injection (bắt buộc)
 

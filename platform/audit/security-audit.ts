@@ -9,7 +9,7 @@
  * - Policy denies are always audited with actor role + action (not full identity).
  *
  * Usage:
- *   auditDeny(actor, "trading:goods-issue:create", requestId);
+ *   auditDeny(actor, "trading:issue:create", requestId);
  *   auditAccess(actor, "platform:me:read", "success", requestId);
  */
 

@@ -31,7 +31,12 @@ export async function GET(request: NextRequest, context: Ctx): Promise<Response>
     if (!allowed) return fail("POLICY_DENIED", 403, requestId);
     const { id } = await context.params;
     if (!isUuid(id)) throw new DomainError("PRICE_LIST_ID_INVALID", 422);
-    const items = await catalogRepos().listPriceListItems(id);
+    const variantId = request.nextUrl.searchParams.get("productVariantId");
+    if (variantId && !isUuid(variantId)) throw new DomainError("VARIANT_ID_INVALID", 422);
+    const items = await catalogRepos().listPriceListItems(
+      id,
+      variantId ? { productVariantId: variantId } : undefined,
+    );
     return okList(items.map(projectPriceListItem), { limit: items.length }, requestId);
   } catch (err) {
     return mapRouteError(err, requestId);

@@ -13,7 +13,7 @@ const db = getPrismaClient();
 after(async () => db.$disconnect());
 
 function actor(): Actor {
-  return { userId: randomUUID(), organizationId: randomUUID(), unitIds: [], roles: ["staff"] };
+  return { userId: randomUUID(), organizationId: randomUUID(), unitIds: [], roles: ["inventory_clerk"] };
 }
 
 test("concurrent draft reservations enforce five per minute and persist denials", async () => {

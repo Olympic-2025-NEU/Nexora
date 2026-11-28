@@ -22,7 +22,7 @@ const documentId = "44444444-4444-4444-8444-444444444444";
 const eventId = "55555555-5555-4555-8555-555555555555";
 const asOf = "2026-11-26T00:00:00.000Z";
 const requestId = "yeu-cau-1";
-const actor: Actor = { userId: "staff-1", organizationId: "org-a", unitIds: [warehouse], roles: ["staff"] };
+const actor: Actor = { userId: "staff-1", organizationId: "org-a", unitIds: [warehouse], roles: ["inventory_clerk"] };
 const warehouses: DraftWarehouse[] = [{ id: warehouse, code: "WH-A", name: "Kho A" }];
 
 type Lot = { batchId: string; issuer: string; lotCode: string; name: string; qualityStatus: string };

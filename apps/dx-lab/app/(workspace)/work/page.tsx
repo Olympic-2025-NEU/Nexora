@@ -33,7 +33,7 @@ export default async function WorkPage() {
   const actor = await currentActor();
   const token = await requireAccessToken();
   const [inbox, receivingResult, inboundResult] = await Promise.all([
-    loadInbox(token, actor.roles.includes("approver")),
+    loadInbox(token, actor.roles.includes("issue_approver")),
     listTradingDocuments(token, "receivings")
       .then((items) => ({ items, error: "" }))
       .catch((error: unknown) => ({ items: [] as Record<string, unknown>[],

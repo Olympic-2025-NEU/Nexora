@@ -67,7 +67,7 @@ async function inspect(item) {
   assert.equal(org.instanceId, `nexora-${item.id}`);
   assert.equal(org.id, item.manifest.organizationId);
   const members = await item.app.membership.findMany({ where: { status: "active" } });
-  for (const role of ["administrator", "staff", "approver"])
+  for (const role of ["administrator", "inventory_clerk", "issue_approver"])
     assert.ok(members.some((row) => row.role === role), `${item.id} missing ${role}`);
   for (const peer of item.manifest.partnerIssuers)
     assert.ok(await item.app.partner.findUnique({ where: { issuerInstanceId: peer } }));

@@ -4,7 +4,7 @@
   <process id="goods-issue-approval" name="Goods Issue Approval" isExecutable="true">
     <startEvent id="start" />
     <sequenceFlow id="s1" sourceRef="start" targetRef="approveGoodsIssue" />
-    <userTask id="approveGoodsIssue" name="Approve goods issue v2" flowable:candidateGroups="approver" />
+    <userTask id="approveGoodsIssue" name="Approve goods issue v2" flowable:candidateGroups="issue_approver" />
     <sequenceFlow id="s2" sourceRef="approveGoodsIssue" targetRef="decision" />
     <exclusiveGateway id="decision" default="rejectFlow" />
     <sequenceFlow id="approveFlow" sourceRef="decision" targetRef="approvedEnd"><conditionExpression xsi:type="tFormalExpression"><![CDATA[${decision == 'approved'}]]></conditionExpression></sequenceFlow>

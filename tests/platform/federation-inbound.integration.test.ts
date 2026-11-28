@@ -106,15 +106,15 @@ test("issuer-qualified mapping creates only allowlisted partner provenance", asy
   const batchId = await makeBatch("A", lot.originLot.lotId);
   const otherIssuerBatch = await makeBatch("OTHER", lot.originLot.lotId);
   await assert.rejects(() => bindExternalLot(db, { inboxId: inbox.id,
-    sourceLineId: lot.sourceLineId, localBatchId: otherIssuerBatch }, ["staff"]),
+    sourceLineId: lot.sourceLineId, localBatchId: otherIssuerBatch }, ["inventory_clerk"]),
     (error: unknown) => error instanceof MappingError && error.code === "LOCAL_BATCH_ORIGIN_MISMATCH");
   await assert.rejects(() => bindExternalLot(db, { inboxId: inbox.id,
     sourceLineId: lot.sourceLineId, localBatchId: batchId }, ["viewer"]),
     (error: unknown) => error instanceof MappingError && error.code === "MAPPING_FORBIDDEN");
   const mappingId = await bindExternalLot(db, { inboxId: inbox.id,
-    sourceLineId: lot.sourceLineId, localBatchId: batchId }, ["staff"]);
+    sourceLineId: lot.sourceLineId, localBatchId: batchId }, ["inventory_clerk"]);
   assert.equal(await bindExternalLot(db, { inboxId: inbox.id,
-    sourceLineId: lot.sourceLineId, localBatchId: batchId }, ["staff"]), mappingId);
+    sourceLineId: lot.sourceLineId, localBatchId: batchId }, ["inventory_clerk"]), mappingId);
   assert.equal((await db.inboxMessage.findUniqueOrThrow({ where: { id: inbox.id } })).state, "applied_to_trace");
   const trace = await db.traceEvent.findFirstOrThrow({ where: { sourceMessageId: inbox.id } });
   assert.equal(trace.batchId, batchId);
@@ -145,7 +145,7 @@ test("B to C child before parent keeps a gap and resolves it exactly once", asyn
   const origin = child.lots[0].originLot;
   const localBatchId = await makeBatch(origin.issuerInstanceId, origin.lotId);
   await bindExternalLot(db, { inboxId: childInbox.id,
-    sourceLineId: child.lots[0].sourceLineId, localBatchId }, ["staff"]);
+    sourceLineId: child.lots[0].sourceLineId, localBatchId }, ["inventory_clerk"]);
   const childTrace = await db.traceEvent.findFirstOrThrow({ where: { sourceMessageId: childInbox.id } });
   assert.equal(childTrace.issuerInstanceId, "B");
   assert.equal(childTrace.originIssuerInstanceId, "A");
@@ -161,7 +161,7 @@ test("B to C child before parent keeps a gap and resolves it exactly once", asyn
   assert.equal(parentAck.status, "pending_dependency");
   const parentInbox = await db.inboxMessage.findFirstOrThrow({ where: { messageId: parent.messageId } });
   await bindExternalLot(db, { inboxId: parentInbox.id,
-    sourceLineId: parent.lots[0].sourceLineId, localBatchId }, ["staff"]);
+    sourceLineId: parent.lots[0].sourceLineId, localBatchId }, ["inventory_clerk"]);
   assert.equal(await resolvePendingDependencies(db), 0);
   const parentTrace = await db.traceEvent.findFirstOrThrow({ where: { sourceMessageId: parentInbox.id } });
   const link = await db.traceLink.findFirstOrThrow({ where: { fromEventId: childTrace.id } });
@@ -198,7 +198,7 @@ test("late parent with a different origin marks the child rejected", async () =>
   const childInbox = await db.inboxMessage.findFirstOrThrow({ where: { messageId: child.messageId } });
   const localBatchId = await makeBatch("A", child.lots[0].originLot.lotId);
   await bindExternalLot(db, { inboxId: childInbox.id,
-    sourceLineId: child.lots[0].sourceLineId, localBatchId }, ["staff"]);
+    sourceLineId: child.lots[0].sourceLineId, localBatchId }, ["inventory_clerk"]);
   const parent = JSON.parse(readFileSync("contracts/events/fixtures/a-to-b-transfer-announced.json", "utf8"));
   parent.messageId = child.upstreamReferences[0].messageId;
   parent.eventId = child.upstreamReferences[0].eventId;
@@ -222,7 +222,7 @@ test("C caches B's public A summary, resolves an offline upstream gap and honors
   const inbox = await db.inboxMessage.findFirstOrThrow({ where: { messageId: child.messageId } });
   const batchId = await makeBatch("A", child.lots[0].originLot.lotId);
   await bindExternalLot(db, { inboxId: inbox.id,
-    sourceLineId: child.lots[0].sourceLineId, localBatchId: batchId }, ["staff"]);
+    sourceLineId: child.lots[0].sourceLineId, localBatchId: batchId }, ["inventory_clerk"]);
   const childTrace = await db.traceEvent.findFirstOrThrow({ where: { sourceMessageId: inbox.id } });
   assert.equal((await db.traceLink.findFirstOrThrow({ where: { fromEventId: childTrace.id } })).toEventId, null);
   const remoteEventId = `${child.upstreamReferences[0].eventId}:${randomUUID()}`;

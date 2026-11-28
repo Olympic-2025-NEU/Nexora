@@ -1,15 +1,30 @@
 <!-- SPDX-License-Identifier: AGPL-3.0-only -->
-# Runbook — M01 provisioning (P05)
+# Runbook — M01 provisioning (P05 / ADR 0018)
 
 ## Prerequisites
 
 - Stack from `phase-04`/`phase-05` with Keycloak + gateway + PG.
 - mkcert HTTPS recommended (`PUBLIC_BASE_URL=https://localhost:19443`).
-- Admin/Approver users must complete TOTP (P02 MFA) before G05 UI demo.
+- Users with `administrator` or `issue_approver` must complete TOTP (MFA) before G05 UI demo.
 
-## Roles
+## Job roles (multi-assign)
 
-Use exactly: `administrator` | `staff` | `approver` | `viewer`. Never `admin`.
+Fixed codes (min 1 per membership):
+
+| Code | Purpose |
+|------|---------|
+| `administrator` | Org, members, partners, warehouse master, broad bypass |
+| `catalog_manager` | Product / UOM / category / price / batch quality |
+| `inventory_clerk` | Receipt, issue, transfer, receiving |
+| `sales_clerk` | POS / sale records |
+| `stocktake_clerk` | Stocktake documents |
+| `issue_approver` | Flowable goods-issue decide (SoD; not confirm) |
+| `quality_officer` | Quality ops |
+| `auditor` | Broad read-only |
+
+Never use legacy codes `staff` | `approver` | `viewer` on new invites (migration expands them once).
+
+Invite/PATCH body uses **`roles: string[]`** (not a single `role`).
 
 ## Bootstrap organization + membership
 
@@ -27,15 +42,35 @@ SEED_PARTNER_NAME="Partner B" \
 node deploy/scripts/seed-system.mjs
 ```
 
-Seed is idempotent — safe to run twice.
+Seed is idempotent — safe to run twice. Ensure Keycloak bootstrap has created realm roles for all job codes (`deploy/keycloak/bootstrap.mjs`).
 
 ## Admin invite (no open JIT)
 
-1. As Administrator, `POST /api/v1/members` with `{ username, displayName, email?, role }`.
-2. ERP authenticates to Keycloak Admin (`KC_BOOTSTRAP_ADMIN_*` + `OIDC_BASE_URL`), creates the user when missing (temporary password + `UPDATE_PASSWORD`; `CONFIGURE_TOTP` for administrator/approver), assigns the matching realm role, and inserts `system.membership` as **active**.
+1. As Administrator, `POST /api/v1/members` with `{ username, displayName, email?, roles: ["sales_clerk", ...] }` (at least one role).
+2. ERP authenticates to Keycloak Admin (`KC_BOOTSTRAP_ADMIN_*` + `OIDC_BASE_URL`), creates the user when missing (temporary password + `UPDATE_PASSWORD`; `CONFIGURE_TOTP` when roles include `administrator` or `issue_approver`), assigns **all** matching realm roles, and inserts `system.membership` + `system.membership_role` as **active**.
 3. Response may include `provisionalPassword` **once** when the Keycloak user was created — copy it out-of-band; it is never stored in the app DB.
 4. Re-inviting an existing username that already has membership → **409 MEMBERSHIP_EXISTS**. JWT without membership still → **403 MEMBERSHIP_NOT_FOUND**.
-5. `PATCH` role/status also best-effort syncs Keycloak realm role and enable/disable.
+5. `PATCH` `{ roles, status, … }` best-effort syncs Keycloak realm roles (replace managed set) and enable/disable.
+
+Example invite:
+
+```json
+{
+  "username": "kho.a",
+  "displayName": "Kho A",
+  "roles": ["inventory_clerk", "catalog_manager"]
+}
+```
+
+Approver-only bundle:
+
+```json
+{
+  "username": "duyet.x",
+  "displayName": "Duyệt X",
+  "roles": ["issue_approver", "auditor"]
+}
+```
 
 ## Partner connection
 

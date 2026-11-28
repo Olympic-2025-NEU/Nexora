@@ -49,4 +49,7 @@ Write-Output "  `$env:DATABASE_URL = '<APP_DATABASE_URL with postgres -> 127.0.0
 Write-Output "  npm run db:migrate"
 Write-Output "  npm run dev"
 Write-Output ""
+Write-Output "File uploads (product images) need core-data + scanner:"
+Write-Output "  docker compose -f deploy/compose.yml -f deploy/compose.local-admin.yml --env-file $envFile -p $Project --profile core up -d core-data file-scanner"
+Write-Output ""
 Write-Output "Full Docker apps stack (slow build): docker compose ... --profile apps up -d"

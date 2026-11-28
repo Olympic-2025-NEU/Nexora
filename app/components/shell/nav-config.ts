@@ -1,100 +1,240 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
-/** Role codes from membership (policy.ts). */
+/** Job-role codes from membership (ADR 0018 / policy.ts). */
 export type AppRole =
   | "administrator"
-  | "staff"
-  | "approver"
-  | "viewer"
+  | "catalog_manager"
+  | "inventory_clerk"
+  | "sales_clerk"
+  | "stocktake_clerk"
+  | "issue_approver"
+  | "quality_officer"
+  | "auditor"
   | string;
 
-export type NavItem = {
+const OPS_READ: AppRole[] = [
+  "administrator",
+  "catalog_manager",
+  "inventory_clerk",
+  "sales_clerk",
+  "stocktake_clerk",
+  "issue_approver",
+  "quality_officer",
+  "auditor",
+];
+
+export type NavLeaf = {
   href: string;
   labelKey: string;
-  /** Roles that may see this link. "*" = all authenticated. */
   roles: AppRole[] | "*";
+  descriptionKey?: string;
 };
 
-/**
- * Single ERP app nav (catalog / inventory / partners).
- * System admin routes are opened from the user menu (administrator only).
- */
-export const APP_NAV: NavItem[] = [
+export type NavIcon =
+  | "dashboard"
+  | "products"
+  | "warehouse"
+  | "orders"
+  | "reports"
+  | "assistant"
+  | "settings";
+
+export type NavGroup = {
+  id: string;
+  labelKey: string;
+  href?: string;
+  roles: AppRole[] | "*";
+  icon: NavIcon;
+  children?: NavLeaf[];
+  flyoutTitleKey?: string;
+};
+
+export const APP_NAV: NavGroup[] = [
   {
-    href: "/catalog/products",
-    labelKey: "nav.products",
-    roles: ["administrator", "staff", "approver", "viewer"],
-  },
-  {
-    href: "/catalog/categories",
-    labelKey: "nav.categories",
-    roles: ["administrator", "staff", "approver", "viewer"],
-  },
-  {
-    href: "/catalog/uom",
-    labelKey: "nav.uom",
-    roles: ["administrator", "staff", "approver", "viewer"],
-  },
-  {
-    href: "/catalog/pricing",
-    labelKey: "nav.pricing",
-    roles: ["administrator", "staff", "approver", "viewer"],
-  },
-  {
-    href: "/catalog/batches",
-    labelKey: "nav.batches",
-    roles: ["administrator", "staff", "approver", "viewer"],
-  },
-  {
-    href: "/inventory/warehouses",
-    labelKey: "nav.warehouses",
-    roles: ["administrator", "staff", "approver", "viewer"],
-  },
-  {
-    href: "/inventory/balances",
-    labelKey: "nav.inventory",
-    roles: ["administrator", "staff", "approver", "viewer"],
-  },
-  {
-    href: "/partners",
-    labelKey: "nav.partners",
+    id: "dashboard",
+    labelKey: "nav.dashboard",
+    href: "/dashboard",
     roles: "*",
+    icon: "dashboard",
   },
   {
-    href: "/trace",
-    labelKey: "nav.trace",
-    roles: ["administrator", "staff", "approver", "viewer"],
+    id: "products",
+    labelKey: "nav.products",
+    href: "/products",
+    roles: OPS_READ,
+    icon: "products",
   },
   {
-    href: "/assistant",
+    id: "warehouse",
+    labelKey: "nav.warehouses",
+    roles: OPS_READ,
+    icon: "warehouse",
+    flyoutTitleKey: "nav.flyoutWarehouse",
+    children: [
+      {
+        href: "/inventory/warehouses",
+        labelKey: "nav.warehouses",
+        roles: OPS_READ,
+        descriptionKey: "nav.descWarehouses",
+      },
+      {
+        href: "/inventory/balances",
+        labelKey: "nav.inventory",
+        roles: OPS_READ,
+        descriptionKey: "nav.descInventory",
+      },
+      {
+        href: "/trading/stocktakes",
+        labelKey: "nav.stocktakes",
+        roles: ["administrator", "stocktake_clerk", "auditor", "issue_approver"],
+        descriptionKey: "nav.descStocktakes",
+      },
+      {
+        href: "/trading/receivings",
+        labelKey: "nav.receivings",
+        roles: ["administrator", "inventory_clerk", "auditor", "issue_approver"],
+        descriptionKey: "nav.descReceivings",
+      },
+      {
+        href: "/trading/issues",
+        labelKey: "nav.issues",
+        roles: ["administrator", "inventory_clerk", "auditor", "issue_approver"],
+        descriptionKey: "nav.descIssues",
+      },
+      {
+        href: "/trading/transfers",
+        labelKey: "nav.transfers",
+        roles: ["administrator", "inventory_clerk", "auditor", "issue_approver"],
+        descriptionKey: "nav.descTransfers",
+      },
+      {
+        href: "/trace",
+        labelKey: "nav.trace",
+        roles: OPS_READ,
+        descriptionKey: "nav.descTrace",
+      },
+    ],
+  },
+  {
+    id: "orders",
+    labelKey: "nav.orders",
+    roles: OPS_READ,
+    icon: "orders",
+    flyoutTitleKey: "nav.flyoutOrders",
+    children: [
+      {
+        href: "/orders",
+        labelKey: "nav.sales",
+        roles: ["administrator", "sales_clerk", "auditor", "issue_approver"],
+        descriptionKey: "nav.descSales",
+      },
+      {
+        href: "/pos",
+        labelKey: "nav.pos",
+        roles: ["administrator", "sales_clerk"],
+        descriptionKey: "nav.descPos",
+      },
+      {
+        href: "/trading/approvals",
+        labelKey: "nav.approvals",
+        roles: ["administrator", "issue_approver"],
+        descriptionKey: "nav.descApprovals",
+      },
+    ],
+  },
+  {
+    id: "reports",
+    labelKey: "nav.reports",
+    href: "/dashboard#reports",
+    roles: "*",
+    icon: "reports",
+  },
+  {
+    id: "assistant",
     labelKey: "nav.assistant",
-    roles: ["administrator", "staff", "approver", "viewer"],
+    href: "/assistant",
+    roles: OPS_READ,
+    icon: "assistant",
+  },
+  {
+    id: "settings",
+    labelKey: "nav.settings",
+    roles: OPS_READ,
+    icon: "settings",
+    flyoutTitleKey: "nav.flyoutSettings",
+    children: [
+      {
+        href: "/admin/organization",
+        labelKey: "nav.organization",
+        roles: OPS_READ,
+        descriptionKey: "nav.descOrganization",
+      },
+      {
+        href: "/admin/members",
+        labelKey: "nav.members",
+        roles: ["administrator"],
+        descriptionKey: "nav.descMembers",
+      },
+      {
+        href: "/partners",
+        labelKey: "nav.partners",
+        roles: "*",
+        descriptionKey: "nav.descPartners",
+      },
+    ],
   },
 ];
 
+export type NavItem = NavLeaf;
+
 export const ADMIN_NAV: NavItem[] = [
-  { href: "/admin/federation", labelKey: "nav.federationOperations", roles: ["administrator"] },
   {
     href: "/admin/organization",
     labelKey: "nav.organization",
-    roles: ["administrator", "staff", "approver", "viewer"],
+    roles: OPS_READ,
   },
   {
     href: "/admin/members",
     labelKey: "nav.members",
     roles: ["administrator"],
   },
+  {
+    href: "/partners",
+    labelKey: "nav.partners",
+    roles: "*",
+  },
 ];
 
-export function filterNavByRoles(
-  items: NavItem[],
-  roles: string[],
-): NavItem[] {
-  const set = new Set(roles.map((r) => r.toLowerCase()));
-  return items.filter((item) => {
-    if (item.roles === "*") return true;
-    return item.roles.some((r) => set.has(String(r).toLowerCase()));
-  });
+export function roleAllowed(roles: AppRole[] | "*", userRoles: string[]): boolean {
+  if (roles === "*") return true;
+  const set = new Set(userRoles.map((r) => r.toLowerCase()));
+  return roles.some((r) => set.has(String(r).toLowerCase()));
+}
+
+export function filterNavByRoles(groups: NavGroup[], roles: string[]): NavGroup[] {
+  return groups
+    .filter((g) => roleAllowed(g.roles, roles))
+    .map((g) => {
+      if (!g.children?.length) return g;
+      const children = g.children.filter((c) => roleAllowed(c.roles, roles));
+      return { ...g, children };
+    })
+    .filter((g) => g.href || (g.children && g.children.length > 0));
+}
+
+export function flattenNav(groups: NavGroup[]): NavItem[] {
+  const out: NavItem[] = [];
+  for (const g of groups) {
+    if (g.href && !g.children?.length) {
+      out.push({ href: g.href, labelKey: g.labelKey, roles: g.roles });
+    }
+    if (g.children) out.push(...g.children);
+  }
+  return out;
+}
+
+export function filterFlatNavByRoles(items: NavItem[], roles: string[]): NavItem[] {
+  return items.filter((item) => roleAllowed(item.roles, roles));
 }
 
 export function isAdministrator(roles: string[]): boolean {
@@ -102,10 +242,30 @@ export function isAdministrator(roles: string[]): boolean {
 }
 
 export function primaryRole(roles: string[]): string {
-  const order = ["administrator", "staff", "approver", "viewer"];
+  const order = [
+    "administrator",
+    "catalog_manager",
+    "inventory_clerk",
+    "sales_clerk",
+    "stocktake_clerk",
+    "issue_approver",
+    "quality_officer",
+    "auditor",
+  ];
   const lower = roles.map((r) => r.toLowerCase());
   for (const r of order) {
     if (lower.includes(r)) return r;
   }
-  return roles[0] ?? "viewer";
+  return roles[0] ?? "auditor";
+}
+
+export function isPathActive(pathname: string, href: string): boolean {
+  const base = href.split("#")[0] ?? href;
+  if (!base) return false;
+  return pathname === base || pathname.startsWith(`${base}/`);
+}
+
+export function groupIsActive(pathname: string, group: NavGroup): boolean {
+  if (group.href && isPathActive(pathname, group.href)) return true;
+  return Boolean(group.children?.some((c) => isPathActive(pathname, c.href)));
 }

@@ -10,9 +10,9 @@
 
 | ID | Area | Prefix | Required screens (MVP UI) |
 | --- | --- | --- | --- |
-| S-ERP | Primary nav | `/catalog`, `/inventory`, `/partners` | Products **index (table rows)**, product detail/variants; batches; warehouses; balances; partners index |
+| S-ERP | Primary nav | `/catalog`, `/inventory`, `/partners` | Products **index (table rows)**, product detail/variants; batches; warehouses; balances; unified partner connection hub |
 | S-CAT | Catalog masters | `/catalog` | Categories tree; UOM master; price lists + items (per product-catalog SRS) |
-| S-ADM | System admin (user-menu entry) | `/admin` | Hub (system only); Organization; Members |
+| S-ADM | System admin (user-menu entry) | `/admin` | Hub (system only); Organization; Members (**index table** + invite/edit/assign-roles **modals**) |
 | S-TRD | Trading | `/trading` | From P07 |
 | S-TRC | Trace | `/trace` | From P08 |
 
@@ -28,12 +28,25 @@
 
 Until schema ADR + API ship, screens may show an honest empty/disabled state — **not** fake CRUD.
 
+### Partner link routes (business language — see BRD-partner-link)
+
+| Route | Requirement |
+| --- | --- |
+| `/partners` | **Unified connection hub**: partner index table; create/edit partner via **modal**; link setup (system address → two-way authorization) via **modal** + Check link; always-visible **How to connect** guide (must state: one Partner; supplier/customer = ship/receive direction); embedded **partner link monitoring** (admin-only, hides on 403) — commercial wording only |
+
+Default notice URL derived from partner system address: `https://{domain}/api/v1/federation/events` (admin may override when partner provides another URL). Secrets remain write-only references (`env:` / `secret:`).
+
+**Partner vs supplier/customer (UI rule):** Do **not** show fixed “Supplier” / “Customer” master roles on Partner. On trading documents (P07+), label counterparties as **receiving partner** / **sending partner** (VI: Đối tác nhận / Đối tác gửi). See [`BRD-partner-link.md`](./BRD-partner-link.md) §1.1.
+
 ### Legacy redirects (must)
 
 | Legacy | Canonical |
 | --- | --- |
 | `/admin/partners` | `/partners` |
-| `/admin/products` | `/catalog/products` |
+| `/admin/federation` | `/partners` |
+| `/partners/new` | `/partners` |
+| `/partners/[id]` | `/partners` |
+| `/admin/products` | `/products` (legacy `/catalog/products` also redirects) |
 | `/admin/batches` | `/catalog/batches` |
 | `/admin/warehouses` | `/inventory/warehouses` |
 | `/admin/inventory` | `/inventory/balances` |
@@ -49,7 +62,7 @@ Server policy remains authoritative.
 | approver | read-oriented ERP links | No |
 | viewer | read-oriented ERP links | No |
 
-Members manage UI: **administrator only** (under `/admin/members`).
+Members manage UI: **administrator only** (under `/admin/members`) — listing table; invite / edit profile (name, email, activate/disable) / assign job roles via modals (not inline forms).
 
 ## 3. Cross-cutting requirements
 

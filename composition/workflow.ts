@@ -10,12 +10,16 @@ export function membershipActorResolver(db: PrismaClient): ActorResolver {
   return async (sub) => {
     const membership = await db.membership.findUnique({
       where: { keycloakSub: sub },
-      include: { warehouses: { select: { warehouseId: true } } },
+      include: {
+        warehouses: { select: { warehouseId: true } },
+        roles: { select: { role: true } },
+      },
     });
     if (!membership) return null;
+    const roles = membership.roles.map((r) => r.role);
     return {
       sub,
-      role: membership.role,
+      roles: roles.length > 0 ? roles : [membership.role],
       active: membership.status === "active",
       warehouseIds: membership.warehouses.map((w) => w.warehouseId),
     };

@@ -56,7 +56,7 @@ test("POST /api/v1/ai/risk/feedback ghi đúng một audit entry, không đổi 
     root.nexoraPrisma = {
       membership: { async findUnique() {
         return { id: "membership-1", organizationId: "org-a", keycloakSub: sub,
-          displayName: "Staff", role: "staff", status: "active", warehouses: [] };
+          displayName: "Staff", role: "inventory_clerk", status: "active", warehouses: [] };
       } },
       $transaction: async (fn: (client: unknown) => Promise<unknown>) => fn(tx),
     };
@@ -73,7 +73,7 @@ test("POST /api/v1/ai/risk/feedback ghi đúng một audit entry, không đổi 
     const { POST } = requireFromTest("../../app/api/v1/ai/risk/feedback/route") as typeof import(
       "../../app/api/v1/ai/risk/feedback/route"
     );
-    const token = await new SignJWT({ realm_access: { roles: ["staff"] } })
+    const token = await new SignJWT({ realm_access: { roles: ["inventory_clerk"] } })
       .setProtectedHeader({ alg: "RS256", kid })
       .setSubject(sub).setIssuer(issuer).setAudience(audience)
       .setExpirationTime("1h").sign(privateKey);

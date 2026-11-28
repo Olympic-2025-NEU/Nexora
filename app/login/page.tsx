@@ -13,33 +13,107 @@ import { Label } from "@/app/components/ui/label";
 import { useT } from "@/app/i18n/LocaleProvider";
 import { loginWithPassword } from "@/app/lib/session";
 
+type LoginStep = "credentials" | "mfa";
+
 function LoginForm() {
   const t = useT();
   const router = useRouter();
   const search = useSearchParams();
-  const next = search.get("next") || "/admin";
+  const next = search.get("next") || "/dashboard";
+  const safeNext = next.startsWith("/") ? next : "/dashboard";
+
+  const [step, setStep] = useState<LoginStep>("credentials");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [totp, setTotp] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  async function onSubmit(e: FormEvent) {
+  async function onCredentialsSubmit(e: FormEvent) {
     e.preventDefault();
     setBusy(true);
     setError(null);
-    const result = await loginWithPassword({ username, password, totp: totp.trim() || undefined });
-    setBusy(false);
-    if (!result.ok) {
-      setError(result.message);
+    const result = await loginWithPassword({ username, password });
+    if (result.ok) {
+      router.replace(safeNext);
       return;
     }
-    router.replace(next.startsWith("/") ? next : "/admin");
+    if (result.code === "MFA_REQUIRED") {
+      setStep("mfa");
+      setBusy(false);
+      return;
+    }
+    setError(result.message);
+    setBusy(false);
+  }
+
+  async function onMfaSubmit(e: FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    const code = totp.trim();
+    if (!/^\d{6,8}$/.test(code)) {
+      setError(t("auth.mfaRequired"));
+      setBusy(false);
+      return;
+    }
+    const result = await loginWithPassword({ username, password, totp: code });
+    if (result.ok) {
+      router.replace(safeNext);
+      return;
+    }
+    setError(result.message);
+    setBusy(false);
+  }
+
+  if (step === "mfa") {
+    return (
+      <form
+        onSubmit={onMfaSubmit}
+        className="w-full max-w-sm space-y-4 rounded-xl border border-border bg-card p-6 text-card-foreground shadow-sm"
+      >
+        <h1 className="text-xl font-semibold">{t("auth.mfaTitle")}</h1>
+        <p className="text-sm text-muted-foreground">{t("auth.mfaHint")}</p>
+        <div className="space-y-1.5">
+          <Label htmlFor="totp">{t("auth.totp")}</Label>
+          <Input
+            id="totp"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            pattern="[0-9]{6,8}"
+            value={totp}
+            onChange={(event) => setTotp(event.target.value)}
+            required
+            autoFocus
+          />
+        </div>
+        {error ? (
+          <p className="text-sm text-destructive" role="alert">
+            {error}
+          </p>
+        ) : null}
+        <Button type="submit" className="w-full" disabled={busy}>
+          {busy ? t("auth.verifying") : t("auth.mfaSubmit")}
+        </Button>
+        <button
+          type="button"
+          className="text-sm text-muted-foreground underline-offset-4 hover:underline"
+          disabled={busy}
+          onClick={() => {
+            setStep("credentials");
+            setTotp("");
+            setError(null);
+          }}
+        >
+          {t("auth.loginTitle")}
+        </button>
+      </form>
+    );
   }
 
   return (
     <form
-      onSubmit={onSubmit}
+      onSubmit={onCredentialsSubmit}
       className="w-full max-w-sm space-y-4 rounded-xl border border-border bg-card p-6 text-card-foreground shadow-sm"
     >
       <h1 className="text-xl font-semibold">{t("auth.loginTitle")}</h1>
@@ -64,11 +138,6 @@ function LoginForm() {
           onChange={(e) => setPassword(e.target.value)}
           required
         />
-      </div>
-      <div className="space-y-1.5">
-        <Label htmlFor="totp">{t("auth.totp")}</Label>
-        <Input id="totp" inputMode="numeric" autoComplete="one-time-code"
-          pattern="[0-9]{6,8}" value={totp} onChange={(event) => setTotp(event.target.value)} />
       </div>
       {error ? (
         <p className="text-sm text-destructive" role="alert">

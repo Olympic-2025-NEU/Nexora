@@ -22,10 +22,10 @@ test("device registry loads demo simulators", () => {
 });
 
 test("OT ingest policy permits operators and denies read-only actors", () => {
-  for (const role of ["administrator", "staff"]) {
+  for (const role of ["administrator", "inventory_clerk"]) {
     assert.equal(checkPolicy({ roles: [role] } as never, "ops:ot:ingest").allowed, true);
   }
-  for (const role of ["approver", "viewer", "partner"]) {
+  for (const role of ["issue_approver", "auditor", "partner", "sales_clerk"]) {
     assert.equal(checkPolicy({ roles: [role] } as never, "ops:ot:ingest").allowed, false);
   }
 });

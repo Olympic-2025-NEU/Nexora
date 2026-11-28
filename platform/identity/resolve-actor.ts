@@ -2,30 +2,27 @@
 /**
  * Resolve an authenticated Actor from verified JWT claims + membership DB lookup.
  *
- * The Actor's organizationId and roles come exclusively from the DB membership row;
- * no field is trusted from the token body or request payload.
- *
- * MFA requirement for administrator/approver is enforced at the Keycloak realm level
- * (CONFIGURE_TOTP required action on those roles — see deploy/keycloak/).
- * The app layer confirms the role against the membership row and rejects stale/disabled entries.
+ * organizationId and roles come exclusively from DB (membership + membership_role).
+ * MFA for administrator / issue_approver is enforced at Keycloak (CONFIGURE_TOTP).
  */
 
+import type { MembershipRole } from "@/contexts/system/domain/types";
 import type { Actor } from "./actor";
 import { realmRoles, type NexoraClaims } from "./token";
 
-/** Minimal DB membership row shape (matches system.membership + warehouse join). */
+/** Minimal DB membership row shape (matches system.membership + roles + warehouses). */
 export interface MembershipRow {
   id: string;
   organizationId: string;
   keycloakSub: string;
   displayName: string;
-  role: "administrator" | "staff" | "approver" | "viewer";
+  /** @deprecated Prefer `roles`. */
+  role: MembershipRole;
+  roles: MembershipRole[];
   status: "invited" | "active" | "disabled";
-  /** Warehouse scope from system.membership_warehouse (empty = none for non-admin). */
   warehouseIds: string[];
 }
 
-/** Port: implement against PrismaClient in infrastructure layer. */
 export interface MembershipRepository {
   findBySub(sub: string): Promise<MembershipRow | null>;
 }
@@ -43,12 +40,6 @@ export class ActorResolutionError extends Error {
 
 /**
  * Build an Actor from verified claims and the local membership row.
- *
- * Rules:
- * - `sub` must exist in system.membership with status='active'.
- * - `organizationId` comes from the membership row, never from the token.
- * - `roles` list is `[membership.role]`; token realm_roles used only for auditing mismatch.
- * - Disabled or invited memberships are rejected with 403.
  */
 export async function resolveActor(
   claims: NexoraClaims,
@@ -72,13 +63,26 @@ export async function resolveActor(
     );
   }
 
-  // Log if token realm_roles diverge from DB role (non-fatal; DB is authoritative).
+  const roles =
+    membership.roles?.length > 0
+      ? membership.roles
+      : membership.role
+        ? [membership.role]
+        : [];
+
+  if (roles.length === 0) {
+    throw new ActorResolutionError(
+      "MEMBERSHIP_ROLES_MISSING",
+      "Membership has no job roles assigned",
+      403,
+    );
+  }
+
   const tokenRoles = realmRoles(claims);
-  if (!tokenRoles.includes(membership.role)) {
-    // Intentionally not throwing — DB membership is source of truth; token may lag.
-    // Caller can audit this via structured logging.
+  const missingInToken = roles.filter((r) => !tokenRoles.includes(r));
+  if (missingInToken.length > 0) {
     console.warn(
-      `[resolve-actor] Token realm roles differ from DB role '${membership.role}' for sub prefix ${claims.sub.slice(0, 8)}`,
+      `[resolve-actor] Token realm roles missing DB roles [${missingInToken.join(",")}] for sub prefix ${claims.sub.slice(0, 8)}`,
     );
   }
 
@@ -86,7 +90,7 @@ export async function resolveActor(
     userId: membership.keycloakSub,
     organizationId: membership.organizationId,
     unitIds: membership.warehouseIds ?? [],
-    roles: [membership.role],
+    roles,
     displayName: membership.displayName,
   };
 }

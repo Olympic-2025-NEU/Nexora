@@ -37,10 +37,27 @@ export function createSaleService(ports: Ports) {
     const sourceMovements = await ctx.tx.stockMovement.findMany({ where: { kind: "issue",
       sourceLineId: { in: doc.lines.map((line) => line.sourceIssueLineId!).filter(Boolean) } },
     select: { sourceLineId: true, delta: true, balanceAfter: true } });
+    const seller = doc.saleDetail.sellerMembershipId
+      ? await ctx.tx.membership.findUnique({
+          where: { id: doc.saleDetail.sellerMembershipId },
+          select: { id: true, displayName: true, role: true },
+        })
+      : null;
+    const customer = doc.saleDetail.customerPartnerId
+      ? await ctx.tx.partner.findUnique({
+          where: { id: doc.saleDetail.customerPartnerId },
+          select: { id: true, code: true, displayName: true },
+        })
+      : null;
     return { id, documentNumber: doc.documentNumber, status: doc.status, version: doc.version,
       createdAt: doc.createdAt.toISOString(), confirmedAt: doc.confirmedAt?.toISOString() ?? null,
       linkedIssueId: doc.saleDetail.linkedIssueId, linkedIssueNumber: issue?.documentNumber,
       buyerRef: doc.saleDetail.buyerRef, soldAt: doc.saleDetail.soldAt.toISOString(),
+      sellerMembershipId: doc.saleDetail.sellerMembershipId,
+      sellerDisplayName: seller?.displayName ?? null,
+      customerPartnerId: doc.saleDetail.customerPartnerId,
+      customerDisplayName: customer?.displayName ?? null,
+      customerCode: customer?.code ?? null,
       lines: doc.lines.map((line) => ({ id: line.id, sourceIssueLineId: line.sourceIssueLineId,
         lineNo: line.lineNo, warehouseId: line.warehouseId, batchId: line.batchId,
         productVariantId: line.productVariantId, productId: line.productId,
@@ -66,7 +83,13 @@ export function createSaleService(ports: Ports) {
         ...(ctx.actor.roles.includes("administrator") ? {} : { warehouseIds: ctx.actor.unitIds, creatorSub: ctx.actor.userId }) });
       return { items: await Promise.all(page.items.map((doc) => view(ctx, doc.id))), nextCursorId: page.nextCursorId };
     },
-    async create(ctx: Context, input: { linkedIssueId: string; buyerRef?: string; soldAt?: string }) {
+    async create(ctx: Context, input: {
+      linkedIssueId: string;
+      buyerRef?: string;
+      soldAt?: string;
+      sellerMembershipId?: string;
+      customerPartnerId?: string;
+    }) {
       await repo(ctx).lockDocument(input.linkedIssueId);
       const issue = await repo(ctx).getAggregate(input.linkedIssueId);
       if (!issue || issue.documentType !== "goods_issue") throw new DomainError("ISSUE_NOT_FOUND", 422);
@@ -78,14 +101,48 @@ export function createSaleService(ports: Ports) {
       const now = new Date();
       const soldAt = input.soldAt ? new Date(input.soldAt) : now;
       if (!Number.isFinite(soldAt.getTime()) || soldAt.getTime() > now.getTime()) throw new DomainError("INVALID_SOLD_AT", 422);
-      const buyerRef = input.buyerRef?.trim() || null;
+
+      let sellerMembershipId: string | null = null;
+      if (input.sellerMembershipId) {
+        const seller = await ctx.tx.membership.findUnique({
+          where: { id: input.sellerMembershipId },
+          include: { roles: { select: { role: true } } },
+        });
+        if (!seller || seller.status !== "active") throw new DomainError("SELLER_NOT_FOUND", 422);
+        const sellerRoles = seller.roles.map((r) => r.role);
+        const roles = sellerRoles.length > 0 ? sellerRoles : [seller.role];
+        if (!roles.some((r) => r === "administrator" || r === "sales_clerk")) {
+          throw new DomainError("SELLER_ROLE_INVALID", 422);
+        }
+        if (
+          "organizationId" in ctx.actor &&
+          seller.organizationId !== ctx.actor.organizationId
+        ) {
+          throw new DomainError("SELLER_ORG_MISMATCH", 403);
+        }
+        sellerMembershipId = seller.id;
+      }
+
+      let customerPartnerId: string | null = null;
+      let partnerCode: string | null = null;
+      if (input.customerPartnerId) {
+        const partner = await ctx.tx.partner.findUnique({ where: { id: input.customerPartnerId } });
+        if (!partner || partner.status !== "active") throw new DomainError("CUSTOMER_NOT_FOUND", 422);
+        customerPartnerId = partner.id;
+        partnerCode = partner.code;
+      }
+
+      // Opaque external ref only — never store display names / PII in buyerRef.
+      const buyerRef = (input.buyerRef?.trim() || partnerCode || null);
       if (buyerRef && buyerRef.length > 64) throw new DomainError("BUYER_REF_TOO_LONG", 422);
       if (!issue.lines.length) throw new DomainError("NO_LINES", 422);
       const id = randomUUID();
       await repo(ctx).createDocument({ id, documentType: "sale_record", createdBySub: ctx.actor.userId,
         correlationId: ctx.requestId });
-      await repo(ctx).attachDetail({ type: "sale_record", data: { documentId: id, linkedIssueId: issue.id,
-        buyerRef, soldAt } });
+      await repo(ctx).attachDetail({ type: "sale_record", data: {
+        documentId: id, linkedIssueId: issue.id, buyerRef, soldAt,
+        sellerMembershipId, customerPartnerId,
+      } });
       await repo(ctx).createLines(id, issue.lines.map((line) => ({ id: randomUUID(), lineNo: line.lineNo,
         warehouseId: line.warehouseId, batchId: line.batchId, productVariantId: line.productVariantId,
         productId: line.productId, uomId: line.uomId, quantity: line.quantity!, sourceIssueLineId: line.id })));

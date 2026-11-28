@@ -55,12 +55,24 @@ export const tradingPorts: TradingPorts & TransferPorts & ReceivingPorts = {
   async confirmApproval(tx, input) {
     const db = getPrismaClient();
     await confirmApproval(tx, async (sub) => {
-      const membership = await db.membership.findUnique({ where: { keycloakSub: sub },
-        include: { warehouses: { select: { warehouseId: true } } } });
-      return membership ? { sub, role: membership.role, active: membership.status === "active",
-        warehouseIds: membership.role === "administrator"
+      const membership = await db.membership.findUnique({
+        where: { keycloakSub: sub },
+        include: {
+          warehouses: { select: { warehouseId: true } },
+          roles: { select: { role: true } },
+        },
+      });
+      if (!membership) return null;
+      const roles = membership.roles.map((r) => r.role);
+      const jobRoles = roles.length > 0 ? roles : [membership.role];
+      return {
+        sub,
+        roles: jobRoles,
+        active: membership.status === "active",
+        warehouseIds: jobRoles.includes("administrator")
           ? (await tx.warehouse.findMany({ select: { id: true } })).map((row) => row.id)
-          : membership.warehouses.map((row) => row.warehouseId) } : null;
+          : membership.warehouses.map((row) => row.warehouseId),
+      };
     }, async () => {}, input);
   },
   async cancelApproval(tx, input) {

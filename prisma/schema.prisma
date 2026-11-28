@@ -8,7 +8,7 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
-  schemas  = ["platform", "system", "catalog", "inventory", "trading", "traceability", "federation"]
+  schemas  = ["platform", "system", "catalog", "inventory", "trading", "traceability", "federation", "sales"]
 }
 
 model AuditLog {
@@ -338,15 +338,31 @@ model Membership {
   keycloakSub    String    @unique @map("keycloak_sub")
   displayName    String    @map("display_name")
   email          String?
+  /// Primary denormalized role (ADR 0018); authz uses MembershipRoleRow.
   role           String
   status         String    @default("invited")
   lastSyncedAt   DateTime? @map("last_synced_at") @db.Timestamptz(6)
 
   organization   Organization @relation(fields: [organizationId], references: [id])
   warehouses     MembershipWarehouse[]
+  sales          SaleDetail[]
+  roles          MembershipRoleRow[]
+  salesOrders    SalesOrder[]
 
   @@index([role, status])
   @@map("membership")
+  @@schema("system")
+}
+
+model MembershipRoleRow {
+  membershipId String @map("membership_id") @db.Uuid
+  role         String
+
+  membership Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+
+  @@id([membershipId, role])
+  @@index([role])
+  @@map("membership_role")
   @@schema("system")
 }
 
@@ -384,6 +400,8 @@ model Partner {
   connection       PartnerConnection?
   transfers        TransferDetail[]
   inboxMessages    InboxMessage[]
+  sales            SaleDetail[]
+  salesOrders      SalesOrder[]
 
   @@map("partner")
   @@schema("system")
@@ -461,6 +479,7 @@ model Uom {
   variantUoms    ProductVariantUom[]
   priceListItems PriceListItem[]
   documentLines  DocumentLine[]
+  salesOrderLines SalesOrderLine[]
 
   @@map("uom")
   @@schema("catalog")
@@ -484,6 +503,7 @@ model Product {
   images   ProductImage[]
   batches  Batch[]
   documentLines DocumentLine[]
+  salesOrderLines SalesOrderLine[]
 
   @@index([isActive, name])
   @@map("product")
@@ -511,6 +531,8 @@ model ProductVariant {
   balances       StockBalance[]
   movements      StockMovement[]
   documentLines  DocumentLine[]
+  salesOrderLines SalesOrderLine[]
+  salesOrderLineLots SalesOrderLineLot[]
 
   @@map("product_variant")
   @@schema("catalog")
@@ -593,6 +615,7 @@ model PriceListItem {
   priceList PriceList      @relation(fields: [priceListId], references: [id])
   variant   ProductVariant @relation(fields: [productVariantId], references: [id])
   uom       Uom            @relation(fields: [uomId], references: [id])
+  salesOrderLines SalesOrderLine[]
 
   @@unique([priceListId, productVariantId, uomId, priceType])
   @@map("price_list_item")
@@ -626,6 +649,7 @@ model Batch {
   passportPolicies PassportPolicy[]
   qrTokens QrToken[]
   identityMappings IdentityMapping[]
+  salesOrderLineLots SalesOrderLineLot[]
 
   @@unique([productId, localCode])
   @@unique([productVariantId, localCode])
@@ -654,6 +678,7 @@ model Warehouse {
   balances    StockBalance[]
   movements   StockMovement[]
   documentLines DocumentLine[]
+  salesOrderLineLots SalesOrderLineLot[]
 
   @@map("warehouse")
   @@schema("inventory")
@@ -737,6 +762,8 @@ model Document {
   approvals ApprovalRequest[]
   traceEvents TraceEvent[]
   traceEvidence TraceEvidence[]
+  salesOrderIssues SalesOrder[] @relation("SalesOrderIssue")
+  salesOrderSales  SalesOrder[] @relation("SalesOrderSale")
 
   @@unique([documentType, documentNumber], map: "uq_trading_document_number")
   @@index([status, createdAt(sort: Desc)], map: "idx_trading_document_status_time")
@@ -774,6 +801,7 @@ model DocumentLine {
   sourceAllocations IssueSourceAllocation[] @relation("IssueAllocationLine")
   allocatedToIssues IssueSourceAllocation[] @relation("AllocationSourceLine")
   businessReceiptLines BusinessReceiptLine[] @relation("BusinessReceiptSourceLine")
+  salesOrderLineLots SalesOrderLineLot[]
 
   @@unique([documentId, lineNo], map: "uq_trading_line_number")
   @@unique([id, documentId], map: "uq_trading_line_document")
@@ -847,15 +875,23 @@ model InboundMessage {
 }
 
 model SaleDetail {
-  documentId    String   @id @map("document_id") @db.Uuid
-  linkedIssueId String   @map("linked_issue_id") @db.Uuid
-  buyerRef      String?  @map("buyer_ref")
-  soldAt        DateTime @map("sold_at") @db.Timestamptz(6)
+  documentId          String   @id @map("document_id") @db.Uuid
+  linkedIssueId       String   @map("linked_issue_id") @db.Uuid
+  buyerRef            String?  @map("buyer_ref")
+  soldAt              DateTime @map("sold_at") @db.Timestamptz(6)
+  /// Cashier / staff who recorded the sale (POS / orders). Optional.
+  sellerMembershipId  String?  @map("seller_membership_id") @db.Uuid
+  /// Customer partner when known; walk-in sales leave null. Optional.
+  customerPartnerId   String?  @map("customer_partner_id") @db.Uuid
 
   document Document @relation("SaleDocument", fields: [documentId], references: [id])
   linkedIssue Document @relation("SaleIssue", fields: [linkedIssueId], references: [id])
+  sellerMembership Membership? @relation(fields: [sellerMembershipId], references: [id])
+  customerPartner Partner? @relation(fields: [customerPartnerId], references: [id])
 
   @@index([linkedIssueId], map: "idx_trading_sale_issue")
+  @@index([sellerMembershipId], map: "idx_trading_sale_seller")
+  @@index([customerPartnerId], map: "idx_trading_sale_customer")
   @@map("sale_detail")
   @@schema("trading")
 }
@@ -1055,4 +1091,120 @@ model QualityIssue {
   @@index([sourceType, sourceId], map: "idx_quality_issue_source")
   @@map("quality_issue")
   @@schema("traceability")
+}
+
+// ---------------------------------------------------------------------------
+// sales schema — ADR 0019 commercial order + invoice QR token
+// ---------------------------------------------------------------------------
+
+model SalesOrder {
+  id                   String    @id @db.Uuid
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+  version              Int       @default(1)
+  orderNumber          String    @unique @map("order_number")
+  status               String    @default("draft")
+  sellerMembershipId   String?   @map("seller_membership_id") @db.Uuid
+  customerPartnerId    String?   @map("customer_partner_id") @db.Uuid
+  currency             String    @db.Char(3)
+  subtotalAmount       Decimal   @map("subtotal_amount") @db.Decimal(20, 3)
+  discountAmount       Decimal   @default(0) @map("discount_amount") @db.Decimal(20, 3)
+  totalAmount          Decimal   @map("total_amount") @db.Decimal(20, 3)
+  paidAmount           Decimal   @default(0) @map("paid_amount") @db.Decimal(20, 3)
+  paymentMethod        String    @map("payment_method")
+  paidAt               DateTime? @map("paid_at") @db.Timestamptz(6)
+  soldAt               DateTime  @map("sold_at") @db.Timestamptz(6)
+  linkedIssueId        String?   @map("linked_issue_id") @db.Uuid
+  linkedSaleId         String?   @map("linked_sale_id") @db.Uuid
+  activeTraceTokenId   String?   @map("active_trace_token_id") @db.Uuid
+  createdBySub         String    @map("created_by_sub")
+  correlationId        String    @map("correlation_id")
+  note                 String?
+
+  seller       Membership?      @relation(fields: [sellerMembershipId], references: [id])
+  customer     Partner?         @relation(fields: [customerPartnerId], references: [id])
+  linkedIssue  Document?        @relation("SalesOrderIssue", fields: [linkedIssueId], references: [id])
+  linkedSale   Document?        @relation("SalesOrderSale", fields: [linkedSaleId], references: [id])
+  activeToken  OrderTraceToken? @relation("SalesOrderActiveToken", fields: [activeTraceTokenId], references: [id])
+  lines        SalesOrderLine[]
+  tokens       OrderTraceToken[] @relation("SalesOrderTokens")
+
+  @@index([status, soldAt(sort: Desc)], map: "idx_sales_order_status_sold")
+  @@index([sellerMembershipId], map: "idx_sales_order_seller")
+  @@index([customerPartnerId], map: "idx_sales_order_customer")
+  @@map("sales_order")
+  @@schema("sales")
+}
+
+model SalesOrderLine {
+  id               String   @id @db.Uuid
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  orderId          String   @map("order_id") @db.Uuid
+  lineNo           Int      @map("line_no")
+  productId        String   @map("product_id") @db.Uuid
+  productVariantId String   @map("product_variant_id") @db.Uuid
+  uomId            String   @map("uom_id") @db.Uuid
+  quantity         Decimal  @db.Decimal(20, 3)
+  unitPrice        Decimal  @map("unit_price") @db.Decimal(20, 3)
+  priceType        String   @map("price_type")
+  lineDiscount     Decimal  @default(0) @map("line_discount") @db.Decimal(20, 3)
+  lineTotal        Decimal  @map("line_total") @db.Decimal(20, 3)
+  priceListItemId  String?  @map("price_list_item_id") @db.Uuid
+
+  order          SalesOrder       @relation(fields: [orderId], references: [id])
+  product        Product          @relation(fields: [productId], references: [id])
+  variant        ProductVariant   @relation(fields: [productVariantId], references: [id])
+  uom            Uom              @relation(fields: [uomId], references: [id])
+  priceListItem  PriceListItem?   @relation(fields: [priceListItemId], references: [id])
+  lots           SalesOrderLineLot[]
+
+  @@unique([orderId, lineNo], map: "uq_sales_order_line_no")
+  @@index([orderId], map: "idx_sales_order_line_order")
+  @@index([productVariantId], map: "idx_sales_order_line_variant")
+  @@map("sales_order_line")
+  @@schema("sales")
+}
+
+model SalesOrderLineLot {
+  id                String   @id @db.Uuid
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  orderLineId       String   @map("order_line_id") @db.Uuid
+  lineNo            Int      @map("line_no")
+  warehouseId       String   @map("warehouse_id") @db.Uuid
+  batchId           String   @map("batch_id") @db.Uuid
+  productVariantId  String   @map("product_variant_id") @db.Uuid
+  quantity          Decimal  @db.Decimal(20, 3)
+  sourceIssueLineId String?  @map("source_issue_line_id") @db.Uuid
+
+  orderLine       SalesOrderLine @relation(fields: [orderLineId], references: [id])
+  warehouse       Warehouse      @relation(fields: [warehouseId], references: [id])
+  batch           Batch          @relation(fields: [batchId, productVariantId], references: [id, productVariantId])
+  variant         ProductVariant @relation(fields: [productVariantId], references: [id])
+  sourceIssueLine DocumentLine?  @relation(fields: [sourceIssueLineId], references: [id])
+
+  @@unique([orderLineId, lineNo], map: "uq_sales_order_line_lot_no")
+  @@index([orderLineId], map: "idx_sales_line_lot_line")
+  @@index([batchId], map: "idx_sales_line_lot_batch")
+  @@index([warehouseId], map: "idx_sales_line_lot_warehouse")
+  @@map("sales_order_line_lot")
+  @@schema("sales")
+}
+
+model OrderTraceToken {
+  id           String    @id @db.Uuid
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  orderId      String    @map("order_id") @db.Uuid
+  tokenHash    String    @unique(map: "uq_sales_order_trace_token_hash") @map("token_hash") @db.Char(64)
+  status       String
+  snapshotJson Json      @map("snapshot_json") @db.JsonB
+  qrPath       String?   @map("qr_path")
+  revokedAt    DateTime? @map("revoked_at") @db.Timestamptz(6)
+  createdBySub String    @map("created_by_sub")
+
+  order            SalesOrder  @relation("SalesOrderTokens", fields: [orderId], references: [id])
+  activeForOrders  SalesOrder[] @relation("SalesOrderActiveToken")
+
+  @@index([orderId], map: "idx_sales_order_trace_token_order")
+  @@map("order_trace_token")
+  @@schema("sales")
 }

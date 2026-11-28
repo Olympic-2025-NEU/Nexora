@@ -37,6 +37,7 @@ Products with `{sku,name,baseUnit}`, identifiers, batches by `productId`, balanc
 | Method/path | Request fields | Response/rule |
 | --- | --- | --- |
 | `POST /api/v1/products` | `{name,categoryId,attributes?,isActive?}` — **no sku** | 201 product; Staff/Admin; may auto-create empty primary later or require first variant in same UX |
+| `POST /api/v1/products/suggest-codes` | `{name,excludeVariantId?,reservedCodes?}` | UX helper: next SKU/barcode from name (initials + numeric tokens + `001`…); same algorithm for both; does not persist; Staff/Admin `catalog:product:create` |
 | `PATCH /api/v1/products/{id}` | `{name?,categoryId?,attributes?,isActive?}`, soft-delete action, `If-Match` | Maintains `search_text`; 409 if soft-delete blocked by stock |
 | `GET /api/v1/products`, `GET …/{id}` | `?q&categoryId&includeDescendants&isActive&cursor&limit` | Match `search_text` **or** variant sku/barcode (normalized); index fields include variantCount, primary retail |
 | `POST /api/v1/products/{id}/variants` | `{sku?,barcode?,isPrimary?,isActive?}` | ≥1 of sku/barcode; 409 `SKU_BARCODE_CONFLICT`; first → primary if none |

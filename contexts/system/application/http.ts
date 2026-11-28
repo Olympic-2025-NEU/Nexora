@@ -72,6 +72,7 @@ export function projectMember(member: MembershipRecord) {
     displayName: member.displayName,
     ...(member.email ? { email: member.email } : {}),
     role: member.role,
+    roles: member.roles,
     status: member.status,
     version: member.version,
     warehouseIds: member.warehouseIds ?? [],

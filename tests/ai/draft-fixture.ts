@@ -54,7 +54,7 @@ export const staffActor: Actor = {
   userId: SEED.actorSub,
   organizationId: "nexora-a",
   unitIds: [SEED.warehouse],
-  roles: ["staff"],
+  roles: ["inventory_clerk"],
   displayName: SEED.actorSub,
 };
 

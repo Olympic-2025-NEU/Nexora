@@ -259,6 +259,28 @@ Migration T03: `prisma/migrations/20261124040000_federation_delivery_attempt/mig
 
 `id uuid PK`, `issuer_instance_id text!`, `external_event_id text!`, `policy_version integer! >0`, `disclosure_scope text! IN ('partner','public')`, `state text! IN ('active','revoked')`, `source_inbox_id uuid!→federation.inbox_message.id`, `observed_at timestamptz!`, `refreshed_at timestamptz!`, `batch_id uuid!→catalog.batch.id`. Unique `(issuer_instance_id,external_event_id)`, index `(batch_id,state)`. Đây là cache quyền mutable cho trace event immutable: version thấp hơn bị từ chối, cùng version chỉ cho active→revoked, remote relay cần scope `public`. `app_runtime` SELECT/INSERT/UPDATE, không DELETE; source event vẫn `partner_asserted`, graph ẩn cache revoked và nêu stale sau 24 giờ. Không tạo FK cross-instance hoặc lưu raw document.
 
+## Sales (ADR 0019) — commercial order + invoice QR
+
+Schema mới `sales`, tách money-free `trading.sale_record`. Stock vẫn chỉ qua `goods_issue` purpose `sale` (D14). Token hóa đơn **không** dùng `traceability.qr_token`.
+
+### `sales.sales_order`
+
+`id`, `created_at`, `updated_at`, `version`; `order_number text! UNIQUE (<=40)`; `status text! CHECK IN ('draft','paid','fulfilled','cancelled')`; `seller_membership_id uuid?→system.membership.id`; `customer_partner_id uuid?→system.partner.id`; `currency char(3)!`; `subtotal_amount numeric(20,3)! CHECK(>=0)`; `discount_amount numeric(20,3)! CHECK(>=0) DEFAULT 0`; `total_amount numeric(20,3)! CHECK(>=0)`; `paid_amount numeric(20,3)! CHECK(>=0) DEFAULT 0`; `payment_method text! CHECK IN ('cash','transfer','card')`; `paid_at timestamptz?`; `sold_at timestamptz!`; `linked_issue_id uuid?→trading.document.id`; `linked_sale_id uuid?→trading.document.id`; `active_trace_token_id uuid?` (soft pointer; FK tới `order_trace_token` sau khi tạo token); `created_by_sub text!`; `correlation_id text!`; `note text?`. Index `(status, sold_at DESC)`, `(order_number)`.
+
+### `sales.sales_order_line`
+
+`id`, `created_at`; `order_id uuid!→sales.sales_order.id`; `line_no int!`; UNIQUE `(order_id,line_no)`; `product_id uuid!→catalog.product.id`; `product_variant_id uuid!→catalog.product_variant.id`; `uom_id uuid!→catalog.uom.id`; `quantity numeric(20,3)! CHECK(>0)`; `unit_price numeric(20,3)! CHECK(>=0)`; `price_type text! CHECK IN ('retail','wholesale')`; `line_discount numeric(20,3)! CHECK(>=0) DEFAULT 0`; `line_total numeric(20,3)! CHECK(>=0)`; `price_list_item_id uuid?→catalog.price_list_item.id`.
+
+### `sales.sales_order_line_lot` (= BRD-Trace `invoice_item`)
+
+`id` (= `invoice_item_id`), `created_at`; `order_line_id uuid!→sales.sales_order_line.id`; `line_no int!`; UNIQUE `(order_line_id,line_no)`; `warehouse_id uuid!→inventory.warehouse.id`; `batch_id uuid!`; `product_variant_id uuid!`; FK `(batch_id,product_variant_id)→catalog.batch(id,product_variant_id)`; `quantity numeric(20,3)! CHECK(>0)`; `source_issue_line_id uuid?→trading.document_line.id`.
+
+### `sales.order_trace_token` (= BRD `invoice_trace_tokens`)
+
+`id`, `created_at`; `order_id uuid!→sales.sales_order.id`; `token_hash char(64)! UNIQUE` (`CHECK ~ '^[0-9a-f]{64}$'`); `status text! CHECK IN ('active','revoked')`; partial UNIQUE `(order_id) WHERE status='active'`; `snapshot_json jsonb!`; `qr_path text?`; `revoked_at timestamptz?`; `created_by_sub text!`. Không lưu raw token. Runtime: `SELECT/INSERT/UPDATE`; không `DELETE` token / fulfilled order rows.
+
+Grants: `USAGE` on schema `sales`; `SELECT,INSERT,UPDATE` on four tables for `app_runtime`.
+
 ## P12 — data quality vận hành
 
 ### `traceability.quality_issue`

@@ -13,7 +13,7 @@ const productId = "33333333-3333-4333-8333-333333333333";
 const variantId = "44444444-4444-4444-8444-444444444444";
 const uomId = "55555555-5555-4555-8555-555555555555";
 const documentId = "66666666-6666-4666-8666-666666666666";
-const actor: Actor = { userId: "staff-1", organizationId: "org-a", unitIds: [warehouseId], roles: ["staff"] };
+const actor: Actor = { userId: "staff-1", organizationId: "org-a", unitIds: [warehouseId], roles: ["inventory_clerk"] };
 
 function fixture() {
   const calls: { method: string; path: string; body?: unknown; key?: string; auth: string }[] = [];
@@ -124,7 +124,7 @@ test("issue draft rejects insufficient stock and viewer cannot create any draft"
   await assert.rejects(sample.run("createIssueDraft", { batchId, warehouseId,
     quantity: "9.000", unit: "EA", purpose: "sale" }, sample.ctx),
   { code: "AI_STOCK_INSUFFICIENT", httpStatus: 422 });
-  const viewer: ToolContext = { ...sample.ctx, actor: { ...actor, roles: ["viewer"] } };
+  const viewer: ToolContext = { ...sample.ctx, actor: { ...actor, roles: ["auditor"] } };
   await assert.rejects(sample.run("createReceiptDraft", { batchId, warehouseId,
     quantity: "1", unit: "EA" }, viewer), { code: "POLICY_DENIED", httpStatus: 403 });
   assert.equal(sample.calls.filter((call) => call.method === "POST").length, 0);

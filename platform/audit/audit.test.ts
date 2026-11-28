@@ -14,7 +14,7 @@ import { auditAuthenticationFailure, auditDeny, auditFailure } from "./security-
 const administrator: Actor = {
   userId: "admin-sub", organizationId: randomUUID(), unitIds: [], roles: ["administrator"],
 };
-const staff: Actor = { ...administrator, userId: "staff-sub", roles: ["staff"] };
+const staff: Actor = { ...administrator, userId: "staff-sub", roles: ["inventory_clerk"] };
 
 describe("audit data boundary", () => {
   it("copies only fixed, bounded summary fields", () => {
@@ -35,13 +35,13 @@ describe("audit data boundary", () => {
       warehouseIds: [wid, "not-a-uuid", wid],
       changedFields: ["warehouseIds", "role", "secret"],
       reason: "Mark available after QC",
-      role: "staff",
+      role: "inventory_clerk",
     });
     assert.deepEqual(summary.warehouseIds, [wid]);
     assert.equal(summary.warehouseCount, 1);
     assert.deepEqual(summary.changedFields, ["warehouseIds", "role"]);
     assert.equal(summary.reason, "Mark available after QC");
-    assert.equal(summary.role, "staff");
+    assert.equal(summary.role, "inventory_clerk");
   });
 
   it("records actor, target, request and redacted summary on the caller's transaction client", async () => {

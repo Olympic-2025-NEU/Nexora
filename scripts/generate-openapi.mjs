@@ -5,9 +5,19 @@ import { ref, schemas, schemaTools } from "./openapi-v1-schemas.mjs";
 
 const { obj, arr, str, uuid } = schemaTools;
 const FILE = "contracts/openapi/nexora-v1.yaml";
-const EVERY_USER = ["administrator", "staff", "approver", "viewer"];
+const EVERY_USER = [
+  "administrator",
+  "catalog_manager",
+  "inventory_clerk",
+  "sales_clerk",
+  "stocktake_clerk",
+  "issue_approver",
+  "quality_officer",
+  "auditor",
+];
 const ADMIN = ["administrator"];
-const WRITER = ["administrator", "staff"];
+const WRITER = ["administrator", "inventory_clerk", "catalog_manager", "sales_clerk", "stocktake_clerk"];
+const APPROVER = ["issue_approver"];
 const filterTypes = {
   cursor: str(), limit: { type: "integer", minimum: 1, maximum: 100, default: 20 },
   depth: { type: "integer", minimum: 1, maximum: 10 },
@@ -35,7 +45,7 @@ const doc = {
       oidc: {
         type: "openIdConnect",
         openIdConnectUrl: "https://keycloak.example/.well-known/openid-configuration",
-        description: "Authorization Code + PKCE. MFA required for administrator and approver roles.",
+        description: "Authorization Code + PKCE. MFA required for administrator and issue_approver roles.",
       },
       bearerUser: {
         type: "http",
@@ -214,9 +224,9 @@ add("get", "/api/v1/lots/{id}/issue-sources", "M03", "Available confirmed receip
 doc.paths["/api/v1/lots/{id}/issue-sources"].get.parameters
   .find((parameter) => parameter.name === "warehouseId").required = true;
 list("/api/v1/documents", "M03", "List documents", "Document", EVERY_USER, ["type", "status", "batchId", "partnerId", "from", "to"]);
-add("get", "/api/v1/approvals/inbox", "M03", "List actionable approval tasks", "ApprovalTask", { roles: ["approver"], description: "Candidate-group tasks in current warehouse scope, excluding creator. Age reflects submission time." });
+add("get", "/api/v1/approvals/inbox", "M03", "List actionable approval tasks", "ApprovalTask", { roles: APPROVER, description: "Candidate-group tasks in current warehouse scope, excluding creator. Age reflects submission time." });
 doc.paths["/api/v1/approvals/inbox"].get.responses["200"].content["application/json"].schema = envelope(arr(ref("ApprovalTask")));
-add("post", "/api/v1/approvals/{id}/decisions", "M03", "Record approval decision intent", "ApprovalDecisionResult", { body: "ApprovalDecisionInput", roles: ["approver"], idempotent: true, ifMatch: true, status: 202, description: "Creator cannot decide own issue. Decision intent commits before Flowable completion; result is asynchronous. Clients must send If-Match / version from approvalVersion." });
+add("post", "/api/v1/approvals/{id}/decisions", "M03", "Record approval decision intent", "ApprovalDecisionResult", { body: "ApprovalDecisionInput", roles: APPROVER, idempotent: true, ifMatch: true, status: 202, description: "Creator cannot decide own issue. Decision intent commits before Flowable completion; result is asynchronous. Clients must send If-Match / version from approvalVersion." });
 
 add("get", "/api/v1/trace/status", "M04", "Local trace projector status", "TraceProjectorStatus", {
   description: "Authenticated local outbox lag. A caught-up queue does not assert that remote partner history is complete." });

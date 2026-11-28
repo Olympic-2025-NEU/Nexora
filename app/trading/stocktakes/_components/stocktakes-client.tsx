@@ -123,10 +123,10 @@ export function StocktakesClient({ id, creating = false }: { id?: string; creati
     {varianceLikely && !note.trim() && <p role="status">Có chênh lệch ước tính. Nhập lý do trước khi confirm.</p>}
     <button type="submit" disabled={busy} className="rounded border p-2">{id ? "Lưu bản nháp" : "Tạo bản nháp"}</button>
   </form>;
-  return <main className="mx-auto max-w-5xl space-y-6 p-6">
+  return <main className="mx-auto max-w-5xl space-y-6">
     <h1 className="text-2xl font-semibold">Kiểm kê theo lô</h1>
     <nav className="flex gap-4"><Link href="/trading/stocktakes">Kiểm kê</Link>
-      <Link href="/trading/stocktakes/create">Tạo phiếu</Link><Link href="/trading/sales">Ghi nhận bán</Link></nav>
+      <Link href="/trading/stocktakes/create">Tạo phiếu</Link><Link href="/orders">Đơn hàng</Link></nav>
     {error && <p role="alert" className="text-red-600">{error}</p>}
     {creating && editor}
     {!id && !creating && <ul className="space-y-2">{items.map((doc) => <li key={doc.id}>

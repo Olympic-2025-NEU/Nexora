@@ -10,7 +10,7 @@ import { IdempotencyClaimLostError, UnimplementedIdempotency, type IdempotencyPo
 import { mapCommandError } from "./error-mapping";
 import { commandPipeline, runCommand, type CommandContext, type CommandOptions } from "./pipeline";
 
-const actor = { userId: "user-1", organizationId: "org-1", unitIds: [], roles: ["staff"] };
+const actor = { userId: "user-1", organizationId: "org-1", unitIds: [], roles: ["inventory_clerk"] };
 const written: unknown[] = [];
 const tx = { outboxMessage: { createMany: async ({ data }: { data: unknown[] }) => { written.push(...data); } } } as unknown as Prisma.TransactionClient;
 
@@ -37,7 +37,7 @@ function setup() {
   const options: CommandOptions<string> = {
     authenticate: async () => actor,
     resolveTenant: async () => "org-1",
-    action: "trading:goods-issue:create",
+    action: "trading:issue:create",
     unitOfWork,
     onStep: (step) => order.push(step),
     domain: async (current) => {

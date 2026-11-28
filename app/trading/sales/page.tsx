@@ -1,3 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { SalesClient } from "./_components/sales-client";
-export default function SalesPage() { return <SalesClient />; }
+import { redirect } from "next/navigation";
+
+/** Legacy path — orders live at `/orders`. */
+export default function SalesRedirectPage() {
+  redirect("/orders");
+}

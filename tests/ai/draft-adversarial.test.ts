@@ -109,7 +109,7 @@ test("thiếu quyền tạo hoặc ngoài scope kho bị 403, không có chứng
   const deXuat = await deXuatHopLe(mau);
   const payload = { proposalId: deXuat.proposalId, fields: deXuat.fields };
 
-  const nguoiXem = { ...mau.actor, roles: ["viewer"] };
+  const nguoiXem = { ...mau.actor, roles: ["auditor"] };
   await assert.rejects(createReceiptDraftFromProposal(payload, { ...mau.deps, actor: nguoiXem }),
     { code: "POLICY_DENIED", httpStatus: 403 }, "viewer thiếu trading:receipt:create");
 

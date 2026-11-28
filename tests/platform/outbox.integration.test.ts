@@ -48,8 +48,8 @@ function dispatcher(workerId: string, handler?: OutboxHandler, maxAttempts = 8) 
 function command(key: string, input: OutboxEventInput, fail = false) {
   let effects = 0;
   const options: CommandOptions<{ id: string }> = {
-    authenticate: async () => ({ userId: "outbox-user", organizationId: "test-org", unitIds: [], roles: ["staff"] }),
-    resolveTenant: async () => "test-org", action: "trading:goods-issue:create",
+    authenticate: async () => ({ userId: "outbox-user", organizationId: "test-org", unitIds: [], roles: ["inventory_clerk"] }),
+    resolveTenant: async () => "test-org", action: "trading:issue:create",
     idempotencyKey: key, payload: { aggregateId: input.aggregateId },
     idempotencyPort: createPrismaIdempotency(client), unitOfWork: () => createTransaction(client),
     domain: async (ctx) => {

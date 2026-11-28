@@ -36,7 +36,7 @@ async function start(): Promise<ProcessInstance> {
 }
 
 async function taskFor(id: string) {
-  return poll(async () => (await client.queryTasks({ candidateGroup: "approver", processInstanceId: id })).find((task) => task.processInstanceId === id && task.taskDefinitionKey === "approveGoodsIssue") || false);
+  return poll(async () => (await client.queryTasks({ candidateGroup: "issue_approver", processInstanceId: id })).find((task) => task.processInstanceId === id && task.taskDefinitionKey === "approveGoodsIssue") || false);
 }
 
 async function finished(id: string, end: string, decision: string, reason?: string) {

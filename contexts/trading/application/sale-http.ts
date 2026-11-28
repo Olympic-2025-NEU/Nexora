@@ -26,13 +26,21 @@ export async function saleRoute(request: NextRequest, id?: string, action?: stri
       });
     }
     if (request.method !== "POST" || (id && !action)) throw new DomainError("METHOD_NOT_ALLOWED", 405);
-    const body = assertBody(await readJson(request), action ? [] : ["linkedIssueId", "buyerRef", "soldAt"]);
+    const body = assertBody(await readJson(request), action ? [] : [
+      "linkedIssueId", "buyerRef", "soldAt", "sellerMembershipId", "customerPartnerId",
+    ]);
     if (!action) {
       if (!isUuid(body.linkedIssueId)) throw new DomainError("LINKED_ISSUE_ID_INVALID", 422);
       if (body.buyerRef !== undefined && typeof body.buyerRef !== "string") throw new DomainError("BUYER_REF_INVALID", 422);
       if (body.soldAt !== undefined && (typeof body.soldAt !== "string" ||
         !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?(?:Z|[+-]\d\d:\d\d)$/.test(body.soldAt) ||
         !Number.isFinite(Date.parse(body.soldAt)))) throw new DomainError("INVALID_SOLD_AT", 422);
+      if (body.sellerMembershipId !== undefined && !isUuid(body.sellerMembershipId)) {
+        throw new DomainError("SELLER_ID_INVALID", 422);
+      }
+      if (body.customerPartnerId !== undefined && !isUuid(body.customerPartnerId)) {
+        throw new DomainError("CUSTOMER_ID_INVALID", 422);
+      }
     }
     const version = id ? parseIfMatchVersion(request.headers.get("if-match")) : null;
     if (id && version === null) throw new DomainError("IF_MATCH_REQUIRED", 428);
@@ -52,7 +60,13 @@ export async function saleRoute(request: NextRequest, id?: string, action?: stri
         const args = { tx: ctx.tx, actor: ctx.actor, requestId, emit: ctx.emit };
         if (id && version !== null && action === "cancel") return service.cancel(args, id, version);
         if (id && version !== null && action === "confirm") return service.confirm(args, id, version);
-        return service.create(args, body as { linkedIssueId: string; buyerRef?: string; soldAt?: string });
+        return service.create(args, body as {
+          linkedIssueId: string;
+          buyerRef?: string;
+          soldAt?: string;
+          sellerMembershipId?: string;
+          customerPartnerId?: string;
+        });
       },
     });
     return ok(result, requestId, id ? 200 : 201);

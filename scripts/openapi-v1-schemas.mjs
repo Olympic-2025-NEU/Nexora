@@ -19,6 +19,16 @@ const nonNegative = str({ pattern: "^(0|[1-9][0-9]*)(\\.[0-9]{1,3})?$" });
 const signed = str({ pattern: "^-?(0|[1-9][0-9]*)(\\.[0-9]{1,3})?$" });
 const unit = enumeration("EA", "KG", "L");
 const status = enumeration("draft", "pending_approval", "approved", "rejected", "confirmed", "cancelled");
+const jobRole = enumeration(
+  "administrator",
+  "catalog_manager",
+  "inventory_clerk",
+  "sales_clerk",
+  "stocktake_clerk",
+  "issue_approver",
+  "quality_officer",
+  "auditor",
+);
 
 function jsonSchemaAsOpenApi(file) {
   const source = JSON.parse(readFileSync(file, "utf8"));
@@ -51,12 +61,12 @@ export const schemas = {
   }, ["code", "message", "requestId"]),
   HealthStatus: obj({ status: enumeration("ok", "degraded"), service: str(), version: str() }, ["status", "service", "version"]),
   Page: obj({ nextCursor: str(), limit: { type: "integer", minimum: 1, maximum: 100 } }, ["limit"]),
-  Me: obj({ userId: str(), organizationId: uuid, roles: arr(enumeration("administrator", "staff", "approver", "viewer")), unitIds: arr(uuid), displayName: str() }, ["userId", "organizationId", "roles", "unitIds", "displayName"]),
+  Me: obj({ userId: str(), organizationId: uuid, roles: arr(jobRole), unitIds: arr(uuid), displayName: str() }, ["userId", "organizationId", "roles", "unitIds", "displayName"]),
   Organization: obj({ id: uuid, instanceId: str(), code: str(), name: str(), timezone: str(), status: str(), version: integer, contactEmail: str({ format: "email" }), contactPhone: str(), address: str() }, ["id", "instanceId", "code", "name", "timezone", "status", "version"]),
   OrganizationPatch: obj({ name: str({ minLength: 1 }), contactEmail: str({ format: "email", nullable: true }), contactPhone: str({ nullable: true }), address: str({ nullable: true }), timezone: str(), version: integer }, [], { minProperties: 1 }),
-  Member: obj({ id: uuid, keycloakSub: str(), displayName: str(), email: str({ format: "email" }), role: enumeration("administrator", "staff", "approver", "viewer"), status: str(), warehouseIds: arr(uuid), version: integer, provisionalPassword: str({ description: "Present only on invite response; never persisted for later GET." }), keycloakCreated: { type: "boolean" } }, ["id", "keycloakSub", "displayName", "role", "status", "version"]),
-  MemberCreate: obj({ username: str({ minLength: 1 }), displayName: str({ minLength: 1 }), email: str({ format: "email" }), role: enumeration("administrator", "staff", "approver", "viewer"), warehouseIds: arr(uuid), temporaryPassword: str({ minLength: 8 }) }, ["username", "displayName", "role"], { description: "Admin invite provisions (or reuses) a Keycloak user by username. Clients must not send keycloakSub — the IdP allocates or resolves the subject." }),
-  MemberPatch: obj({ role: enumeration("administrator", "staff", "approver", "viewer"), status: enumeration("active", "disabled"), displayName: str({ minLength: 1 }), email: str({ format: "email", nullable: true }), warehouseIds: arr(uuid), version: integer }, [], { minProperties: 1 }),
+  Member: obj({ id: uuid, keycloakSub: str(), displayName: str(), email: str({ format: "email" }), role: jobRole, roles: arr(jobRole, { minItems: 1 }), status: str(), warehouseIds: arr(uuid), version: integer, provisionalPassword: str({ description: "Present only on invite response; never persisted for later GET." }), keycloakCreated: { type: "boolean" } }, ["id", "keycloakSub", "displayName", "role", "roles", "status", "version"]),
+  MemberCreate: obj({ username: str({ minLength: 1 }), displayName: str({ minLength: 1 }), email: str({ format: "email" }), roles: arr(jobRole, { minItems: 1 }), warehouseIds: arr(uuid), temporaryPassword: str({ minLength: 8 }) }, ["username", "displayName", "roles"], { description: "Admin invite provisions (or reuses) a Keycloak user by username. Clients send roles[] (ADR 0018); do not send keycloakSub." }),
+  MemberPatch: obj({ roles: arr(jobRole, { minItems: 1 }), status: enumeration("active", "disabled"), displayName: str({ minLength: 1 }), email: str({ format: "email", nullable: true }), warehouseIds: arr(uuid), version: integer }, [], { minProperties: 1 }),
   Partner: obj({ id: uuid, issuerInstanceId: str(), code: str(), displayName: str(), contactEmail: str({ format: "email" }), status: str(), connectionStatus: str(), version: integer }, ["id", "issuerInstanceId", "code", "displayName", "status", "version"]),
   PartnerCreate: obj({ issuerInstanceId: str({ minLength: 1 }), code: str({ minLength: 1 }), displayName: str({ minLength: 1 }), contactEmail: str({ format: "email" }) }, ["issuerInstanceId", "code", "displayName"]),
   PartnerPatch: obj({ displayName: str({ minLength: 1 }), status: enumeration("active", "suspended"), contactEmail: str({ format: "email", nullable: true }), version: integer }, [], { minProperties: 1 }),

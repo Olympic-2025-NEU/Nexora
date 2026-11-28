@@ -9,12 +9,17 @@ import {
   normalizeVariantCode,
   uomNameKey,
 } from "../domain/normalize-uom";
+import {
+  buildVariantCodeBase,
+  suggestVariantCode as allocateSuggestedVariantCode,
+} from "../domain/suggest-variant-code";
 import type {
   BatchRecord,
   CategoryRecord,
   PriceListItemRecord,
   PriceListRecord,
   PriceType,
+  ProductImageRecord,
   ProductListItem,
   ProductRecord,
   ProductVariantRecord,
@@ -23,6 +28,8 @@ import type {
   UomKind,
   UomRecord,
 } from "../domain/types";
+
+const MAX_PRODUCT_IMAGES = 5;
 
 type Db = PrismaClient | Prisma.TransactionClient;
 
@@ -251,17 +258,124 @@ export function createCatalogRepos(db: Db) {
           variants: {
             where: { deletedAt: null, isPrimary: true },
             take: 1,
-            select: { sku: true, barcode: true },
+            select: {
+              id: true,
+              sku: true,
+              barcode: true,
+              uoms: {
+                where: { isStockKeeping: true },
+                take: 1,
+                select: { uomId: true },
+              },
+            },
+          },
+          images: {
+            where: { deletedAt: null },
+            orderBy: [{ isPrimary: "desc" }, { sortOrder: "asc" }, { createdAt: "asc" }],
+            take: 1,
+            select: { attachmentId: true },
           },
         },
       });
+
+      const uomIds = new Set<string>();
+      const variantIds: string[] = [];
+      const baseUomByVariant = new Map<string, string>();
+      for (const row of rows) {
+        const attrs = asAttrs(row.attributes);
+        const baseUomId = typeof attrs.baseUomId === "string" ? attrs.baseUomId : null;
+        if (baseUomId) uomIds.add(baseUomId);
+        const primary = row.variants[0];
+        const stockUomId = primary?.uoms[0]?.uomId;
+        if (stockUomId) uomIds.add(stockUomId);
+        if (primary?.id) {
+          variantIds.push(primary.id);
+          if (baseUomId) baseUomByVariant.set(primary.id, baseUomId);
+        }
+      }
+
+      const [uoms, defaultList] = await Promise.all([
+        uomIds.size
+          ? db.uom.findMany({
+              where: { id: { in: [...uomIds] }, deletedAt: null },
+              select: { id: true, name: true },
+            })
+          : Promise.resolve([] as { id: string; name: string }[]),
+        variantIds.length
+          ? db.priceList.findFirst({
+              where: { isDefault: true, deletedAt: null, isActive: true },
+              select: { id: true },
+            })
+          : Promise.resolve(null),
+      ]);
+      const uomNameById = new Map(uoms.map((u) => [u.id, u.name]));
+
+      const priceByVariant = new Map<
+        string,
+        { purchase: string | null; retail: string | null; wholesale: string | null }
+      >();
+      if (defaultList && variantIds.length) {
+        const priceRows = await db.priceListItem.findMany({
+          where: {
+            priceListId: defaultList.id,
+            productVariantId: { in: variantIds },
+            isActive: true,
+          },
+          select: {
+            productVariantId: true,
+            uomId: true,
+            priceType: true,
+            amount: true,
+          },
+        });
+        for (const item of priceRows) {
+          const baseUomId = baseUomByVariant.get(item.productVariantId);
+          if (baseUomId && item.uomId !== baseUomId) continue;
+          const slot = priceByVariant.get(item.productVariantId) ?? {
+            purchase: null,
+            retail: null,
+            wholesale: null,
+          };
+          const amount = item.amount.toFixed();
+          if (item.priceType === "purchase") slot.purchase = amount;
+          else if (item.priceType === "retail") slot.retail = amount;
+          else if (item.priceType === "wholesale") slot.wholesale = amount;
+          priceByVariant.set(item.productVariantId, slot);
+        }
+      }
+
       const mapped: ProductListItem[] = rows.map((row) => {
         const primary = row.variants[0];
+        const product = mapProduct(row);
+        const attrUomId =
+          typeof product.attributes.baseUomId === "string" ? product.attributes.baseUomId : null;
+        const stockUomId = primary?.uoms[0]?.uomId ?? null;
+        const baseUomId = attrUomId ?? stockUomId;
+        const attrPrices =
+          product.attributes.prices &&
+          typeof product.attributes.prices === "object" &&
+          !Array.isArray(product.attributes.prices)
+            ? (product.attributes.prices as Record<string, unknown>)
+            : {};
+        const listPrices = primary?.id ? priceByVariant.get(primary.id) : undefined;
+        const pickPrice = (key: "purchase" | "retail" | "wholesale") => {
+          const fromList = listPrices?.[key] ?? null;
+          if (fromList != null && fromList !== "") return fromList;
+          const fromAttr = attrPrices[key];
+          return fromAttr != null && String(fromAttr).trim() !== "" ? String(fromAttr) : null;
+        };
         return {
-          ...mapProduct(row),
+          ...product,
           variantCount: row._count.variants,
+          primaryVariantId: primary?.id ?? null,
           primarySku: primary?.sku ?? null,
           primaryBarcode: primary?.barcode ?? null,
+          baseUomId,
+          baseUomName: baseUomId ? (uomNameById.get(baseUomId) ?? null) : null,
+          pricePurchase: pickPrice("purchase"),
+          priceRetail: pickPrice("retail"),
+          priceWholesale: pickPrice("wholesale"),
+          primaryImageAttachmentId: row.images[0]?.attachmentId ?? null,
         };
       });
       return finishPage(mapped, filters.limit);
@@ -270,6 +384,116 @@ export function createCatalogRepos(db: Db) {
     async findProductById(id: string): Promise<ProductRecord | null> {
       const row = await db.product.findUnique({ where: { id } });
       return row ? mapProduct(row) : null;
+    },
+
+    async listProductImages(productId: string): Promise<ProductImageRecord[]> {
+      const rows = await db.productImage.findMany({
+        where: { productId, deletedAt: null },
+        orderBy: [{ isPrimary: "desc" }, { sortOrder: "asc" }, { createdAt: "asc" }],
+      });
+      return rows.map((row) => ({
+        id: row.id,
+        productId: row.productId,
+        attachmentId: row.attachmentId,
+        sortOrder: row.sortOrder,
+        isPrimary: row.isPrimary,
+        deletedAt: row.deletedAt?.toISOString() ?? null,
+        createdAt: row.createdAt.toISOString(),
+        updatedAt: row.updatedAt.toISOString(),
+      }));
+    },
+
+    async createProductImage(input: {
+      id: string;
+      productId: string;
+      attachmentId: string;
+      isPrimary?: boolean;
+    }): Promise<ProductImageRecord> {
+      const product = await db.product.findFirst({
+        where: { id: input.productId, deletedAt: null },
+        select: { id: true },
+      });
+      if (!product) throw new DomainError("PRODUCT_NOT_FOUND", 404);
+
+      const activeCount = await db.productImage.count({
+        where: { productId: input.productId, deletedAt: null },
+      });
+      if (activeCount >= MAX_PRODUCT_IMAGES) {
+        throw new DomainError("PRODUCT_IMAGE_LIMIT", 422);
+      }
+
+      const duplicate = await db.productImage.findFirst({
+        where: {
+          productId: input.productId,
+          attachmentId: input.attachmentId,
+          deletedAt: null,
+        },
+      });
+      if (duplicate) throw new DomainError("PRODUCT_IMAGE_EXISTS", 409);
+
+      const makePrimary = input.isPrimary === true || activeCount === 0;
+      if (makePrimary) {
+        await db.productImage.updateMany({
+          where: { productId: input.productId, deletedAt: null, isPrimary: true },
+          data: { isPrimary: false, updatedAt: new Date() },
+        });
+      }
+
+      const row = await db.productImage.create({
+        data: {
+          id: input.id,
+          productId: input.productId,
+          attachmentId: input.attachmentId,
+          sortOrder: activeCount,
+          isPrimary: makePrimary,
+        },
+      });
+      return {
+        id: row.id,
+        productId: row.productId,
+        attachmentId: row.attachmentId,
+        sortOrder: row.sortOrder,
+        isPrimary: row.isPrimary,
+        deletedAt: row.deletedAt?.toISOString() ?? null,
+        createdAt: row.createdAt.toISOString(),
+        updatedAt: row.updatedAt.toISOString(),
+      };
+    },
+
+    async softDeleteProductImage(
+      productId: string,
+      imageId: string,
+    ): Promise<ProductImageRecord | null> {
+      const existing = await db.productImage.findFirst({
+        where: { id: imageId, productId, deletedAt: null },
+      });
+      if (!existing) return null;
+      const row = await db.productImage.update({
+        where: { id: imageId },
+        data: { deletedAt: new Date(), isPrimary: false, updatedAt: new Date() },
+      });
+      if (existing.isPrimary) {
+        const next = await db.productImage.findFirst({
+          where: { productId, deletedAt: null },
+          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+        });
+        if (next) {
+          await db.productImage.update({
+            where: { id: next.id },
+            data: { isPrimary: true, updatedAt: new Date() },
+          });
+        }
+      }
+      return {
+        id: row.id,
+        productId: row.productId,
+        attachmentId: row.attachmentId,
+        sortOrder: row.sortOrder,
+        isPrimary: row.isPrimary,
+        deletedAt: row.deletedAt?.toISOString() ?? null,
+        createdAt: row.createdAt.toISOString(),
+        updatedAt: row.updatedAt.toISOString(),
+      };
     },
 
     async createProduct(input: {
@@ -331,6 +555,38 @@ export function createCatalogRepos(db: Db) {
         orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }],
       });
       return rows.map(mapVariant);
+    },
+
+    /**
+     * Suggest next SKU/barcode from product name using registry occupancy
+     * (`variant_code`), plus optional in-form reserved codes.
+     */
+    async suggestVariantCode(input: {
+      name: string;
+      excludeVariantId?: string | null;
+      reservedCodes?: string[];
+    }): Promise<{ code: string; base: string }> {
+      const base = buildVariantCodeBase(input.name);
+      const normalizedBase = normalizeVariantCode(base);
+      const rows = await db.variantCode.findMany({
+        where: {
+          code: { startsWith: normalizedBase },
+          ...(input.excludeVariantId
+            ? { NOT: { variantId: input.excludeVariantId } }
+            : {}),
+        },
+        select: { code: true },
+      });
+      const occupied = new Set(rows.map((r) => r.code));
+      for (const reserved of input.reservedCodes ?? []) {
+        const trimmed = reserved.trim();
+        if (!trimmed) continue;
+        occupied.add(normalizeVariantCode(trimmed));
+      }
+      return {
+        code: allocateSuggestedVariantCode(input.name, [...occupied]),
+        base,
+      };
     },
 
     async findVariantById(id: string): Promise<ProductVariantRecord | null> {
@@ -684,8 +940,16 @@ export function createCatalogRepos(db: Db) {
       }
     },
 
-    async listPriceListItems(priceListId: string): Promise<PriceListItemRecord[]> {
-      const rows = await db.priceListItem.findMany({ where: { priceListId } });
+    async listPriceListItems(
+      priceListId: string,
+      filters?: { productVariantId?: string },
+    ): Promise<PriceListItemRecord[]> {
+      const rows = await db.priceListItem.findMany({
+        where: {
+          priceListId,
+          ...(filters?.productVariantId ? { productVariantId: filters.productVariantId } : {}),
+        },
+      });
       return rows.map((r) => ({
         id: r.id,
         priceListId: r.priceListId,

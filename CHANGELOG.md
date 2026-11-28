@@ -2,6 +2,8 @@
 
 Các thay đổi của Nexora sẽ được ghi tại đây. Tag contest/semver chỉ tạo khi owner chốt tên (P13-T06).
 
+Product semver source of truth: root `package.json` (`0.1.0`). Suggested git tag: `v0.1.0`.
+
 ## Unreleased
 
 ### Phase 13 — Release / nghiệm thu (P13-T01–T09 / G13)
@@ -11,6 +13,11 @@ Các thay đổi của Nexora sẽ được ghi tại đây. Tag contest/semver 
 - Clean-install and deploy runbooks; E2E A→B→C journey script; demo 15m runbook; submission checklist (BTC fields owner-owned).
 - Release artifact prep (`npm run prep:release-archive` → source `.tar.gz` + sha256); **no git tag until user confirms tag name**.
 - Gate package `evidence/G13.md` — conditional release-ready if BTC/AC-13 second-person/submission receipt still open.
+
+## [0.1.0] — contest candidate
+
+- Product semver wired from `package.json` into build env (`NEXT_PUBLIC_APP_VERSION`), SystemHeader chip, health responses, and release archive meta.
+- Shared UI: DateTimePicker + declarative ListFilters for reusable list search/filter bars.
 
 ### Phase 06 — M02 Catalog & Inventory (P06-T01–T08 / G06)
 

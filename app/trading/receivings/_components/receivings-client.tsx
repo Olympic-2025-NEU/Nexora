@@ -134,7 +134,7 @@ export function ReceivingsClient({ id, creating = false }: { id?: string; creati
         <option key={warehouse.id} value={warehouse.id}>{warehouse.name}</option>)}
     </select></label>
   </div>;
-  return <main className="mx-auto max-w-5xl space-y-6 p-6">
+  return <main className="mx-auto max-w-5xl space-y-6">
     <h1 className="text-2xl font-semibold">Xác nhận nhận hàng đối tác</h1>
     <nav className="flex gap-4"><Link href="/trading/transfers">Transfers</Link>
       <Link href="/trading/receivings">Receivings</Link><Link href="/trading/receivings/create">Tạo receiving</Link></nav>

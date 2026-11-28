@@ -4,10 +4,23 @@
  * Uses realm-master admin-cli credentials (KC_BOOTSTRAP_ADMIN_*); never logs secrets.
  */
 import { randomBytes } from "node:crypto";
-import type { MembershipRole } from "@/contexts/system/domain/types";
+import {
+  MEMBERSHIP_ROLES,
+  normalizeMembershipRoles,
+  rolesRequireMfa,
+  type MembershipRole,
+} from "@/contexts/system/domain/types";
 
 const REALM = "nexora";
 const TIMEOUT_MS = 12_000;
+
+/** Realm roles managed by ERP membership sync (includes legacy for cleanup). */
+const MANAGED_REALM_ROLES = new Set<string>([
+  ...MEMBERSHIP_ROLES,
+  "staff",
+  "approver",
+  "viewer",
+]);
 
 export class KeycloakAdminError extends Error {
   constructor(
@@ -30,7 +43,8 @@ export type ProvisionUserInput = {
   username: string;
   displayName: string;
   email?: string | null;
-  role: MembershipRole;
+  /** One or more fixed job roles (ADR 0018). */
+  roles: MembershipRole[];
   /** When set, used as temporary password; otherwise a random one is generated. */
   temporaryPassword?: string;
 };
@@ -170,24 +184,31 @@ export function createKeycloakAdminClient(config: KeycloakAdminConfig) {
     return { id: json.id, name: json.name };
   }
 
-  async function replaceRealmRoles(userId: string, role: MembershipRole): Promise<void> {
-    const desired = await getRealmRole(role);
+  async function replaceRealmRoles(userId: string, roles: MembershipRole[]): Promise<void> {
+    const desiredNames = normalizeMembershipRoles(roles);
+    if (desiredNames.length === 0) {
+      throw new KeycloakAdminError("INVALID_ROLE", "At least one membership role is required", 422);
+    }
+    const desired = await Promise.all(desiredNames.map((name) => getRealmRole(name)));
+    const desiredSet = new Set(desiredNames);
     const { json: current } = await request<Array<{ id: string; name: string }>>(
       `/admin/realms/${REALM}/users/${encodeURIComponent(userId)}/role-mappings/realm`,
     );
-    const managed = new Set(["administrator", "staff", "approver", "viewer"]);
-    const toRemove = (current ?? []).filter((r) => managed.has(r.name) && r.name !== role);
+    const toRemove = (current ?? []).filter(
+      (r) => MANAGED_REALM_ROLES.has(r.name) && !desiredSet.has(r.name as MembershipRole),
+    );
     if (toRemove.length) {
       await request(`/admin/realms/${REALM}/users/${encodeURIComponent(userId)}/role-mappings/realm`, {
         method: "DELETE",
         body: JSON.stringify(toRemove),
       });
     }
-    const hasDesired = (current ?? []).some((r) => r.name === role);
-    if (!hasDesired) {
+    const currentNames = new Set((current ?? []).map((r) => r.name));
+    const toAdd = desired.filter((r) => !currentNames.has(r.name));
+    if (toAdd.length) {
       await request(`/admin/realms/${REALM}/users/${encodeURIComponent(userId)}/role-mappings/realm`, {
         method: "POST",
-        body: JSON.stringify([desired]),
+        body: JSON.stringify(toAdd),
       });
     }
   }
@@ -238,13 +259,15 @@ export function createKeycloakAdminClient(config: KeycloakAdminConfig) {
       throw new KeycloakAdminError("INVALID_USERNAME", "Invalid username", 422);
     }
 
+    const roles = normalizeMembershipRoles(input.roles);
+    if (roles.length === 0) {
+      throw new KeycloakAdminError("INVALID_ROLE", "At least one membership role is required", 422);
+    }
+
     const existing = await findUserByUsername(username);
     if (existing) {
-      await replaceRealmRoles(existing.id, input.role);
-      if (
-        input.role === "administrator" ||
-        input.role === "approver"
-      ) {
+      await replaceRealmRoles(existing.id, roles);
+      if (rolesRequireMfa(roles)) {
         await ensureRequiredActions(existing.id, ["CONFIGURE_TOTP"]);
       }
       if (!existing.enabled) await setEnabled(existing.id, true);
@@ -253,7 +276,7 @@ export function createKeycloakAdminClient(config: KeycloakAdminConfig) {
 
     const provisionalPassword = input.temporaryPassword?.trim() || generateTemporaryPassword();
     const requiredActions = ["UPDATE_PASSWORD"];
-    if (input.role === "administrator" || input.role === "approver") {
+    if (rolesRequireMfa(roles)) {
       requiredActions.push("CONFIGURE_TOTP");
     }
 
@@ -298,11 +321,11 @@ export function createKeycloakAdminClient(config: KeycloakAdminConfig) {
     }
     // Conflict path: user already existed — do not return a password we did not set.
     if (createRes.status === 409) {
-      await replaceRealmRoles(userId, input.role);
+      await replaceRealmRoles(userId, roles);
       return { keycloakSub: userId, created: false };
     }
 
-    await replaceRealmRoles(userId, input.role);
+    await replaceRealmRoles(userId, roles);
     return {
       keycloakSub: userId,
       created: true,

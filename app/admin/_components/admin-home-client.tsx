@@ -3,7 +3,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { ADMIN_NAV, filterNavByRoles } from "@/app/components/shell/nav-config";
+import { ADMIN_NAV, filterFlatNavByRoles } from "@/app/components/shell/nav-config";
 import { useT } from "@/app/i18n/LocaleProvider";
 import { fetchMe, getAccessToken } from "@/app/lib/session";
 
@@ -18,7 +18,7 @@ export function AdminHomeClient() {
     });
   }, []);
 
-  const items = roles.length ? filterNavByRoles(ADMIN_NAV, roles) : [];
+  const items = roles.length ? filterFlatNavByRoles(ADMIN_NAV, roles) : [];
 
   return (
     <section className="space-y-4">
@@ -37,7 +37,7 @@ export function AdminHomeClient() {
         ))}
       </ul>
       <p className="text-sm">
-        <Link href="/catalog/products" className="text-primary underline-offset-4 hover:underline">
+        <Link href="/products" className="text-primary underline-offset-4 hover:underline">
           {t("home.ctaCatalog")}
         </Link>
       </p>

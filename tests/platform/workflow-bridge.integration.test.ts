@@ -20,7 +20,7 @@ const db = new PrismaClient({ datasources: { db: { url: databaseUrl.toString() }
 const engine = new FlowableClient({ baseUrl: `http://127.0.0.1:${process.env.FLOWABLE_HOST_PORT}`,
   user: process.env.FLOWABLE_ADMIN_USER!, password: process.env.FLOWABLE_ADMIN_PASSWORD! });
 const warehouseId = randomUUID();
-const actor: ApprovalActor = { sub: "fixture-approver", role: "approver", warehouseIds: [warehouseId], active: true };
+const actor: ApprovalActor = { sub: "fixture-approver", roles: ["issue_approver"], warehouseIds: [warehouseId], active: true };
 const resolver = async (sub: string) => sub === actor.sub ? actor : { ...actor, sub };
 const lines = [{ lineNo: 1, warehouseId, productId: randomUUID(), batchId: randomUUID(), quantity: 3, unit: "kg" }];
 const hash = computeLineSnapshotSha256(lines);

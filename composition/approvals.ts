@@ -3,15 +3,19 @@ import type { Prisma } from "@prisma/client";
 import type { Actor } from "@/platform/identity/actor";
 import { getPrismaClient } from "@/platform/persistence/prisma";
 import { FlowableClient } from "@/platform/workflow/flowable-client";
-import { hasScope, type Decision } from "@/platform/workflow/approval-request";
+import {
+  hasScope,
+  ISSUE_APPROVER_ROLE,
+  type Decision,
+} from "@/platform/workflow/approval-request";
 import { recordDecisionIntent } from "@/platform/workflow/approval-service";
 import { DomainError } from "@/platform/kernel/errors";
 import { membershipRepository } from "@/composition/system";
 
 export async function approvalInbox(actor: Actor) {
-  if (!actor.roles.includes("approver")) return [];
+  if (!actor.roles.includes(ISSUE_APPROVER_ROLE)) return [];
   const engine = FlowableClient.fromEnv();
-  const tasks = await engine.queryTasks({ candidateGroup: "approver" });
+  const tasks = await engine.queryTasks({ candidateGroup: ISSUE_APPROVER_ROLE });
   const db = getPrismaClient();
   const rows = await db.approvalRequest.findMany({
     where: {
@@ -45,9 +49,14 @@ export async function approvalInbox(actor: Actor) {
       row.creatorSub !== actor.userId &&
       row.document.status === "pending_approval" &&
       hasScope(
-        { sub: actor.userId, role: "approver", active: true, warehouseIds: [...actor.unitIds] },
+        {
+          sub: actor.userId,
+          roles: [...actor.roles],
+          active: true,
+          warehouseIds: [...actor.unitIds],
+        },
         row.warehouseIds,
-        "approver",
+        ISSUE_APPROVER_ROLE,
       ) &&
       tasks.some((task) =>
         task.id === row.flowableTaskId &&
@@ -99,7 +108,7 @@ export async function decideApproval(
         ? {
           sub,
           active: current.status === "active",
-          role: current.role,
+          roles: current.roles?.length ? [...current.roles] : [current.role],
           warehouseIds: current.warehouseIds,
         }
         : null;

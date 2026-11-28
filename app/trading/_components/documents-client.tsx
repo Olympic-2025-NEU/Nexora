@@ -165,7 +165,7 @@ export function DocumentsClient({ kind, id }: { kind: Kind; id?: string }) {
     } catch (err) { setError(err instanceof Error ? err.message : "Lỗi tải chứng từ."); }
   }
 
-  return <main className="mx-auto max-w-5xl space-y-6 p-6">
+  return <main className="mx-auto max-w-5xl space-y-6">
     <h1 className="text-2xl font-semibold">{kind === "receipts" ? "Nhập kho" : "Xuất kho"}</h1>
     <nav className="flex gap-4"><Link href="/trading/receipts">Nhập kho</Link><Link href="/trading/issues">Xuất kho</Link>
       {kind === "issues" && <Link href="/trading/approvals">Hộp duyệt</Link>}</nav>

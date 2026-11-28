@@ -1,57 +1,61 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 /**
- * Application-level policy matrix for Nexora.
+ * Application-level policy matrix for Nexora (ADR 0018).
  *
- * Roles: administrator | staff | approver | viewer | partner | public
+ * Job roles (membership, multi-assign):
+ *   administrator | catalog_manager | inventory_clerk | sales_clerk |
+ *   stocktake_clerk | issue_approver | quality_officer | auditor
  *
- * Policy is enforced at the application boundary (use-case/route handler),
- * NOT only in the UI. Gateway OIDC confirms the user is authenticated;
- * this module confirms they are authorised for the specific action.
+ * Synthetic: partner (M2M) | public
  *
- * Action naming convention:  "<module>:<resource>:<verb>"
- *   e.g. "platform:me:read", "trading:goods-issue:create"
- *
- * Rules:
- * - `administrator` can perform any action in its domain.
- * - `staff` can create/update operational records; cannot perform admin actions.
- * - `approver` can read and approve/reject workflow decisions; cannot create.
- * - `viewer` has read-only access.
- * - `partner` has M2M access to federation endpoints only.
- * - `public` has no authenticated role; only public projections are allowed.
+ * Enforced at application boundary — not UI-only.
+ * Action naming: "<module>:<resource>:<verb>"
  */
 
 import type { Actor } from "../identity/actor.js";
 
-// ---------------------------------------------------------------------------
-// Role constants
-// ---------------------------------------------------------------------------
-
 export type NexoraRole =
   | "administrator"
-  | "staff"
-  | "approver"
-  | "viewer"
+  | "catalog_manager"
+  | "inventory_clerk"
+  | "sales_clerk"
+  | "stocktake_clerk"
+  | "issue_approver"
+  | "quality_officer"
+  | "auditor"
   | "partner"
   | "public";
 
-// ---------------------------------------------------------------------------
-// Action matrix
-// ---------------------------------------------------------------------------
+/** Authenticated human job roles (excludes partner/public). */
+const HUMAN: NexoraRole[] = [
+  "administrator",
+  "catalog_manager",
+  "inventory_clerk",
+  "sales_clerk",
+  "stocktake_clerk",
+  "issue_approver",
+  "quality_officer",
+  "auditor",
+];
 
-/**
- * Policy entry: which roles are allowed to perform an action.
- * An empty roles array means "no authenticated role" (public access).
- */
+const READERS: NexoraRole[] = [
+  "catalog_manager",
+  "inventory_clerk",
+  "sales_clerk",
+  "stocktake_clerk",
+  "issue_approver",
+  "quality_officer",
+  "auditor",
+];
+
 interface ActionPolicy {
-  /** Roles that may perform this action. '*' means all authenticated roles. */
   roles: NexoraRole[] | "*";
-  /** If true, administrator is always allowed regardless of roles list. */
   adminAlwaysAllowed?: boolean;
 }
 
 const ACTION_POLICIES: Record<string, ActionPolicy> = {
   // --- Platform ---
-  "platform:me:read": { roles: ["administrator", "staff", "approver", "viewer"], adminAlwaysAllowed: true },
+  "platform:me:read": { roles: HUMAN, adminAlwaysAllowed: true },
   "platform:health:read": { roles: "*" },
   "platform:audit:read": { roles: ["administrator"], adminAlwaysAllowed: true },
   "platform:operations:retry": { roles: ["administrator"], adminAlwaysAllowed: true },
@@ -59,128 +63,115 @@ const ACTION_POLICIES: Record<string, ActionPolicy> = {
   // --- Federation (M2M partner only) ---
   "federation:events:write": { roles: ["partner"], adminAlwaysAllowed: false },
   "federation:acks:write": { roles: ["partner"], adminAlwaysAllowed: false },
+  "federation:connectivity:probe": { roles: ["partner"], adminAlwaysAllowed: false },
 
-  // --- Admin / M01 System & Partner ---
-  "admin:organization:read": {
-    roles: ["administrator", "staff", "approver", "viewer"],
-    adminAlwaysAllowed: true,
-  },
+  // --- Admin / M01 ---
+  "admin:organization:read": { roles: READERS, adminAlwaysAllowed: true },
   "admin:organization:manage": { roles: ["administrator"], adminAlwaysAllowed: true },
   "admin:membership:read": { roles: ["administrator"], adminAlwaysAllowed: true },
   "admin:membership:manage": { roles: ["administrator"], adminAlwaysAllowed: true },
-  "admin:partner:read": {
-    roles: ["administrator", "staff", "approver", "viewer"],
-    adminAlwaysAllowed: true,
-  },
+  "admin:partner:read": { roles: READERS, adminAlwaysAllowed: true },
   "admin:partner:manage": { roles: ["administrator"], adminAlwaysAllowed: true },
   "admin:partner:connection:manage": { roles: ["administrator"], adminAlwaysAllowed: true },
 
-  // Connectivity probe (M2M) — distinct from inbox (P09)
-  "federation:connectivity:probe": { roles: ["partner"], adminAlwaysAllowed: false },
+  // --- Workflow (issue approval) ---
+  "workflow:approval:read": { roles: ["issue_approver"], adminAlwaysAllowed: false },
+  "workflow:approval:decide": { roles: ["issue_approver"], adminAlwaysAllowed: false },
 
-  // --- Trading (placeholder until P07) ---
-  "trading:goods-issue:create": { roles: ["staff"], adminAlwaysAllowed: true },
-  "trading:goods-issue:approve": { roles: ["approver"], adminAlwaysAllowed: true },
-  "workflow:approval:read": { roles: ["approver"], adminAlwaysAllowed: false },
-  "workflow:approval:decide": { roles: ["approver"], adminAlwaysAllowed: false },
-  "trading:goods-issue:read": { roles: ["staff", "approver", "viewer"], adminAlwaysAllowed: true },
-  "trading:history:read": { roles: ["staff", "approver", "viewer"], adminAlwaysAllowed: true },
-  "trading:receipt:read": { roles: ["staff", "approver", "viewer"], adminAlwaysAllowed: true },
-  "trading:issue:read": { roles: ["staff", "approver", "viewer"], adminAlwaysAllowed: true },
-  "trading:receipt:create": { roles: ["staff"], adminAlwaysAllowed: true },
-  "trading:receipt:edit": { roles: ["staff"], adminAlwaysAllowed: true },
-  "trading:receipt:confirm": { roles: ["staff"], adminAlwaysAllowed: true },
-  "trading:receipt:cancel": { roles: ["staff"], adminAlwaysAllowed: true },
-  "trading:issue:create": { roles: ["staff"], adminAlwaysAllowed: true },
-  "trading:issue:edit": { roles: ["staff"], adminAlwaysAllowed: true },
-  "trading:issue:submit": { roles: ["staff"], adminAlwaysAllowed: true },
-  "trading:issue:confirm": { roles: ["staff"], adminAlwaysAllowed: true },
-  "trading:issue:cancel": { roles: ["staff"], adminAlwaysAllowed: true },
-  "trading:transfer:read": { roles: ["staff", "approver", "viewer"], adminAlwaysAllowed: true },
-  "trading:transfer:create": { roles: ["staff"], adminAlwaysAllowed: true },
-  "trading:transfer:confirm": { roles: ["staff"], adminAlwaysAllowed: true },
-  "trading:transfer:cancel": { roles: ["staff"], adminAlwaysAllowed: true },
-  "trading:receiving:read": { roles: ["staff", "approver", "viewer"], adminAlwaysAllowed: true },
-  "trading:receiving:create": { roles: ["staff"], adminAlwaysAllowed: true },
-  "trading:receiving:update": { roles: ["staff"], adminAlwaysAllowed: true },
-  "trading:receiving:confirm": { roles: ["staff"], adminAlwaysAllowed: true },
-  "trading:receiving:cancel": { roles: ["staff"], adminAlwaysAllowed: true },
-  "trading:stocktake:create": { roles: ["staff"], adminAlwaysAllowed: true },
-  "trading:stocktake:read": { roles: ["staff", "approver", "viewer"], adminAlwaysAllowed: true },
-  "trading:stocktake:update": { roles: ["staff"], adminAlwaysAllowed: true },
-  "trading:stocktake:confirm": { roles: ["staff"], adminAlwaysAllowed: true },
-  "trading:stocktake:cancel": { roles: ["staff"], adminAlwaysAllowed: true },
-  "trading:sale:create": { roles: ["staff"], adminAlwaysAllowed: true },
-  "trading:sale:read": { roles: ["staff", "approver", "viewer"], adminAlwaysAllowed: true },
-  "trading:sale:confirm": { roles: ["staff"], adminAlwaysAllowed: true },
-  "trading:sale:cancel": { roles: ["staff"], adminAlwaysAllowed: true },
+  // --- Trading ---
+  "trading:history:read": { roles: READERS, adminAlwaysAllowed: true },
+  "trading:receipt:read": { roles: READERS, adminAlwaysAllowed: true },
+  "trading:receipt:create": { roles: ["inventory_clerk"], adminAlwaysAllowed: true },
+  "trading:receipt:edit": { roles: ["inventory_clerk"], adminAlwaysAllowed: true },
+  "trading:receipt:confirm": { roles: ["inventory_clerk"], adminAlwaysAllowed: true },
+  "trading:receipt:cancel": { roles: ["inventory_clerk"], adminAlwaysAllowed: true },
+  "trading:issue:read": { roles: READERS, adminAlwaysAllowed: true },
+  "trading:issue:create": { roles: ["inventory_clerk"], adminAlwaysAllowed: true },
+  "trading:issue:edit": { roles: ["inventory_clerk"], adminAlwaysAllowed: true },
+  "trading:issue:submit": { roles: ["inventory_clerk"], adminAlwaysAllowed: true },
+  "trading:issue:confirm": { roles: ["inventory_clerk"], adminAlwaysAllowed: true },
+  "trading:issue:cancel": { roles: ["inventory_clerk"], adminAlwaysAllowed: true },
+  "trading:transfer:read": { roles: READERS, adminAlwaysAllowed: true },
+  "trading:transfer:create": { roles: ["inventory_clerk"], adminAlwaysAllowed: true },
+  "trading:transfer:confirm": { roles: ["inventory_clerk"], adminAlwaysAllowed: true },
+  "trading:transfer:cancel": { roles: ["inventory_clerk"], adminAlwaysAllowed: true },
+  "trading:receiving:read": { roles: READERS, adminAlwaysAllowed: true },
+  "trading:receiving:create": { roles: ["inventory_clerk"], adminAlwaysAllowed: true },
+  "trading:receiving:update": { roles: ["inventory_clerk"], adminAlwaysAllowed: true },
+  "trading:receiving:confirm": { roles: ["inventory_clerk"], adminAlwaysAllowed: true },
+  "trading:receiving:cancel": { roles: ["inventory_clerk"], adminAlwaysAllowed: true },
+  "trading:stocktake:read": { roles: READERS, adminAlwaysAllowed: true },
+  "trading:stocktake:create": { roles: ["stocktake_clerk"], adminAlwaysAllowed: true },
+  "trading:stocktake:update": { roles: ["stocktake_clerk"], adminAlwaysAllowed: true },
+  "trading:stocktake:confirm": { roles: ["stocktake_clerk"], adminAlwaysAllowed: true },
+  "trading:stocktake:cancel": { roles: ["stocktake_clerk"], adminAlwaysAllowed: true },
+  "trading:sale:read": { roles: READERS, adminAlwaysAllowed: true },
+  "trading:sale:create": { roles: ["sales_clerk"], adminAlwaysAllowed: true },
+  "trading:sale:confirm": { roles: ["sales_clerk"], adminAlwaysAllowed: true },
+  "trading:sale:cancel": { roles: ["sales_clerk"], adminAlwaysAllowed: true },
+
+  // --- Commercial sales orders (ADR 0019) ---
+  "sales:order:read": { roles: READERS, adminAlwaysAllowed: true },
+  "sales:order:create": { roles: ["sales_clerk"], adminAlwaysAllowed: true },
+  "sales:order:checkout": { roles: ["sales_clerk"], adminAlwaysAllowed: true },
+  "sales:order:cancel": { roles: ["sales_clerk"], adminAlwaysAllowed: true },
+  "sales:order:trace:revoke": { roles: ["administrator"], adminAlwaysAllowed: true },
 
   // --- Traceability ---
-  "trace:read": { roles: ["staff", "approver", "viewer"], adminAlwaysAllowed: true },
+  "trace:read": { roles: READERS, adminAlwaysAllowed: true },
   "trace:federation:publish": { roles: ["administrator"], adminAlwaysAllowed: true },
   "trace:passport-policy:manage": { roles: ["administrator"], adminAlwaysAllowed: true },
-  "trace:qr:manage": { roles: ["administrator", "staff"], adminAlwaysAllowed: true },
-  "trace:evidence:manage": { roles: ["administrator", "staff"], adminAlwaysAllowed: true },
-  "ops:quality:read": { roles: ["administrator"], adminAlwaysAllowed: true },
-  "ops:quality:manage": { roles: ["administrator"], adminAlwaysAllowed: true },
-  "ops:ot:ingest": { roles: ["staff"], adminAlwaysAllowed: true },
+  "trace:qr:manage": {
+    roles: ["administrator", "inventory_clerk", "catalog_manager"],
+    adminAlwaysAllowed: true,
+  },
+  "trace:evidence:manage": {
+    roles: ["administrator", "inventory_clerk", "catalog_manager"],
+    adminAlwaysAllowed: true,
+  },
+  "ops:quality:read": { roles: ["quality_officer"], adminAlwaysAllowed: true },
+  "ops:quality:manage": { roles: ["quality_officer"], adminAlwaysAllowed: true },
+  "ops:ot:ingest": { roles: ["inventory_clerk"], adminAlwaysAllowed: true },
 
-  // --- Catalog/Inventory (P06 + P065) ---
-  "catalog:product:create": { roles: ["administrator", "staff"], adminAlwaysAllowed: true },
-  "catalog:product:read": { roles: ["staff", "approver", "viewer"], adminAlwaysAllowed: true },
-  "catalog:product:manage": { roles: ["administrator", "staff"], adminAlwaysAllowed: true },
-  "catalog:category:read": { roles: ["staff", "approver", "viewer"], adminAlwaysAllowed: true },
-  "catalog:category:manage": { roles: ["administrator", "staff"], adminAlwaysAllowed: true },
-  "catalog:uom:read": { roles: ["staff", "approver", "viewer"], adminAlwaysAllowed: true },
-  "catalog:uom:manage": { roles: ["administrator", "staff"], adminAlwaysAllowed: true },
-  "catalog:price_list:read": { roles: ["staff", "approver", "viewer"], adminAlwaysAllowed: true },
-  "catalog:price_list:manage": { roles: ["administrator", "staff"], adminAlwaysAllowed: true },
-  "catalog:batch:read": { roles: ["staff", "approver", "viewer"], adminAlwaysAllowed: true },
-  "catalog:batch:create": { roles: ["administrator", "staff"], adminAlwaysAllowed: true },
-  "catalog:batch:quality": { roles: ["administrator", "staff"], adminAlwaysAllowed: true },
-  "inventory:warehouse:read": { roles: ["staff", "approver", "viewer"], adminAlwaysAllowed: true },
+  // --- Catalog / Inventory ---
+  "catalog:product:create": { roles: ["catalog_manager"], adminAlwaysAllowed: true },
+  "catalog:product:read": { roles: READERS, adminAlwaysAllowed: true },
+  "catalog:product:manage": { roles: ["catalog_manager"], adminAlwaysAllowed: true },
+  "catalog:category:read": { roles: READERS, adminAlwaysAllowed: true },
+  "catalog:category:manage": { roles: ["catalog_manager"], adminAlwaysAllowed: true },
+  "catalog:uom:read": { roles: READERS, adminAlwaysAllowed: true },
+  "catalog:uom:manage": { roles: ["catalog_manager"], adminAlwaysAllowed: true },
+  "catalog:price_list:read": { roles: READERS, adminAlwaysAllowed: true },
+  "catalog:price_list:manage": { roles: ["catalog_manager"], adminAlwaysAllowed: true },
+  "catalog:batch:read": { roles: READERS, adminAlwaysAllowed: true },
+  "catalog:batch:create": { roles: ["catalog_manager", "inventory_clerk"], adminAlwaysAllowed: true },
+  "catalog:batch:quality": {
+    roles: ["catalog_manager", "inventory_clerk", "quality_officer"],
+    adminAlwaysAllowed: true,
+  },
+  "inventory:warehouse:read": { roles: READERS, adminAlwaysAllowed: true },
   "inventory:warehouse:manage": { roles: ["administrator"], adminAlwaysAllowed: true },
-  "inventory:stock:read": { roles: ["staff", "approver", "viewer"], adminAlwaysAllowed: true },
+  "inventory:stock:read": { roles: READERS, adminAlwaysAllowed: true },
 };
-
-// ---------------------------------------------------------------------------
-// Policy check result
-// ---------------------------------------------------------------------------
 
 export interface PolicyResult {
   allowed: boolean;
   reason: string;
 }
 
-// ---------------------------------------------------------------------------
-// checkPolicy
-// ---------------------------------------------------------------------------
-
-/**
- * Check whether the given Actor is allowed to perform `action`.
- *
- * Returns `{ allowed: true, reason: "..." }` or `{ allowed: false, reason: "..." }`.
- *
- * Usage:
- *   const { allowed } = checkPolicy(actor, "trading:goods-issue:create");
- *   if (!allowed) return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
- */
 export function checkPolicy(actor: Actor, action: string): PolicyResult {
   const policy = ACTION_POLICIES[action];
   if (!policy) {
-    // Unknown action — deny by default (fail-closed).
     return { allowed: false, reason: `Unknown action: ${action}` };
   }
 
   const actorRoles = actor.roles as NexoraRole[];
 
-  // Administrator bypass (only for policies that allow it).
   if (policy.adminAlwaysAllowed && actorRoles.includes("administrator")) {
     return { allowed: true, reason: "administrator bypass" };
   }
 
   if (policy.roles === "*") {
-    // Any authenticated actor may perform this action.
     return { allowed: true, reason: "open to all authenticated actors" };
   }
 
@@ -195,10 +186,6 @@ export function checkPolicy(actor: Actor, action: string): PolicyResult {
   };
 }
 
-// ---------------------------------------------------------------------------
-// requirePolicy — throws PolicyError on deny (use in route handlers)
-// ---------------------------------------------------------------------------
-
 export class PolicyError extends Error {
   constructor(
     public readonly action: string,
@@ -210,10 +197,6 @@ export class PolicyError extends Error {
   }
 }
 
-/**
- * Like `checkPolicy` but throws `PolicyError` when denied.
- * Convenient for route handlers that want to propagate the error up.
- */
 export function requirePolicy(actor: Actor, action: string): void {
   const result = checkPolicy(actor, action);
   if (!result.allowed) {

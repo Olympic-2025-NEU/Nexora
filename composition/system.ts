@@ -9,7 +9,10 @@ import {
 import { getPrismaClient } from "@/platform/persistence/prisma";
 import { createSystemRepos } from "@/contexts/system/infrastructure/prisma-repos";
 import { prismaAuditRecorder } from "@/platform/audit/prisma-audit-recorder";
-import type { MembershipRepository } from "@/platform/identity/resolve-actor";
+import type {
+  MembershipRepository,
+  MembershipRow,
+} from "@/platform/identity/resolve-actor";
 
 /** Shared Prisma membership port for user auth (admin-invite; no open JIT). */
 export function membershipRepository(): MembershipRepository {
@@ -18,15 +21,20 @@ export function membershipRepository(): MembershipRepository {
     async findBySub(sub) {
       const row = await db.membership.findUnique({
         where: { keycloakSub: sub },
-        include: { warehouses: { select: { warehouseId: true } } },
+        include: {
+          warehouses: { select: { warehouseId: true } },
+          roles: { select: { role: true } },
+        },
       });
       if (!row) return null;
+      const roles = row.roles.map((r) => r.role) as MembershipRow["roles"];
       return {
         id: row.id,
         organizationId: row.organizationId,
         keycloakSub: row.keycloakSub,
         displayName: row.displayName,
-        role: row.role as "administrator" | "staff" | "approver" | "viewer",
+        role: (roles[0] ?? row.role) as MembershipRow["role"],
+        roles: roles.length > 0 ? roles : [row.role as MembershipRow["role"]],
         status: row.status as "invited" | "active" | "disabled",
         warehouseIds: row.warehouses.map((w) => w.warehouseId),
       };

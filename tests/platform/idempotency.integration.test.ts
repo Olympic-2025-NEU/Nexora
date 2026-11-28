@@ -20,9 +20,9 @@ const unitOfWork = () => createTransaction(client);
 function command(requestId: string, key: string, payload: unknown, actorId = "test-user") {
   let effects = 0;
   const options: CommandOptions<{ id: string; accepted: boolean }> = {
-    authenticate: async () => ({ userId: actorId, organizationId: "test-org", unitIds: [], roles: ["staff"] }),
+    authenticate: async () => ({ userId: actorId, organizationId: "test-org", unitIds: [], roles: ["inventory_clerk"] }),
     resolveTenant: async () => "test-org",
-    action: "trading:goods-issue:create",
+    action: "trading:issue:create",
     idempotencyKey: key,
     payload,
     idempotencyPort: port,

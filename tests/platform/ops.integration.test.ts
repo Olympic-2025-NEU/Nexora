@@ -27,7 +27,7 @@ test("metrics, scan, permissioned list/retry and non-leakage", async () => {
   const stuckId = randomUUID(), haltedId = randomUUID();
   const old = new Date(Date.now() - 20 * 60_000);
   await migrator.organization.create({ data: { id: orgId, instanceId: `ops-${orgId}`, code: `ops-${orgId}`, name: "Ops" } });
-  for (const [sub, role] of [["ops-admin", "administrator"], ["ops-staff", "staff"]]) {
+  for (const [sub, role] of [["ops-admin", "administrator"], ["ops-staff", "inventory_clerk"]]) {
     await migrator.membership.create({ data: { id: randomUUID(), organizationId: orgId, keycloakSub: sub,
       displayName: sub, role, status: "active" } });
   }

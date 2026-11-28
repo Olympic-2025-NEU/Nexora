@@ -111,16 +111,20 @@ try {
   run("deploy/scripts/seed-system.mjs", env);
   const organization = await prisma.organization.findUniqueOrThrow({ where: { singletonSlot: 1 } });
   if (organization.instanceId !== `nexora-${instance}`) throw new Error("Database instance mismatch");
-  const members = await prisma.membership.findMany({ where: { status: "active",
-    role: { in: ["administrator", "staff", "approver"] } } });
-  for (const role of ["administrator", "staff", "approver"]) {
-    if (!members.some((row) => row.role === role))
-      throw new Error(`Missing demo role ${role}`);
+  const members = await prisma.membership.findMany({
+    where: { status: "active" },
+    include: { roles: true },
+  });
+  const memberHas = (row, code) =>
+    row.roles.some((r) => r.role === code) || row.role === code;
+  if (!members.some((row) => memberHas(row, "administrator"))) {
+    throw new Error("Missing demo role administrator");
   }
+  const nonAdmin = members.filter((row) => !memberHas(row, "administrator"));
   run("deploy/scripts/seed-catalog.mjs", { ...env,
-    SEED_STAFF_SUBS: members.filter((row) => row.role !== "administrator")
+    SEED_STAFF_SUBS: (nonAdmin.length ? nonAdmin : members)
       .map((row) => row.keycloakSub).join(",") });
-  const admin = members.find((row) => row.role === "administrator");
+  const admin = members.find((row) => memberHas(row, "administrator"));
   const adjacent = instance === "a" ? ["b"] : instance === "b" ? ["a", "c"] : ["b"];
   for (const peer of adjacent) {
     await prisma.partner.upsert({ where: { issuerInstanceId: `nexora-${peer}` },

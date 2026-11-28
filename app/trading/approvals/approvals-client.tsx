@@ -46,7 +46,7 @@ export function ApprovalsClient() {
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Lỗi duyệt."); }
     finally { setBusy(""); }
   }
-  return <main className="mx-auto max-w-5xl space-y-5 p-6">
+  return <main className="mx-auto max-w-5xl space-y-5">
     <h1 className="text-2xl font-semibold">Hộp phê duyệt phiếu xuất</h1>
     <Link className="underline" href="/trading/issues">Phiếu xuất</Link>
     <button className="ml-4 underline" onClick={() => void refresh().catch((cause: Error) => setError(cause.message))}>Tải lại</button>

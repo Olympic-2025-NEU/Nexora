@@ -316,7 +316,7 @@ test("P08 sale and stocktake project from confirmed document sources", async () 
 });
 
 test("P08-T03 backward query keeps source links, remote gap and pages distinct", async () => {
-  const actor = { userId: "fixture", organizationId: "fixture", unitIds: [warehouseId], roles: ["viewer"] };
+  const actor = { userId: "fixture", organizationId: "fixture", unitIds: [warehouseId], roles: ["auditor"] };
   const port = createPrismaBackwardPort(app, actor);
   const transfer = await app.traceEvent.findFirstOrThrow({ where: {
     batchId: batches[0], eventType: TRADING_EVENT_TYPES.transfer } });
@@ -388,7 +388,7 @@ test("P08-T04 forward impact keeps two transfer branches, partial receiving and 
     nextAttemptAt: new Date(Date.now() - 60_000) } });
   assert.equal((await dispatcher.tick()).delivered, 1);
 
-  const actor = { userId: "fixture", organizationId: "fixture", unitIds: [warehouseId], roles: ["viewer"] };
+  const actor = { userId: "fixture", organizationId: "fixture", unitIds: [warehouseId], roles: ["auditor"] };
   const graph = await forwardTrace(createPrismaForwardPort(app, actor), actor,
     { batchId: batches[0], depth: 10, limit: 100 });
   const transfers = graph.impact.filter((row) => row.kind === "transfer");
@@ -467,7 +467,7 @@ test("P08-T04 forward impact keeps two transfer branches, partial receiving and 
 test("P08-T05 owner approval builds only allowlisted public data and invalidates on source or quality change", async () => {
   const admin = { userId: "fixture-owner", organizationId: "fixture",
     unitIds: [], roles: ["administrator"] };
-  const viewer = { ...admin, roles: ["viewer"] };
+  const viewer = { ...admin, roles: ["auditor"] };
   const service = createPassportService(app);
   const privateAccess = { organization: "private", product: "private", batch: "private",
     timeline: "private", evidence: "private" };
@@ -533,8 +533,8 @@ test("P08-T05 owner approval builds only allowlisted public data and invalidates
 test("P08-T06 real projected lot QR remains private, expires and revokes with policy or quality", async () => {
   const admin = { userId: "fixture-owner", organizationId: "fixture",
     unitIds: [], roles: ["administrator"] };
-  const viewer = { ...admin, roles: ["viewer"] };
-  const scopedOut = { ...admin, unitIds: [randomUUID()], roles: ["staff"] };
+  const viewer = { ...admin, roles: ["auditor"] };
+  const scopedOut = { ...admin, unitIds: [randomUUID()], roles: ["inventory_clerk"] };
   const publication = createPassportService(app);
   const access = { organization: "public", product: "public", batch: "public",
     timeline: "public", evidence: "private" };
@@ -592,7 +592,7 @@ test("P08-T06 real projected lot QR remains private, expires and revokes with po
 test("P08-T07 clean public evidence is linked by checksum and short-lived access rechecks policy", async () => {
   const admin = { userId: "fixture-owner", organizationId: "fixture",
     unitIds: [], roles: ["administrator"] };
-  const staff = { ...admin, roles: ["staff"], unitIds: [warehouseId] };
+  const staff = { ...admin, roles: ["inventory_clerk"], unitIds: [warehouseId] };
   const evidence = createTraceEvidenceService(app);
   const publication = createPassportService(app);
   const qr = createQrService(app, "https://passport.example");
@@ -694,7 +694,7 @@ test("P08-T08 M03 confirm flows through outbox to local trace and public QR", as
   const batchId = randomUUID();
   const originLotId = randomUUID();
   const actor: Actor = { userId: "gate-staff", organizationId: "fixture",
-    roles: ["staff"], unitIds: [warehouseId] };
+    roles: ["inventory_clerk"], unitIds: [warehouseId] };
   const ownerActor: Actor = { ...actor, userId: "gate-owner",
     roles: ["administrator"], unitIds: [] };
   await owner.batch.create({ data: { id: batchId, productId, productVariantId: variantId,

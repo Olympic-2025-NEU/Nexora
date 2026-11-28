@@ -5,8 +5,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useT } from "@/app/i18n/LocaleProvider";
 import { cn } from "@/app/lib/cn";
-import type { NavItem } from "./nav-config";
+import { isPathActive, type NavItem } from "./nav-config";
 
+/** Flat link list (mobile fallback / legacy). Prefer AppSidebar for shell. */
 export function AppNav({
   items,
   onNavigate,
@@ -18,10 +19,9 @@ export function AppNav({
   const pathname = usePathname();
 
   return (
-    <ul className="flex flex-col gap-1 md:flex-row md:flex-wrap md:items-center md:gap-1">
+    <ul className="flex flex-col gap-1">
       {items.map((item) => {
-        const active =
-          pathname === item.href || pathname.startsWith(`${item.href}/`);
+        const active = isPathActive(pathname, item.href);
         return (
           <li key={item.href}>
             <Link

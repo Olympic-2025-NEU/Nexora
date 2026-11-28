@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-// P02-T01: Bootstrap Keycloak realm, clients, optional boot users.
-// - Staff user: no MFA required action.
-// - Administrator user (KC_ADMIN_USERNAME / KC_ADMIN_PASSWORD env): CONFIGURE_TOTP assigned.
-// - Approver user (KC_APPROVER_USERNAME / KC_APPROVER_PASSWORD env): CONFIGURE_TOTP assigned.
+// P02-T01 + ADR 0018: Bootstrap Keycloak realm, clients, optional boot users.
+// - Dev clerk user: catalog/inventory/sales/stocktake (no MFA).
+// - Administrator: CONFIGURE_TOTP.
+// - Approver boot user → issue_approver + auditor: CONFIGURE_TOTP.
 import { readFileSync } from 'node:fs';
 
 const required = (name) => {
@@ -90,9 +90,31 @@ async function assignRole(token, userId, roleName) {
   }
 }
 
+const JOB_ROLES = [
+  'administrator',
+  'catalog_manager',
+  'inventory_clerk',
+  'sales_clerk',
+  'stocktake_clerk',
+  'issue_approver',
+  'quality_officer',
+  'auditor',
+];
+
+/** Ensure ADR 0018 realm roles exist (idempotent for already-imported realms). */
+async function ensureJobRoles(token) {
+  for (const name of JOB_ROLES) {
+    try {
+      await request(`/admin/realms/${realm.realm}/roles/${encodeURIComponent(name)}`, token);
+    } catch {
+      await request(`/admin/realms/${realm.realm}/roles`, token, 'POST', { name });
+    }
+  }
+}
+
 /**
  * Assign CONFIGURE_TOTP required action (MFA) to a user.
- * Required for administrator and approver roles per security.md / ADR 0004.
+ * Required for administrator and issue_approver (ADR 0018).
  * A configured OTP credential satisfies setup; restarts must not re-add the action.
  */
 async function assignMfaRequiredAction(token, userId) {
@@ -151,6 +173,11 @@ async function main() {
       });
       changes++;
     }
+  }
+
+  await ensureJobRoles(token);
+
+  if (existing) {
     for (const client of realm.clients) {
       const found = await request(
         `/admin/realms/${realm.realm}/clients?clientId=${encodeURIComponent(client.clientId)}`,
@@ -252,7 +279,7 @@ async function main() {
   }
 
   // -------------------------------------------------------------------------
-  // Optional dev staff user (KC_DEV_USER_PASSWORD) — no MFA required.
+  // Optional dev clerk user (KC_DEV_USER_PASSWORD) — legacy staff bundle, no MFA.
   // -------------------------------------------------------------------------
   if (process.env.KC_DEV_USER_PASSWORD) {
     const username = required('KC_DEV_USERNAME');
@@ -260,7 +287,9 @@ async function main() {
     const userId = await ensureUser(token, username, process.env.KC_DEV_USER_PASSWORD, {
       temporary: false,
     });
-    await assignRole(token, userId, 'staff');
+    for (const role of ['catalog_manager', 'inventory_clerk', 'sales_clerk', 'stocktake_clerk']) {
+      await assignRole(token, userId, role);
+    }
     changes++;
   }
 
@@ -276,12 +305,13 @@ async function main() {
   }
 
   // -------------------------------------------------------------------------
-  // Optional approver boot user (KC_APPROVER_USERNAME / KC_APPROVER_PASSWORD) — MFA required.
+  // Optional approver boot user → issue_approver + auditor — MFA required.
   // -------------------------------------------------------------------------
   if (process.env.KC_APPROVER_PASSWORD) {
     const username = required('KC_APPROVER_USERNAME');
     const userId = await ensureUser(token, username, process.env.KC_APPROVER_PASSWORD);
-    await assignRole(token, userId, 'approver');
+    await assignRole(token, userId, 'issue_approver');
+    await assignRole(token, userId, 'auditor');
     await assignMfaRequiredAction(token, userId);
     changes++;
   }

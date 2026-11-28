@@ -2,7 +2,7 @@
 /**
  * tests/gateway/policy.test.mjs
  *
- * Unit tests for platform/access/policy.ts action matrix.
+ * Unit tests for platform/access/policy.ts action matrix (ADR 0018 job roles).
  *
  * Run: node --test tests/gateway/policy.test.mjs
  */
@@ -14,31 +14,52 @@ import assert from "node:assert/strict";
 // Inline policy logic (mirrors policy.ts to avoid ESM/CJS friction)
 // ---------------------------------------------------------------------------
 
+const HUMAN = [
+  "administrator",
+  "catalog_manager",
+  "inventory_clerk",
+  "sales_clerk",
+  "stocktake_clerk",
+  "issue_approver",
+  "quality_officer",
+  "auditor",
+];
+
+const READERS = [
+  "catalog_manager",
+  "inventory_clerk",
+  "sales_clerk",
+  "stocktake_clerk",
+  "issue_approver",
+  "quality_officer",
+  "auditor",
+];
+
 const ACTION_POLICIES = {
-  "platform:me:read": { roles: ["administrator", "staff", "approver", "viewer"], adminAlwaysAllowed: true },
+  "platform:me:read": { roles: HUMAN, adminAlwaysAllowed: true },
   "platform:health:read": { roles: "*" },
   "federation:events:write": { roles: ["partner"], adminAlwaysAllowed: false },
   "federation:acks:write": { roles: ["partner"], adminAlwaysAllowed: false },
-  "admin:organization:read": {
-    roles: ["administrator", "staff", "approver", "viewer"],
-    adminAlwaysAllowed: true,
-  },
+  "admin:organization:read": { roles: READERS, adminAlwaysAllowed: true },
   "admin:organization:manage": { roles: ["administrator"], adminAlwaysAllowed: true },
   "admin:membership:read": { roles: ["administrator"], adminAlwaysAllowed: true },
   "admin:membership:manage": { roles: ["administrator"], adminAlwaysAllowed: true },
-  "admin:partner:read": {
-    roles: ["administrator", "staff", "approver", "viewer"],
-    adminAlwaysAllowed: true,
-  },
+  "admin:partner:read": { roles: READERS, adminAlwaysAllowed: true },
   "admin:partner:manage": { roles: ["administrator"], adminAlwaysAllowed: true },
   "admin:partner:connection:manage": { roles: ["administrator"], adminAlwaysAllowed: true },
   "federation:connectivity:probe": { roles: ["partner"], adminAlwaysAllowed: false },
-  "trading:goods-issue:create": { roles: ["staff"], adminAlwaysAllowed: true },
-  "trading:goods-issue:approve": { roles: ["approver"], adminAlwaysAllowed: true },
-  "trading:goods-issue:read": { roles: ["staff", "approver", "viewer"], adminAlwaysAllowed: true },
-  "catalog:product:create": { roles: ["administrator", "staff"], adminAlwaysAllowed: true },
-  "catalog:product:read": { roles: ["staff", "approver", "viewer"], adminAlwaysAllowed: true },
-  "inventory:stock:read": { roles: ["staff", "approver", "viewer"], adminAlwaysAllowed: true },
+  "workflow:approval:read": { roles: ["issue_approver"], adminAlwaysAllowed: false },
+  "workflow:approval:decide": { roles: ["issue_approver"], adminAlwaysAllowed: false },
+  "trading:issue:create": { roles: ["inventory_clerk"], adminAlwaysAllowed: true },
+  "trading:issue:confirm": { roles: ["inventory_clerk"], adminAlwaysAllowed: true },
+  "trading:issue:read": { roles: READERS, adminAlwaysAllowed: true },
+  "trading:sale:create": { roles: ["sales_clerk"], adminAlwaysAllowed: true },
+  "trading:stocktake:create": { roles: ["stocktake_clerk"], adminAlwaysAllowed: true },
+  "catalog:product:create": { roles: ["catalog_manager"], adminAlwaysAllowed: true },
+  "catalog:product:read": { roles: READERS, adminAlwaysAllowed: true },
+  "inventory:stock:read": { roles: READERS, adminAlwaysAllowed: true },
+  "inventory:warehouse:manage": { roles: ["administrator"], adminAlwaysAllowed: true },
+  "ops:quality:manage": { roles: ["quality_officer"], adminAlwaysAllowed: true },
 };
 
 function checkPolicy(actor, action) {
@@ -55,8 +76,9 @@ function checkPolicy(actor, action) {
     : { allowed: false, reason: `role(s) not allowed for ${action}` };
 }
 
-function makeActor(role, orgId = "org-1") {
-  return { userId: "user-" + role, organizationId: orgId, roles: [role], unitIds: [] };
+function makeActor(roles, orgId = "org-1") {
+  const list = Array.isArray(roles) ? roles : [roles];
+  return { userId: "user-" + list.join("+"), organizationId: orgId, roles: list, unitIds: [] };
 }
 
 // ---------------------------------------------------------------------------
@@ -67,105 +89,101 @@ describe("policy: administrator access", () => {
   const admin = makeActor("administrator");
 
   it("admin can read /me", () => {
-    const { allowed } = checkPolicy(admin, "platform:me:read");
-    assert.ok(allowed);
+    assert.ok(checkPolicy(admin, "platform:me:read").allowed);
   });
 
   it("admin can manage membership", () => {
-    const { allowed } = checkPolicy(admin, "admin:membership:manage");
-    assert.ok(allowed);
+    assert.ok(checkPolicy(admin, "admin:membership:manage").allowed);
   });
 
-  it("admin can create goods-issue (adminAlwaysAllowed bypass)", () => {
-    const { allowed } = checkPolicy(admin, "trading:goods-issue:create");
-    assert.ok(allowed);
+  it("admin can create issue via adminAlwaysAllowed", () => {
+    assert.ok(checkPolicy(admin, "trading:issue:create").allowed);
   });
 
-  it("admin CANNOT perform federation:events:write (not in allowed + adminAlwaysAllowed=false)", () => {
-    const { allowed } = checkPolicy(admin, "federation:events:write");
-    assert.ok(!allowed, "admin must not access partner-only federation endpoint");
-  });
-});
-
-describe("policy: staff access", () => {
-  const staff = makeActor("staff");
-
-  it("staff can read /me", () => {
-    const { allowed } = checkPolicy(staff, "platform:me:read");
-    assert.ok(allowed);
+  it("admin CANNOT perform federation:events:write", () => {
+    assert.ok(!checkPolicy(admin, "federation:events:write").allowed);
   });
 
-  it("staff can create goods-issue", () => {
-    const { allowed } = checkPolicy(staff, "trading:goods-issue:create");
-    assert.ok(allowed);
-  });
-
-  it("staff cannot approve goods-issue", () => {
-    const { allowed } = checkPolicy(staff, "trading:goods-issue:approve");
-    assert.ok(!allowed, "staff must not approve goods-issue");
-  });
-
-  it("staff cannot manage memberships (admin-only)", () => {
-    const { allowed } = checkPolicy(staff, "admin:membership:manage");
-    assert.ok(!allowed, "staff must not manage memberships");
-  });
-
-  it("staff cannot access federation endpoints", () => {
-    const { allowed } = checkPolicy(staff, "federation:events:write");
-    assert.ok(!allowed, "staff must not access M2M federation");
+  it("admin cannot decide workflow approval (SoD / adminAlwaysAllowed false)", () => {
+    assert.ok(!checkPolicy(admin, "workflow:approval:decide").allowed);
   });
 });
 
-describe("policy: approver access", () => {
-  const approver = makeActor("approver");
+describe("policy: inventory_clerk", () => {
+  const clerk = makeActor("inventory_clerk");
 
-  it("approver can read /me", () => {
-    const { allowed } = checkPolicy(approver, "platform:me:read");
-    assert.ok(allowed);
+  it("can create and confirm issues", () => {
+    assert.ok(checkPolicy(clerk, "trading:issue:create").allowed);
+    assert.ok(checkPolicy(clerk, "trading:issue:confirm").allowed);
   });
 
-  it("approver can approve goods-issue", () => {
-    const { allowed } = checkPolicy(approver, "trading:goods-issue:approve");
-    assert.ok(allowed);
+  it("cannot decide approvals", () => {
+    assert.ok(!checkPolicy(clerk, "workflow:approval:decide").allowed);
   });
 
-  it("approver cannot create goods-issue", () => {
-    const { allowed } = checkPolicy(approver, "trading:goods-issue:create");
-    assert.ok(!allowed, "approver must not create goods-issue");
+  it("cannot manage memberships", () => {
+    assert.ok(!checkPolicy(clerk, "admin:membership:manage").allowed);
   });
 
-  it("approver cannot manage memberships", () => {
-    const { allowed } = checkPolicy(approver, "admin:membership:manage");
-    assert.ok(!allowed);
+  it("cannot create sales", () => {
+    assert.ok(!checkPolicy(clerk, "trading:sale:create").allowed);
   });
 });
 
-describe("policy: viewer access", () => {
-  const viewer = makeActor("viewer");
+describe("policy: sales_clerk", () => {
+  const sales = makeActor("sales_clerk");
 
-  it("viewer can read /me", () => {
-    const { allowed } = checkPolicy(viewer, "platform:me:read");
-    assert.ok(allowed);
+  it("can create sales", () => {
+    assert.ok(checkPolicy(sales, "trading:sale:create").allowed);
   });
 
-  it("viewer can read goods-issues", () => {
-    const { allowed } = checkPolicy(viewer, "trading:goods-issue:read");
-    assert.ok(allowed);
+  it("cannot create issues", () => {
+    assert.ok(!checkPolicy(sales, "trading:issue:create").allowed);
+  });
+});
+
+describe("policy: issue_approver", () => {
+  const approver = makeActor("issue_approver");
+
+  it("can decide approvals", () => {
+    assert.ok(checkPolicy(approver, "workflow:approval:decide").allowed);
   });
 
-  it("viewer cannot create goods-issue", () => {
-    const { allowed } = checkPolicy(viewer, "trading:goods-issue:create");
-    assert.ok(!allowed);
+  it("cannot create issues", () => {
+    assert.ok(!checkPolicy(approver, "trading:issue:create").allowed);
   });
 
-  it("viewer cannot approve goods-issue", () => {
-    const { allowed } = checkPolicy(viewer, "trading:goods-issue:approve");
-    assert.ok(!allowed);
+  it("cannot manage memberships", () => {
+    assert.ok(!checkPolicy(approver, "admin:membership:manage").allowed);
+  });
+});
+
+describe("policy: auditor read-only", () => {
+  const auditor = makeActor("auditor");
+
+  it("can read issues and catalog", () => {
+    assert.ok(checkPolicy(auditor, "trading:issue:read").allowed);
+    assert.ok(checkPolicy(auditor, "catalog:product:read").allowed);
   });
 
-  it("viewer cannot manage admin resources", () => {
-    const { allowed } = checkPolicy(viewer, "admin:membership:manage");
-    assert.ok(!allowed);
+  it("cannot mutate trading or catalog", () => {
+    assert.ok(!checkPolicy(auditor, "trading:issue:create").allowed);
+    assert.ok(!checkPolicy(auditor, "catalog:product:create").allowed);
+    assert.ok(!checkPolicy(auditor, "workflow:approval:decide").allowed);
+  });
+});
+
+describe("policy: multi-role union", () => {
+  it("union of sales_clerk + inventory_clerk grants both capabilities", () => {
+    const actor = makeActor(["sales_clerk", "inventory_clerk"]);
+    assert.ok(checkPolicy(actor, "trading:sale:create").allowed);
+    assert.ok(checkPolicy(actor, "trading:issue:create").allowed);
+  });
+
+  it("issue_approver + auditor can decide and read", () => {
+    const actor = makeActor(["issue_approver", "auditor"]);
+    assert.ok(checkPolicy(actor, "workflow:approval:decide").allowed);
+    assert.ok(checkPolicy(actor, "trading:issue:read").allowed);
   });
 });
 
@@ -173,64 +191,51 @@ describe("policy: partner (M2M) access", () => {
   const partner = makeActor("partner");
 
   it("partner can write federation events", () => {
-    const { allowed } = checkPolicy(partner, "federation:events:write");
-    assert.ok(allowed);
+    assert.ok(checkPolicy(partner, "federation:events:write").allowed);
   });
 
-  it("partner can write federation acks", () => {
-    const { allowed } = checkPolicy(partner, "federation:acks:write");
-    assert.ok(allowed);
+  it("partner cannot read /me", () => {
+    assert.ok(!checkPolicy(partner, "platform:me:read").allowed);
   });
 
-  it("partner cannot read /me (user-only endpoint)", () => {
-    const { allowed } = checkPolicy(partner, "platform:me:read");
-    assert.ok(!allowed, "partner (M2M) must not access user /me");
-  });
-
-  it("partner cannot create goods-issue", () => {
-    const { allowed } = checkPolicy(partner, "trading:goods-issue:create");
-    assert.ok(!allowed);
+  it("partner cannot create issues", () => {
+    assert.ok(!checkPolicy(partner, "trading:issue:create").allowed);
   });
 });
 
 describe("policy: unknown action — fail-closed", () => {
-  it("unknown action is denied for any role", () => {
-    const admin = makeActor("administrator");
-    const { allowed } = checkPolicy(admin, "nonexistent:action:do");
-    assert.ok(!allowed, "unknown action must be denied (fail-closed)");
+  it("unknown action is denied", () => {
+    assert.ok(!checkPolicy(makeActor("administrator"), "nonexistent:action:do").allowed);
   });
 });
 
 describe("policy: health route — open to all authenticated", () => {
-  it("staff can read health", () => {
-    const { allowed } = checkPolicy(makeActor("staff"), "platform:health:read");
-    assert.ok(allowed);
-  });
-
-  it("viewer can read health", () => {
-    const { allowed } = checkPolicy(makeActor("viewer"), "platform:health:read");
-    assert.ok(allowed);
-  });
-
-  it("partner can read health", () => {
-    const { allowed } = checkPolicy(makeActor("partner"), "platform:health:read");
-    assert.ok(allowed);
+  it("clerks and partners can read health", () => {
+    assert.ok(checkPolicy(makeActor("inventory_clerk"), "platform:health:read").allowed);
+    assert.ok(checkPolicy(makeActor("auditor"), "platform:health:read").allowed);
+    assert.ok(checkPolicy(makeActor("partner"), "platform:health:read").allowed);
   });
 });
 
 describe("policy: separation of duties", () => {
-  it("staff cannot perform admin actions even via API (manual call)", () => {
-    const staff = makeActor("staff");
-    const adminActions = ["admin:membership:manage", "admin:organization:manage", "admin:partner:manage"];
-    for (const action of adminActions) {
-      const { allowed } = checkPolicy(staff, action);
-      assert.ok(!allowed, `staff must not perform ${action}`);
+  it("non-admin job roles cannot manage admin resources", () => {
+    for (const role of ["inventory_clerk", "sales_clerk", "issue_approver", "auditor"]) {
+      for (const action of [
+        "admin:membership:manage",
+        "admin:organization:manage",
+        "admin:partner:manage",
+      ]) {
+        assert.ok(!checkPolicy(makeActor(role), action).allowed, `${role} must not ${action}`);
+      }
     }
   });
 
-  it("approver cannot create without also having create role", () => {
-    const approver = makeActor("approver");
-    const { allowed } = checkPolicy(approver, "catalog:product:create");
-    assert.ok(!allowed, "approver-only must not create catalog entries");
+  it("issue_approver cannot create catalog products", () => {
+    assert.ok(!checkPolicy(makeActor("issue_approver"), "catalog:product:create").allowed);
+  });
+
+  it("warehouse manage is administrator-only", () => {
+    assert.ok(checkPolicy(makeActor("administrator"), "inventory:warehouse:manage").allowed);
+    assert.ok(!checkPolicy(makeActor("inventory_clerk"), "inventory:warehouse:manage").allowed);
   });
 });

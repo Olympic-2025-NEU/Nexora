@@ -75,10 +75,33 @@ export async function POST(req: Request) {
   };
 
   if (!upstream.ok || !json.access_token) {
+    const detail = json.error_description;
+    const haystack = `${json.error ?? ""} ${detail ?? ""}`.toLowerCase();
+    const totpProvided = Boolean(body.totp);
+    const looksMfa =
+      !totpProvided &&
+      (/\b(totp|otp|mfa)\b/.test(haystack) ||
+        /missing\s+totp/.test(haystack) ||
+        /invalid\s+totp\s+authenticator/.test(haystack) ||
+        /account\s+is\s+not\s+fully\s+set\s+up/.test(haystack));
+
+    if (looksMfa) {
+      return NextResponse.json(
+        {
+          error: "MFA_REQUIRED",
+          detail,
+          message: detail ?? "MFA_REQUIRED",
+        },
+        { status: 401 },
+      );
+    }
+
+    const error = json.error ?? "TOKEN_REQUEST_FAILED";
     return NextResponse.json(
       {
-        error: json.error ?? "TOKEN_REQUEST_FAILED",
-        detail: json.error_description,
+        error,
+        detail,
+        message: detail ?? error,
       },
       { status: 401 },
     );

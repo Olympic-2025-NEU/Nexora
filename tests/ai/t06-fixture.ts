@@ -48,7 +48,7 @@ export const t06Actor: Actor = {
   userId: "dev-staff",
   organizationId: "nexora-a",
   unitIds: [T06_SEED.warehouseOwn],
-  roles: ["staff"],
+  roles: ["inventory_clerk"],
   displayName: "dev-staff",
 };
 

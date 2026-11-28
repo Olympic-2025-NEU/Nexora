@@ -20,12 +20,12 @@ async function loadInbox(token: string): Promise<{ tasks?: ApprovalTask[]; error
 
 export default async function ApprovalsPage() {
   const actor = await currentActor();
-  if (!actor.roles.includes("approver")) {
+  if (!actor.roles.includes("issue_approver")) {
     return (
       <section className="stack">
         <p className="eyebrow">P · Process</p>
         <h1>Hộp phê duyệt</h1>
-        <StatusBanner tone="info">Chỉ Approver mới mở inbox quyết định.</StatusBanner>
+        <StatusBanner tone="info">Chỉ issue_approver mới mở inbox quyết định.</StatusBanner>
       </section>
     );
   }

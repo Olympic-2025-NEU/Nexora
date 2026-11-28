@@ -2,24 +2,28 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
+const READERS = [
+  "catalog_manager",
+  "inventory_clerk",
+  "sales_clerk",
+  "stocktake_clerk",
+  "issue_approver",
+  "quality_officer",
+  "auditor",
+];
+
 const ACTION_POLICIES = {
-  "admin:organization:read": {
-    roles: ["administrator", "staff", "approver", "viewer"],
-    adminAlwaysAllowed: true,
-  },
+  "admin:organization:read": { roles: READERS, adminAlwaysAllowed: true },
   "admin:organization:manage": { roles: ["administrator"], adminAlwaysAllowed: true },
   "admin:membership:read": { roles: ["administrator"], adminAlwaysAllowed: true },
   "admin:membership:manage": { roles: ["administrator"], adminAlwaysAllowed: true },
-  "admin:partner:read": {
-    roles: ["administrator", "staff", "approver", "viewer"],
-    adminAlwaysAllowed: true,
-  },
+  "admin:partner:read": { roles: READERS, adminAlwaysAllowed: true },
   "admin:partner:manage": { roles: ["administrator"], adminAlwaysAllowed: true },
   "admin:partner:connection:manage": { roles: ["administrator"], adminAlwaysAllowed: true },
   "federation:events:write": { roles: ["partner"], adminAlwaysAllowed: false },
   "federation:connectivity:probe": { roles: ["partner"], adminAlwaysAllowed: false },
   "platform:me:read": {
-    roles: ["administrator", "staff", "approver", "viewer"],
+    roles: ["administrator", ...READERS],
     adminAlwaysAllowed: true,
   },
 };
@@ -36,19 +40,19 @@ function checkPolicy(actor, action) {
   };
 }
 
-const staff = { roles: ["staff"] };
+const clerk = { roles: ["inventory_clerk"] };
 const admin = { roles: ["administrator"] };
 const partner = { roles: ["partner"] };
 
-describe("P05 M01 policy matrix", () => {
-  it("staff can read org but not manage", () => {
-    assert.equal(checkPolicy(staff, "admin:organization:read").allowed, true);
-    assert.equal(checkPolicy(staff, "admin:organization:manage").allowed, false);
+describe("P05 M01 policy matrix (ADR 0018)", () => {
+  it("inventory_clerk can read org but not manage", () => {
+    assert.equal(checkPolicy(clerk, "admin:organization:read").allowed, true);
+    assert.equal(checkPolicy(clerk, "admin:organization:manage").allowed, false);
   });
 
-  it("staff cannot manage membership or connection", () => {
-    assert.equal(checkPolicy(staff, "admin:membership:manage").allowed, false);
-    assert.equal(checkPolicy(staff, "admin:partner:connection:manage").allowed, false);
+  it("inventory_clerk cannot manage membership or connection", () => {
+    assert.equal(checkPolicy(clerk, "admin:membership:manage").allowed, false);
+    assert.equal(checkPolicy(clerk, "admin:partner:connection:manage").allowed, false);
   });
 
   it("admin can manage org/members/partners", () => {

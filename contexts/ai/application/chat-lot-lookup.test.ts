@@ -20,7 +20,7 @@ const batchA = "11111111-1111-4111-8111-111111111111";
 const batchB = "22222222-2222-4222-8222-222222222222";
 const warehouse = "33333333-3333-4333-8333-333333333333";
 const eventId = "44444444-4444-4444-8444-444444444444";
-const actor: Actor = { userId: "staff-1", organizationId: "org-a", unitIds: [warehouse], roles: ["staff"] };
+const actor: Actor = { userId: "staff-1", organizationId: "org-a", unitIds: [warehouse], roles: ["inventory_clerk"] };
 const asOf = "2026-11-26T00:00:00.000Z";
 
 type Lot = { batchId: string; issuer: string; lotCode: string; name: string };

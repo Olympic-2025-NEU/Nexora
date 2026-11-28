@@ -144,31 +144,134 @@ export function createDocumentService(ports: TradingPorts) {
     } catch (err) { normalizeTransition(err); }
   }
 
-  return {
-    async create(ctx: Context, kind: TradingKind, input: DocumentInput) {
-      if (kind === "goods_issue" && !["partner_transfer", "sale", "other"].includes(input.purpose ?? "")) {
-        throw new DomainError("ISSUE_PURPOSE_REQUIRED", 422);
-      }
-      const id = randomUUID();
-      await correction(ctx, id, kind, input);
-      if (input.lines.length > 100) throw new DomainError("TOO_MANY_LINES", 422);
-      const prepared = await Promise.all(input.lines.map((line) => validateLine(ctx, line)));
-      const lineIds = input.lines.map(() => randomUUID());
-      const allocations = allocationsFor(kind, input.lines, lineIds, prepared);
-      const repo = createTradingRepos(ctx.tx);
-      if (allocations.length) await repo.checkSourceReferences(input.lines,
-        prepared.map((item) => item.stockUomId));
-      await repo.createDocument({ id, documentType: kind, createdBySub: ctx.actor.userId,
-        correlationId: ctx.requestId, note: input.note, issuePurpose: kind === "goods_issue" ? input.purpose : null,
-        correctionOfDocumentId: input.correctionOfDocumentId, correctionReason: input.correctionReason });
-      await repo.createLines(id, input.lines.map((line, i) => ({ id: lineIds[i]!, lineNo: i + 1,
+  async function create(ctx: Context, kind: TradingKind, input: DocumentInput) {
+    if (kind === "goods_issue" && !["partner_transfer", "sale", "other"].includes(input.purpose ?? "")) {
+      throw new DomainError("ISSUE_PURPOSE_REQUIRED", 422);
+    }
+    const id = randomUUID();
+    await correction(ctx, id, kind, input);
+    if (input.lines.length > 100) throw new DomainError("TOO_MANY_LINES", 422);
+    const prepared = await Promise.all(input.lines.map((line) => validateLine(ctx, line)));
+    const lineIds = input.lines.map(() => randomUUID());
+    const allocations = allocationsFor(kind, input.lines, lineIds, prepared);
+    const repo = createTradingRepos(ctx.tx);
+    if (allocations.length) await repo.checkSourceReferences(input.lines,
+      prepared.map((item) => item.stockUomId));
+    await repo.createDocument({ id, documentType: kind, createdBySub: ctx.actor.userId,
+      correlationId: ctx.requestId, note: input.note, issuePurpose: kind === "goods_issue" ? input.purpose : null,
+      correctionOfDocumentId: input.correctionOfDocumentId, correctionReason: input.correctionReason });
+    await repo.createLines(id, input.lines.map((line, i) => ({ id: lineIds[i]!, lineNo: i + 1,
+      warehouseId: line.warehouseId, batchId: line.batchId, productVariantId: line.productVariantId,
+      productId: prepared[i]!.productId, uomId: line.uomId, quantity: line.quantity })));
+    if (allocations.length) await ctx.tx.issueSourceAllocation.createMany({ data: allocations });
+    await ports.audit(ctx.tx, { actorSub: ctx.actor.userId, action: "trading.document.create",
+      id, requestId: ctx.requestId, after: "draft", version: 1 });
+    return view(ctx, id, kind);
+  }
+
+  async function action(ctx: Context, kind: TradingKind, id: string, actionName: "submit" | "confirm" | "cancel",
+    version: number) {
+    const repo = createTradingRepos(ctx.tx);
+    await repo.lockDocument(id);
+    const doc = await repo.getAggregate(id);
+    if (!doc || doc.documentType !== kind) throw new DomainError("DOCUMENT_NOT_FOUND", 404);
+    if (doc.version !== version) throw new DomainError("VERSION_CONFLICT", 409);
+    if (actionName === "submit" && kind !== "goods_issue") throw new DomainError("WRONG_STATE", 409);
+    if (actionName === "confirm" && kind === "goods_issue") {
+      if (doc.status !== "approved") throw new DomainError("WRONG_STATE", 409);
+    } else {
+      try { checkTransition(kind, doc.status, actionName); } catch (err) { normalizeTransition(err); }
+    }
+    doc.lines.forEach((line) => inScope(ctx.actor, line.warehouseId));
+    const approval = kind === "goods_issue" ? await repo.findApproval(id) : null;
+    if (actionName === "cancel" && approval && approval.state !== "cancelled") {
+      await ports.cancelApproval(ctx.tx, { approvalRequestId: approval.id, actorSub: ctx.actor.userId,
+        reason: "Document cancelled", approved: approval.state === "approved" });
+    }
+    let lines = doc.lines;
+    if (actionName !== "cancel") {
+      checkLines(lines.map((line) => ({ ...line, quantity: line.quantity?.toFixed() ?? null })));
+      const prepared = await Promise.all(lines.map(async (line) => validateLine(ctx, {
         warehouseId: line.warehouseId, batchId: line.batchId, productVariantId: line.productVariantId,
-        productId: prepared[i]!.productId, uomId: line.uomId, quantity: line.quantity })));
-      if (allocations.length) await ctx.tx.issueSourceAllocation.createMany({ data: allocations });
-      await ports.audit(ctx.tx, { actorSub: ctx.actor.userId, action: "trading.document.create",
-        id, requestId: ctx.requestId, after: "draft", version: 1 });
-      return view(ctx, id, kind);
-    },
+        uomId: line.uomId, quantity: line.quantity!.toFixed(),
+      }, true)));
+      if (actionName === "submit" || kind === "goods_receipt") {
+        for (const [i, line] of lines.entries()) {
+          await repo.normalizeLine(line.id, prepared[i]!.stockQuantity, prepared[i]!.stockUomId);
+        }
+        lines = (await repo.getAggregate(id))!.lines;
+      }
+    }
+    const next = actionName === "submit" ? "pending_approval" : actionName === "confirm" ? "confirmed" : "cancelled";
+    const updated = await repo.transition(id, doc.status, version, next, ctx.actor.userId);
+    if (!updated) throw new DomainError("VERSION_CONFLICT", 409);
+    const hash = () => ports.hash(lines.map((line) => {
+      if (line.quantity!.mul(1000).gt(Number.MAX_SAFE_INTEGER)) {
+        throw new DomainError("APPROVAL_QUANTITY_UNSAFE", 422);
+      }
+      return { lineNo: line.lineNo,
+      warehouseId: line.warehouseId, productId: line.productId, batchId: line.batchId,
+      quantity: Number(line.quantity!.toFixed()), unit: line.uomId };
+    }));
+    if (actionName === "submit") {
+      await ports.submit(ctx.tx, { documentId: id, submittedDocumentVersion: updated.version,
+        creatorSub: doc.createdBySub, warehouseIds: [...new Set(lines.map((line) => line.warehouseId))].sort(),
+        lineSnapshotSha256: hash() });
+    }
+    const movementIds: string[] = [];
+    if (actionName === "confirm") {
+      if (kind === "goods_issue") {
+        if (!approval) throw new DomainError("APPROVAL_NOT_YET_APPROVED", 409);
+        if (approval.state === "rejected") throw new DomainError("APPROVAL_REJECTED", 409);
+        if (approval.state !== "approved" || approval.haltReason) throw new DomainError("APPROVAL_NOT_YET_APPROVED", 409);
+        if (approval.lineSnapshotSha256 !== hash()) throw new DomainError("APPROVAL_LINE_MISMATCH", 409);
+        await ports.confirmApproval(ctx.tx, { approvalRequestId: approval.id,
+          actorSub: ctx.actor.userId, currentLineSnapshotSha256: hash() });
+        const keys = aggregateDemand(lines.map((line) => ({ warehouseId: line.warehouseId,
+          batchId: line.batchId, quantity: line.quantity! })));
+        const balances = await repo.lockBalances(keys);
+        for (const key of keys) {
+          const available = balances.find((row) => row.warehouseId === key.warehouseId && row.batchId === key.batchId)?.quantity ?? new Decimal(0);
+          if (available.lt(key.requested)) {
+            throw new StockShortage(key.batchId, key.requested.toFixed(3), available.toFixed(3));
+          }
+        }
+        await repo.validateIssueSources(lines);
+      }
+      for (const line of lines) {
+        try {
+          const result = await ports.adjust(ctx.tx, { warehouseId: line.warehouseId, batchId: line.batchId,
+            productId: line.productId, productVariantId: line.productVariantId,
+            sourceLineId: line.id, kind: kind === "goods_receipt" ? "receipt" : "issue",
+            delta: kind === "goods_receipt" ? line.quantity! : line.quantity!.neg(),
+            actorSub: ctx.actor.userId, correlationId: doc.correlationId });
+          movementIds.push(result.movement.id);
+        } catch (err) {
+          if (err instanceof DomainError && err.code === "INSUFFICIENT_STOCK") {
+            throw new DomainError("INSUFFICIENT_STOCK", 422);
+          }
+          throw err;
+        }
+      }
+      const eventLines = await Promise.all(lines.map(async (line) => {
+        const valid = await validateLine(ctx, { warehouseId: line.warehouseId, batchId: line.batchId,
+          productVariantId: line.productVariantId, quantity: line.quantity!.toFixed(), uomId: line.uomId }, true);
+        return { id: line.id, warehouseId: line.warehouseId, batchId: line.batchId,
+          quantity: line.quantity!.toFixed(3), originIssuerInstanceId: valid.batch.originIssuerInstanceId,
+          originLotId: valid.batch.originLotId, unit: valid.unit };
+      }));
+      for (const event of ports.event(kind === "goods_receipt" ? "receipt" : "issue", {
+        id, version: updated.version, actorSub: ctx.actor.userId, correlationId: doc.correlationId,
+        lines: eventLines, movementIds })) ctx.emit(event);
+    }
+    await ports.audit(ctx.tx, { actorSub: ctx.actor.userId, action: `trading.document.${actionName}`,
+      id, requestId: ctx.requestId, before: doc.status, after: next, version: updated.version });
+    return { id, status: next, version: updated.version,
+      ...(actionName === "confirm" ? { confirmedAt: updated.confirmedAt?.toISOString(), movementIds } : {}) };
+  }
+
+  return {
+    create,
     view,
     async list(ctx: Context, kind: TradingKind, status?: DocumentStatus, cursorId?: string, limit = 20) {
       const page = await createTradingRepos(ctx.tx).list({ type: kind, status, cursorId, limit,
@@ -203,104 +306,59 @@ export function createDocumentService(ports: TradingPorts) {
         id, requestId: ctx.requestId, before: "draft", after: "draft", version: expectedVersion + 1 });
       return view(ctx, id, kind);
     },
-    async action(ctx: Context, kind: TradingKind, id: string, action: "submit" | "confirm" | "cancel", version: number) {
+    action,
+    /**
+     * ADR 0019 POS sale fast-path: create purpose=sale GI, auto-approve without Flowable, confirm + stock.
+     * Non-sale purposes must use submit → Flowable → confirm.
+     */
+    async createAndConfirmSaleIssue(ctx: Context, input: DocumentInput) {
+      if (input.purpose !== "sale") throw new DomainError("ISSUE_PURPOSE_REQUIRED", 422);
+      const created = await create(ctx, "goods_issue", input) as { id: string; version: number };
       const repo = createTradingRepos(ctx.tx);
-      await repo.lockDocument(id);
-      const doc = await repo.getAggregate(id);
-      if (!doc || doc.documentType !== kind) throw new DomainError("DOCUMENT_NOT_FOUND", 404);
-      if (doc.version !== version) throw new DomainError("VERSION_CONFLICT", 409);
-      if (action === "submit" && kind !== "goods_issue") throw new DomainError("WRONG_STATE", 409);
-      if (action === "confirm" && kind === "goods_issue") {
-        if (doc.status !== "approved") throw new DomainError("WRONG_STATE", 409);
-      } else {
-        try { checkTransition(kind, doc.status, action); } catch (err) { normalizeTransition(err); }
+      await repo.lockDocument(created.id);
+      let doc = await repo.getAggregate(created.id);
+      if (!doc || doc.documentType !== "goods_issue" || doc.issuePurpose !== "sale") {
+        throw new DomainError("DOCUMENT_NOT_FOUND", 404);
       }
       doc.lines.forEach((line) => inScope(ctx.actor, line.warehouseId));
-      const approval = kind === "goods_issue" ? await repo.findApproval(id) : null;
-      if (action === "cancel" && approval && approval.state !== "cancelled") {
-        await ports.cancelApproval(ctx.tx, { approvalRequestId: approval.id, actorSub: ctx.actor.userId,
-          reason: "Document cancelled", approved: approval.state === "approved" });
+      checkLines(doc.lines.map((line) => ({ ...line, quantity: line.quantity?.toFixed() ?? null })));
+      const prepared = await Promise.all(doc.lines.map(async (line) => validateLine(ctx, {
+        warehouseId: line.warehouseId, batchId: line.batchId, productVariantId: line.productVariantId,
+        uomId: line.uomId, quantity: line.quantity!.toFixed(),
+      }, true)));
+      for (const [i, line] of doc.lines.entries()) {
+        await repo.normalizeLine(line.id, prepared[i]!.stockQuantity, prepared[i]!.stockUomId);
       }
-      let lines = doc.lines;
-      if (action !== "cancel") {
-        checkLines(lines.map((line) => ({ ...line, quantity: line.quantity?.toFixed() ?? null })));
-        const prepared = await Promise.all(lines.map(async (line) => validateLine(ctx, {
-          warehouseId: line.warehouseId, batchId: line.batchId, productVariantId: line.productVariantId,
-          uomId: line.uomId, quantity: line.quantity!.toFixed(),
-        }, true)));
-        if (action === "submit" || kind === "goods_receipt") {
-          for (const [i, line] of lines.entries()) {
-            await repo.normalizeLine(line.id, prepared[i]!.stockQuantity, prepared[i]!.stockUomId);
-          }
-          lines = (await repo.getAggregate(id))!.lines;
-        }
-      }
-      const next = action === "submit" ? "pending_approval" : action === "confirm" ? "confirmed" : "cancelled";
-      const updated = await repo.transition(id, doc.status, version, next, ctx.actor.userId);
-      if (!updated) throw new DomainError("VERSION_CONFLICT", 409);
-      const hash = () => ports.hash(lines.map((line) => {
+      doc = (await repo.getAggregate(created.id))!;
+      const lines = doc.lines;
+      const lineSnapshotSha256 = ports.hash(lines.map((line) => {
         if (line.quantity!.mul(1000).gt(Number.MAX_SAFE_INTEGER)) {
           throw new DomainError("APPROVAL_QUANTITY_UNSAFE", 422);
         }
-        return { lineNo: line.lineNo,
-        warehouseId: line.warehouseId, productId: line.productId, batchId: line.batchId,
-        quantity: Number(line.quantity!.toFixed()), unit: line.uomId };
+        return { lineNo: line.lineNo, warehouseId: line.warehouseId, productId: line.productId,
+          batchId: line.batchId, quantity: Number(line.quantity!.toFixed()), unit: line.uomId };
       }));
-      if (action === "submit") {
-        await ports.submit(ctx.tx, { documentId: id, submittedDocumentVersion: updated.version,
-          creatorSub: doc.createdBySub, warehouseIds: [...new Set(lines.map((line) => line.warehouseId))].sort(),
-          lineSnapshotSha256: hash() });
-      }
-      const movementIds: string[] = [];
-      if (action === "confirm") {
-        if (kind === "goods_issue") {
-          if (!approval) throw new DomainError("APPROVAL_NOT_YET_APPROVED", 409);
-          if (approval.state === "rejected") throw new DomainError("APPROVAL_REJECTED", 409);
-          if (approval.state !== "approved" || approval.haltReason) throw new DomainError("APPROVAL_NOT_YET_APPROVED", 409);
-          if (approval.lineSnapshotSha256 !== hash()) throw new DomainError("APPROVAL_LINE_MISMATCH", 409);
-          await ports.confirmApproval(ctx.tx, { approvalRequestId: approval.id,
-            actorSub: ctx.actor.userId, currentLineSnapshotSha256: hash() });
-          const keys = aggregateDemand(lines.map((line) => ({ warehouseId: line.warehouseId,
-            batchId: line.batchId, quantity: line.quantity! })));
-          const balances = await repo.lockBalances(keys);
-          for (const key of keys) {
-            const available = balances.find((row) => row.warehouseId === key.warehouseId && row.batchId === key.batchId)?.quantity ?? new Decimal(0);
-            if (available.lt(key.requested)) {
-              throw new StockShortage(key.batchId, key.requested.toFixed(3), available.toFixed(3));
-            }
-          }
-          await repo.validateIssueSources(lines);
-        }
-        for (const line of lines) {
-          try {
-            const result = await ports.adjust(ctx.tx, { warehouseId: line.warehouseId, batchId: line.batchId,
-              productId: line.productId, productVariantId: line.productVariantId,
-              sourceLineId: line.id, kind: kind === "goods_receipt" ? "receipt" : "issue",
-              delta: kind === "goods_receipt" ? line.quantity! : line.quantity!.neg(),
-              actorSub: ctx.actor.userId, correlationId: doc.correlationId });
-            movementIds.push(result.movement.id);
-          } catch (err) {
-            if (err instanceof DomainError && err.code === "INSUFFICIENT_STOCK") {
-              throw new DomainError("INSUFFICIENT_STOCK", 422);
-            }
-            throw err;
-          }
-        }
-        const eventLines = await Promise.all(lines.map(async (line) => {
-          const valid = await validateLine(ctx, { warehouseId: line.warehouseId, batchId: line.batchId,
-            productVariantId: line.productVariantId, quantity: line.quantity!.toFixed(), uomId: line.uomId }, true);
-          return { id: line.id, warehouseId: line.warehouseId, batchId: line.batchId,
-            quantity: line.quantity!.toFixed(3), originIssuerInstanceId: valid.batch.originIssuerInstanceId,
-            originLotId: valid.batch.originLotId, unit: valid.unit };
-        }));
-        for (const event of ports.event(kind === "goods_receipt" ? "receipt" : "issue", {
-          id, version: updated.version, actorSub: ctx.actor.userId, correlationId: doc.correlationId,
-          lines: eventLines, movementIds })) ctx.emit(event);
-      }
-      await ports.audit(ctx.tx, { actorSub: ctx.actor.userId, action: `trading.document.${action}`,
-        id, requestId: ctx.requestId, before: doc.status, after: next, version: updated.version });
-      return { id, status: next, version: updated.version,
-        ...(action === "confirm" ? { confirmedAt: updated.confirmedAt?.toISOString(), movementIds } : {}) };
+      const approved = await repo.transition(created.id, "draft", doc.version, "approved", ctx.actor.userId);
+      if (!approved) throw new DomainError("VERSION_CONFLICT", 409);
+      await ctx.tx.approvalRequest.create({
+        data: {
+          id: randomUUID(),
+          documentId: created.id,
+          submittedDocumentVersion: approved.version,
+          creatorSub: doc.createdBySub,
+          warehouseIds: [...new Set(lines.map((line) => line.warehouseId))].sort(),
+          lineSnapshotSha256,
+          state: "approved",
+          decision: "approved",
+          decisionReason: "POS sale fast-path (ADR 0019)",
+          approverSub: ctx.actor.userId,
+          decidedAt: new Date(),
+          version: 1,
+        },
+      });
+      await ports.audit(ctx.tx, { actorSub: ctx.actor.userId, action: "trading.document.pos_sale_fast_path",
+        id: created.id, requestId: ctx.requestId, before: "draft", after: "approved", version: approved.version });
+      return action(ctx, "goods_issue", created.id, "confirm", approved.version);
     },
   };
 }

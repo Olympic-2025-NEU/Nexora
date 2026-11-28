@@ -1,12 +1,33 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { randomUUID, createHmac, createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+function readAppVersion() {
+  const fromEnv = (process.env.NEXT_PUBLIC_APP_VERSION || process.env.NEXORA_APP_VERSION || "").trim();
+  if (fromEnv) return fromEnv;
+  try {
+    const pkgPath = join(dirname(fileURLToPath(import.meta.url)), "..", "package.json");
+    const pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
+    return typeof pkg.version === "string" && pkg.version ? pkg.version : "0.1.0";
+  } catch {
+    return "0.1.0";
+  }
+}
 
 export const requestId = (value) => /^[a-zA-Z0-9_-]{1,64}$/.test(value || "") ? value : randomUUID();
 export const log = (service, id, event, status) => console.log(JSON.stringify({ timestamp: new Date().toISOString(), service, requestId: id, event, status }));
 export const response = (res, service, id, ready, reason) => {
   log(service, id, "health", ready ? "up" : "down");
   res.writeHead(ready ? 200 : 503, { "content-type": "application/json", "cache-control": "no-store", "x-request-id": id });
-  res.end(JSON.stringify({ status: ready ? "up" : "down", ...(reason ? { reason } : {}), requestId: id }));
+  res.end(JSON.stringify({
+    status: ready ? "up" : "down",
+    service,
+    version: readAppVersion(),
+    ...(reason ? { reason } : {}),
+    requestId: id,
+  }));
 };
 export async function timed(promise, ms = 2000) {
   let timer;

@@ -16,6 +16,22 @@ const required = (name) => {
 
 const kcBase = (process.env.OIDC_BASE_URL || "http://keycloak:8080").replace(/\/$/, "");
 
+/** Legacy seed labels → job-role bundles (ADR 0018). */
+function expandSeedRoles(label) {
+  switch (label) {
+    case "administrator":
+      return ["administrator"];
+    case "staff":
+      return ["catalog_manager", "inventory_clerk", "sales_clerk", "stocktake_clerk"];
+    case "approver":
+      return ["issue_approver", "auditor"];
+    case "viewer":
+      return ["auditor"];
+    default:
+      return [label];
+  }
+}
+
 async function adminToken() {
   const response = await fetch(`${kcBase}/realms/master/protocol/openid-connect/token`, {
     method: "POST",
@@ -42,25 +58,31 @@ async function userSub(token, username) {
   return users[0].id;
 }
 
-async function upsertMembership(prisma, organizationId, sub, displayName, role) {
-  await prisma.membership.upsert({
+async function upsertMembership(prisma, organizationId, sub, displayName, roleLabel) {
+  const roles = expandSeedRoles(roleLabel);
+  const primary = roles[0];
+  const row = await prisma.membership.upsert({
     where: { keycloakSub: sub },
     create: {
       id: randomUUID(),
       organizationId,
       keycloakSub: sub,
       displayName,
-      role,
+      role: primary,
       status: "active",
       lastSyncedAt: new Date(),
     },
     update: {
       organizationId,
       displayName,
-      role,
+      role: primary,
       status: "active",
       lastSyncedAt: new Date(),
     },
+  });
+  await prisma.membershipRoleRow.deleteMany({ where: { membershipId: row.id } });
+  await prisma.membershipRoleRow.createMany({
+    data: roles.map((role) => ({ membershipId: row.id, role })),
   });
 }
 
@@ -88,7 +110,6 @@ async function main() {
       update: { updatedAt: new Date() },
     });
 
-    // Prefer a dedicated admin user when present; otherwise promote note in logs.
     const adminUsername = process.env.KC_ADMIN_USERNAME || staffUsername;
     let adminSub = staffSub;
     if (adminUsername !== staffUsername) {
@@ -132,7 +153,7 @@ async function main() {
 
     const fingerprint = createHash("sha256").update(adminSub).digest("hex").slice(0, 12);
     console.log(
-      `Seeded org ${organization.id}; administrator sub_fp=${fingerprint}; role enum=administrator|staff|approver|viewer`,
+      `Seeded org ${organization.id}; administrator sub_fp=${fingerprint}; job roles via membership_role (ADR 0018)`,
     );
   } finally {
     await prisma.$disconnect();

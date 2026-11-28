@@ -92,7 +92,19 @@ export function sanitizeAuditSummary(input: unknown): Prisma.InputJsonObject {
   if (typeof value.verification === "string" && verifications.has(value.verification)) {
     safe.verification = value.verification;
   }
-  if (typeof value.role === "string" && ["administrator", "staff", "approver", "viewer"].includes(value.role)) {
+  if (
+    typeof value.role === "string" &&
+    [
+      "administrator",
+      "catalog_manager",
+      "inventory_clerk",
+      "sales_clerk",
+      "stocktake_clerk",
+      "issue_approver",
+      "quality_officer",
+      "auditor",
+    ].includes(value.role)
+  ) {
     safe.role = value.role;
   }
   if (Array.isArray(value.changedFields)) {

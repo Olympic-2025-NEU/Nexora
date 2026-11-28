@@ -3,4 +3,5 @@ export * from "./domain/quantity";
 export * from "./domain/types";
 export * from "./domain/normalize-uom";
 export * from "./domain/ean13";
+export * from "./domain/suggest-variant-code";
 export { createCatalogRepos } from "./infrastructure/prisma-repos";

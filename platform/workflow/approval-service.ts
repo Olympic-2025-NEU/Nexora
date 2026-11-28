@@ -5,7 +5,8 @@ import { serializeDomainEvent, WORKFLOW_EVENT_TYPES } from "../../contracts/even
 import { appendOutbox } from "../outbox/writer";
 import { auditApproval, getApproval, transition } from "./approval-repository";
 import { ApprovalNotReadyError, ApprovalScopeError, DecisionConflictError, SelfApprovalError,
-  SnapshotMismatchError, VersionConflictError, hasScope, type ActorResolver, type Decision } from "./approval-request";
+  SnapshotMismatchError, VersionConflictError, hasScope, ISSUE_APPROVER_ROLE,
+  type ActorResolver, type Decision } from "./approval-request";
 
 export async function createRequest(tx: Prisma.TransactionClient, input: {
   documentId: string; submittedDocumentVersion: number; creatorSub: string;
@@ -40,10 +41,14 @@ export async function recordDecisionIntent(tx: Prisma.TransactionClient, resolve
   flowableTaskId: string; expectedVersion: number;
 }) {
   const actor = await resolver(input.actorSub);
-  if (!actor?.active || actor.role !== "approver") throw new ApprovalScopeError("Approver membership inactive or missing");
+  if (!actor?.active || !actor.roles.includes(ISSUE_APPROVER_ROLE)) {
+    throw new ApprovalScopeError("Approver membership inactive or missing");
+  }
   const row = await getApproval(tx, input.approvalRequestId);
   if (!row) throw new ApprovalNotReadyError("Approval request missing");
-  if (!hasScope(actor, row.warehouseIds, "approver")) throw new ApprovalScopeError("Warehouse scope incomplete");
+  if (!hasScope(actor, row.warehouseIds, ISSUE_APPROVER_ROLE)) {
+    throw new ApprovalScopeError("Warehouse scope incomplete");
+  }
   if (row.state === "decision_pending") {
     if (row.decisionRequestedBySub === actor.sub && row.decisionIntent === input.decision &&
         row.flowableTaskId === input.flowableTaskId && row.decisionIntentReason === (input.reason?.trim() || null)) return row;

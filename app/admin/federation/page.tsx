@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { FederationOperationsClient } from "./federation-operations-client";
+import { redirect } from "next/navigation";
 
-export const instant = false;
-export default function FederationOperationsPage() { return <FederationOperationsClient />; }
+/** Legacy ops route — monitoring lives on the unified `/partners` connection screen. */
+export default function FederationOperationsRedirectPage() {
+  redirect("/partners");
+}
